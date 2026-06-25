@@ -1,0 +1,215 @@
+.loader-bg {
+    align-items: center;
+    background: #f3f4f6;
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: fixed;
+    z-index: 9999;
+}
+
+.erp-global-search {
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    display: flex;
+    gap: 10px;
+    min-width: 420px;
+    padding: 0 14px;
+}
+
+.erp-global-search i {
+    color: #64748b;
+    font-size: 16px;
+}
+
+.erp-global-search .form-control {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    height: 42px;
+    padding: 0;
+}
+
+.erp-notification-menu {
+    min-width: 280px;
+}
+
+.erp-module-launcher {
+    max-width: min(990px, calc(100vw - 360px));
+    min-width: 990px;
+    padding: 0;
+}
+
+.erp-module-launcher.nxl-mega-menu-sm,
+.erp-module-launcher.nxl-mega-menu-md,
+.erp-module-launcher.nxl-mega-menu-lg,
+.erp-module-launcher.nxl-mega-menu-xl,
+.erp-module-launcher.nxl-mega-menu-xxl,
+.erp-module-launcher.nxl-mega-menu-full {
+    max-width: min(990px, calc(100vw - 360px));
+    min-width: 990px;
+}
+
+.erp-module-launcher .nxl-mega-menu-tabs {
+    width: 250px;
+    min-width: 250px;
+    max-width: 250px;
+}
+
+.erp-module-launcher .nxl-mega-menu-tabs-content {
+    height: 390px;
+    min-height: 390px;
+    padding: 30px;
+    width: 100%;
+}
+
+.erp-module-launcher .tab-pane {
+    height: 100%;
+}
+
+.erp-module-launcher .tab-pane.show.active {
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-module-launcher hr {
+    margin: 20px 0;
+}
+
+.erp-mega-module-grid {
+    margin-top: 6px;
+}
+
+.erp-module-link {
+    align-items: center;
+    border: 1px dashed #e5e7eb;
+    border-radius: 6px;
+    display: flex;
+    gap: 12px;
+    min-height: 58px;
+    padding: 10px 12px;
+}
+
+.erp-module-link:hover {
+    border-color: #3454d1;
+    background-color: #f8faff;
+}
+
+.erp-module-link-copy {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+    min-width: 0;
+}
+
+.erp-module-link-copy small {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+.erp-module-footer {
+    align-items: center;
+    background: #fff;
+    border-top: 1px dashed #e5e7eb;
+    display: flex;
+    gap: 12px;
+    margin-top: auto;
+    padding-top: 18px;
+}
+
+.erp-tenant-button {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    max-width: 270px;
+    min-height: 42px;
+}
+
+.erp-tenant-copy {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    min-width: 0;
+    text-align: left;
+}
+
+.erp-tenant-copy strong,
+.erp-tenant-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.erp-tenant-copy small {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 3px;
+}
+
+.erp-tenant-dropdown {
+    min-width: 340px;
+}
+
+.erp-tenant-dropdown .dropdown-item {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+}
+
+.erp-approval-list {
+    align-items: stretch;
+    padding: 18px 22px;
+}
+
+.erp-domain-tile {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    min-height: 58px;
+    padding: 14px 16px;
+}
+
+.erp-domain-tile:hover {
+    border-color: #3454d1;
+    color: #3454d1;
+}
+
+@media (max-width: 1199.98px) {
+    .erp-global-search {
+        min-width: 260px;
+    }
+
+    .erp-module-launcher {
+        max-width: calc(100vw - 60px);
+        min-width: 720px;
+    }
+
+    .erp-module-launcher.nxl-mega-menu-sm,
+    .erp-module-launcher.nxl-mega-menu-md,
+    .erp-module-launcher.nxl-mega-menu-lg,
+    .erp-module-launcher.nxl-mega-menu-xl,
+    .erp-module-launcher.nxl-mega-menu-xxl,
+    .erp-module-launcher.nxl-mega-menu-full {
+        max-width: calc(100vw - 60px);
+        min-width: 720px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .erp-global-search {
+        display: none;
+    }
+
+    .erp-module-launcher,
+    .erp-tenant-dropdown {
+        min-width: 100%;
+    }
+}
