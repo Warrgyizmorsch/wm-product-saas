@@ -1,18 +1,29 @@
 @php
+    $resolvedTenant = tenant();
+    $tenantSettings = $resolvedTenant?->settings ?? [];
+    $tenantPlan = ucfirst((string) ($resolvedTenant?->plan ?? 'Starter'));
+    $tenantSlug = $resolvedTenant?->slug ?? 'central';
+
     $currentTenant = [
-        'name' => 'Acme Manufacturing Pvt Ltd',
-        'code' => 'ACME-IN',
-        'plan' => 'Enterprise',
-        'branch' => 'Mumbai HQ',
-        'currency' => 'INR',
-        'year' => 'FY 2026-27',
+        'name' => $resolvedTenant?->name ?? 'Central Workspace',
+        'code' => strtoupper(str_replace('-', ' ', $tenantSlug)),
+        'plan' => $tenantPlan,
+        'branch' => $tenantSettings['branch'] ?? 'Main Office',
+        'currency' => $tenantSettings['currency'] ?? 'INR',
+        'year' => $tenantSettings['financial_year'] ?? 'FY ' . now()->format('Y'),
     ];
 
-    $tenants = [
-        ['name' => 'Acme Manufacturing Pvt Ltd', 'code' => 'ACME-IN', 'active' => true],
-        ['name' => 'Northwind Retail Group', 'code' => 'NW-US'],
-        ['name' => 'Contoso Services LLC', 'code' => 'CON-ME'],
-    ];
+    $tenants = \Illuminate\Support\Facades\Schema::hasTable('tenants')
+        ? \App\Models\Tenant::query()
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($tenant) => [
+                'name' => $tenant->name,
+                'code' => strtoupper($tenant->slug),
+                'slug' => $tenant->slug,
+                'active' => $resolvedTenant?->is($tenant) ?? false,
+            ])
+        : collect();
 
     $quickCreates = [
         ['label' => 'Customer', 'icon' => 'feather-user-plus'],
@@ -236,7 +247,7 @@
                                 <p class="fs-11 text-muted mb-0">{{ $currentTenant['currency'] }} - {{ $currentTenant['plan'] }} Plan</p>
                             </div>
                             @foreach ($tenants as $tenant)
-                                <a href="javascript:void(0);" class="dropdown-item {{ !empty($tenant['active']) ? 'active' : '' }}">
+                                <a href="{{ route('tenant.switch', $tenant['slug']) }}" class="dropdown-item {{ !empty($tenant['active']) ? 'active' : '' }}">
                                     <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($tenant['name'], 0, 1) }}</span>
                                     <span>
                                         <span class="d-block fw-semibold">{{ $tenant['name'] }}</span>

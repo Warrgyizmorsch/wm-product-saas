@@ -15,6 +15,15 @@ class TenantResolver
             return $this->findByKey($tenantKey);
         }
 
+        $sessionTenantSlug = $request->hasSession() ? $request->session()->get('tenant_slug') : null;
+
+        if ($sessionTenantSlug) {
+            return Tenant::query()
+                ->where('slug', $sessionTenantSlug)
+                ->where('status', 'active')
+                ->first();
+        }
+
         $host = $request->getHost();
 
         if (in_array($host, config('tenancy.central_domains'), true)) {
@@ -44,10 +53,14 @@ class TenantResolver
         $slug = config('tenancy.local_fallback_slug');
 
         if ($slug) {
-            return Tenant::query()
+            $tenant = Tenant::query()
                 ->where('slug', $slug)
                 ->where('status', 'active')
                 ->first();
+
+            if ($tenant !== null) {
+                return $tenant;
+            }
         }
 
         return Tenant::query()

@@ -1,4 +1,8 @@
 @php
+    $resolvedTenant = tenant();
+    $tenantSettings = $resolvedTenant?->settings ?? [];
+    $tenantPlan = ucfirst((string) ($resolvedTenant?->plan ?? 'Starter'));
+
     $modules = [
         'Workspace' => [
             ['label' => 'Executive Dashboard', 'icon' => 'feather-home', 'route' => 'dashboard'],
@@ -80,8 +84,8 @@
             <div class="card text-center">
                 <div class="card-body">
                     <i class="feather-activity fs-4 text-dark"></i>
-                    <h6 class="mt-4 text-dark fw-bolder">Acme Manufacturing</h6>
-                    <p class="fs-11 my-3 text-dark">Mumbai HQ - FY 2026-27<br>Enterprise Plan</p>
+                    <h6 class="mt-4 text-dark fw-bolder">{{ $resolvedTenant?->name ?? 'Central Workspace' }}</h6>
+                    <p class="fs-11 my-3 text-dark">{{ $tenantSettings['branch'] ?? 'Main Office' }}<br>{{ $tenantPlan }} Plan</p>
                     <a href="{{ route('dashboard') }}" class="btn btn-primary text-dark w-100">Tenant Dashboard</a>
                 </div>
             </div>

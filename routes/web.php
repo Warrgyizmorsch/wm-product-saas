@@ -1,6 +1,10 @@
 <?php
 
+use App\Http\Controllers\TenantSwitchController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/tenant-switch/{tenant:slug}', TenantSwitchController::class)
+    ->name('tenant.switch');
 
 Route::get('/', function () {
     return view('dashboard');
