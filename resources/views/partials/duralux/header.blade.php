@@ -365,6 +365,14 @@
                     </div>
                 </div>
 
+                <!-- Primary Color Picker -->
+                <div class="nxl-h-item d-flex align-items-center justify-content-center me-3">
+                    <div class="d-flex align-items-center gap-2 border rounded-pill px-2 py-1 bg-light" style="height: 38px;">
+                        <i class="feather-aperture text-muted fs-14"></i>
+                        <input type="color" id="primaryColorPicker" class="form-control form-control-color border-0 bg-transparent p-0" style="width: 22px; height: 22px; cursor: pointer; border-radius: 50% !important;" value="#0000FF" title="Choose Primary Color">
+                    </div>
+                </div>
+
                 <div class="nxl-h-item dark-light-theme">
                     <a href="javascript:void(0);" class="nxl-head-link me-0 dark-button">
                         <i class="feather-moon"></i>

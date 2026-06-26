@@ -13,6 +13,14 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/daterangepicker.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/theme.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/erp.css') }}">
+    <script>
+        (function() {
+            var savedColor = localStorage.getItem('erp_primary_color');
+            if (savedColor) {
+                document.documentElement.style.setProperty('--bs-primary', savedColor);
+            }
+        })();
+    </script>
     @stack('styles')
 </head>
 <body>
@@ -143,6 +151,19 @@
                 
                 select.select2(options);
             });
+        });
+        // Initialize and bind primary color picker
+        $(document).ready(function() {
+            var savedColor = localStorage.getItem('erp_primary_color') || '#0000FF';
+            var picker = $('#primaryColorPicker');
+            if (picker.length) {
+                picker.val(savedColor);
+                picker.on('input change', function() {
+                    var color = $(this).val();
+                    document.documentElement.style.setProperty('--bs-primary', color);
+                    localStorage.setItem('erp_primary_color', color);
+                });
+            }
         });
     </script>
     @stack('scripts')

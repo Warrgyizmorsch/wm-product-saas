@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../app/helpers.php';
+
 use App\Http\Middleware\IdentifyTenant;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\TenantMiddleware;
