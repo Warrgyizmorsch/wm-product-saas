@@ -259,7 +259,7 @@
                                 </a>
                             @endforeach
                             <div class="dropdown-divider"></div>
-                            <a href="javascript:void(0);" class="dropdown-item">
+                            <a href="{{ route('platform.tenants.create') }}" class="dropdown-item">
                                 <i class="feather-plus"></i>
                                 <span>Add Tenant</span>
                             </a>

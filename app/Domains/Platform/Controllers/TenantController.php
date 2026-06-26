@@ -1,0 +1,101 @@
+<?php
+
+namespace App\Domains\Platform\Controllers;
+
+use App\Domains\Platform\Services\TenantService;
+use App\Http\Controllers\Controller;
+use App\Models\Tenant;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+
+class TenantController extends Controller
+{
+    public function __construct(
+        private readonly TenantService $tenants,
+    ) {
+    }
+
+    public function index(): View
+    {
+        return view('modules.platform.tenants.index', [
+            'tenants' => $this->tenants->all(),
+            'summary' => $this->tenants->summary(),
+        ]);
+    }
+
+    public function create(): View
+    {
+        return view('modules.platform.tenants.create', [
+            'tenant' => new Tenant(),
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $tenant = $this->tenants->create($this->validated($request));
+
+        return redirect()
+            ->route('platform.tenants.index')
+            ->with('success', 'Tenant '.$tenant->name.' created successfully.');
+    }
+
+    public function edit(Tenant $tenant): View
+    {
+        return view('modules.platform.tenants.edit', [
+            'tenant' => $tenant,
+        ]);
+    }
+
+    public function update(Request $request, Tenant $tenant): RedirectResponse
+    {
+        $this->tenants->update($tenant, $this->validated($request, $tenant));
+
+        return redirect()
+            ->route('platform.tenants.index')
+            ->with('success', 'Tenant '.$tenant->name.' updated successfully.');
+    }
+
+    public function status(Request $request, Tenant $tenant): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', Rule::in(['active', 'inactive'])],
+        ]);
+
+        $this->tenants->updateStatus($tenant, $validated['status']);
+
+        return redirect()
+            ->route('platform.tenants.index')
+            ->with('success', 'Tenant '.$tenant->name.' marked '.$validated['status'].'.');
+    }
+
+    private function validated(Request $request, ?Tenant $tenant = null): array
+    {
+        $tenantId = $tenant?->id;
+
+        return $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => [
+                'nullable',
+                'string',
+                'max:255',
+                'alpha_dash',
+                Rule::unique('tenants', 'slug')->ignore($tenantId),
+            ],
+            'domain' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('tenants', 'domain')->ignore($tenantId),
+            ],
+            'status' => ['required', 'string', Rule::in(['active', 'inactive'])],
+            'plan' => ['required', 'string', Rule::in(['starter', 'pro', 'enterprise'])],
+            'timezone' => ['required', 'string', 'max:100'],
+            'locale' => ['required', 'string', 'max:10'],
+            'branch' => ['nullable', 'string', 'max:255'],
+            'currency' => ['nullable', 'string', 'max:10'],
+            'financial_year' => ['nullable', 'string', 'max:50'],
+        ]);
+    }
+}

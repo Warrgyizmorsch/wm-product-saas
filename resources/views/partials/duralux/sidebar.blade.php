@@ -6,7 +6,12 @@
     $modules = [
         'Workspace' => [
             ['label' => 'Executive Dashboard', 'icon' => 'feather-home', 'route' => 'dashboard'],
-            ['label' => 'Tenant Console', 'icon' => 'feather-grid', 'url' => '#', 'children' => ['Companies', 'Branches', 'Subscriptions', 'Usage Limits']],
+            ['label' => 'Tenant Console', 'icon' => 'feather-grid', 'url' => '#', 'children' => [
+                ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
+                ['label' => 'Add Tenant', 'route' => 'platform.tenants.create'],
+                ['label' => 'Subscriptions'],
+                ['label' => 'Usage Limits'],
+            ]],
             ['label' => 'Approvals Center', 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
         'Revenue Cycle' => [
