@@ -22,6 +22,10 @@ return new class extends Migration
                     $table->string('timezone')->default('UTC')->after('status');
                 }
 
+                if (! Schema::hasColumn('tenants', 'plan')) {
+                    $table->string('plan')->default('starter')->after('status');
+                }
+
                 if (! Schema::hasColumn('tenants', 'locale')) {
                     $table->string('locale')->default('en')->after('timezone');
                 }
@@ -40,6 +44,7 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('domain')->nullable()->unique();
             $table->string('status')->default('active')->index();
+            $table->string('plan')->default('starter');
             $table->string('timezone')->default('UTC');
             $table->string('locale')->default('en');
             $table->json('settings')->nullable();

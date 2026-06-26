@@ -9,16 +9,26 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tenants', function (Blueprint $table) {
-            $table->string('slug')->change();
-            $table->string('domain')->nullable()->change();
+            if (Schema::hasColumn('tenants', 'slug')) {
+                $table->string('slug')->change();
+            }
+
+            if (Schema::hasColumn('tenants', 'domain')) {
+                $table->string('domain')->nullable()->change();
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('tenants', function (Blueprint $table) {
-            $table->integer('slug', false, true)->change();
-            $table->string('domain', 50)->nullable(false)->change();
+            if (Schema::hasColumn('tenants', 'slug')) {
+                $table->string('slug')->change();
+            }
+
+            if (Schema::hasColumn('tenants', 'domain')) {
+                $table->string('domain')->nullable()->change();
+            }
         });
     }
 };

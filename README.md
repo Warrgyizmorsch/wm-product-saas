@@ -1,59 +1,78 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# WM Product SaaS ERP
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 12 modular monolith starter for a multi-tenant SaaS ERP. The foundation follows the structure in `skills.md`: tenant-first request handling, row-based tenant isolation, domain modules, service/repository layers, and a Duralux Blade admin shell.
 
-## About Laravel
+## Architecture
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- `app/Core` contains platform-level building blocks such as tenancy, database base classes, and future auth primitives.
+- `app/Domains` contains ERP modules. Each module owns its controllers, models, services, repositories, DTOs, events, listeners, and routes.
+- `app/Core/Database/BaseModel.php` is the default parent for tenant-owned Eloquent models.
+- `app/Models/Concerns/BelongsToTenant.php` applies tenant global scope and auto-fills `tenant_id` on create.
+- `resources/views/layouts/duralux.blade.php` is the main admin layout.
+- `resources/views/modules/{module}` is the Blade location for module screens.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tenant Flow
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Tenant resolution is handled by the `tenant` middleware:
 
-## Learning Laravel
+1. Read tenant key from `X-Tenant` header when present.
+2. Otherwise resolve from domain or subdomain.
+3. Store the tenant in `App\Core\Tenant\TenantContext`.
+4. Use `tenant()` and `tenant_id()` helpers throughout services/models.
+5. Tenant-owned models extending `BaseModel` are automatically scoped.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Central domains are configured in `config/tenancy.php` using `CENTRAL_DOMAINS`.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Module Pattern
 
-## Laravel Sponsors
+Use CRM Leads and Customers as the reference module:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- Lead Controller: `app/Domains/CRM/Controllers/LeadController.php`
+- Lead Model: `app/Domains/CRM/Models/Lead.php`
+- Controller: `app/Domains/CRM/Controllers/CustomerController.php`
+- Model: `app/Domains/CRM/Models/Customer.php`
+- Service: `app/Domains/CRM/Services/CustomerService.php`
+- Repository: `app/Domains/CRM/Repositories/CustomerRepository.php`
+- Routes: `app/Domains/CRM/Routes/web.php`
+- Views: `resources/views/modules/crm/...`
 
-### Premium Partners
+When building a new module feature, keep controller methods thin, put business logic in services, put query persistence behind repositories, and use events/listeners for cross-module workflows.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## View Structure
 
-## Contributing
+- `resources/views/layouts` contains app-level layouts such as Duralux.
+- `resources/views/partials` contains shared shell partials such as header, sidebar, and footer.
+- `resources/views/components` contains reusable UI/form/table components.
+- `resources/views/modules/{module}` contains module pages only.
+- `resources/views/modules/dashboard` contains dashboard-specific screens.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Do not place new module screens directly under `resources/views/crm`, `resources/views/sales`, etc. Keep them under `resources/views/modules/{module}`.
 
-## Code of Conduct
+## Current Domains
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- CRM
+- Inventory
+- Sales
+- Purchase
+- Production
+- HRMS
+- Accounting
+- Projects
 
-## Security Vulnerabilities
+## Developer Rules
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- Tenant-owned tables must include an indexed `tenant_id`.
+- Tenant-owned models should extend `App\Core\Database\BaseModel`.
+- Do not call another module's database tables directly from module logic.
+- Use events for cross-module side effects such as Sales updating Inventory or Accounting.
+- Keep Duralux pages under `resources/views/modules`.
+- Keep shared UI in `resources/views/components` or `resources/views/partials`.
 
-## License
+## Useful Commands
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+composer dump-autoload
+php artisan migrate
+php artisan route:list
+php artisan test
+```

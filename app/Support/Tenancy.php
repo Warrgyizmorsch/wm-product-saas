@@ -2,29 +2,9 @@
 
 namespace App\Support;
 
-use App\Models\Tenant;
+use App\Core\Tenant\TenantContext;
 
-class Tenancy
+class Tenancy extends TenantContext
 {
-    private ?Tenant $tenant = null;
-
-    public function setTenant(?Tenant $tenant): void
-    {
-        $this->tenant = $tenant;
-    }
-
-    public function tenant(): ?Tenant
-    {
-        return $this->tenant;
-    }
-
-    public function id(): ?int
-    {
-        return $this->tenant?->id;
-    }
-
-    public function clear(): void
-    {
-        $this->tenant = null;
-    }
+    //
 }

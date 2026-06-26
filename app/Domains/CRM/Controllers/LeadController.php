@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Domains\CRM\Controllers;
 
-use App\Models\Lead;
+use App\Domains\CRM\Models\Lead;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -29,7 +30,7 @@ class LeadController extends Controller
             'enterprise' => $enterpriseCount,
         ];
 
-        return view('crm.leads.index', compact('leads', 'metrics'));
+        return view('modules.crm.leads.index', compact('leads', 'metrics'));
     }
 
     /**
@@ -38,7 +39,7 @@ class LeadController extends Controller
     public function create()
     {
         $lead = new Lead();
-        return view('crm.leads.create', compact('lead'));
+        return view('modules.crm.leads.create', compact('lead'));
     }
 
     /**
@@ -106,7 +107,7 @@ class LeadController extends Controller
      */
     public function edit(Lead $lead)
     {
-        return view('crm.leads.create', compact('lead'));
+        return view('modules.crm.leads.create', compact('lead'));
     }
 
     /**

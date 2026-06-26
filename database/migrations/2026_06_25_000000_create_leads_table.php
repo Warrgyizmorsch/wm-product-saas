@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('leads', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('tenant_id')->nullable();
+            $table->foreignId('tenant_id')->nullable()->constrained()->cascadeOnDelete();
             $table->dateTime('call_date')->nullable();
             $table->string('company_name');
             $table->string('contact_person')->nullable();
@@ -23,8 +23,9 @@ return new class extends Migration
             $table->string('priority')->nullable();
             $table->string('segment')->nullable();
             $table->timestamps();
+            $table->softDeletes();
 
-            $table->foreign('tenant_id')->references('id')->on('tenants')->cascadeOnDelete();
+            $table->index(['tenant_id', 'created_at']);
         });
     }
 

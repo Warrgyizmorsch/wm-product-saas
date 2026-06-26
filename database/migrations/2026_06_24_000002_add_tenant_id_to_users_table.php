@@ -11,9 +11,11 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             if (Schema::hasColumn('users', 'tenant_id')) {
-                $table->bigInteger('tenant_id')->nullable()->change();
+                $table->unsignedBigInteger('tenant_id')->nullable()->change();
             } else {
-                $table->bigInteger('tenant_id')->nullable()->after('id');
+                $table->foreignId('tenant_id')
+                    ->nullable()
+                    ->after('id');
             }
 
             if ($this->indexExists('users', 'users_email_unique')) {
@@ -25,7 +27,10 @@ return new class extends Migration
             }
 
             if (! $this->foreignKeyExists('users', 'users_tenant_id_foreign')) {
-                $table->foreign('tenant_id')->references('id')->on('tenants')->cascadeOnDelete();
+                $table->foreign('tenant_id')
+                    ->references('id')
+                    ->on('tenants')
+                    ->cascadeOnDelete();
             }
         });
     }

@@ -1,15 +1,14 @@
 <?php
 
-namespace App\Models;
+namespace App\Domains\CRM\Models;
 
-use App\Models\Concerns\BelongsToTenant;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Lead extends Model
+class Lead extends BaseModel
 {
-    use BelongsToTenant, HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'tenant_id',

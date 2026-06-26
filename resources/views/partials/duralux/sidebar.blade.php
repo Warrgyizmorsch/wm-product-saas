@@ -6,7 +6,12 @@
             ['label' => 'Approvals Center', 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
         'Revenue Cycle' => [
-            ['label' => 'CRM', 'icon' => 'feather-users', 'url' => '#', 'children' => ['Leads', 'Customers', 'Contacts', 'Activities']],
+            ['label' => 'CRM', 'icon' => 'feather-users', 'url' => '#', 'children' => [
+                ['label' => 'Leads', 'route' => 'crm.leads.index'],
+                ['label' => 'Customers', 'route' => 'crm.customers.index'],
+                ['label' => 'Contacts'],
+                ['label' => 'Activities'],
+            ]],
             ['label' => 'Sales', 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => ['Quotations', 'Sales Orders', 'Invoices', 'Receipts']],
             ['label' => 'Projects', 'icon' => 'feather-briefcase', 'url' => '#', 'children' => ['Projects', 'Milestones', 'Tasks', 'Timesheets']],
         ],
@@ -58,8 +63,12 @@
                             @if ($hasChildren)
                                 <ul class="nxl-submenu">
                                     @foreach ($item['children'] as $child)
+                                        @php
+                                            $child = is_array($child) ? $child : ['label' => $child];
+                                            $childHref = isset($child['route']) ? route($child['route']) : ($child['url'] ?? '#');
+                                        @endphp
                                         <li class="nxl-item">
-                                            <a class="nxl-link" href="#">{{ $child }}</a>
+                                            <a class="nxl-link" href="{{ $childHref }}">{{ $child['label'] }}</a>
                                         </li>
                                     @endforeach
                                 </ul>
