@@ -85,6 +85,65 @@
                 alt: selected.data('language')
             });
         });
+
+        // Select2 search focus fix inside Bootstrap modals
+        $(document).on('show.bs.modal', '.modal', function () {
+            var modal = $(this);
+            modal.find('[data-select2-selector]').each(function () {
+                var select = $(this);
+                if (select.hasClass('select2-hidden-accessible')) {
+                    select.select2('destroy');
+                }
+                var selectorType = select.data('select2-selector');
+                var options = {
+                    theme: "bootstrap-5",
+                    dropdownParent: modal
+                };
+                
+                if (selectorType === 'icon' || selectorType === 'visibility' || selectorType === 'privacy') {
+                    options.templateResult = typeof iformat !== 'undefined' ? iformat : undefined;
+                    options.templateSelection = typeof iformat !== 'undefined' ? iformat : undefined;
+                } else if (selectorType === 'storage') {
+                    options.templateResult = typeof storageformat !== 'undefined' ? storageformat : undefined;
+                    options.templateSelection = typeof storageformat !== 'undefined' ? storageformat : undefined;
+                } else if (selectorType === 'tag' || selectorType === 'status' || selectorType === 'priority' || selectorType === 'label' || selectorType === 'type') {
+                    options.templateResult = typeof bgformat !== 'undefined' ? bgformat : undefined;
+                    options.templateSelection = typeof bgformat !== 'undefined' ? bgformat : undefined;
+                } else if (selectorType === 'user') {
+                    options.templateResult = typeof userformat !== 'undefined' ? userformat : undefined;
+                    options.templateSelection = typeof userformat !== 'undefined' ? userformat : undefined;
+                } else if (selectorType === 'payment') {
+                    options.templateResult = typeof paymentformat !== 'undefined' ? paymentformat : undefined;
+                    options.templateSelection = typeof paymentformat !== 'undefined' ? paymentformat : undefined;
+                } else if (selectorType === 'flag') {
+                    options.templateResult = typeof flagformat !== 'undefined' ? flagformat : undefined;
+                    options.templateSelection = typeof flagformat !== 'undefined' ? flagformat : undefined;
+                } else if (selectorType === 'country') {
+                    options.templateResult = typeof countryformat !== 'undefined' ? countryformat : undefined;
+                    options.templateSelection = typeof countryformat !== 'undefined' ? countryformat : undefined;
+                } else if (selectorType === 'tzone') {
+                    options.templateResult = typeof tzoneformat !== 'undefined' ? tzoneformat : undefined;
+                    options.templateSelection = typeof tzoneformat !== 'undefined' ? tzoneformat : undefined;
+                } else if (selectorType === 'state') {
+                    options.templateResult = typeof stateformat !== 'undefined' ? stateformat : undefined;
+                    options.templateSelection = typeof stateformat !== 'undefined' ? stateformat : undefined;
+                } else if (selectorType === 'city') {
+                    options.templateResult = typeof cityformat !== 'undefined' ? cityformat : undefined;
+                    options.templateSelection = typeof cityformat !== 'undefined' ? cityformat : undefined;
+                } else if (selectorType === 'language') {
+                    options.templateResult = typeof languageformat !== 'undefined' ? languageformat : undefined;
+                    options.templateSelection = typeof languageformat !== 'undefined' ? languageformat : undefined;
+                } else if (selectorType === 'currency') {
+                    options.templateResult = typeof currencyformat !== 'undefined' ? currencyformat : undefined;
+                    options.templateSelection = typeof currencyformat !== 'undefined' ? currencyformat : undefined;
+                } else if (selectorType === 'programming') {
+                    options.templateResult = typeof programmingformat !== 'undefined' ? programmingformat : undefined;
+                    options.templateSelection = typeof programmingformat !== 'undefined' ? programmingformat : undefined;
+                }
+                
+                select.select2(options);
+            });
+        });
     </script>
     @stack('scripts')
 </body>
