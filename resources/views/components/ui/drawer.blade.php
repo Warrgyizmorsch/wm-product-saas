@@ -10,8 +10,6 @@
     $backdropValue = 'true';
     if ($backdrop === false) {
         $backdropValue = 'false';
-    } elseif ($backdrop === 'static') {
-        $backdropValue = 'static';
     }
 @endphp
 
@@ -44,6 +42,32 @@
         var drawerEl = document.getElementById('{{ $id }}');
         if (drawerEl) {
             document.body.appendChild(drawerEl);
+
+            // Track last mouse down element to detect click outside
+            var lastClickTarget = null;
+            document.addEventListener('mousedown', function (e) {
+                lastClickTarget = e.target;
+            }, true);
+
+            // Prevent closing when clicking outside the drawer
+            drawerEl.addEventListener('hide.bs.offcanvas', function (e) {
+                if (lastClickTarget) {
+                    var clickedInside = drawerEl.contains(lastClickTarget);
+                    var isCloseBtn = lastClickTarget.closest('[data-bs-dismiss="offcanvas"]');
+                    if (!clickedInside && !isCloseBtn) {
+                        e.preventDefault();
+                    }
+                }
+            });
+
+            // Clean up backdrop on hide if it gets stuck
+            drawerEl.addEventListener('hidden.bs.offcanvas', function () {
+                document.querySelectorAll('.offcanvas-backdrop').forEach(function (backdrop) {
+                    backdrop.remove();
+                });
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+            });
         }
     })();
 </script>
