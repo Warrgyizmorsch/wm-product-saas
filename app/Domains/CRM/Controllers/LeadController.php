@@ -58,25 +58,18 @@ class LeadController extends Controller
             'source' => 'nullable|string|max:255',
             'priority' => 'nullable|string|max:255',
             'segment' => 'nullable|string|max:255',
-            
-            // Call Date parts
-            'call_date_date' => 'required|date',
-            'call_date_hour' => 'required|string|max:2',
-            'call_date_minute' => 'required|string|max:2',
-            'call_date_ampm' => 'required|string|in:AM,PM',
+            'call_date' => 'required|string',
+            'industry_type' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'address' => 'nullable|string',
+            'product' => 'nullable|string|max:255',
         ]);
 
-        // Construct Call Date & Time
+        // Parse Call Date & Time
         try {
-            $hour = intval($validated['call_date_hour']);
-            if ($validated['call_date_ampm'] === 'PM' && $hour < 12) {
-                $hour += 12;
-            } elseif ($validated['call_date_ampm'] === 'AM' && $hour === 12) {
-                $hour = 0;
-            }
-            
-            $timeString = sprintf('%02d:%02d:00', $hour, intval($validated['call_date_minute']));
-            $callDateTime = Carbon::parse($validated['call_date_date'] . ' ' . $timeString);
+            $callDateTime = Carbon::parse($validated['call_date']);
         } catch (\Exception $e) {
             $callDateTime = Carbon::now();
         }
@@ -94,6 +87,12 @@ class LeadController extends Controller
             'source' => $validated['source'] ?: 'Select an Option',
             'priority' => $validated['priority'] ?: 'Select an Option',
             'segment' => $validated['segment'] ?: 'Select an Option',
+            'industry_type' => $validated['industry_type'],
+            'country' => $validated['country'],
+            'state' => $validated['state'],
+            'city' => $validated['city'],
+            'address' => $validated['address'],
+            'product' => $validated['product'],
         ];
 
         // Direct DB save
@@ -126,25 +125,18 @@ class LeadController extends Controller
             'source' => 'nullable|string|max:255',
             'priority' => 'nullable|string|max:255',
             'segment' => 'nullable|string|max:255',
-            
-            // Call Date parts
-            'call_date_date' => 'required|date',
-            'call_date_hour' => 'required|string|max:2',
-            'call_date_minute' => 'required|string|max:2',
-            'call_date_ampm' => 'required|string|in:AM,PM',
+            'call_date' => 'required|string',
+            'industry_type' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'address' => 'nullable|string',
+            'product' => 'nullable|string|max:255',
         ]);
 
-        // Construct Call Date & Time
+        // Parse Call Date & Time
         try {
-            $hour = intval($validated['call_date_hour']);
-            if ($validated['call_date_ampm'] === 'PM' && $hour < 12) {
-                $hour += 12;
-            } elseif ($validated['call_date_ampm'] === 'AM' && $hour === 12) {
-                $hour = 0;
-            }
-            
-            $timeString = sprintf('%02d:%02d:00', $hour, intval($validated['call_date_minute']));
-            $callDateTime = Carbon::parse($validated['call_date_date'] . ' ' . $timeString);
+            $callDateTime = Carbon::parse($validated['call_date']);
         } catch (\Exception $e) {
             $callDateTime = Carbon::now();
         }
@@ -162,6 +154,12 @@ class LeadController extends Controller
             'source' => $validated['source'] ?: 'Select an Option',
             'priority' => $validated['priority'] ?: 'Select an Option',
             'segment' => $validated['segment'] ?: 'Select an Option',
+            'industry_type' => $validated['industry_type'],
+            'country' => $validated['country'],
+            'state' => $validated['state'],
+            'city' => $validated['city'],
+            'address' => $validated['address'],
+            'product' => $validated['product'],
         ];
 
         // Direct DB update
