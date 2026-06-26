@@ -232,7 +232,10 @@
     border-color: var(--bs-primary) !important;
     color: #fff !important;
 }
-.btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
     background-color: color-mix(in srgb, var(--bs-primary) 80%, transparent) !important;
     border-color: color-mix(in srgb, var(--bs-primary) 80%, transparent) !important;
     color: #fff !important;
@@ -244,7 +247,10 @@
     border-color: #81b29a !important;
     color: #fff !important;
 }
-.btn-success:hover, .btn-success:focus, .btn-success:active {
+
+.btn-success:hover,
+.btn-success:focus,
+.btn-success:active {
     background-color: #70a189 !important;
     border-color: #70a189 !important;
     color: #fff !important;
@@ -256,7 +262,10 @@
     border-color: #f2cc8f !important;
     color: #3d405b !important;
 }
-.btn-warning:hover, .btn-warning:focus, .btn-warning:active {
+
+.btn-warning:hover,
+.btn-warning:focus,
+.btn-warning:active {
     background-color: #e0b97d !important;
     border-color: #e0b97d !important;
     color: #3d405b !important;
@@ -268,7 +277,10 @@
     border-color: #e76f51 !important;
     color: #fff !important;
 }
-.btn-danger:hover, .btn-danger:focus, .btn-danger:active {
+
+.btn-danger:hover,
+.btn-danger:focus,
+.btn-danger:active {
     background-color: #d95d40 !important;
     border-color: #d95d40 !important;
     color: #fff !important;
@@ -280,7 +292,10 @@
     border-color: #5f9ea0 !important;
     color: #fff !important;
 }
-.btn-info:hover, .btn-info:focus, .btn-info:active {
+
+.btn-info:hover,
+.btn-info:focus,
+.btn-info:active {
     background-color: #4e8d8f !important;
     border-color: #4e8d8f !important;
     color: #fff !important;
@@ -292,7 +307,10 @@
     border-color: #3d405b !important;
     color: #fff !important;
 }
-.btn-secondary:hover, .btn-secondary:focus, .btn-secondary:active {
+
+.btn-secondary:hover,
+.btn-secondary:focus,
+.btn-secondary:active {
     background-color: #2f324a !important;
     border-color: #2f324a !important;
     color: #fff !important;
@@ -304,7 +322,10 @@
     border-color: #f4f1de !important;
     color: #3d405b !important;
 }
-.btn-light-brand:hover, .btn-light-brand:focus, .btn-light-brand:active {
+
+.btn-light-brand:hover,
+.btn-light-brand:focus,
+.btn-light-brand:active {
     background-color: #eae6cc !important;
     border-color: #eae6cc !important;
     color: #3d405b !important;
@@ -319,12 +340,13 @@
     border-radius: 12px !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
     margin-bottom: 24px;
-    overflow: hidden; /* Keep header border-radius clip */
+    overflow: hidden;
+    /* Keep header border-radius clip */
 }
 
 .table-responsive-container .table-responsive {
-    padding:10px 0 !important;
-    margin:10px 0 !important;
+    padding: 10px 0 !important;
+    margin: 10px 0 !important;
 }
 
 .table-responsive-container .table {
@@ -399,6 +421,7 @@
     opacity: 0;
     transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease !important;
 }
+
 .modal.show .modal-dialog {
     transform: scale(1) !important;
     opacity: 1;
@@ -444,9 +467,12 @@
 .toast.showing {
     animation: toast-slide-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
-.toast.showing, .toast.show {
+
+.toast.showing,
+.toast.show {
     opacity: 1 !important;
 }
+
 .toast.hide {
     animation: toast-slide-out 0.3s ease-in-out forwards;
 }
@@ -456,6 +482,7 @@
         transform: translateY(-20px) scale(0.9);
         opacity: 0;
     }
+
     100% {
         transform: translateY(0) scale(1);
         opacity: 1;
@@ -467,6 +494,7 @@
         transform: translateY(0) scale(1);
         opacity: 1;
     }
+
     100% {
         transform: translateY(-20px) scale(0.9);
         opacity: 0;
@@ -477,6 +505,7 @@
     background-size: 8px !important;
     opacity: 0.5;
 }
+
 .erp-premium-toast .btn-close:hover {
     opacity: 0.9;
 }
@@ -558,18 +587,45 @@
 }
 
 /* ==========================================
-   MOBILE MODAL RESPONSIVENESS OVERRIDES
+   MOBILE & TABLET MODAL RESPONSIVENESS OVERRIDES
    ========================================== */
-@media (max-width: 575.98px) {
+@media (max-width: 1024.98px) {
+
+    body.modal-open,
+    body.offcanvas-open {
+        padding-right: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .modal-open .nxl-header,
+    .offcanvas-open .nxl-header {
+        padding-right: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    /* Disable background blur on smaller viewports to prevent browser rendering glitches and layout shifts */
+    body.modal-open .nxl-header,
+    body.modal-open .nxl-navigation,
+    body.modal-open .page-header,
+    body.modal-open .nxl-container {
+        filter: none !important;
+        transition: none !important;
+    }
+
     .modal {
+        left: 0 !important;
+        margin-left: 0 !important;
+        width: 100% !important;
         padding-left: 0 !important;
         padding-right: 0 !important;
     }
+
     .modal-dialog {
-        margin: 16px !important;
-        max-width: calc(100% - 32px) !important;
+        margin: 16px auto !important;
+        max-width: min(500px, calc(100% - 32px)) !important;
         width: auto !important;
     }
+
     .modal-content {
         border-radius: 12px !important;
         padding: 4px !important;
@@ -577,16 +633,52 @@
 }
 
 @keyframes check-bounce {
-    0% { 
+    0% {
         transform: scale(0.8);
         box-shadow: 0 0 0 0 color-mix(in srgb, var(--bs-primary) 40%, transparent) !important;
     }
-    50% { 
+
+    50% {
         transform: scale(1.25);
         box-shadow: 0 0 0 8px color-mix(in srgb, var(--bs-primary) 20%, transparent) !important;
     }
-    100% { 
+
+    100% {
         transform: scale(1);
         box-shadow: 0 0 0 0 color-mix(in srgb, var(--bs-primary) 0%, transparent) !important;
     }
+}
+
+/* Select field UI improvements */
+.select2-container--bootstrap-5 .select2-dropdown {
+    border-radius: 12px !important;
+    border: 1px solid #dcdce0 !important;
+    overflow: hidden !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02) !important;
+}
+
+.select2-container--bootstrap-5 .select2-results__option {
+    font-size: 12px !important;
+    /* Smaller text size */
+    padding: 8px 12px !important;
+    color: #475569 !important;
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+.select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected],
+.select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected]:hover,
+.select2-container--bootstrap-5 .select2-results__option[aria-selected="true"],
+.select2-container--bootstrap-5 .select2-results__option:hover {
+    background-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+}
+
+/* Fallbacks for native select field styling */
+.erp-premium-select {
+    border-radius: 8px !important;
+    font-size: 13px !important;
+}
+
+.erp-premium-select option {
+    font-size: 12px !important;
 }

@@ -78,6 +78,8 @@
                     <x-ui.button variant="light-brand">Light Brand</x-ui.button>
                     <x-ui.button variant="primary" disabled>Disabled</x-ui.button>
                     <x-ui.button variant="link" href="https://laravel.com" target="_blank">Link Button</x-ui.button>
+                    <x-ui.button variant="primary" href="{{ route('dashboard') }}">Dashboard (via href)</x-ui.button>
+                    <x-ui.button variant="primary" onclick="window.location.href='{{ route('dashboard') }}'">Dashboard (via onclick)</x-ui.button>
                 </div>
 
                 <h6 class="text-uppercase fs-11 text-muted mb-3">Badge Variants (Solid vs Soft)</h6>
