@@ -30,6 +30,26 @@
         </div>
     @endif
 
+    <!-- Error Message -->
+    @if ($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+            <div class="d-flex align-items-center">
+                <div class="avatar-text avatar-md bg-danger text-white me-3">
+                    <i class="feather-alert-triangle"></i>
+                </div>
+                <div>
+                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+                    <ul class="fs-12 mb-0 ps-3">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <!-- Metrics Cards -->
     <div class="row g-4 mb-4">
         <!-- Metric 1: Total Leads -->
@@ -138,6 +158,7 @@
                             <th>Source</th>
                             <th>Priority</th>
                             <th>Segment</th>
+                            <th>Status</th>
                             <th class="text-end pe-4">Action</th>
                         </tr>
                     </thead>
@@ -193,10 +214,35 @@
                                 <td>
                                     <span class="badge bg-soft-info text-info">{{ $lead->segment }}</span>
                                 </td>
+                                <td>
+                                    @if ($lead->is_customer || $lead->status === 'Converted')
+                                        <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 fw-bold"><i class="feather-check-circle me-1"></i>Converted</span>
+                                    @else
+                                        <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline">
+                                            @csrf
+                                            @method('PATCH')
+                                            <select name="status" class="form-control status-select" data-select2-selector="status" style="width: 150px;">
+                                                @foreach(['New', 'Follow-up Scheduled', 'Contacted', 'Qualified', 'Converted', 'Lost'] as $statusOption)
+                                                    @php
+                                                        $bgClass = 'bg-primary';
+                                                        if($statusOption === 'Follow-up Scheduled') $bgClass = 'bg-warning';
+                                                        elseif($statusOption === 'Contacted') $bgClass = 'bg-info';
+                                                        elseif($statusOption === 'Qualified') $bgClass = 'bg-teal';
+                                                        elseif($statusOption === 'Converted') $bgClass = 'bg-success';
+                                                        elseif($statusOption === 'Lost') $bgClass = 'bg-danger';
+                                                    @endphp
+                                                    <option value="{{ $statusOption }}" data-bg="{{ $bgClass }}" {{ ($lead->status ?: 'New') === $statusOption ? 'selected' : '' }}>
+                                                        {{ $statusOption }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </form>
+                                    @endif
+                                </td>
                                 <td class="text-end pe-4">
                                     <div class="hstack gap-2 justify-content-end">
-                                        <!-- View Requirement (static eye icon) -->
-                                        <a href="javascript:void(0)" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Requirement">
+                                        <!-- View Details -->
+                                        <a href="{{ route('crm.leads.show', $lead->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Details">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                         
@@ -218,7 +264,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="text-center py-5 text-muted">
+                                <td colspan="11" class="text-center py-5 text-muted">
                                     <i class="feather-users fs-1 d-block mb-3 text-light"></i>
                                     No leads registered yet. Click "Add New Call / Lead" to create one.
                                 </td>
@@ -232,9 +278,32 @@
 
 @endsection
 
+@push('styles')
+    <!-- Select2 Theme Styles -->
+    <link class="select2-css" rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link class="select2-css" rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <style>
+        /* Make select2 container compact for table layout */
+        .select2-container--bootstrap-5 .select2-selection--single {
+            padding: 2px 8px;
+            height: auto;
+            font-size: 11px;
+            font-weight: 600;
+        }
+    </style>
+@endpush
+
 @push('scripts')
+    <!-- Select2 Scripts -->
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
         $(function () {
+            // Auto submit status forms when changed in Select2
+            $('.status-select').on('change', function() {
+                $(this).closest('form').submit();
+            });
+
             // Live Search filter for the Leads table
             $('#tableSearch').on('input', function() {
                 var value = $(this).val().toLowerCase().trim();
@@ -262,7 +331,7 @@
                 // If no rows are visible and we have actual data rows, show a "No results found" row
                 if (visibleRows === 0 && totalRows > 0) {
                     $('#leadsTable tbody').append(
-                        '<tr class="no-search-results"><td colspan="10" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>No matching leads found for "' + value + '"</td></tr>'
+                        '<tr class="no-search-results"><td colspan="11" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>No matching leads found for "' + value + '"</td></tr>'
                     );
                 }
             });

@@ -1,0 +1,101 @@
+@extends('layouts.duralux')
+
+@section('title', 'Quotations | SaaS ERP')
+@section('page-title', 'Quotations')
+@section('breadcrumb', 'CRM / Quotations')
+
+@section('page-actions')
+    <a href="{{ route('crm.quotations.create') }}" class="btn btn-primary">
+        <i class="feather-plus me-2"></i>New Quotation
+    </a>
+@endsection
+
+@section('content')
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+            <div class="d-flex align-items-center">
+                <div class="avatar-text avatar-md bg-success text-white me-3">
+                    <i class="feather-check-circle"></i>
+                </div>
+                <div>
+                    <h6 class="alert-heading fw-bold mb-1">Success!</h6>
+                    <p class="fs-12 mb-0">{{ session('success') }}</p>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom py-3">
+            <h5 class="card-title mb-0 fw-bold text-dark">
+                <i class="feather-file-text me-2 text-primary"></i>All Quotations
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                        <tr>
+                            <th class="ps-4">Quotation #</th>
+                            <th>Customer</th>
+                            <th>Date</th>
+                            <th>Expiry Date</th>
+                            <th>Total Amount</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="fs-13 text-dark">
+                        @forelse ($quotations as $quotation)
+                            <tr>
+                                <td class="ps-4 fw-bold text-primary">
+                                    <a href="{{ route('crm.quotations.show', $quotation->id) }}">{{ $quotation->quotation_number }}</a>
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ $quotation->customer->name }}</span>
+                                </td>
+                                <td>{{ $quotation->quotation_date ? $quotation->quotation_date->format('d/m/Y') : '—' }}</td>
+                                <td>{{ $quotation->expiry_date ? $quotation->expiry_date->format('d/m/Y') : '—' }}</td>
+                                <td class="fw-bold text-dark">₹{{ number_format($quotation->total_amount, 2) }}</td>
+                                <td>
+                                    @php
+                                        $badgeClass = 'bg-soft-secondary text-secondary';
+                                        if ($quotation->status === 'Sent') $badgeClass = 'bg-soft-info text-info';
+                                        elseif ($quotation->status === 'Accepted') $badgeClass = 'bg-soft-success text-success';
+                                        elseif ($quotation->status === 'Declined') $badgeClass = 'bg-soft-danger text-danger';
+                                    @endphp
+                                    <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $quotation->status }}</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <a href="{{ route('crm.quotations.show', $quotation->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Quotation">
+                                            <i class="feather feather-eye"></i>
+                                        </a>
+                                        <a href="{{ route('crm.quotations.edit', $quotation->id) }}" class="avatar-text avatar-md bg-soft-info text-info" data-bs-toggle="tooltip" title="Edit Quotation">
+                                            <i class="feather feather-edit-3"></i>
+                                        </a>
+                                        <form action="{{ route('crm.quotations.destroy', $quotation->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this quotation?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="avatar-text avatar-md bg-soft-danger text-danger border-0 p-0" data-bs-toggle="tooltip" title="Delete Quotation">
+                                                <i class="feather feather-trash-2"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="feather-file-text fs-1 mb-2 d-block"></i>
+                                    No quotations found in this tenant workspace.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+@endsection

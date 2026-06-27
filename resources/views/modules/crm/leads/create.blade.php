@@ -146,6 +146,18 @@
                                 <input type="text" class="form-control" name="industry_type" value="{{ $currentIndustry }}" placeholder="e.g. Manufacturing, Healthcare, IT, Retail">
                             </div>
 
+                            <div class="mb-4">
+                                <label class="form-label fw-bold text-dark">Assign Lead Owner</label>
+                                <select class="form-select" name="lead_owner_id" data-select2-selector="default">
+                                    <option value="">Select Owner (Unassigned)</option>
+                                    @foreach($users as $user)
+                                        <option value="{{ $user->id }}" {{ old('lead_owner_id', $lead->lead_owner_id) == $user->id ? 'selected' : '' }}>
+                                            {{ $user->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="row g-3">
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold text-dark">Source</label>

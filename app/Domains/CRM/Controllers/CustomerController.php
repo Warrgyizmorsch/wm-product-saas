@@ -2,10 +2,12 @@
 
 namespace App\Domains\CRM\Controllers;
 
+use App\Core\Tenant\TenantContext;
 use App\Domains\CRM\Services\CustomerService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class CustomerController extends Controller
@@ -19,6 +21,7 @@ class CustomerController extends Controller
     {
         return view('modules.crm.customers.index', [
             'summary' => $this->customers->summary(),
+            'customers' => $this->customers->latest(),
         ]);
     }
 
@@ -29,9 +32,18 @@ class CustomerController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $tenantId = tenant_id() ?? app(TenantContext::class)->id();
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => [
+                'nullable', 
+                'email', 
+                'max:255', 
+                Rule::unique('customers', 'email')->where(function ($query) use ($tenantId) {
+                    return $query->where('tenant_id', $tenantId);
+                })
+            ],
             'phone' => ['nullable', 'string', 'max:50'],
             'status' => ['required', 'string', 'in:active,inactive'],
         ]);

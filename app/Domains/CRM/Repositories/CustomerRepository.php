@@ -22,4 +22,9 @@ class CustomerRepository
             ->where('status', 'active')
             ->count();
     }
+
+    public function latest(): \Illuminate\Database\Eloquent\Collection
+    {
+        return Customer::query()->latest()->get();
+    }
 }
