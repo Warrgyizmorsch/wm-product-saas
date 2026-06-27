@@ -31,7 +31,7 @@ class ProductionBomController extends Controller
         $filters = $request->only(['product_id', 'status', 'search']);
         $boms = $this->bomRepository->getAll($filters);
         
-        $products = Product::where('type', 'finished_good')->get();
+        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
 
         return view('modules.production.bom.index', compact('boms', 'products'));
     }
@@ -74,17 +74,25 @@ class ProductionBomController extends Controller
             'cost_per_unit' => $costPerUnit,
         ];
 
-        return view('modules.production.bom.show', compact('bom', 'explosion', 'calcQty', 'costSummary'));
+        $componentProductIds = $bom->items->pluck('material_id')->unique();
+        $componentBoms = ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $bom->tenant_id)
+            ->whereIn('product_id', $componentProductIds)
+            ->get()
+            ->groupBy('product_id');
+
+        return view('modules.production.bom.show', compact('bom', 'explosion', 'calcQty', 'costSummary', 'componentBoms'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        $products = Product::where('type', 'finished_good')->get();
-        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good'])->get(); // support multi-level
+        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'semi_finished'])->get(); // support multi-level
         $uoms = Uom::all();
         $routings = Routing::all();
+        $selectedProductId = $request->query('product_id');
 
-        return view('modules.production.bom.create', compact('products', 'materials', 'uoms', 'routings'));
+        return view('modules.production.bom.create', compact('products', 'materials', 'uoms', 'routings', 'selectedProductId'));
     }
 
     public function store(StoreProductionBomRequest $request): RedirectResponse
@@ -93,8 +101,13 @@ class ProductionBomController extends Controller
             $dto = ProductionBomDTO::fromArray($request->validated());
             $bom = $this->bomService->create($dto, auth()->id() ?: 1);
 
+            $routeParams = ['bom' => $bom->id];
+            if ($request->filled('parent_product_id')) {
+                $routeParams['parent_product_id'] = $request->input('parent_product_id');
+            }
+
             return redirect()
-                ->route('production.boms.show', $bom->id)
+                ->route('production.boms.show', $routeParams)
                 ->with('success', 'BOM created successfully in draft mode.');
         } catch (\Exception $e) {
             return redirect()
@@ -110,8 +123,8 @@ class ProductionBomController extends Controller
         abort_if(!$bom, 404, 'BOM not found.');
         abort_if(!$bom->isDraft() && !$bom->isUnderRevision(), 403, 'Approved BOMs cannot be edited directly.');
 
-        $products = Product::where('type', 'finished_good')->get();
-        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good'])->get(); // support multi-level
+        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'semi_finished'])->get(); // support multi-level
         $uoms = Uom::all();
         $routings = Routing::all();
 
@@ -127,8 +140,13 @@ class ProductionBomController extends Controller
             $dto = ProductionBomDTO::fromArray($request->validated());
             $this->bomService->update($id, $dto);
 
+            $routeParams = ['bom' => $bom->id];
+            if ($request->filled('parent_product_id')) {
+                $routeParams['parent_product_id'] = $request->input('parent_product_id');
+            }
+
             return redirect()
-                ->route('production.boms.show', $bom->id)
+                ->route('production.boms.show', $routeParams)
                 ->with('success', 'BOM updated successfully.');
         } catch (\Exception $e) {
             return redirect()

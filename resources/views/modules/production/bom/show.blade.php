@@ -47,7 +47,21 @@
 
 @section('content')
     <!-- Success & Error Banners -->
-    @if (session('success'))
+    @if(request()->has('parent_product_id'))
+        <x-ui.alert variant="success" icon="feather-check-circle" class="mb-4">
+            <div class="d-flex align-items-center justify-content-between w-100" style="width: 100%;">
+                <div>
+                    <h6 class="alert-heading fw-bold mb-1">Child BOM Saved Successfully!</h6>
+                    <p class="fs-12 mb-0">The child BOM for <strong>{{ $bom->product->name }}</strong> is now saved. You can close this tab and return to the parent tab.</p>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-success btn-sm ms-3" onclick="window.close();">
+                        <i class="feather-x-circle me-1"></i>Close & Return
+                    </button>
+                </div>
+            </div>
+        </x-ui.alert>
+    @elseif (session('success'))
         <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
             <div class="d-flex align-items-center">
                 <div class="avatar-text avatar-md bg-success text-white me-3">
@@ -210,6 +224,16 @@
                                                 <small class="text-muted">{{ $item->material->sku }}</small>
                                                 @if($item->notes)
                                                     <span class="text-muted fs-11 mt-1"><i class="feather-info me-1"></i>{{ $item->notes }}</span>
+                                                @endif
+                                                @if(($item->material->type === 'semi_finished' || $item->material->type === 'finished_good') && isset($componentBoms[$item->material_id]))
+                                                    <div class="mt-1 d-flex flex-wrap gap-1 align-items-center">
+                                                        <span class="text-muted fs-10 fw-bold text-uppercase">BOM Versions:</span>
+                                                        @foreach($componentBoms[$item->material_id] as $cBom)
+                                                            <span class="badge bg-soft-secondary text-secondary fs-9" style="padding: 1px 4px;">
+                                                                v{{ $cBom->version }} ({{ $cBom->status }})
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
                                                 @endif
                                             </div>
                                         </td>

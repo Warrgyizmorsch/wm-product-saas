@@ -553,4 +553,108 @@ class ProductionBomTest extends TestCase
         $explosionService = app(BomExplosionService::class);
         $explosionService->explode($this->finishedGoodA->id, 10.0, $this->tenantA->id);
     }
+
+    public function test_quick_create_product_success(): void
+    {
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->postJson(route('products.quick-create'), [
+                'name' => 'Alloy Assembly Joint',
+                'sku' => 'SF-ALLOY-JOINT',
+                'type' => 'semi_finished',
+                'unit_cost' => 12.99
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonStructure(['id', 'name', 'type'])
+            ->assertJson([
+                'name' => 'Alloy Assembly Joint',
+                'type' => 'semi_finished'
+            ]);
+
+        $this->assertDatabaseHas('products', [
+            'tenant_id' => $this->tenantA->id,
+            'sku' => 'SF-ALLOY-JOINT',
+            'type' => 'semi_finished'
+        ]);
+    }
+
+    public function test_quick_create_uom_success(): void
+    {
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->postJson(route('uoms.quick-create'), [
+                'name' => 'Liters',
+                'code' => 'L'
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonStructure(['id', 'name'])
+            ->assertJson([
+                'name' => 'Liters'
+            ]);
+
+        $this->assertDatabaseHas('uoms', [
+            'tenant_id' => $this->tenantA->id,
+            'code' => 'L'
+        ]);
+    }
+
+    public function test_quick_create_product_validation(): void
+    {
+        // SKU is required
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->postJson(route('products.quick-create'), [
+                'name' => 'Incomplete Product',
+                'type' => 'raw_material'
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['sku']);
+    }
+
+    public function test_quick_create_tenant_isolation(): void
+    {
+        // Creating duplicate SKU for Tenant A is allowed if it belongs to Tenant B
+        Product::create([
+            'tenant_id' => $this->tenantB->id,
+            'name' => 'Shared SKU Product',
+            'sku' => 'SKU-SHARED',
+            'type' => 'raw_material',
+            'status' => 'active'
+        ]);
+
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->postJson(route('products.quick-create'), [
+                'name' => 'Tenant A Product',
+                'sku' => 'SKU-SHARED',
+                'type' => 'raw_material'
+            ]);
+
+        $response->assertStatus(200);
+
+        // However, Tenant A cannot duplicate their own SKU
+        $response2 = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->postJson(route('products.quick-create'), [
+                'name' => 'Tenant A Duplicate SKU',
+                'sku' => 'SKU-SHARED',
+                'type' => 'raw_material'
+            ]);
+
+        $response2->assertStatus(422)
+            ->assertJsonValidationErrors(['sku']);
+    }
+
+    public function test_create_child_bom_prefills_product(): void
+    {
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->get(route('production.boms.create', ['product_id' => $this->subAssemblyA->id]));
+
+        $response->assertStatus(200)
+            ->assertSee('value="' . $this->subAssemblyA->id . '"', false);
+    }
 }

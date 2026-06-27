@@ -165,6 +165,122 @@
                 });
             }
         });
+
+        // Generic Quick Create Master Dropdown handler
+        $(document).on('change', '.erp-premium-select', function() {
+            var select = $(this);
+            if (select.val() === '__ADD_NEW__') {
+                var master = select.attr('data-master');
+                var modalId = 'quickCreateModal_' + master;
+                var modalEl = document.getElementById(modalId);
+                if (modalEl) {
+                    var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modal.show();
+                    $(modalEl).data('trigger-select', select);
+                }
+                select.val('').trigger('change.select2'); // Reset selection
+            }
+        });
+
+        // Ensure button[form] works across all browsers/shells
+        $(document).on('click', 'button[form]', function(e) {
+            var btn = $(this);
+            var formId = btn.attr('form');
+            if (formId) {
+                var form = $('#' + formId);
+                if (form.length) {
+                    e.preventDefault();
+                    form.submit();
+                }
+            }
+        });
+
+        // Click handler for div-based quick-create forms
+        $(document).on('click', '.btn-save-master', function(e) {
+            e.preventDefault();
+            var btn = $(this);
+            var formId = btn.attr('data-form');
+            var formEl = $('#' + formId);
+            if (formEl.length) {
+                submitQuickCreateForm(formEl, btn);
+            }
+        });
+
+        // Keydown Enter handler for quick-create input fields
+        $(document).on('keydown', '.quick-create-form input', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                var formEl = $(this).closest('.quick-create-form');
+                var modalEl = formEl.closest('.modal');
+                var btn = modalEl.find('.btn-save-master');
+                if (btn.length) {
+                    submitQuickCreateForm(formEl, btn);
+                }
+            }
+        });
+
+        function submitQuickCreateForm(form, submitBtn) {
+            var modalEl = form.closest('.modal');
+            var triggerSelect = modalEl.data('trigger-select');
+
+            submitBtn.prop('disabled', true);
+            form.find('.invalid-feedback').remove();
+            form.find('.is-invalid').removeClass('is-invalid');
+            form.find('.alert-danger').remove();
+
+            var inputs = form.find('input, select, textarea');
+            var formData = inputs.serialize();
+
+            $.ajax({
+                url: form.attr('data-action'),
+                method: 'POST',
+                data: formData,
+                success: function(response) {
+                    submitBtn.prop('disabled', false);
+                    if (response.id && response.name) {
+                        var modal = bootstrap.Modal.getInstance(modalEl[0]);
+                        modal.hide();
+                        
+                        // Clear inputs
+                        inputs.each(function() {
+                            var el = $(this);
+                            if (el.attr('type') !== 'hidden' && el.attr('name') !== '_token') {
+                                el.val('');
+                            }
+                        });
+
+                        if (triggerSelect) {
+                            var optionEl = $('<option>', {
+                                value: response.id,
+                                text: response.name,
+                                selected: true
+                            });
+                            if (response.type) {
+                                optionEl.attr('data-type', response.type);
+                            }
+                            $(triggerSelect).append(optionEl).trigger('change');
+                        }
+                    }
+                },
+                error: function(xhr) {
+                    submitBtn.prop('disabled', false);
+                    if (xhr.status === 422) {
+                        var errors = xhr.responseJSON.errors;
+                        $.each(errors, function(field, messages) {
+                            var input = form.find('[name="' + field + '"]');
+                            if (input.length) {
+                                input.addClass('is-invalid');
+                                input.after('<div class="invalid-feedback">' + messages[0] + '</div>');
+                            } else {
+                                form.prepend('<div class="alert alert-danger mb-3">' + messages[0] + '</div>');
+                            }
+                        });
+                    } else {
+                        form.prepend('<div class="alert alert-danger mb-3">' + (xhr.responseJSON?.message || 'An error occurred.') + '</div>');
+                    }
+                }
+            });
+        }
     </script>
     @stack('scripts')
 </body>

@@ -32,42 +32,31 @@
 @section('content')
     <!-- Validation Errors & Warning Banners -->
     @if ($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
-                    <ul class="mb-0 fs-12 ps-3">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+            <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
+            <ul class="mb-0 fs-12 ps-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+        <div class="mb-4"></div>
     @endif
 
     <!-- Session Error Message -->
     @if (session('error'))
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                    <p class="fs-12 mb-0">{{ session('error') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+            <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+            <p class="fs-12 mb-0">{{ session('error') }}</p>
+        </x-ui.alert>
+        <div class="mb-4"></div>
     @endif
 
     <form method="POST" action="{{ route('production.boms.store') }}" x-data="bomForm">
         @csrf
+        @if(request()->has('parent_product_id'))
+            <input type="hidden" name="parent_product_id" value="{{ request('parent_product_id') }}">
+        @endif
 
         <div class="row g-4">
             <!-- Left Column: Header Information -->
@@ -81,7 +70,17 @@
                             <x-ui.input label="BOM Description Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" value="{{ old('bom_name') }}" required />
                         </div>
                         <div class="col-md-3">
-                            <x-ui.select label="Target Finished Product" name="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id') }}" data-select2-selector="default" required />
+                            <x-ui.select label="Target Finished Product" name="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id', $selectedProductId ?? '') }}" data-select2-selector="default" master="product" required>
+                                <x-ui.input label="Product Name" name="name" placeholder="e.g. Steel Sheet" required />
+                                <x-ui.input label="SKU / Item Code" name="sku" placeholder="e.g. RM-STEEL-01" required />
+                                <x-ui.select label="Product Type" name="type" :options="[
+                                    'finished_good' => 'Finished Good (Standard Sales/Assembly)',
+                                    'semi_finished' => 'Semi Finished Product (Sub-Assembly)',
+                                    'raw_material' => 'Raw Material',
+                                    'component' => 'Component / Hardware'
+                                ]" selected="semi_finished" required />
+                                <x-ui.input label="Standard Unit Cost" name="unit_cost" type="number" step="any" placeholder="0.00" value="0.00" />
+                            </x-ui.select>
                         </div>
                         <div class="col-md-3">
                             <x-ui.select label="BOM Type" name="bom_type" :options="[
@@ -97,7 +96,10 @@
                             <x-ui.input label="Base Production Qty" name="base_quantity" type="number" step="any" placeholder="1.0" value="{{ old('base_quantity', '1.0000') }}" required />
                         </div>
                         <div class="col-md-3">
-                            <x-ui.select label="Base UOM" name="base_uom_id" :options="['' => 'Select UOM'] + $uoms->pluck('name', 'id')->toArray()" selected="{{ old('base_uom_id') }}" data-select2-selector="default" required />
+                            <x-ui.select label="Base UOM" name="base_uom_id" :options="['' => 'Select UOM'] + $uoms->pluck('name', 'id')->toArray()" selected="{{ old('base_uom_id') }}" data-select2-selector="default" master="uom" required>
+                                <x-ui.input label="UOM Name" name="name" placeholder="e.g. Pieces" required />
+                                <x-ui.input label="UOM Code / Abbreviation" name="code" placeholder="e.g. PCS" required />
+                            </x-ui.select>
                         </div>
                         <div class="col-md-2">
                             <x-ui.input label="BOM Version ID" name="version" placeholder="e.g. 1.0.0" value="{{ old('version', '1.0.0') }}" required />
@@ -151,14 +153,30 @@
                                         <x-ui.select x-bind:name="'items['+index+'][material_id]'" class="fs-13" x-model="item.material_id" required data-select2-selector="default">
                                             <option value="">Select Material...</option>
                                             @foreach($materials as $material)
-                                                <option value="{{ $material->id }}">{{ $material->name }} ({{ $material->sku }})</option>
+                                                <option value="{{ $material->id }}" data-type="{{ $material->type }}">{{ $material->name }} ({{ $material->sku }})</option>
                                             @endforeach
                                         </x-ui.select>
+                                        <template x-if="errors && errors['items.' + index + '.material_id']">
+                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
+                                        </template>
+                                        <template x-if="getMaterialType(item.material_id) === 'semi_finished'">
+                                            <div class="mt-2 d-flex align-items-center gap-2">
+                                                <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-xs btn-soft-primary">
+                                                    <i class="feather-plus me-1"></i>Create Child BOM
+                                                </a>
+                                                <a x-bind:href="'{{ route('production.boms.index') }}?product_id=' + item.material_id" target="_blank" class="btn btn-xs btn-soft-info">
+                                                    <i class="feather-eye me-1"></i>View BOMs
+                                                </a>
+                                            </div>
+                                        </template>
                                     </td>
                                     
                                     <!-- Quantity -->
                                     <td>
                                         <x-ui.input type="number" step="any" x-bind:name="'items['+index+'][quantity]'" class="text-end fs-13" x-model="item.quantity" placeholder="0.00" required min="0.0001" />
+                                        <template x-if="errors && errors['items.' + index + '.quantity']">
+                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.quantity'][0]"></span>
+                                        </template>
                                     </td>
                                     
                                     <!-- UOM -->
@@ -169,23 +187,38 @@
                                                 <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
                                             @endforeach
                                         </x-ui.select>
+                                        <template x-if="errors && errors['items.' + index + '.uom_id']">
+                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.uom_id'][0]"></span>
+                                        </template>
                                     </td>
                                     
                                     <!-- Material Scrap Percentage -->
                                     <td>
                                         <x-ui.input type="number" step="any" x-bind:name="'items['+index+'][material_scrap_percentage]'" class="text-end fs-13 text-danger" x-model="item.material_scrap_percentage" placeholder="0.00" min="0" max="100" />
+                                        <template x-if="errors && errors['items.' + index + '.material_scrap_percentage']">
+                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_scrap_percentage'][0]"></span>
+                                        </template>
                                     </td>
 
                                     <!-- Priority -->
                                     <td>
                                         <x-ui.input type="number" x-bind:name="'items['+index+'][priority]'" class="text-end fs-13" x-model="item.priority" placeholder="1" min="1" />
+                                        <template x-if="errors && errors['items.' + index + '.priority']">
+                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.priority'][0]"></span>
+                                        </template>
                                     </td>
 
                                     <!-- Validity limits (effective_from, effective_to) -->
                                     <td>
                                         <div class="d-flex flex-column gap-1">
                                             <x-ui.input type="date" x-bind:name="'items['+index+'][effective_from]'" class="form-control-sm fs-11" x-model="item.effective_from" />
+                                            <template x-if="errors && errors['items.' + index + '.effective_from']">
+                                                <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_from'][0]"></span>
+                                            </template>
                                             <x-ui.input type="date" x-bind:name="'items['+index+'][effective_to]'" class="form-control-sm fs-11" x-model="item.effective_to" />
+                                            <template x-if="errors && errors['items.' + index + '.effective_to']">
+                                                <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_to'][0]"></span>
+                                            </template>
                                         </div>
                                     </td>
                                     
@@ -207,6 +240,9 @@
                                             </div>
                                             <div x-show="item.is_alternative">
                                                 <x-ui.input type="text" x-bind:name="'items['+index+'][alternative_group]'" class="form-control-sm fs-11" placeholder="Alt Group Code..." x-model="item.alternative_group" />
+                                                <template x-if="errors && errors['items.' + index + '.alternative_group']">
+                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.alternative_group'][0]"></span>
+                                                </template>
                                             </div>
                                         </div>
                                     </td>
@@ -248,6 +284,14 @@
         document.addEventListener('alpine:init', () => {
             Alpine.data('bomForm', () => ({
                 items: @json($oldItems),
+                errors: @json($errors->toArray()),
+                materials: @json($materials),
+
+                getMaterialType(materialId) {
+                    if (!materialId) return '';
+                    var mat = this.materials.find(m => m.id == materialId);
+                    return mat ? mat.type : '';
+                },
 
                 init() {
                     // Make sure structure is consistent and has a unique key for tracking
@@ -301,6 +345,14 @@
                             dropdownParent: $(rowEl).closest('.table-responsive-container')
                         });
                         
+                        // Capture type on init
+                        var nameAttr = $select.attr('name') || '';
+                        if (nameAttr.indexOf('material_id') !== -1) {
+                            var val = $select.val();
+                            var selectedOption = $select.find('option[value="' + val + '"]');
+                            item.material_type = selectedOption.attr('data-type') || '';
+                        }
+                        
                         // Sync select2 changes to Alpine.js
                         $select.on('change.select2', function () {
                             var val = $select.val();
@@ -308,6 +360,8 @@
                             
                             if (nameAttr.indexOf('material_id') !== -1) {
                                 item.material_id = val;
+                                var selectedOption = $select.find('option[value="' + val + '"]');
+                                item.material_type = selectedOption.attr('data-type') || '';
                             } else if (nameAttr.indexOf('uom_id') !== -1) {
                                 item.uom_id = val;
                             }

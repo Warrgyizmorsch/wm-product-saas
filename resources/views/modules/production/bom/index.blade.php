@@ -148,76 +148,54 @@
                             @endif
                         </td>
                         <td class="text-end">
-                            <div class="dropdown d-inline-block">
-                                <button class="btn btn-sm btn-light-brand dropdown-toggle no-arrow" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="feather-more-vertical"></i>
+                            <div class="d-flex align-items-center gap-1 justify-content-end">
+                                <a href="{{ route('production.boms.show', $bom->id) }}" class="btn btn-sm btn-light-brand" title="View Recipe">
+                                    <i class="feather-eye"></i>
+                                </a>
+                                
+                                @if($bom->isDraft() || $bom->isUnderRevision())
+                                    <a href="{{ route('production.boms.edit', $bom->id) }}" class="btn btn-sm btn-soft-primary" title="Edit Draft">
+                                        <i class="feather-edit"></i>
+                                    </a>
+                                    <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-soft-info" title="Submit Approval">
+                                            <i class="feather-send"></i>
+                                        </button>
+                                    </form>
+                                @endif
+
+                                @if($bom->isPendingApproval())
+                                    <form method="POST" action="{{ route('production.boms.approve', $bom->id) }}" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-soft-success" title="Approve BOM">
+                                            <i class="feather-check-circle"></i>
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-sm btn-soft-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ $bom->id }}" title="Reject BOM">
+                                        <i class="feather-x-circle"></i>
+                                    </button>
+                                @endif
+
+                                @if($bom->isApproved())
+                                    <button type="button" class="btn btn-sm btn-soft-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $bom->id }}" title="Cancel BOM">
+                                        <i class="feather-slash"></i>
+                                    </button>
+                                @endif
+
+                                <button type="button" class="btn btn-sm btn-soft-warning" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ $bom->id }}" title="Duplicate Version">
+                                    <i class="feather-copy"></i>
                                 </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li>
-                                        <a class="dropdown-item" href="{{ route('production.boms.show', $bom->id) }}">
-                                            <i class="feather-eye me-2 text-muted"></i>View Recipe
-                                        </a>
-                                    </li>
-                                    
-                                    @if($bom->isDraft() || $bom->isUnderRevision())
-                                        <li>
-                                            <a class="dropdown-item" href="{{ route('production.boms.edit', $bom->id) }}">
-                                                <i class="feather-edit me-2 text-muted"></i>Edit Draft
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item">
-                                                    <i class="feather-send me-2 text-muted"></i>Submit Approval
-                                                </button>
-                                            </form>
-                                        </li>
-                                    @endif
 
-                                    @if($bom->isPendingApproval())
-                                        <li>
-                                            <form method="POST" action="{{ route('production.boms.approve', $bom->id) }}" class="d-inline">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item text-success">
-                                                    <i class="feather-check-circle me-2"></i>Approve BOM
-                                                </button>
-                                            </form>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#rejectModal{{ $bom->id }}">
-                                                <i class="feather-x-circle me-2"></i>Reject BOM
-                                            </a>
-                                        </li>
-                                    @endif
-
-                                    @if($bom->isApproved())
-                                        <li>
-                                            <a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $bom->id }}">
-                                                <i class="feather-slash me-2"></i>Cancel BOM
-                                            </a>
-                                        </li>
-                                    @endif
-
-                                    <li>
-                                        <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ $bom->id }}">
-                                            <i class="feather-copy me-2 text-muted"></i>Duplicate Version
-                                        </a>
-                                    </li>
-
-                                    @if($bom->isDraft() || $bom->isUnderRevision())
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <form method="POST" action="{{ route('production.boms.destroy', $bom->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this BOM?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="dropdown-item text-danger">
-                                                    <i class="feather-trash-2 me-2"></i>Delete BOM
-                                                </button>
-                                            </form>
-                                        </li>
-                                    @endif
-                                </ul>
+                                @if($bom->isDraft() || $bom->isUnderRevision())
+                                    <form method="POST" action="{{ route('production.boms.destroy', $bom->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this BOM?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-soft-danger" title="Delete BOM">
+                                            <i class="feather-trash-2"></i>
+                                        </button>
+                                    </form>
+                                @endif
                             </div>
 
                             <!-- Duplicate Modal -->
