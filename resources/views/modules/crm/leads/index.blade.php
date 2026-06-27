@@ -150,11 +150,9 @@
                     <thead class="table-light fs-11 text-uppercase text-muted">
                         <tr>
                             <th class="ps-4">Call Date & Time</th>
-                            <th>Company Name</th>
-                            <th>Contact Person</th>
-                            <th>Contact Phone/Email</th>
-                            <th class="text-end">Expected Amount</th>
-                            <th>Sale Date</th>
+                            <th>Lead / Company</th>
+                            <th>Phone / Email</th>
+                            <th class="text-end">Value / Est. Sale</th>
                             <th>Source</th>
                             <th>Priority</th>
                             <th>Segment</th>
@@ -177,10 +175,8 @@
                                     </div>
                                 </td>
                                 <td>
-                                    <span class="fw-bold text-dark">{{ $lead->company_name }}</span>
-                                </td>
-                                <td>
-                                    <span>{{ $lead->contact_person ?: 'N/A' }}</span>
+                                    <span class="fw-bold text-dark d-block mb-1">{{ $lead->company_name }}</span>
+                                    <span class="text-muted fs-11"><i class="feather-user me-1 fs-10 text-primary"></i>{{ $lead->contact_person ?: 'N/A' }}</span>
                                 </td>
                                 <td>
                                     @if ($lead->phone)
@@ -193,22 +189,24 @@
                                         <span class="text-muted">N/A</span>
                                     @endif
                                 </td>
-                                <td class="text-end fw-bold text-dark">
-                                    {{ $lead->expected_amount ? '₹' . number_format($lead->expected_amount, 2) : '—' }}
-                                </td>
-                                <td>
-                                    <span>{{ $lead->expected_sale_date ? $lead->expected_sale_date->format('d/m/Y') : '—' }}</span>
+                                <td class="text-end">
+                                    <span class="fw-bold text-dark d-block mb-1">{{ $lead->expected_amount ? '₹' . number_format($lead->expected_amount, 2) : '—' }}</span>
+                                    @if($lead->expected_sale_date)
+                                        <span class="text-muted fs-11"><i class="feather-calendar me-1 fs-10 text-success"></i>{{ $lead->expected_sale_date->format('d/m/Y') }}</span>
+                                    @else
+                                        <span class="text-muted fs-11">—</span>
+                                    @endif
                                 </td>
                                 <td>
                                     <span class="badge bg-soft-secondary text-secondary">{{ $lead->source }}</span>
                                 </td>
                                 <td>
                                     @if ($lead->priority == 'High' || $lead->priority == 'Urgent')
-                                        <span class="badge bg-soft-danger text-danger"><i class="feather-arrow-up-right me-1 fs-10"></i>{{ $lead->priority }}</span>
+                                        <span class="badge bg-soft-danger text-danger">{{ $lead->priority }}</span>
                                     @elseif ($lead->priority == 'Medium')
-                                        <span class="badge bg-soft-warning text-warning"><i class="feather-minus me-1 fs-10"></i>{{ $lead->priority }}</span>
+                                        <span class="badge bg-soft-warning text-warning">{{ $lead->priority }}</span>
                                     @else
-                                        <span class="badge bg-soft-success text-success"><i class="feather-arrow-down-left me-1 fs-10"></i>{{ $lead->priority }}</span>
+                                        <span class="badge bg-soft-success text-success">{{ $lead->priority }}</span>
                                     @endif
                                 </td>
                                 <td>
@@ -250,7 +248,7 @@
                                         <a href="{{ route('crm.leads.edit', $lead->id) }}" class="avatar-text avatar-md bg-soft-info text-info" data-bs-toggle="tooltip" title="Edit">
                                             <i class="feather feather-edit-3"></i>
                                         </a>
-
+ 
                                         <!-- Delete -->
                                         <form id="delete-form-{{ $lead->id }}" action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" class="d-inline">
                                             @csrf
@@ -264,7 +262,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="text-center py-5 text-muted">
+                                <td colspan="9" class="text-center py-5 text-muted">
                                     <i class="feather-users fs-1 d-block mb-3 text-light"></i>
                                     No leads registered yet. Click "Add New Call / Lead" to create one.
                                 </td>
@@ -289,6 +287,11 @@
             height: auto;
             font-size: 11px;
             font-weight: 600;
+        }
+        /* Ensure status dropdown inside table has a fixed minimum width */
+        .status-select + .select2-container {
+            min-width: 160px !important;
+            width: 160px !important;
         }
     </style>
 @endpush
@@ -331,7 +334,7 @@
                 // If no rows are visible and we have actual data rows, show a "No results found" row
                 if (visibleRows === 0 && totalRows > 0) {
                     $('#leadsTable tbody').append(
-                        '<tr class="no-search-results"><td colspan="11" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>No matching leads found for "' + value + '"</td></tr>'
+                        '<tr class="no-search-results"><td colspan="9" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>No matching leads found for "' + value + '"</td></tr>'
                     );
                 }
             });
