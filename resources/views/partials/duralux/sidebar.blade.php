@@ -21,7 +21,12 @@
                 ['label' => 'Contacts'],
                 ['label' => 'Activities'],
             ]],
-            ['label' => 'Sales', 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => ['Quotations', 'Sales Orders', 'Invoices', 'Receipts']],
+             ['label' => 'Sales', 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
+                ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
+                ['label' => 'Sales Orders'],
+                ['label' => 'Invoices'],
+                ['label' => 'Receipts'],
+            ]],
             ['label' => 'Projects', 'icon' => 'feather-briefcase', 'url' => '#', 'children' => ['Projects', 'Milestones', 'Tasks', 'Timesheets']],
         ],
         'Supply Chain' => [
