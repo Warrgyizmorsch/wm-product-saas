@@ -27,7 +27,7 @@
         'Supply Chain' => [
             ['label' => 'Inventory', 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],
             ['label' => 'Purchase', 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', 'Requests', 'Purchase Orders', 'Bills']],
-            ['label' => 'Production', 'icon' => 'feather-cpu', 'url' => '#', 'children' => ['BOM', 'Work Orders', 'Planning', 'Quality']],
+            ['label' => 'Production', 'icon' => 'feather-cpu', 'url' => '#', 'children' => [['label' => 'BOM', 'route' => 'production.boms.index'], 'Work Orders', 'Planning', 'Quality']],
         ],
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => ['Chart of Accounts', 'Journals', 'Ledgers', 'Tax Reports']],
