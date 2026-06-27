@@ -71,17 +71,7 @@
                             <x-ui.input label="BOM Description Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" value="{{ old('bom_name', $bom->bom_name) }}" required />
                         </div>
                         <div class="col-md-3">
-                            <x-ui.select label="Target Finished Product" name="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id', $bom->product_id) }}" data-select2-selector="default" master="product" required>
-                                <x-ui.input label="Product Name" name="name" placeholder="e.g. Steel Sheet" required />
-                                <x-ui.input label="SKU / Item Code" name="sku" placeholder="e.g. RM-STEEL-01" required />
-                                <x-ui.select label="Product Type" name="type" :options="[
-                                    'finished_good' => 'Finished Good (Standard Sales/Assembly)',
-                                    'semi_finished' => 'Semi Finished Product (Sub-Assembly)',
-                                    'raw_material' => 'Raw Material',
-                                    'component' => 'Component / Hardware'
-                                ]" selected="semi_finished" required />
-                                <x-ui.input label="Standard Unit Cost" name="unit_cost" type="number" step="any" placeholder="0.00" value="0.00" />
-                            </x-ui.select>
+                            <x-ui.select label="Target Finished Product" name="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id', $bom->product_id) }}" data-select2-selector="default" master="product" required />
                         </div>
                         <div class="col-md-3">
                             <x-ui.select label="BOM Type" name="bom_type" :options="[
@@ -97,10 +87,7 @@
                             <x-ui.input label="Base Production Qty" name="base_quantity" type="number" step="any" placeholder="1.0" value="{{ old('base_quantity', $bom->base_quantity) }}" required />
                         </div>
                         <div class="col-md-3">
-                            <x-ui.select label="Base UOM" name="base_uom_id" :options="['' => 'Select UOM'] + $uoms->pluck('name', 'id')->toArray()" selected="{{ old('base_uom_id', $bom->base_uom_id) }}" data-select2-selector="default" master="uom" required>
-                                <x-ui.input label="UOM Name" name="name" placeholder="e.g. Pieces" required />
-                                <x-ui.input label="UOM Code / Abbreviation" name="code" placeholder="e.g. PCS" required />
-                            </x-ui.select>
+                            <x-ui.select label="Base UOM" name="base_uom_id" :options="['' => 'Select UOM'] + $uoms->pluck('name', 'id')->toArray()" selected="{{ old('base_uom_id', $bom->base_uom_id) }}" data-select2-selector="default" master="uom" required />
                         </div>
                         <div class="col-md-2">
                             <x-ui.input label="BOM Version ID" name="version" placeholder="e.g. 1.0.0" value="{{ old('version', $bom->version) }}" required />
@@ -161,11 +148,11 @@
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
                                         </template>
                                         <template x-if="getMaterialType(item.material_id) === 'semi_finished'">
-                                            <div class="mt-2 d-flex align-items-center gap-2">
-                                                <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-xs btn-soft-primary">
+                                            <div class="erp-child-bom-cta">
+                                                <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-soft-primary">
                                                     <i class="feather-plus me-1"></i>Create Child BOM
                                                 </a>
-                                                <a x-bind:href="'{{ route('production.boms.index') }}?product_id=' + item.material_id" target="_blank" class="btn btn-xs btn-soft-info">
+                                                <a x-bind:href="'{{ route('production.boms.index') }}?product_id=' + item.material_id" target="_blank" class="btn btn-soft-info">
                                                     <i class="feather-eye me-1"></i>View BOMs
                                                 </a>
                                             </div>
@@ -384,4 +371,7 @@
             }));
         });
     </script>
+
+    {{-- Global master quick-create modals (rendered once, shared by all selects with master=) --}}
+    <x-ui.master-modals :masters="['product', 'uom']" />
 @endsection

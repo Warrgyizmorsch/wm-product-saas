@@ -149,53 +149,45 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex align-items-center gap-1 justify-content-end">
-                                <a href="{{ route('production.boms.show', $bom->id) }}" class="btn btn-sm btn-light-brand" title="View Recipe">
-                                    <i class="feather-eye"></i>
-                                </a>
-                                
+
+                                {{-- View --}}
+                                <x-ui.icon-btn href="{{ route('production.boms.show', $bom->id) }}" variant="soft-info" title="View Recipe" icon="feather-eye" />
+
+                                {{-- Edit / Submit (draft only) --}}
                                 @if($bom->isDraft() || $bom->isUnderRevision())
-                                    <a href="{{ route('production.boms.edit', $bom->id) }}" class="btn btn-sm btn-soft-primary" title="Edit Draft">
-                                        <i class="feather-edit"></i>
-                                    </a>
+                                    <x-ui.icon-btn href="{{ route('production.boms.edit', $bom->id) }}" variant="soft-primary" title="Edit Draft" icon="feather-edit" />
                                     <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-soft-info" title="Submit Approval">
-                                            <i class="feather-send"></i>
-                                        </button>
+                                        <x-ui.icon-btn type="submit" variant="soft-info" title="Submit for Approval" icon="feather-send" />
                                     </form>
                                 @endif
 
+                                {{-- Approve / Reject --}}
                                 @if($bom->isPendingApproval())
                                     <form method="POST" action="{{ route('production.boms.approve', $bom->id) }}" class="d-inline">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-soft-success" title="Approve BOM">
-                                            <i class="feather-check-circle"></i>
-                                        </button>
+                                        <x-ui.icon-btn type="submit" variant="soft-success" title="Approve BOM" icon="feather-check-circle" />
                                     </form>
-                                    <button type="button" class="btn btn-sm btn-soft-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ $bom->id }}" title="Reject BOM">
-                                        <i class="feather-x-circle"></i>
-                                    </button>
+                                    <x-ui.icon-btn type="button" variant="soft-danger" title="Reject BOM" icon="feather-x-circle" data-bs-toggle="modal" data-bs-target="#rejectModal{{ $bom->id }}" />
                                 @endif
 
+                                {{-- Cancel --}}
                                 @if($bom->isApproved())
-                                    <button type="button" class="btn btn-sm btn-soft-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $bom->id }}" title="Cancel BOM">
-                                        <i class="feather-slash"></i>
-                                    </button>
+                                    <x-ui.icon-btn type="button" variant="soft-danger" title="Cancel BOM" icon="feather-slash" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $bom->id }}" />
                                 @endif
 
-                                <button type="button" class="btn btn-sm btn-soft-warning" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ $bom->id }}" title="Duplicate Version">
-                                    <i class="feather-copy"></i>
-                                </button>
+                                {{-- Duplicate --}}
+                                <x-ui.icon-btn type="button" variant="soft-warning" title="Duplicate Version" icon="feather-copy" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ $bom->id }}" />
 
+                                {{-- Delete (draft only) --}}
                                 @if($bom->isDraft() || $bom->isUnderRevision())
-                                    <form method="POST" action="{{ route('production.boms.destroy', $bom->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this BOM?');">
+                                    <form method="POST" action="{{ route('production.boms.destroy', $bom->id) }}" class="d-inline" onsubmit="return confirm('Delete this BOM permanently?');">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-soft-danger" title="Delete BOM">
-                                            <i class="feather-trash-2"></i>
-                                        </button>
+                                        <x-ui.icon-btn type="submit" variant="soft-danger" title="Delete BOM" icon="feather-trash-2" />
                                     </form>
                                 @endif
+
                             </div>
 
                             <!-- Duplicate Modal -->
