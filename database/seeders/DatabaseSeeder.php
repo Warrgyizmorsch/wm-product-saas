@@ -39,5 +39,9 @@ class DatabaseSeeder extends Seeder
                 'password' => 'password',
             ],
         );
+
+        $this->call([
+            ProductionBomSeeder::class,
+        ]);
     }
 }

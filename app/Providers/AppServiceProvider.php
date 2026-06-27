@@ -15,6 +15,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(Tenancy::class);
         $this->app->singleton(TenantContext::class, fn ($app) => $app->make(Tenancy::class));
+        
+        $this->app->bind(
+            \App\Domains\Production\Repositories\ProductionBomRepositoryInterface::class,
+            \App\Domains\Production\Repositories\ProductionBomRepository::class
+        );
     }
 
     /**
@@ -22,6 +27,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionBom::class,
+            \App\Domains\Production\Policies\ProductionBomPolicy::class
+        );
     }
 }
