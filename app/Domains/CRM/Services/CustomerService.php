@@ -24,4 +24,9 @@ class CustomerService
     {
         return $this->customers->create($data);
     }
+
+    public function latest(): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->customers->latest();
+    }
 }
