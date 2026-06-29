@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Dashboard | SaaS ERP')
-@section('page-title', 'Executive Dashboard')
-@section('breadcrumb', 'Executive Dashboard')
+@section('title', __('ui.dashboard') . ' | SaaS ERP')
+@section('page-title', __('ui.executive_dashboard'))
+@section('breadcrumb', __('ui.executive_dashboard'))
 
 @section('page-actions')
     <div id="reportrange" class="reportrange-picker d-flex align-items-center">
@@ -11,10 +11,10 @@
     <div class="dropdown filter-dropdown">
         <a class="btn btn-md btn-light-brand" data-bs-toggle="dropdown" data-bs-offset="0, 10" data-bs-auto-close="outside">
             <i class="feather-filter me-2"></i>
-            <span>Filter</span>
+            <span>{{ __('ui.filter') }}</span>
         </a>
         <div class="dropdown-menu dropdown-menu-end">
-            @foreach (['Company', 'Branch', 'Department', 'Owner', 'Status'] as $filter)
+            @foreach ([__('ui.company'), __('ui.branch'), __('ui.department'), __('ui.owner'), __('ui.status')] as $filter)
                 <div class="dropdown-item">
                     <div class="custom-control custom-checkbox">
                         <input type="checkbox" class="custom-control-input" id="filter{{ $filter }}" checked>
@@ -25,26 +25,26 @@
             <div class="dropdown-divider"></div>
             <a href="javascript:void(0);" class="dropdown-item">
                 <i class="feather-plus me-3"></i>
-                <span>Create New</span>
+                <span>{{ __('ui.create_new') }}</span>
             </a>
             <a href="javascript:void(0);" class="dropdown-item">
                 <i class="feather-filter me-3"></i>
-                <span>Manage Filter</span>
+                <span>{{ __('ui.manage_filter') }}</span>
             </a>
         </div>
     </div>
     <button type="button" class="btn btn-primary">
-        <i class="feather-plus me-2"></i>New Workflow
+        <i class="feather-plus me-2"></i>{{ __('ui.new_workflow') }}
     </button>
 @endsection
 
 @section('content')
     <div class="row g-4">
         @foreach ([
-            ['label' => 'Monthly Revenue', 'value' => '$284.6K', 'trend' => '+12.4%', 'icon' => 'feather-trending-up', 'tone' => 'primary'],
-            ['label' => 'Open Sales Orders', 'value' => '428', 'trend' => '36 urgent', 'icon' => 'feather-shopping-cart', 'tone' => 'warning'],
-            ['label' => 'Inventory Value', 'value' => '$1.82M', 'trend' => '18 low stock', 'icon' => 'feather-box', 'tone' => 'success'],
-            ['label' => 'Payroll This Month', 'value' => '$96.2K', 'trend' => '214 staff', 'icon' => 'feather-users', 'tone' => 'info'],
+            ['label' => __('ui.monthly_revenue'), 'value' => '$284.6K', 'trend' => '+12.4%', 'icon' => 'feather-trending-up', 'tone' => 'primary'],
+            ['label' => __('ui.open_sales_orders'), 'value' => '428', 'trend' => '36 urgent', 'icon' => 'feather-shopping-cart', 'tone' => 'warning'],
+            ['label' => __('ui.inventory_value'), 'value' => '$1.82M', 'trend' => '18 low stock', 'icon' => 'feather-box', 'tone' => 'success'],
+            ['label' => __('ui.payroll_this_month'), 'value' => '$96.2K', 'trend' => '214 staff', 'icon' => 'feather-users', 'tone' => 'info'],
         ] as $metric)
             <div class="col-xxl-3 col-md-6">
                 <div class="card stretch stretch-full">
@@ -69,17 +69,17 @@
         <div class="col-xxl-8">
             <div class="card stretch stretch-full">
                 <div class="card-header">
-                    <h5 class="card-title">ERP Module Readiness</h5>
+                    <h5 class="card-title">{{ __('ui.erp_module_readiness') }}</h5>
                     <div class="card-header-action">
                         <a href="#" class="avatar-text avatar-md" data-bs-toggle="refresh"><i class="feather-refresh-cw"></i></a>
                     </div>
                 </div>
                 <div class="card-body">
                     @foreach ([
-                        ['name' => 'CRM & Sales', 'value' => 25, 'color' => 'primary'],
-                        ['name' => 'Inventory & Purchase', 'value' => 18, 'color' => 'success'],
-                        ['name' => 'HRMS & Payroll', 'value' => 12, 'color' => 'warning'],
-                        ['name' => 'Accounting Core', 'value' => 8, 'color' => 'danger'],
+                        ['name' => __('ui.crm_and_sales'), 'value' => 25, 'color' => 'primary'],
+                        ['name' => __('ui.inventory_purchase'), 'value' => 18, 'color' => 'success'],
+                        ['name' => __('ui.hrms_payroll'), 'value' => 12, 'color' => 'warning'],
+                        ['name' => __('ui.accounting_core'), 'value' => 8, 'color' => 'danger'],
                     ] as $module)
                         <div class="mb-4">
                             <div class="d-flex justify-content-between mb-2">
@@ -98,15 +98,15 @@
         <div class="col-xxl-4">
             <div class="card stretch stretch-full">
                 <div class="card-header">
-                    <h5 class="card-title">Platform Setup</h5>
+                    <h5 class="card-title">{{ __('ui.platform_setup') }}</h5>
                 </div>
                 <div class="card-body">
                     @foreach ([
-                        ['Tenant isolation', 'Done', 'success'],
-                        ['ERP app shell', 'Done', 'success'],
-                        ['Authentication', 'Next', 'warning'],
-                        ['Roles & permissions', 'Next', 'warning'],
-                        ['Audit logging', 'Planned', 'secondary'],
+                        [__('ui.tenant_isolation'), __('ui.done'), 'success'],
+                        [__('ui.erp_app_shell'), __('ui.done'), 'success'],
+                        ['Authentication', __('ui.next'), 'warning'],
+                        [__('ui.roles_permissions'), __('ui.next'), 'warning'],
+                        ['Audit logging', __('ui.planned'), 'secondary'],
                     ] as $item)
                         <div class="d-flex align-items-center justify-content-between py-3 border-bottom">
                             <span class="fw-semibold text-dark">{{ $item[0] }}</span>
@@ -120,11 +120,11 @@
 
     <div class="card">
         <div class="card-header">
-            <h5 class="card-title">Large Scale ERP Domains</h5>
+            <h5 class="card-title">{{ __('ui.large_scale_erp_domains') }}</h5>
         </div>
         <div class="card-body">
             <div class="row g-3 erp-domain-grid">
-                @foreach (['CRM', 'Sales', 'Inventory', 'Purchase', 'Production', 'HRMS', 'Projects', 'Accounting', 'Administration'] as $domain)
+                @foreach ([__('ui.crm'), __('ui.sales'), __('ui.inventory'), __('ui.purchase'), __('ui.production'), __('ui.hrms'), __('ui.projects'), __('ui.accounting'), __('ui.administration')] as $domain)
                     <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
                         <a href="#" class="erp-domain-tile">
                             <span>{{ $domain }}</span>

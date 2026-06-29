@@ -26,19 +26,19 @@
         : collect();
 
     $quickCreates = [
-        ['label' => 'Customer', 'icon' => 'feather-user-plus'],
-        ['label' => 'Sales Invoice', 'icon' => 'feather-file-plus'],
+        ['label' => __('ui.customer'), 'icon' => 'feather-user-plus'],
+        ['label' => __('ui.sales_invoice'), 'icon' => 'feather-file-plus'],
         ['label' => 'Purchase Order', 'icon' => 'feather-truck'],
-        ['label' => 'Stock Adjustment', 'icon' => 'feather-package'],
-        ['label' => 'Employee', 'icon' => 'feather-user-check'],
-        ['label' => 'Journal Entry', 'icon' => 'feather-credit-card'],
+        ['label' => __('ui.stock_adjustment'), 'icon' => 'feather-package'],
+        ['label' => __('ui.employee'), 'icon' => 'feather-user-check'],
+        ['label' => __('ui.journal_entry'), 'icon' => 'feather-credit-card'],
     ];
 
     $moduleTabs = [
         [
             'target' => 'erp-front-office',
             'size' => 'sm',
-            'title' => 'Front Office',
+            'title' => __('ui.front_office'),
             'icon' => 'feather-users',
             'description' => 'Customer lifecycle, pipeline, sales execution, and project delivery.',
             'modules' => [
@@ -53,7 +53,7 @@
         [
             'target' => 'erp-operations',
             'size' => 'md',
-            'title' => 'Operations',
+            'title' => __('ui.operations'),
             'icon' => 'feather-box',
             'description' => 'Procurement, inventory movement, production planning, and quality control.',
             'modules' => [
@@ -68,7 +68,7 @@
         [
             'target' => 'erp-back-office',
             'size' => 'lg',
-            'title' => 'Back Office',
+            'title' => __('ui.back_office'),
             'icon' => 'feather-credit-card',
             'description' => 'Accounting, payroll, compliance reports, and management dashboards.',
             'modules' => [
@@ -83,7 +83,7 @@
         [
             'target' => 'erp-platform',
             'size' => 'xl',
-            'title' => 'Platform',
+            'title' => __('ui.platform'),
             'icon' => 'feather-shield',
             'description' => 'Tenant administration, access policies, workflow automation, and audit trail.',
             'modules' => [
@@ -97,20 +97,6 @@
         ],
     ];
 
-    $languages = [
-        ['code' => 'sa', 'name' => 'Arabic'],
-        ['code' => 'bd', 'name' => 'Bengali'],
-        ['code' => 'cn', 'name' => 'Chinese'],
-        ['code' => 'nl', 'name' => 'Dutch'],
-        ['code' => 'us', 'name' => 'English', 'active' => true],
-        ['code' => 'fr', 'name' => 'French'],
-        ['code' => 'de', 'name' => 'German'],
-        ['code' => 'in', 'name' => 'Hindi'],
-        ['code' => 'ru', 'name' => 'Russian'],
-        ['code' => 'es', 'name' => 'Spanish'],
-        ['code' => 'tr', 'name' => 'Turkish'],
-        ['code' => 'pk', 'name' => 'Urdu'],
-    ];
 @endphp
 
 <header class="nxl-header">
@@ -143,7 +129,7 @@
                 <div class="nxl-lavel-mega-menu-toggle d-flex d-lg-none">
                     <a href="javascript:void(0)" id="nxl-lavel-mega-menu-hide">
                         <i class="feather-arrow-left me-2"></i>
-                        <span>Back</span>
+                        <span>{{ __('ui.back') }}</span>
                     </a>
                 </div>
 
@@ -162,7 +148,7 @@
                             <div class="dropdown-divider"></div>
                             <a href="javascript:void(0);" class="dropdown-item">
                                 <i class="feather-settings"></i>
-                                <span>Configure Number Series</span>
+                                <span>{{ __('ui.configure_number_series') }}</span>
                             </a>
                         </div>
                     </div>
@@ -170,7 +156,7 @@
                     <div class="dropdown nxl-h-item nxl-mega-menu">
                         <a href="javascript:void(0);" class="btn btn-light-brand" data-bs-toggle="dropdown" data-bs-auto-close="outside">
                             <i class="feather-grid me-2"></i>
-                            Modules
+                            {{ __('ui.modules') }}
                         </a>
                         <div class="dropdown-menu nxl-h-dropdown erp-module-launcher" id="mega-menu-dropdown">
                             <div class="d-lg-flex align-items-start">
@@ -243,7 +229,7 @@
                         </a>
                         <div class="dropdown-menu nxl-h-dropdown erp-tenant-dropdown">
                             <div class="px-4 py-3 border-bottom">
-                                <h6 class="mb-1">Switch Tenant</h6>
+                                <h6 class="mb-1">{{ __('ui.switch_tenant') }}</h6>
                                 <p class="fs-11 text-muted mb-0">{{ $currentTenant['currency'] }} - {{ $currentTenant['plan'] }} Plan</p>
                             </div>
                             @foreach ($tenants as $tenant)
@@ -261,7 +247,7 @@
                             <div class="dropdown-divider"></div>
                             <a href="{{ route('platform.tenants.create') }}" class="dropdown-item">
                                 <i class="feather-plus"></i>
-                                <span>Add Tenant</span>
+                                <span>{{ __('ui.add_tenant') }}</span>
                             </a>
                         </div>
                     </div>
@@ -280,7 +266,7 @@
                             <span class="input-group-text">
                                 <i class="feather-search fs-6 text-muted"></i>
                             </span>
-                            <input type="text" class="form-control search-input-field" placeholder="Search customer, invoice, item, employee, vendor">
+                            <input type="text" class="form-control search-input-field" placeholder="{{ __('ui.search_placeholder') }}">
                             <span class="input-group-text">
                                 <button type="button" class="btn-close"></button>
                             </span>
@@ -323,38 +309,7 @@
                     </div>
                 </div>
 
-                <div class="dropdown nxl-h-item nxl-header-language d-none d-sm-flex">
-                    <a href="javascript:void(0);" class="nxl-head-link me-0 nxl-language-link" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                        <img src="{{ asset('assets/vendors/img/flags/4x3/us.svg') }}" alt="English" class="img-fluid wd-20">
-                    </a>
-                    <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-language-dropdown">
-                        <div class="dropdown-divider mt-0"></div>
-                        <div class="language-items-wrapper">
-                            <div class="select-language px-4 py-2 hstack justify-content-between gap-4">
-                                <div class="lh-lg">
-                                    <h6 class="mb-0">Select Language</h6>
-                                    <p class="fs-11 text-muted mb-0">12 languages available!</p>
-                                </div>
-                                <a href="javascript:void(0);" class="avatar-text avatar-md" data-bs-toggle="tooltip" title="Add Language">
-                                    <i class="feather-plus"></i>
-                                </a>
-                            </div>
-                            <div class="dropdown-divider"></div>
-                            <div class="row px-4 pt-3">
-                                @foreach ($languages as $language)
-                                    <div class="col-sm-4 col-6 language_select {{ !empty($language['active']) ? 'active' : '' }}">
-                                        <a href="javascript:void(0);" class="d-flex align-items-center gap-2" data-language="{{ $language['name'] }}" data-flag="{{ asset('assets/vendors/img/flags/4x3/' . $language['code'] . '.svg') }}">
-                                            <div class="avatar-image avatar-sm">
-                                                <img src="{{ asset('assets/vendors/img/flags/1x1/' . $language['code'] . '.svg') }}" alt="{{ $language['name'] }}" class="img-fluid">
-                                            </div>
-                                            <span>{{ $language['name'] }}</span>
-                                        </a>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                @include('partials.duralux.language-switcher')
 
                 <div class="nxl-h-item d-none d-sm-flex">
                     <div class="full-screen-switcher">
@@ -389,10 +344,10 @@
                     </a>
                     <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-timesheets-menu">
                         <div class="d-flex justify-content-between align-items-center timesheets-head">
-                            <h6 class="fw-bold text-dark mb-0">Approvals</h6>
+                            <h6 class="fw-bold text-dark mb-0">{{ __('ui.approvals') }}</h6>
                             <a href="javascript:void(0);" class="fs-11 text-success text-end ms-auto">
                                 <i class="feather-clock"></i>
-                                <span>Due Today</span>
+                                <span>{{ __('ui.due_today') }}</span>
                             </a>
                         </div>
                         <div class="timesheets-body erp-approval-list">
@@ -404,7 +359,7 @@
                             @endforeach
                         </div>
                         <div class="text-center timesheets-footer">
-                            <a href="javascript:void(0);" class="fs-13 fw-semibold text-dark">All Approvals</a>
+                            <a href="javascript:void(0);" class="fs-13 fw-semibold text-dark">{{ __('ui.all_approvals') }}</a>
                         </div>
                     </div>
                 </div>
@@ -416,10 +371,10 @@
                     </a>
                     <div class="dropdown-menu dropdown-menu-end nxl-h-dropdown nxl-notifications-menu">
                         <div class="d-flex justify-content-between align-items-center notifications-head">
-                            <h6 class="fw-bold text-dark mb-0">Notifications</h6>
+                            <h6 class="fw-bold text-dark mb-0">{{ __('ui.notifications') }}</h6>
                             <a href="javascript:void(0);" class="fs-11 text-success text-end ms-auto">
                                 <i class="feather-check"></i>
-                                <span>Mark as Read</span>
+                                <span>{{ __('ui.mark_as_read') }}</span>
                             </a>
                         </div>
                         @foreach ([
@@ -444,7 +399,7 @@
                             </div>
                         @endforeach
                         <div class="text-center notifications-footer">
-                            <a href="javascript:void(0);" class="fs-13 fw-semibold text-dark">All Notifications</a>
+                            <a href="javascript:void(0);" class="fs-13 fw-semibold text-dark">{{ __('ui.all_notifications') }}</a>
                         </div>
                     </div>
                 </div>
@@ -458,7 +413,7 @@
                             <div class="d-flex align-items-center">
                                 <img src="{{ asset('assets/images/avatar/1.png') }}" alt="user-image" class="img-fluid user-avtar">
                                 <div>
-                                    <h6 class="text-dark mb-0">ERP Admin <span class="badge bg-soft-success text-success ms-1">{{ $currentTenant['plan'] }}</span></h6>
+                                    <h6 class="text-dark mb-0">{{ __('ui.erp_admin') }} <span class="badge bg-soft-success text-success ms-1">{{ $currentTenant['plan'] }}</span></h6>
                                     <span class="fs-12 fw-medium text-muted">admin@saas-erp.local</span>
                                 </div>
                             </div>
@@ -473,16 +428,16 @@
                         </a>
                         <a href="javascript:void(0);" class="dropdown-item">
                             <i class="feather-shield"></i>
-                            <span>Roles & Permissions</span>
+                            <span>{{ __('ui.roles_permissions') }}</span>
                         </a>
                         <a href="javascript:void(0);" class="dropdown-item">
                             <i class="feather-settings"></i>
-                            <span>Account Settings</span>
+                            <span>{{ __('ui.account_settings') }}</span>
                         </a>
                         <div class="dropdown-divider"></div>
                         <a href="javascript:void(0);" class="dropdown-item">
                             <i class="feather-log-out"></i>
-                            <span>Logout</span>
+                            <span>{{ __('ui.logout') }}</span>
                         </a>
                     </div>
                 </div>
