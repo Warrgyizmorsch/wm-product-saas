@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\TenantSwitchController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,3 +24,7 @@ Route::middleware(['tenant'])->group(function (): void {
         require $moduleRoutes;
     }
 });
+
+Route::get('/org/company', [CompanyController::class, 'index'])->name('company.index');
+Route::get('/org/company/create', [CompanyController::class, 'create']);
+Route::post('/org/company/store', [CompanyController::class, 'store'])->name('campany.store');
