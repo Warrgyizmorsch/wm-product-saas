@@ -40,10 +40,10 @@
                 'Work Orders', 'Planning', 'Quality'
             ]],
         ],
-        __('ui.finance_people') => [
-            ['label' => __('ui.accounting'), 'icon' => 'feather-credit-card', 'url' => '#', 'children' => ['Chart of Accounts', 'Journals', 'Ledgers', 'Tax Reports']],
-            ['label' => __('ui.hrms_payroll'), 'icon' => 'feather-user-check', 'url' => '#', 'children' => ['Employees', 'Attendance', 'Leave', 'Payroll']],
-            ['label' => __('ui.reports_bi'), 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
+        'Finance & People' => [
+            ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => ['Chart of Accounts', 'Journals', 'Ledgers', 'Tax Reports']],
+            ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'url' => '#', 'children' => ['Employees', 'Attendance', 'Leave', 'Payroll', ['label' => 'Setting', 'route' => 'hrms.org.index']]],
+            ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],
         __('ui.platform_admin') => [
             ['label' => __('ui.access_control'), 'icon' => 'feather-shield', 'url' => '#', 'children' => ['Roles', 'Permissions', 'Teams', 'Policies']],
