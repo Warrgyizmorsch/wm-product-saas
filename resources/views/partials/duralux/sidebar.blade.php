@@ -32,7 +32,13 @@
         __('ui.supply_chain') => [
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],
             ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', 'Requests', 'Purchase Orders', 'Bills']],
-            ['label' => __('ui.production'), 'icon' => 'feather-cpu', 'url' => '#', 'children' => [['label' => 'BOM', 'route' => 'production.boms.index'], 'Work Orders', 'Planning', 'Quality']],
+            ['label' => __('ui.production'), 'icon' => 'feather-cpu', 'url' => '#', 'children' => [
+                ['label' => 'BOM', 'route' => 'production.boms.index'],
+                ['label' => 'Work Centers', 'route' => 'production.work-centers.index'],
+                ['label' => 'Machines', 'route' => 'production.machines.index'],
+                ['label' => 'Routing', 'route' => 'production.routing.index'],
+                'Work Orders', 'Planning', 'Quality'
+            ]],
         ],
         __('ui.finance_people') => [
             ['label' => __('ui.accounting'), 'icon' => 'feather-credit-card', 'url' => '#', 'children' => ['Chart of Accounts', 'Journals', 'Ledgers', 'Tax Reports']],

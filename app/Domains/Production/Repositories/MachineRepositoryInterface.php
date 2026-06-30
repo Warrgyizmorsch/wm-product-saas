@@ -1,0 +1,23 @@
+<?php
+
+namespace App\Domains\Production\Repositories;
+
+use App\Domains\Production\Models\Machine;
+use Illuminate\Database\Eloquent\Collection;
+
+interface MachineRepositoryInterface
+{
+    public function getAll(array $filters = []): Collection;
+
+    public function find(int $id): ?Machine;
+
+    public function create(array $data): Machine;
+
+    public function update(int $id, array $data): Machine;
+
+    public function delete(int $id): bool;
+
+    public function getByWorkCenter(int $workCenterId, bool $activeOnly = false): Collection;
+
+    public function findByCode(string $code, int $tenantId, ?int $ignoreId = null): ?Machine;
+}
