@@ -9,9 +9,15 @@
         <a href="{{ route('crm.quotations.index') }}" class="btn btn-light d-print-none">
             <i class="feather-arrow-left me-2"></i>Back to List
         </a>
-        <a href="{{ route('crm.quotations.edit', $quotation->id) }}" class="btn btn-info text-white d-print-none">
-            <i class="feather-edit-3 me-2"></i>Edit Quotation
-        </a>
+        @if ($quotation->lead_id)
+            <a href="{{ route('crm.leads.show', ['lead' => $quotation->lead_id, 'edit_quotation' => 1]) }}" class="btn btn-info text-white d-print-none">
+                <i class="feather-edit-3 me-2"></i>Edit Quotation
+            </a>
+        @else
+            <a href="{{ route('crm.quotations.edit', $quotation->id) }}" class="btn btn-info text-white d-print-none">
+                <i class="feather-edit-3 me-2"></i>Edit Quotation
+            </a>
+        @endif
         <button onclick="window.print()" class="btn btn-primary d-print-none">
             <i class="feather-printer me-2"></i>Print / Download PDF
         </button>
@@ -54,9 +60,10 @@
                     <span class="fs-14 fw-bold text-dark d-block">No: {{ $quotation->quotation_number }}</span>
                     @php
                         $badgeClass = 'bg-soft-secondary text-secondary';
-                        if ($quotation->status === 'Sent') $badgeClass = 'bg-soft-info text-info';
+                        if ($quotation->status === 'Sent' || $quotation->status === 'Quotation Sent') $badgeClass = 'bg-soft-info text-info';
                         elseif ($quotation->status === 'Accepted') $badgeClass = 'bg-soft-success text-success';
-                        elseif ($quotation->status === 'Declined') $badgeClass = 'bg-soft-danger text-danger';
+                        elseif ($quotation->status === 'Declined' || $quotation->status === 'Rejected') $badgeClass = 'bg-soft-danger text-danger';
+                        elseif ($quotation->status === 'Quotation Rework' || $quotation->status === 'Rework') $badgeClass = 'bg-soft-warning text-warning';
                     @endphp
                     <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 mt-1">{{ $quotation->status }}</span>
                 </div>
@@ -68,9 +75,9 @@
             <div class="row mb-5">
                 <div class="col-6 text-start">
                     <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Prepared For</span>
-                    <h5 class="fw-bold text-dark mb-1">{{ $quotation->customer->name }}</h5>
-                    <p class="text-muted mb-1 fs-13"><i class="feather-mail me-2"></i>{{ $quotation->customer->email ?: '—' }}</p>
-                    <p class="text-muted mb-0 fs-13"><i class="feather-phone me-2"></i>{{ $quotation->customer->phone ?: '—' }}</p>
+                    <h5 class="fw-bold text-dark mb-1">{{ $quotation->customer?->name ?? '—' }}</h5>
+                    <p class="text-muted mb-1 fs-13"><i class="feather-mail me-2"></i>{{ $quotation->customer?->email ?: '—' }}</p>
+                    <p class="text-muted mb-0 fs-13"><i class="feather-phone me-2"></i>{{ $quotation->customer?->phone ?: '—' }}</p>
                 </div>
                 <div class="col-6 text-end">
                     <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Quotation Schedule</span>
@@ -249,3 +256,13 @@
         }
     </style>
 @endpush
+
+@if(request()->has('print'))
+    @push('scripts')
+        <script>
+            window.addEventListener('DOMContentLoaded', () => {
+                window.print();
+            });
+        </script>
+    @endpush
+@endif

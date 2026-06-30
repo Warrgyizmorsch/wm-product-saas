@@ -4,6 +4,8 @@ namespace App\Domains\CRM\Controllers;
 
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\Customer;
+use App\Domains\CRM\Models\Quotation;
+use App\Domains\CRM\Services\QuotationService;
 use App\Models\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -14,7 +16,7 @@ class LeadController extends Controller
     /**
      * Display a listing of the leads.
      */
-    public function index()
+    public function index(QuotationService $quotationService)
     {
         // Direct DB fetch
         $leads = Lead::latest()->get();
@@ -32,7 +34,10 @@ class LeadController extends Controller
             'enterprise' => $enterpriseCount,
         ];
 
-        return view('modules.crm.leads.index', compact('leads', 'metrics'));
+        // Fetch quotations for secondary tab
+        $quotations = $quotationService->latest();
+
+        return view('modules.crm.leads.index', compact('leads', 'metrics', 'quotations'));
     }
 
     /**
@@ -50,9 +55,37 @@ class LeadController extends Controller
      */
     public function show(Lead $lead)
     {
-        $lead->load('followups');
+        $lead->load(['followups', 'histories.user']);
         $users = User::orderBy('name')->get();
-        return view('modules.crm.leads.show', compact('lead', 'users'));
+
+        // Step 1: Get the linked customer using email/phone
+        $customer = null;
+        if ($lead->email) {
+            $customer = Customer::where('email', $lead->email)->first();
+        }
+        if (!$customer && $lead->phone) {
+            $customer = Customer::where('phone', $lead->phone)->first();
+        }
+
+        // Step 1b: If creating quotation and no customer exists, auto-create one
+        if (request()->has('create_quotation') && !$customer) {
+            $customer = Customer::create([
+                'tenant_id' => $lead->tenant_id,
+                'name'      => $lead->contact_person ?: ($lead->company_name ?: 'Converted Lead'),
+                'email'     => $lead->email,
+                'phone'     => $lead->phone,
+                'status'    => 'inactive',
+            ]);
+        }
+
+        // Step 2: Get quotations ONLY for this specific lead (by lead_id)
+        $quotations = Quotation::where('lead_id', $lead->id)->latest()->get();
+        $activeQuotation = $quotations->first();
+
+        $customers = Customer::orderBy('name')->get();
+        $nextQuotationNumber = app(QuotationService::class)->getNextQuotationNumber();
+
+        return view('modules.crm.leads.show', compact('lead', 'users', 'customer', 'quotations', 'activeQuotation', 'customers', 'nextQuotationNumber'));
     }
 
     /**
@@ -137,7 +170,26 @@ class LeadController extends Controller
         ];
 
         // Direct DB save
-        Lead::create($leadData);
+        $lead = Lead::create($leadData);
+
+        \App\Domains\CRM\Models\LeadHistory::logEvent(
+            $lead,
+            'created',
+            null,
+            $lead->company_name,
+            'Lead created with initial stage: ' . ($lead->status ?: 'New')
+        );
+
+        if ($lead->lead_owner_id) {
+            $ownerName = \App\Models\User::find($lead->lead_owner_id)?->name ?: 'Unknown';
+            \App\Domains\CRM\Models\LeadHistory::logEvent(
+                $lead,
+                'assigned',
+                null,
+                $ownerName,
+                'Lead automatically assigned to lead owner: ' . $ownerName
+            );
+        }
 
         return redirect()->route('crm.leads.index')->with('success', 'Lead successfully saved to Database!');
     }
@@ -233,8 +285,22 @@ class LeadController extends Controller
             'product' => $validated['product'] ?? null,
         ];
 
+        $oldOwnerId = $lead->lead_owner_id;
+
         // Direct DB update
         $lead->update($leadData);
+
+        if ($oldOwnerId != $lead->lead_owner_id) {
+            $oldOwnerName = $oldOwnerId ? (\App\Models\User::find($oldOwnerId)?->name ?: 'Unknown') : 'None';
+            $newOwnerName = $lead->lead_owner_id ? (\App\Models\User::find($lead->lead_owner_id)?->name ?: 'Unknown') : 'None';
+            \App\Domains\CRM\Models\LeadHistory::logEvent(
+                $lead,
+                'assigned',
+                $oldOwnerName,
+                $newOwnerName,
+                "Lead owner updated from {$oldOwnerName} to {$newOwnerName}"
+            );
+        }
 
         return redirect()->route('crm.leads.index')->with('success', 'Lead successfully updated in Database!');
     }
@@ -259,14 +325,17 @@ class LeadController extends Controller
 
         // Handle Conversion to Customer
         if ($validated['status'] === 'Converted' && !$lead->is_customer) {
-            // Check if customer with the same email already exists (if email is provided)
-            $existingCustomer = null;
-            if ($lead->email) {
-                $existingCustomer = Customer::where('email', $lead->email)->first();
+            // Check if the lead has an accepted quotation
+            $hasAcceptedQuotation = $lead->getQuotations()->where('status', 'Accepted')->isNotEmpty();
+            if (!$hasAcceptedQuotation) {
+                return redirect()->back()->withErrors(['status' => 'This lead cannot be converted to a customer because there is no accepted quotation.']);
             }
 
-            // Create Customer only if it doesn't already exist
-            if (!$existingCustomer) {
+            $customer = $lead->getCustomer();
+            if ($customer) {
+                $customer->update(['status' => 'active']);
+                $message = 'Lead successfully converted and Customer record activated!';
+            } else {
                 Customer::create([
                     'tenant_id' => $lead->tenant_id,
                     'name' => $lead->company_name ?: ($lead->contact_person ?: 'Converted Lead'),
@@ -275,14 +344,23 @@ class LeadController extends Controller
                     'status' => 'active',
                 ]);
                 $message = 'Lead successfully converted and Customer record created!';
-            } else {
-                $message = 'Lead successfully converted and linked to existing Customer!';
             }
 
             $updateData['is_customer'] = true;
         }
 
+        $oldStatus = $lead->status ?: 'New';
         $lead->update($updateData);
+
+        if ($oldStatus !== $lead->status) {
+            \App\Domains\CRM\Models\LeadHistory::logEvent(
+                $lead,
+                'status_changed',
+                $oldStatus,
+                $lead->status,
+                "Lead stage status updated from '{$oldStatus}' to '{$lead->status}'"
+            );
+        }
 
         if (!isset($message)) {
             $message = 'Lead status successfully updated!';
@@ -318,5 +396,38 @@ class LeadController extends Controller
     {
         $lead->delete();
         return redirect()->route('crm.leads.index')->with('success', 'Lead successfully deleted from Database!');
+    }
+
+    /**
+     * Convert lead to customer and redirect to create quotation.
+     */
+    public function convertToQuotation(Lead $lead)
+    {
+        // 1. Ensure the customer record is created for this lead as inactive
+        $existingCustomer = null;
+        if ($lead->email) {
+            $existingCustomer = Customer::where('email', $lead->email)->first();
+        }
+
+        if (!$existingCustomer) {
+            $customer = Customer::create([
+                'tenant_id' => $lead->tenant_id,
+                'name' => $lead->company_name ?: ($lead->contact_person ?: 'Converted Lead'),
+                'email' => $lead->email,
+                'phone' => $lead->phone,
+                'status' => 'inactive',
+            ]);
+        } else {
+            $customer = $existingCustomer;
+        }
+
+        // 2. DO NOT update lead status to Converted or is_customer to true here.
+        // It will only be updated to Converted when the quotation is accepted.
+
+        // 3. Redirect to Lead show page with create_quotation parameter
+        return redirect()->route('crm.leads.show', [
+            'lead' => $lead->id,
+            'create_quotation' => 1
+        ])->with('success', 'Quotation draft initiated! Please fill in the quotation details below.');
     }
 }

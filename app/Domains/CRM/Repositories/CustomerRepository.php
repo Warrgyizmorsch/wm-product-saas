@@ -13,7 +13,7 @@ class CustomerRepository
 
     public function count(): int
     {
-        return Customer::query()->count();
+        return Customer::query()->where('status', 'active')->count();
     }
 
     public function activeCount(): int
@@ -26,5 +26,10 @@ class CustomerRepository
     public function latest(): \Illuminate\Database\Eloquent\Collection
     {
         return Customer::query()->latest()->get();
+    }
+
+    public function latestActive(): \Illuminate\Database\Eloquent\Collection
+    {
+        return Customer::query()->where('status', 'active')->latest()->get();
     }
 }

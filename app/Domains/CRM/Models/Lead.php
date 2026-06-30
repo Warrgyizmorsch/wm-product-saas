@@ -4,7 +4,8 @@ namespace App\Domains\CRM\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
-
+use App\Domains\CRM\Models\Customer;
+use App\Domains\CRM\Models\Quotation;
 use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 
@@ -59,5 +60,47 @@ class Lead extends Model
     public function followups(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(LeadFollowup::class)->orderBy('followup_date', 'desc');
+    }
+
+    /**
+     * Get the history entries for the lead.
+     */
+    public function histories(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LeadHistory::class)->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Get all quotations belonging to this specific lead (by lead_id).
+     * Using lead_id prevents same-email leads from sharing quotations.
+     */
+    public function quotations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Quotation::class);
+    }
+
+    /**
+     * Helper to get quotations as a collection (used in status checks).
+     */
+    public function getQuotations()
+    {
+        return Quotation::where('lead_id', $this->id)->latest()->get();
+    }
+
+    /**
+     * Get the linked customer record for this lead.
+     * Looks up by email first, then phone.
+     */
+    public function getCustomer()
+    {
+        if ($this->email) {
+            $customer = Customer::where('email', $this->email)->first();
+            if ($customer) return $customer;
+        }
+        if ($this->phone) {
+            $customer = Customer::where('phone', $this->phone)->first();
+            if ($customer) return $customer;
+        }
+        return null;
     }
 }
