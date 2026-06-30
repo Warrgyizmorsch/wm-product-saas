@@ -16,7 +16,7 @@
                         <div class="card border-top-0">
                             <div>
                                 <div class="card-body personal-info">
-                                    <form action="{{ route('campany.store') }}" method="POST" enctype="multipart/form-data">
+                                    <form action="{{ route('hrms.company.store') }}" method="POST" enctype="multipart/form-data">
                                     @csrf
                                         <div class="mb-4 d-flex align-items-center justify-content-between">
                                             <h5 class="fw-bold mb-0 me-4">
@@ -25,167 +25,147 @@
                                             </h5>
                                             <button type="submit" class="btn btn-lg btn-light-brand">Add New</button>
                                         </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label class="fw-semibold">Logo: </label>
-                                            </div>
-                                            <div class="col-lg-8">
-                                                <div class="mb-4 mb-md-0 d-flex gap-4 your-brand">
-                                                    <div class="wd-100 ht-100 position-relative overflow-hidden border border-gray-2 rounded">
-                                                        <img src="assets/images/avatar/1.png" class="upload-pic img-fluid rounded h-100 w-100" alt="">
-                                                        <div class="position-absolute start-50 top-50 end-0 bottom-0 translate-middle h-100 w-100 hstack align-items-center justify-content-center c-pointer upload-button">
-                                                            <i class="feather feather-camera" aria-hidden="true"></i>
-                                                        </div>
-                                                        <input class="file-upload" type="file" name="logo" accept="image/*">
-                                                    </div>
-                                                    <div class="d-flex flex-column gap-1">
-                                                        <div class="fs-11 text-gray-500 mt-2"># Upload your prifile</div>
-                                                        <div class="fs-11 text-gray-500"># Avatar size 150x150</div>
-                                                        <div class="fs-11 text-gray-500"># Max upload size 2mb</div>
-                                                        <div class="fs-11 text-gray-500"># Allowed file types: png, jpg, jpeg</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="fullnameInput" class="fw-semibold">Company Name: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+                                         <!-- Logo Section -->
+                                         <div class="mb-4">
+                                             <label class="form-label fw-semibold">Logo: </label>
+                                             <div class="mb-4 mb-md-0 d-flex gap-4 your-brand">
+                                                 <div class="wd-100 ht-100 position-relative overflow-hidden border border-gray-2 rounded">
+                                                     <img src="{{ asset('assets/images/avatar/1.png') }}" class="upload-pic img-fluid rounded h-100 w-100" alt="">
+                                                     <div class="position-absolute start-50 top-50 end-0 translate-middle h-100 w-100 hstack align-items-center justify-content-center c-pointer upload-button">
+                                                         <i class="feather feather-camera" aria-hidden="true"></i>
+                                                     </div>
+                                                     <input class="file-upload" type="file" name="logo" accept="image/*" style="display: none;">
+                                                 </div>
+                                                 <div class="d-flex flex-column gap-1">
+                                                     <div class="fs-11 text-gray-500 mt-2"># Upload your profile</div>
+                                                     <div class="fs-11 text-gray-500"># Avatar size 150x150</div>
+                                                     <div class="fs-11 text-gray-500"># Max upload size 2mb</div>
+                                                     <div class="fs-11 text-gray-500"># Allowed file types: png, jpg, jpeg</div>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                        <!-- Row 1: Company Name & Legal Name -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <label for="companyNameInput" class="form-label fw-semibold">Company Name: </label>
                                                 <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-user"></i></div>
-                                                    <input type="text" class="form-control" id="fullnameInput" name="company_name" placeholder="Company Name">
+                                                    <div class="input-group-text"><i class="feather-briefcase"></i></div>
+                                                    <input type="text" class="form-control" id="companyNameInput" name="company_name" placeholder="Company Name">
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="fullnameInput" class="fw-semibold">Legal Name: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+                                            <div class="col-md-6">
+                                                <label for="legalNameInput" class="form-label fw-semibold">Legal Name: </label>
                                                 <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-user"></i></div>
-                                                    <input type="text" class="form-control" id="fullnameInput" name="legal_name" placeholder="Legal Name">
+                                                    <div class="input-group-text"><i class="feather-file-text"></i></div>
+                                                    <input type="text" class="form-control" id="legalNameInput" name="legal_name" placeholder="Legal Name">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="fullnameInput" class="fw-semibold">GST Number: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+
+                                        <!-- Row 2: GST Number & PAN Number -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <label for="gstNumberInput" class="form-label fw-semibold">GST Number: </label>
                                                 <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-user"></i></div>
-                                                    <input type="text" class="form-control" id="fullnameInput" name="gst_number" placeholder="GST">
+                                                    <div class="input-group-text"><i class="feather-percent"></i></div>
+                                                    <input type="text" class="form-control" id="gstNumberInput" name="gst_number" placeholder="GST">
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="fullnameInput" class="fw-semibold">PAN Number: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+                                            <div class="col-md-6">
+                                                <label for="panNumberInput" class="form-label fw-semibold">PAN Number: </label>
                                                 <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-user"></i></div>
-                                                    <input type="text" class="form-control" id="fullnameInput" name="pan_number" placeholder="PAN">
+                                                    <div class="input-group-text"><i class="feather-credit-card"></i></div>
+                                                    <input type="text" class="form-control" id="panNumberInput" name="pan_number" placeholder="PAN">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="fullnameInput" class="fw-semibold">CIN Number: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+
+                                        <!-- Row 3: CIN Number & Registration Number -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <label for="cinNumberInput" class="form-label fw-semibold">CIN Number: </label>
                                                 <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-user"></i></div>
-                                                    <input type="text" class="form-control" id="fullnameInput" name="cin_number" placeholder="CIN">
+                                                    <div class="input-group-text"><i class="feather-hash"></i></div>
+                                                    <input type="text" class="form-control" id="cinNumberInput" name="cin_number" placeholder="CIN">
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="fullnameInput" class="fw-semibold">Registration Number: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+                                            <div class="col-md-6">
+                                                <label for="registrationNumberInput" class="form-label fw-semibold">Registration Number: </label>
                                                 <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-user"></i></div>
-                                                    <input type="text" class="form-control" id="fullnameInput" name="registration_number" placeholder="Registration Number">
+                                                    <div class="input-group-text"><i class="feather-key"></i></div>
+                                                    <input type="text" class="form-control" id="registrationNumberInput" name="registration_number" placeholder="Registration Number">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="mailInput" class="fw-semibold">Email: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+
+                                        <!-- Row 4: Email & Phone -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <label for="emailInput" class="form-label fw-semibold">Email: </label>
                                                 <div class="input-group">
                                                     <div class="input-group-text"><i class="feather-mail"></i></div>
-                                                    <input type="text" class="form-control" id="mailInput" name="email" placeholder="Email">
+                                                    <input type="text" class="form-control" id="emailInput" name="email" placeholder="Email">
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="phoneInput" class="fw-semibold">Phone: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+                                            <div class="col-md-6">
+                                                <label for="phoneInput" class="form-label fw-semibold">Phone: </label>
                                                 <div class="input-group">
                                                     <div class="input-group-text"><i class="feather-phone"></i></div>
                                                     <input type="text" class="form-control" name="phone" id="phoneInput" placeholder="Phone">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="websiteInput" class="fw-semibold">Website: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+
+                                        <!-- Row 5: Website & Postal Code -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <label for="websiteInput" class="form-label fw-semibold">Website: </label>
                                                 <div class="input-group">
                                                     <div class="input-group-text"><i class="feather-link"></i></div>
                                                     <input type="text" class="form-control" name="website" id="websiteInput" placeholder="Website">
                                                 </div>
                                             </div>
-                                        </div>
-                                    
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="addressInput_2" class="fw-semibold">Address: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+                                            <div class="col-md-6">
+                                                <label for="postalCodeInput" class="form-label fw-semibold">Postal Code: </label>
                                                 <div class="input-group">
                                                     <div class="input-group-text"><i class="feather-map-pin"></i></div>
-                                                    <textarea class="form-control" name="address" id="addressInput_2" cols="30" rows="3" placeholder="Address"></textarea>
+                                                    <input type="text" class="form-control" name="postal_code" id="postalCodeInput" placeholder="Postal Code">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="addressInput_2" class="fw-semibold">City: </label>
+
+                                        <!-- Row 6: Address (Full Width) -->
+                                        <div class="mb-4">
+                                            <label for="addressInput" class="form-label fw-semibold">Address: </label>
+                                            <div class="input-group">
+                                                <div class="input-group-text"><i class="feather-map-pin"></i></div>
+                                                <textarea class="form-control" name="address" id="addressInput" cols="30" rows="3" placeholder="Address"></textarea>
                                             </div>
-                                            <div class="col-lg-8">
+                                        </div>
+
+                                        <!-- Row 7: City & State -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <label for="cityInput" class="form-label fw-semibold">City: </label>
                                                 <div class="input-group">
                                                     <div class="input-group-text"><i class="feather-map-pin"></i></div>
-                                                    <textarea class="form-control" name="city" id="addressInput_2" cols="30" rows="3" placeholder="Address"></textarea>
+                                                    <input class="form-control" name="city" id="cityInput" placeholder="City">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="stateInput" class="form-label fw-semibold">State: </label>
+                                                <div class="input-group">
+                                                    <div class="input-group-text"><i class="feather-map"></i></div>
+                                                    <input class="form-control" name="state" id="stateInput" placeholder="State">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="addressInput_2" class="fw-semibold">State: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <label class="form-label fw-semibold">Country: </label>
                                                 <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-map-pin"></i></div>
-                                                    <textarea class="form-control" name="state" id="addressInput_2" cols="30" rows="3" placeholder="Address"></textarea>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label class="fw-semibold">Country: </label>
-                                            </div>
-                                            <div class="col-lg-8">
-                                                <select class="form-control" data-select2-selector="country" name="country">
+                                                    <div class="input-group-text"><i class="feather-globe"></i></div>
+                                                    <select class="form-control" data-select2-selector="country" name="country">
                                                     <option data-country="af">Afghanistan</option>
                                                     <option data-country="ax">Åland Islands</option>
                                                     <option data-country="al">Albania</option>
@@ -439,24 +419,12 @@
                                                     <option data-country="zm">Zambia</option>
                                                     <option data-country="zw">Zimbabwe</option>
                                                 </select>
-                                            </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label for="fullnameInput" class="fw-semibold">Postal Code: </label>
-                                            </div>
-                                            <div class="col-lg-8">
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-user"></i></div>
-                                                    <input type="text" class="form-control" name="postal_code" id="fullnameInput" placeholder="Postal Code">
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label class="fw-semibold">Currency: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Currency: </label>
+                                                <div class="input-group">
+                                                    <div class="input-group-text"><i class="feather-dollar-sign"></i></div>
                                                 <select class="form-control" data-select2-selector="currency" name="currency">
                                                     <option data-currency="af">AFN - Afghan Afghani - ؋</option>
                                                     <option data-currency="al">ALL - Albanian Lek - Lek</option>
@@ -622,13 +590,15 @@
                                                     <option data-currency="ye">YER - Yemeni Rial - ﷼</option>
                                                     <option data-currency="zm">ZMK - Zambian Kwacha - ZK</option>
                                                 </select>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label class="fw-semibold">Time Zone: </label>
-                                            </div>
-                                            <div class="col-lg-8">
+
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <label class="form-label fw-semibold">Time Zone: </label>
+                                                <div class="input-group">
+                                                    <div class="input-group-text"><i class="feather-clock"></i></div>
                                                 <select class="form-control" data-select2-selector="tzone" name="time_zone">
                                                     <option data-tzone="feather-moon">(GMT -12:00) Eniwetok, Kwajalein</option>
                                                     <option data-tzone="feather-moon">(GMT -11:00) Midway Island, Samoa</option>
@@ -671,17 +641,17 @@
                                                     <option data-tzone="feather-sun">(GMT +13:00) Apia, Nukualofa</option>
                                                     <option data-tzone="feather-sun">(GMT +14:00) Line Islands, Tokelau</option>
                                                 </select>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div class="row mb-4 align-items-center">
-                                            <div class="col-lg-4">
-                                                <label class="fw-semibold">Status: </label>
-                                            </div>
-                                            <div class="col-lg-8">
-                                                <select class="form-control" data-select2-selector="status" name="status">
-                                                    <option value="success" data-bg="bg-success" selected>Active</option>
-                                                    <option value="warning" data-bg="bg-warning">Inactive</option>
-                                                </select>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Status: </label>
+                                                <div class="input-group">
+                                                    <div class="input-group-text"><i class="feather-check-circle"></i></div>
+                                                    <select class="form-control" data-select2-selector="status" name="status">
+                                                        <option value="success" data-bg="bg-success" selected>Active</option>
+                                                        <option value="warning" data-bg="bg-warning">Inactive</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
                                     </form>
@@ -689,5 +659,26 @@
                             </div>
                         </div>
                     </div>
-    </div>
+                </div>
 @endsection
+
+@push('scripts')
+<script>
+$(document).ready(function(){
+    $(document).on("click", ".upload-button", function(){
+        $(".file-upload").click();
+    });
+
+    $(document).on("change", ".file-upload", function(){
+        var fileInput = this;
+        if (fileInput.files && fileInput.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                $(".upload-pic").attr("src", e.target.result);
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        }
+    });
+});
+</script>
+@endpush
