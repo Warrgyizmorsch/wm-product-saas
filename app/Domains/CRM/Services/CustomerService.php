@@ -29,4 +29,9 @@ class CustomerService
     {
         return $this->customers->latest();
     }
+
+    public function latestActive(): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->customers->latestActive();
+    }
 }

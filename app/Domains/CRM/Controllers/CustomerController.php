@@ -21,7 +21,7 @@ class CustomerController extends Controller
     {
         return view('modules.crm.customers.index', [
             'summary' => $this->customers->summary(),
-            'customers' => $this->customers->latest(),
+            'customers' => $this->customers->latestActive(),
         ]);
     }
 

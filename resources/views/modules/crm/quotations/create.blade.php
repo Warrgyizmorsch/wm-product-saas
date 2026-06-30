@@ -74,7 +74,7 @@
                             >
                                 <option value="">Select a Customer</option>
                                 @foreach ($customers as $customer)
-                                    <option value="{{ $customer->id }}" @selected(old('customer_id', $isEdit ? $quotation->customer_id : '') == $customer->id)>
+                                    <option value="{{ $customer->id }}" @selected(old('customer_id', $isEdit ? $quotation->customer_id : request()->query('customer_id')) == $customer->id)>
                                         {{ $customer->name }} ({{ $customer->email ?: 'No Email' }})
                                     </option>
                                 @endforeach
@@ -108,9 +108,10 @@
                                 class="fw-semibold"
                             >
                                 <option value="Draft" @selected(old('status', $isEdit ? $quotation->status : 'Draft') === 'Draft')>Draft</option>
-                                <option value="Sent" @selected(old('status', $isEdit ? $quotation->status : '') === 'Sent')>Sent</option>
+                                <option value="Quotation Sent" @selected(old('status', $isEdit ? $quotation->status : '') === 'Quotation Sent')>Quotation Sent</option>
                                 <option value="Accepted" @selected(old('status', $isEdit ? $quotation->status : '') === 'Accepted')>Accepted</option>
-                                <option value="Declined" @selected(old('status', $isEdit ? $quotation->status : '') === 'Declined')>Declined</option>
+                                <option value="Rejected" @selected(old('status', $isEdit ? $quotation->status : '') === 'Rejected')>Rejected</option>
+                                <option value="Quotation Rework" @selected(old('status', $isEdit ? $quotation->status : '') === 'Quotation Rework')>Quotation Rework</option>
                             </x-ui.select>
                             @error('status')
                                 <div class="invalid-feedback d-block" style="margin-top: -10px; margin-bottom: 15px;">{{ $message }}</div>
@@ -323,13 +324,24 @@
                 `;
             }
 
-            // Prefill existing items if in Edit mode
+            // Prefill existing items if in Edit mode or prefilled from URL query parameters
             const isEdit = @json($isEdit);
             const existingItems = isEdit ? @json($isEdit ? $quotation->items : []) : [];
+            const prefillProduct = @json(request()->query('prefill_product'));
+            const prefillAmount = @json(request()->query('prefill_amount'));
 
             if (existingItems.length > 0) {
                 existingItems.forEach(function(item) {
                     addRow(item);
+                });
+            } else if (!isEdit && (prefillProduct || prefillAmount)) {
+                // Add a prefilled row from Lead details
+                addRow({
+                    item_name: prefillProduct || 'ERP CRM Integration Product/Service',
+                    description: 'Converted from Lead details.',
+                    quantity: 1,
+                    unit_price: parseFloat(prefillAmount) || 0.00,
+                    tax_rate: 18.00
                 });
             } else {
                 addRow();

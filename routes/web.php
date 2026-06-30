@@ -1,7 +1,12 @@
 <?php
 
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\TenantSwitchController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/locale/{locale}', LocaleController::class)
+    ->whereIn('locale', array_keys(config('localization.supported', [])))
+    ->name('locale.switch');
 
 Route::get('/tenant-switch/{tenant:slug}', TenantSwitchController::class)
     ->name('tenant.switch');

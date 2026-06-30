@@ -522,3 +522,175 @@ I can now build your FULL production starter kit, including:
 Just say:
 
 👉 “build SaaS foundation codebase”
+
+
+Key Features of Absolute ERP
+Here are the powerful features that make Absolute ERP stand out from the competition. Packed with innovative tools and advanced functionalities, this software offers a range of benefits.
+
+Inventory Management
+Sales Management
+Purchase Management
+Finance Management
+Human Resource Management
+Customer Relationship Management
+Production Planning
+Quality Management
+Project Management
+Supply Chain Management
+Warehouse Management
+Asset Management
+Document Management
+Reporting And Analytics
+Mobile Access
+User Role Management
+Workflow Automation
+Vendor Management
+Order Management
+Billing And Invoicing
+Audit Trail
+CRM
+Expense Tracking
+Financial Management
+Hr & Payroll
+Job Costing
+Manufacturing
+Payroll Management
+Performance Management
+Production Management
+Quotation & Estimates
+Sales Quotes
+Task Management
+Sales Forecasting
+Multicurrency Payment Processing
+Integration Capabilities
+Sales And Distribution
+Bill Of Materials (bom)
+Business Intelligence (bi)
+Dispatching
+General Ledger
+Invoicing
+Manufacturing Execution System (mes):
+Material Requirements Planning (mrp)
+Manage Customers And Suppliers
+Barcode Scanning
+Employee Management
+Point Of Sale (pos)
+Equipment Management
+Onboarding
+Employee Scheduling
+Balance Sheet
+Bills Of Material
+Forecasting
+Inventory Tracking
+Multi Currency
+Multi Location
+Order Processing
+Real Time Reporting
+Gantt Charts
+Issue Management
+Billing & Invoicing
+Payment Processing
+Tax Management
+Ad Hoc Reports
+Lead Capture
+Lead Distribution
+Lead Scoring
+Lead Segmentation
+Sales & Operations Planning
+Analytics
+Credit Management
+Approval Process Control
+Quote Management
+Dispatch Management
+Maintenance Scheduling
+Product Management
+Capacity Management
+Alerts/notifications
+Invoice Management
+Invoice Processing
+Reporting
+Financial Accounting
+Excel Import
+Job Management
+Manufacturing Process Planning
+Product Data Management
+Item Management
+Business Process Automation
+Distribution Management
+Maintenance Management
+Multi Store Management
+Data Analysis
+Template Management
+Project Accounting
+Materials Management
+Samples Tracking
+Templates
+Multiple Billing Rates
+Approval Workflow
+Access Control
+Reporting & Statistics
+Project Billing
+Job Tracking
+Recurring Billing
+Real Time Data
+Payroll
+Sales History
+Automated Scheduling
+General Ledger Entry
+Employee Database
+Retail Inventory Management
+Real Time Scheduling
+Gst Ready
+Analytics & Reporting
+Tax Calculator
+Export Documentation
+Textile Pattern Design
+Raw Material Specifications
+Batch Monitoring
+Manufacturing Batch Record
+Finance & Accounting Management System
+Jobwork/insourcing Management System
+Human Resources Management System
+Masters And Opening Balance Uploading
+Multi Smart Device (desktop/ Laptop/notepad/mobile)
+Intuitive User Interface
+Multi Browser Compatible
+Multi Lingual
+Email/sms Integration
+Centralized Data
+Material Requirement Planning
+Multi Level Bill Of Material
+Chart Of Accounts
+Inventory Valuation
+Business Process Control
+Sales Reports
+Hr Management
+Erp
+Mrp
+Barcoding
+Multi Channel Management
+Report Export
+Custom Pricing Options
+Barcoding/rfid
+Quotes/proposals
+Material Management
+Fingerprint Scanning
+Plant Management
+Multi Company
+Multi Department/project
+Currency Management
+Financial Reporting
+Multi Country
+Multi State
+Account Management
+To Do List View
+Multi Department / Project
+Manufacturing Inventory Management
+Roles Management
+Audit Trails
+Real Time Tracking
+Retail Pos
+Downtime Tracking
+Financial Planning
+Warehouse And Fulfillment
+Operations Management

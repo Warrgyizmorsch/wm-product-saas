@@ -4,43 +4,49 @@
     $tenantPlan = ucfirst((string) ($resolvedTenant?->plan ?? 'Starter'));
 
     $modules = [
-        'Workspace' => [
-            ['label' => 'Executive Dashboard', 'icon' => 'feather-home', 'route' => 'dashboard'],
+        __('ui.workspace') => [
+            ['label' => __('ui.executive_dashboard'), 'icon' => 'feather-home', 'route' => 'dashboard'],
             ['label' => 'Tenant Console', 'icon' => 'feather-grid', 'url' => '#', 'children' => [
                 ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
-                ['label' => 'Add Tenant', 'route' => 'platform.tenants.create'],
+                ['label' => __('ui.add_tenant'), 'route' => 'platform.tenants.create'],
                 ['label' => 'Subscriptions'],
                 ['label' => 'Usage Limits'],
             ]],
-            ['label' => 'Approvals Center', 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
+            ['label' => __('ui.approvals_center'), 'icon' => 'feather-check-square', 'url' => '#', 'children' => ['Pending', 'Delegated', 'Escalations', 'Workflow Rules']],
         ],
         'Revenue Cycle' => [
-            ['label' => 'CRM', 'icon' => 'feather-users', 'url' => '#', 'children' => [
+            ['label' => __('ui.crm'), 'icon' => 'feather-users', 'url' => '#', 'children' => [
                 ['label' => 'Leads', 'route' => 'crm.leads.index'],
                 ['label' => 'Customers', 'route' => 'crm.customers.index'],
                 ['label' => 'Contacts'],
                 ['label' => 'Activities'],
             ]],
-             ['label' => 'Sales', 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
+             ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
                 ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
                 ['label' => 'Sales Orders'],
                 ['label' => 'Invoices'],
                 ['label' => 'Receipts'],
             ]],
-            ['label' => 'Projects', 'icon' => 'feather-briefcase', 'url' => '#', 'children' => ['Projects', 'Milestones', 'Tasks', 'Timesheets']],
+            ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [__('ui.projects'), 'Milestones', 'Tasks', 'Timesheets']],
         ],
-        'Supply Chain' => [
-            ['label' => 'Inventory', 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],
-            ['label' => 'Purchase', 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', 'Requests', 'Purchase Orders', 'Bills']],
-            ['label' => 'Production', 'icon' => 'feather-cpu', 'url' => '#', 'children' => [['label' => 'BOM', 'route' => 'production.boms.index'], 'Work Orders', 'Planning', 'Quality']],
+        __('ui.supply_chain') => [
+            ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],
+            ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', 'Requests', 'Purchase Orders', 'Bills']],
+            ['label' => __('ui.production'), 'icon' => 'feather-cpu', 'url' => '#', 'children' => [
+                ['label' => 'BOM', 'route' => 'production.boms.index'],
+                ['label' => 'Work Centers', 'route' => 'production.work-centers.index'],
+                ['label' => 'Machines', 'route' => 'production.machines.index'],
+                ['label' => 'Routing', 'route' => 'production.routing.index'],
+                'Work Orders', 'Planning', 'Quality'
+            ]],
         ],
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => ['Chart of Accounts', 'Journals', 'Ledgers', 'Tax Reports']],
             ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'url' => '#', 'children' => ['Employees', 'Attendance', 'Leave', 'Payroll', ['label' => 'Setting', 'route' => 'hrms.org.index']]],
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],
-        'Platform Admin' => [
-            ['label' => 'Access Control', 'icon' => 'feather-shield', 'url' => '#', 'children' => ['Roles', 'Permissions', 'Teams', 'Policies']],
+        __('ui.platform_admin') => [
+            ['label' => __('ui.access_control'), 'icon' => 'feather-shield', 'url' => '#', 'children' => ['Roles', 'Permissions', 'Teams', 'Policies']],
             ['label' => 'Automation', 'icon' => 'feather-zap', 'url' => '#', 'children' => ['Workflows', 'Alerts', 'Schedulers', 'Webhooks']],
             ['label' => 'Audit & Settings', 'icon' => 'feather-settings', 'url' => '#', 'children' => ['Audit Logs', 'Localization', 'Currencies', 'System Settings']],
         ],
@@ -96,7 +102,7 @@
                     <i class="feather-activity fs-4 text-dark"></i>
                     <h6 class="mt-4 text-dark fw-bolder">{{ $resolvedTenant?->name ?? 'Central Workspace' }}</h6>
                     <p class="fs-11 my-3 text-dark">{{ $tenantSettings['branch'] ?? 'Main Office' }}<br>{{ $tenantPlan }} Plan</p>
-                    <a href="{{ route('dashboard') }}" class="btn btn-primary text-dark w-100">Tenant Dashboard</a>
+                    <a href="{{ route('dashboard') }}" class="btn btn-primary text-dark w-100">{{ __('ui.tenant_dashboard') }}</a>
                 </div>
             </div>
         </div>

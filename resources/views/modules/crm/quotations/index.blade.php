@@ -53,7 +53,7 @@
                                     <a href="{{ route('crm.quotations.show', $quotation->id) }}">{{ $quotation->quotation_number }}</a>
                                 </td>
                                 <td>
-                                    <span class="fw-bold">{{ $quotation->customer->name }}</span>
+                                    <span class="fw-bold">{{ $quotation->customer?->name ?? '—' }}</span>
                                 </td>
                                 <td>{{ $quotation->quotation_date ? $quotation->quotation_date->format('d/m/Y') : '—' }}</td>
                                 <td>{{ $quotation->expiry_date ? $quotation->expiry_date->format('d/m/Y') : '—' }}</td>

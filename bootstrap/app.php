@@ -4,6 +4,7 @@ require_once __DIR__ . '/../app/helpers.php';
 
 use App\Http\Middleware\IdentifyTenant;
 use App\Http\Middleware\ResolveTenant;
+use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenantMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -16,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->appendToGroup('web', SetLocale::class);
+
         $middleware->alias([
             'identify.tenant' => IdentifyTenant::class,
             'tenant' => ResolveTenant::class,

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ $currentLanguage['dir'] ?? 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="IE=edge">
@@ -26,7 +26,7 @@
 <body>
     <div class="loader-bg">
         <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
+            <span class="visually-hidden">{{ __('ui.loading') }}</span>
         </div>
     </div>
 
@@ -38,11 +38,11 @@
             <div class="page-header">
                 <div class="page-header-left d-flex align-items-center">
                     <div class="page-header-title">
-                        <h5 class="m-b-10">@yield('page-title', 'Dashboard')</h5>
+                        <h5 class="m-b-10">@yield('page-title', __('ui.dashboard'))</h5>
                     </div>
                     <ul class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Home</a></li>
-                        <li class="breadcrumb-item">@yield('breadcrumb', 'Dashboard')</li>
+                        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('ui.home') }}</a></li>
+                        <li class="breadcrumb-item">@yield('breadcrumb', __('ui.dashboard'))</li>
                     </ul>
                 </div>
                 <div class="page-header-right ms-auto">
@@ -50,7 +50,7 @@
                         <div class="d-flex d-md-none">
                             <a href="javascript:void(0)" class="page-header-right-close-toggle">
                                 <i class="feather-arrow-left me-2"></i>
-                                <span>Back</span>
+                                <span>{{ __('ui.back') }}</span>
                             </a>
                         </div>
                         <div class="d-flex align-items-center gap-2 page-header-right-items-wrapper">
@@ -81,9 +81,7 @@
     <script src="{{ asset('assets/vendors/js/nxlNavigation.min.js') }}"></script>
     <script src="{{ asset('assets/js/common-init.min.js') }}"></script>
     <script>
-        $(document).on('click', '.language_select a[data-flag]', function (event) {
-            event.preventDefault();
-
+        $(document).on('click', '.language_select a[data-flag]', function () {
             var selected = $(this);
 
             $('.language_select').removeClass('active');

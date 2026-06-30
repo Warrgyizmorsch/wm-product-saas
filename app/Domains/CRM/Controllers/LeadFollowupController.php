@@ -30,13 +30,28 @@ class LeadFollowupController extends Controller
         }
 
         // Create the followup (BelongsToTenant will auto-inject tenant_id)
-        LeadFollowup::create([
+        // Create the followup (BelongsToTenant will auto-inject tenant_id)
+        $followup = LeadFollowup::create([
             'lead_id' => $lead->id,
             'followup_date' => $followupDateTime,
             'type' => $validated['type'],
             'status' => $validated['status'],
             'notes' => $validated['notes'],
         ]);
+
+        // Log history event
+        $eventType = $followup->status === 'Pending' ? 'activity_scheduled' : 'activity_completed';
+        $description = $followup->status === 'Pending' 
+            ? "Scheduled a {$followup->type} activity on " . $followup->followup_date->format('d/m/Y h:i A')
+            : "Logged a {$followup->type} interaction: " . ($followup->notes ?: 'No details');
+
+        \App\Domains\CRM\Models\LeadHistory::logEvent(
+            $lead,
+            $eventType,
+            null,
+            $followup->type,
+            $description
+        );
 
         // Sync Parent Lead status and next meetup date
         $this->syncLeadStatusAndFollowupDate($lead);
@@ -76,7 +91,18 @@ class LeadFollowupController extends Controller
             }
         }
 
+        $oldStatus = $followup->status;
         $followup->update($updateData);
+
+        if ($oldStatus !== $followup->status && $followup->status === 'Completed') {
+            \App\Domains\CRM\Models\LeadHistory::logEvent(
+                $followup->lead,
+                'activity_completed',
+                $oldStatus,
+                'Completed',
+                "Marked scheduled {$followup->type} activity (scheduled for " . $followup->followup_date->format('d/m/Y h:i A') . ") as Completed"
+            );
+        }
 
         // Sync Parent Lead status and next meetup date
         $lead = $followup->lead;
@@ -93,6 +119,15 @@ class LeadFollowupController extends Controller
     public function destroy(LeadFollowup $followup)
     {
         $lead = $followup->lead;
+
+        \App\Domains\CRM\Models\LeadHistory::logEvent(
+            $lead,
+            'activity_deleted',
+            $followup->type,
+            null,
+            "Deleted {$followup->type} activity (scheduled/logged for " . $followup->followup_date->format('d/m/Y h:i A') . ")"
+        );
+
         $followup->delete();
 
         // Sync Parent Lead status and next meetup date
@@ -119,15 +154,8 @@ class LeadFollowupController extends Controller
 
         if ($nextPending) {
             $lead->next_followup_date = $nextPending->followup_date;
-            $lead->status = 'Follow-up Scheduled';
         } else {
             $lead->next_followup_date = null;
-            
-            // If lead status is 'New' or 'Follow-up Scheduled' and there is at least one Completed follow-up, mark as Contacted
-            $hasCompleted = $lead->followups()->where('status', 'Completed')->exists();
-            if ($hasCompleted && in_array($lead->status, ['New', 'Follow-up Scheduled'])) {
-                $lead->status = 'Contacted';
-            }
         }
         
         $lead->save();
