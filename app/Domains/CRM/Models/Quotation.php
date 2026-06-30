@@ -25,6 +25,7 @@ class Quotation extends BaseModel
     protected $fillable = [
         'tenant_id',
         'customer_id',
+        'lead_id',        // Links this quotation to a specific lead (not just email)
         'sales_person_id',
         'quotation_number',
         'quotation_date',
@@ -40,11 +41,11 @@ class Quotation extends BaseModel
 
     protected $casts = [
         'quotation_date' => 'date',
-        'expiry_date' => 'date',
-        'subtotal' => 'decimal:2',
-        'tax' => 'decimal:2',
-        'discount' => 'decimal:2',
-        'total_amount' => 'decimal:2',
+        'expiry_date'    => 'date',
+        'subtotal'       => 'decimal:2',
+        'tax'            => 'decimal:2',
+        'discount'       => 'decimal:2',
+        'total_amount'   => 'decimal:2',
     ];
 
     public function customer(): BelongsTo
@@ -55,6 +56,14 @@ class Quotation extends BaseModel
     public function salesPerson(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'sales_person_id');
+    }
+
+    /**
+     * The specific lead this quotation was created for.
+     */
+    public function lead(): BelongsTo
+    {
+        return $this->belongsTo(Lead::class);
     }
 
     public function items(): HasMany

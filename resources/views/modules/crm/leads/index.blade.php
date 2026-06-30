@@ -216,25 +216,35 @@
                                     @if ($lead->is_customer || $lead->status === 'Converted')
                                         <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 fw-bold"><i class="feather-check-circle me-1"></i>Converted</span>
                                     @else
-                                        <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('PATCH')
-                                            <select name="status" class="form-control status-select" data-select2-selector="status" style="width: 150px;">
-                                                @foreach(['New', 'Follow-up Scheduled', 'Contacted', 'Qualified', 'Converted', 'Lost'] as $statusOption)
-                                                    @php
-                                                        $bgClass = 'bg-primary';
-                                                        if($statusOption === 'Follow-up Scheduled') $bgClass = 'bg-warning';
-                                                        elseif($statusOption === 'Contacted') $bgClass = 'bg-info';
-                                                        elseif($statusOption === 'Qualified') $bgClass = 'bg-teal';
-                                                        elseif($statusOption === 'Converted') $bgClass = 'bg-success';
-                                                        elseif($statusOption === 'Lost') $bgClass = 'bg-danger';
-                                                    @endphp
-                                                    <option value="{{ $statusOption }}" data-bg="{{ $bgClass }}" {{ ($lead->status ?: 'New') === $statusOption ? 'selected' : '' }}>
-                                                        {{ $statusOption }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </form>
+                                        <div class="d-flex flex-column gap-1">
+                                            <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                @method('PATCH')
+                                                <select name="status" class="form-control status-select" data-select2-selector="status" style="width: 150px;">
+                                                    @foreach(['New', 'Follow-up Scheduled', 'Contacted', 'Qualified', 'Converted', 'Lost'] as $statusOption)
+                                                        @php
+                                                            $bgClass = 'bg-primary';
+                                                            if($statusOption === 'Follow-up Scheduled') $bgClass = 'bg-warning';
+                                                            elseif($statusOption === 'Contacted') $bgClass = 'bg-info';
+                                                            elseif($statusOption === 'Qualified') $bgClass = 'bg-teal';
+                                                            elseif($statusOption === 'Converted') $bgClass = 'bg-success';
+                                                            elseif($statusOption === 'Lost') $bgClass = 'bg-danger';
+                                                        @endphp
+                                                        <option value="{{ $statusOption }}" data-bg="{{ $bgClass }}" {{ ($lead->status ?: 'New') === $statusOption ? 'selected' : '' }}>
+                                                            {{ $statusOption }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </form>
+                                            @if (($lead->status ?: 'New') === 'Qualified' && $lead->getQuotations()->isEmpty())
+                                                <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-xs btn-primary mt-1 w-100 fw-bold py-1 px-1 fs-10">
+                                                        <i class="feather-file-plus me-1"></i>Convert to Quotation
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
                                     @endif
                                 </td>
                                 <td class="text-end pe-4">
@@ -245,10 +255,10 @@
                                         </a>
                                         
                                         <!-- Edit -->
-                                        <a href="{{ route('crm.leads.edit', $lead->id) }}" class="avatar-text avatar-md bg-soft-info text-info" data-bs-toggle="tooltip" title="Edit">
+                                        <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="avatar-text avatar-md bg-soft-info text-info" data-bs-toggle="tooltip" title="Edit">
                                             <i class="feather feather-edit-3"></i>
                                         </a>
- 
+         
                                         <!-- Delete -->
                                         <form id="delete-form-{{ $lead->id }}" action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" class="d-inline">
                                             @csrf
@@ -273,7 +283,6 @@
             </div>
         </div>
     </div>
-
 @endsection
 
 @push('styles')
@@ -306,6 +315,7 @@
             $('.status-select').on('change', function() {
                 $(this).closest('form').submit();
             });
+
 
             // Live Search filter for the Leads table
             $('#tableSearch').on('input', function() {

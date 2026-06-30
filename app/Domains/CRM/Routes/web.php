@@ -25,6 +25,8 @@ Route::prefix('crm')
             ->name('leads.updateStatus');
         Route::patch('leads/{lead}/owner', [LeadController::class, 'updateOwner'])
             ->name('leads.updateOwner');
+        Route::post('leads/{lead}/convert-to-quotation', [LeadController::class, 'convertToQuotation'])
+            ->name('leads.convertToQuotation');
         Route::delete('leads/{lead}', [LeadController::class, 'destroy'])
             ->name('leads.destroy');
 
@@ -49,5 +51,6 @@ Route::prefix('crm')
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->name('quotations.show');
         Route::get('quotations/{quotation}/edit', [QuotationController::class, 'edit'])->name('quotations.edit');
         Route::put('quotations/{quotation}', [QuotationController::class, 'update'])->name('quotations.update');
+        Route::patch('quotations/{quotation}/status', [QuotationController::class, 'updateStatus'])->name('quotations.updateStatus');
         Route::delete('quotations/{quotation}', [QuotationController::class, 'destroy'])->name('quotations.destroy');
     });
