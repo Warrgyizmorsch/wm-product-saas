@@ -8,10 +8,24 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
-        /* Remove bottom margin of premium form components inside table cells */
-        .table-responsive-container td .mb-3,
-        .table-responsive td .mb-3 {
+        /* Keep input components inside table cells extremely compact */
+        .erp-thin-table td .mb-3 {
             margin-bottom: 0 !important;
+        }
+        .erp-thin-table td .form-control,
+        .erp-thin-table td .form-select {
+            height: 34px !important;
+            padding: 4px 8px !important;
+            font-size: 12px !important;
+        }
+        .erp-thin-table td .select2-container--bootstrap-5 .select2-selection {
+            min-height: 34px !important;
+            height: 34px !important;
+            padding: 3px 8px !important;
+            font-size: 12px !important;
+        }
+        .c-pointer {
+            cursor: pointer;
         }
     </style>
 @endpush
@@ -23,108 +37,121 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 @endpush
 
-@section('page-actions')
-    <a href="{{ route('production.boms.index') }}" class="btn btn-secondary">
-        <i class="feather-x me-2"></i>Cancel
-    </a>
-@endsection
-
 @section('content')
-    <!-- Validation Errors & Warning Banners -->
-    @if ($errors->any())
-        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-            <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
-            <ul class="mb-0 fs-12 ps-3">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </x-ui.alert>
-        <div class="mb-4"></div>
-    @endif
+    <div class="erp-single-panel bg-white" x-data="bomForm">
+        <!-- Header with Close Button -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <h4 class="fw-bold text-dark mb-0">New Bill of Materials</h4>
+            <a href="{{ route('production.boms.index') }}" class="text-muted hover-danger fs-18">
+                <i class="feather-x"></i>
+            </a>
+        </div>
 
-    <!-- Session Error Message -->
-    @if (session('error'))
-        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-            <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-            <p class="fs-12 mb-0">{{ session('error') }}</p>
-        </x-ui.alert>
-        <div class="mb-4"></div>
-    @endif
-
-    <form method="POST" action="{{ route('production.boms.store') }}" x-data="bomForm">
-        @csrf
-        @if(request()->has('parent_product_id'))
-            <input type="hidden" name="parent_product_id" value="{{ request('parent_product_id') }}">
+        <!-- Validation Errors & Warning Banners -->
+        @if ($errors->any())
+            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
+                <ul class="mb-0 fs-12 ps-3">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
+            <div class="mb-4"></div>
         @endif
 
-        <div class="row g-4">
-            <!-- Left Column: Header Information -->
-            <div class="col-xl-12">
-                <x-ui.card title="BOM General Header Information">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <x-ui.input label="BOM Identifier / Number" name="bom_number" placeholder="e.g. BOM-XYZ-001 or AUTO" value="{{ old('bom_number', 'AUTO') }}" helperText="Leave as AUTO to generate automatically" required />
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.input label="BOM Description Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" value="{{ old('bom_name') }}" required />
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.select label="Target Finished Product" name="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id', $selectedProductId ?? '') }}" data-select2-selector="default" master="product" required />
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.select label="BOM Type" name="bom_type" :options="[
-                                'manufacturing' => 'Manufacturing BOM (Standard)',
-                                'engineering' => 'Engineering BOM (R&D)',
-                                'sales' => 'Sales BOM (Kit)',
-                                'phantom' => 'Phantom (Blow-Through)',
-                                'subcontracting' => 'Subcontracting (Outsourced)'
-                            ]" selected="{{ old('bom_type', 'manufacturing') }}" data-select2-selector="default" required />
-                        </div>
-                        
-                        <div class="col-md-3">
-                            <x-ui.input label="Base Production Qty" name="base_quantity" type="number" step="any" placeholder="1.0" value="{{ old('base_quantity', '1.0000') }}" required />
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.select label="Base UOM" name="base_uom_id" :options="['' => 'Select UOM'] + $uoms->pluck('name', 'id')->toArray()" selected="{{ old('base_uom_id') }}" data-select2-selector="default" master="uom" required />
-                        </div>
-                        <div class="col-md-2">
-                            <x-ui.input label="BOM Version ID" name="version" placeholder="e.g. 1.0.0" value="{{ old('version', '1.0.0') }}" required />
-                        </div>
-                        <div class="col-md-4">
-                            <x-ui.select label="Routing Reference" name="routing_id" :options="['' => 'No Routing Reference / Standalone'] + $routings->pluck('name', 'id')->toArray()" selected="{{ old('routing_id') }}" data-select2-selector="default" />
-                        </div>
+        @if (session('error'))
+            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+                <p class="fs-12 mb-0">{{ session('error') }}</p>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-                        <div class="col-md-3">
-                            <x-ui.input label="Effective Start Date" name="effective_date" type="date" value="{{ old('effective_date', date('Y-m-d')) }}" required />
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.input label="Effective Expiry Date" name="expiry_date" type="date" value="{{ old('expiry_date') }}" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Revision Reason" name="revision_reason" placeholder="e.g. Engineering specification update" value="{{ old('revision_reason') }}" />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold text-dark fs-12 text-uppercase mb-2">Recipe Description & Engineering Notes</label>
-                            <textarea class="form-control" name="notes" rows="3" placeholder="Enter process description, instructions, or version change notes...">{{ old('notes') }}</textarea>
-                        </div>
-                    </div>
-                </x-ui.card>
+        <form method="POST" action="{{ route('production.boms.store') }}">
+            @csrf
+            @if(request()->has('parent_product_id'))
+                <input type="hidden" name="parent_product_id" value="{{ request('parent_product_id') }}">
+            @endif
+
+            <!-- BOM Header Fields using Redesigned Common Components -->
+            <div class="row g-4 mb-4">
+                <!-- Left Column -->
+                <div class="col-md-6">
+                    <x-ui.input label="Bill of Material#*" name="bom_number" placeholder="e.g. BOM-XYZ-001 or AUTO" value="{{ old('bom_number', 'AUTO') }}" required />
+                    
+                    <x-ui.select label="Item to Produce*" name="product_id" id="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id', $selectedProductId ?? '') }}" data-select2-selector="default" master="product" required />
+
+                    <x-ui.input label="BOM Description Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" value="{{ old('bom_name') }}" required />
+
+                    <x-ui.select label="BOM Type*" name="bom_type" :options="[
+                        'manufacturing' => 'Manufacturing BOM (Standard)',
+                        'engineering' => 'Engineering BOM (R&D)',
+                        'sales' => 'Sales BOM (Kit)',
+                        'phantom' => 'Phantom (Blow-Through)',
+                        'subcontracting' => 'Subcontracting (Outsourced)'
+                    ]" selected="{{ old('bom_type', 'manufacturing') }}" data-select2-selector="default" required />
+                </div>
+
+                <!-- Right Column -->
+                <div class="col-md-6">
+                    <x-ui.input label="Quantity*" name="base_quantity" type="number" step="any" placeholder="1.0" value="{{ old('base_quantity', '1.0000') }}" required />
+                    
+                    <x-ui.select label="Base Unit*" name="base_uom_id" :options="['' => 'Select UOM'] + $uoms->pluck('name', 'id')->toArray()" selected="{{ old('base_uom_id') }}" data-select2-selector="default" master="uom" required />
+                    
+                    <x-ui.textarea label="Description" name="notes" placeholder="Max. 500 characters" value="{{ old('notes') }}" rows="3" />
+                </div>
             </div>
 
-            <!-- Full Width: Components Dynamic Grid -->
-            <div class="col-xl-12">
-                <x-ui.card title="BOM Recipe Structure (Dynamic Components Grid)">
-                    <x-ui.table bordered>
-                        <thead class="table-light fs-11 text-uppercase text-dark">
+            <!-- Advanced Configuration Collapsible settings using Alpine.js -->
+            <div class="border rounded mb-4">
+                <div class="bg-light py-2 px-3 fs-13 fw-semibold text-dark d-flex justify-content-between align-items-center c-pointer" @click="showAdvanced = !showAdvanced">
+                    <span><i class="feather-settings me-2"></i>Advanced Configuration & Lifecycle Dates</span>
+                    <i class="feather-chevron-down transition-all" style="transition: transform 0.2s;" :style="showAdvanced ? 'transform: rotate(180deg);' : ''"></i>
+                </div>
+                <div class="bg-white" 
+                     style="transition: max-height 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out; overflow: hidden;"
+                     :style="showAdvanced ? 'max-height: 1000px; padding: 1rem; opacity: 1; border-top: 1px solid #dee2e6;' : 'max-height: 0px; padding: 0 1rem; opacity: 0; border-top: none;'">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <x-ui.input label="Version ID*" name="version" placeholder="e.g. 1.0.0" value="{{ old('version', '1.0.0') }}" required />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.select label="Routing Reference" name="routing_id" id="routing_id" :options="['' => 'No Routing Reference'] + $routings->pluck('name', 'id')->toArray()" selected="{{ old('routing_id') }}" data-select2-selector="default" x-model="selectedRoutingId" @change="loadOperations()" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input label="Effective Start Date*" name="effective_date" type="date" value="{{ old('effective_date', date('Y-m-d')) }}" required />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input label="Effective Expiry Date" name="expiry_date" type="date" value="{{ old('expiry_date') }}" />
+                        </div>
+                        <div class="col-md-12">
+                            <x-ui.input label="Revision Reason" name="revision_reason" placeholder="e.g. Engineering specification update" value="{{ old('revision_reason') }}" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Headers -->
+            <div class="erp-tabs-nav">
+                <a href="javascript:void(0)" class="erp-tabs-link" :class="activeTab === 'components' ? 'active' : ''" @click="activeTab = 'components'">Components</a>
+                <a href="javascript:void(0)" class="erp-tabs-link" :class="activeTab === 'operations' ? 'active' : ''" @click="activeTab = 'operations'; loadOperations()">Operations*</a>
+            </div>
+
+            <!-- Tab 1: Components Panel -->
+            <div x-show="activeTab === 'components'" x-transition>
+                <h5 class="fw-bold text-dark mb-3">Add Component*</h5>
+                <div class="table-responsive mb-4">
+                    <table class="erp-thin-table">
+                        <thead>
                             <tr>
-                                <th style="width: 5%">Seq</th>
+                                <th style="width: 5%" class="text-center">Seq</th>
                                 <th style="width: 25%">Material Component</th>
                                 <th style="width: 10%">Quantity</th>
                                 <th style="width: 12%">UOM</th>
                                 <th style="width: 10%">Scrap %</th>
                                 <th style="width: 8%">Priority</th>
-                                <th style="width: 18%">Validity (From - To)</th>
+                                <th style="width: 15%">Validity (From - To)</th>
                                 <th style="width: 12%">Alternative</th>
                                 <th style="width: 5%" class="text-center">Action</th>
                             </tr>
@@ -133,21 +160,21 @@
                             <template x-for="(item, index) in items" :key="item.uid">
                                 <tr x-init="$nextTick(() => initRowSelects($el, item))">
                                     <!-- Sequence -->
-                                    <td class="fw-bold text-center" x-text="index + 1"></td>
+                                    <td class="fw-bold text-center align-middle" x-text="index + 1"></td>
                                     
                                     <!-- Material Selection -->
-                                    <td>
+                                    <td class="align-middle">
                                         <x-ui.select x-bind:name="'items['+index+'][material_id]'" class="fs-13" x-model="item.material_id" required data-select2-selector="default" master="product">
                                             <option value="">Select Material...</option>
                                             @foreach($materials as $material)
-                                                <option value="{{ $material->id }}" data-type="{{ $material->type }}">{{ $material->name }} ({{ $material->sku }})</option>
+                                                <option value="{{ $material->id }}" data-type="{{ $material->type }}" data-sku="{{ $material->sku }}">{{ $material->name }} ({{ $material->sku }})</option>
                                             @endforeach
                                         </x-ui.select>
                                         <template x-if="errors && errors['items.' + index + '.material_id']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
                                         </template>
                                         <template x-if="getMaterialType(item.material_id) === 'semi_finished'">
-                                            <div class="erp-child-bom-cta">
+                                            <div class="erp-child-bom-cta mt-2">
                                                 <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-soft-primary">
                                                     <i class="feather-plus me-1"></i>Create Child BOM
                                                 </a>
@@ -159,7 +186,7 @@
                                     </td>
                                     
                                     <!-- Quantity -->
-                                    <td>
+                                    <td class="align-middle">
                                         <x-ui.input type="number" step="any" x-bind:name="'items['+index+'][quantity]'" class="text-end fs-13" x-model="item.quantity" placeholder="0.00" required min="0.0001" />
                                         <template x-if="errors && errors['items.' + index + '.quantity']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.quantity'][0]"></span>
@@ -167,7 +194,7 @@
                                     </td>
                                     
                                     <!-- UOM -->
-                                    <td>
+                                    <td class="align-middle">
                                         <x-ui.select x-bind:name="'items['+index+'][uom_id]'" class="fs-13" x-model="item.uom_id" required data-select2-selector="default" master="uom">
                                             <option value="">Select UOM...</option>
                                             @foreach($uoms as $uom)
@@ -180,7 +207,7 @@
                                     </td>
                                     
                                     <!-- Material Scrap Percentage -->
-                                    <td>
+                                    <td class="align-middle">
                                         <x-ui.input type="number" step="any" x-bind:name="'items['+index+'][material_scrap_percentage]'" class="text-end fs-13 text-danger" x-model="item.material_scrap_percentage" placeholder="0.00" min="0" max="100" />
                                         <template x-if="errors && errors['items.' + index + '.material_scrap_percentage']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_scrap_percentage'][0]"></span>
@@ -188,15 +215,15 @@
                                     </td>
 
                                     <!-- Priority -->
-                                    <td>
+                                    <td class="align-middle">
                                         <x-ui.input type="number" x-bind:name="'items['+index+'][priority]'" class="text-end fs-13" x-model="item.priority" placeholder="1" min="1" />
                                         <template x-if="errors && errors['items.' + index + '.priority']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.priority'][0]"></span>
                                         </template>
                                     </td>
 
-                                    <!-- Validity limits (effective_from, effective_to) -->
-                                    <td>
+                                    <!-- Validity limits -->
+                                    <td class="align-middle">
                                         <div class="d-flex flex-column gap-1">
                                             <x-ui.input type="date" x-bind:name="'items['+index+'][effective_from]'" class="form-control-sm fs-11" x-model="item.effective_from" />
                                             <template x-if="errors && errors['items.' + index + '.effective_from']">
@@ -209,11 +236,10 @@
                                         </div>
                                     </td>
                                     
-                                    <!-- Alternative material group options -->
-                                    <td>
+                                    <!-- Alternative material options -->
+                                    <td class="align-middle">
                                         <div class="d-flex flex-column gap-2">
                                             <div>
-                                                <!-- Hidden input to guarantee is_alternative is sent as 0 if unchecked -->
                                                 <input type="hidden" x-bind:name="'items['+index+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
                                                 
                                                 <x-ui.checkbox 
@@ -235,31 +261,92 @@
                                     </td>
                                     
                                     <!-- Remove Row Action -->
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-sm btn-soft-danger" @click="removeItem(index)">
-                                            <i class="feather-trash-2"></i>
+                                    <td class="text-center align-middle">
+                                        <button type="button" class="erp-btn-delete" @click="removeItem(index)">
+                                            <i class="feather-x"></i>
                                         </button>
                                     </td>
                                 </tr>
                             </template>
                         </tbody>
-                    </x-ui.table>
+                    </table>
+                </div>
 
-                    <div class="mt-3">
-                        <button type="button" class="btn btn-light-brand" @click="addItem()">
-                            <i class="feather-plus me-2"></i>Add Component Row
-                        </button>
+                <!-- Add Row Action -->
+                <div class="mb-4">
+                    <button type="button" class="btn btn-light-brand" @click="addItem()">
+                        <i class="feather-plus me-2"></i>Add Component Row
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab 2: Operations Panel (Read-only viewed, linked to Routing reference dropdown) -->
+            <div x-show="activeTab === 'operations'" x-transition style="display: none;">
+                <h5 class="fw-bold text-dark mb-3">Routing Operations List</h5>
+                
+                <template x-if="!selectedRoutingId">
+                    <div class="p-4 text-center border rounded bg-light text-muted">
+                        <i class="feather-info me-2"></i>Select routing to see operations
                     </div>
-                </x-ui.card>
+                </template>
+                
+                <template x-if="selectedRoutingId">
+                    <div>
+                        <template x-if="loadingOperations">
+                            <div class="p-4 text-center">
+                                <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading operations...
+                            </div>
+                        </template>
+                        
+                        <template x-if="!loadingOperations && operations.length === 0">
+                            <div class="p-4 text-center border rounded bg-light text-muted">
+                                No operations defined for this routing.
+                            </div>
+                        </template>
+                        
+                        <template x-if="!loadingOperations && operations.length > 0">
+                            <div class="table-responsive">
+                                <table class="erp-thin-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 10%" class="text-center">Seq</th>
+                                            <th style="width: 25%">Operation Stage</th>
+                                            <th style="width: 15%">Type</th>
+                                            <th style="width: 20%">Work Center</th>
+                                            <th style="width: 15%">Machine</th>
+                                            <th style="width: 15%" class="text-end">Times & Yield</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="op in operations" :key="op.sequence">
+                                            <tr>
+                                                <td class="fw-semibold text-muted text-center align-middle" x-text="op.sequence"></td>
+                                                <td class="fw-bold text-dark align-middle" x-text="op.name"></td>
+                                                <td class="text-capitalize align-middle" x-text="op.operation_type"></td>
+                                                <td class="align-middle" x-text="op.work_center_name"></td>
+                                                <td class="align-middle" x-text="op.machine_name"></td>
+                                                <td class="text-end align-middle">
+                                                    <div class="fs-11 text-muted">Setup: <span class="fw-semibold text-dark" x-text="op.setup_time_minutes + 'm'"></span></div>
+                                                    <div class="fs-11 text-muted">Run: <span class="fw-semibold text-dark" x-text="op.processing_time_minutes + 'm'"></span></div>
+                                                    <div class="fs-11 text-muted">Yield: <span class="fw-semibold text-dark" x-text="op.expected_yield_percentage + '%'"></span></div>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+                    </div>
+                </template>
             </div>
 
-            <div class="col-xl-12 text-end">
-                <button type="submit" class="btn btn-primary btn-lg px-5">
-                    <i class="feather-save me-2"></i>Save Recipe as Draft
-                </button>
+            <!-- Footer Save and Cancel buttons -->
+            <div class="d-flex gap-2 pt-3 border-top mt-4">
+                <button type="submit" class="btn btn-primary px-4">Save Recipe as Draft</button>
+                <a href="{{ route('production.boms.index') }}" class="btn btn-secondary px-4">Cancel</a>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 
     @php
         $oldItems = old('items', [
@@ -273,6 +360,11 @@
                 items: @json($oldItems),
                 errors: @json($errors->toArray()),
                 materials: @json($materials),
+                selectedRoutingId: '{{ old("routing_id", "") }}',
+                operations: [],
+                loadingOperations: false,
+                activeTab: 'components',
+                showAdvanced: true,
 
                 getMaterialType(materialId) {
                     if (!materialId) return '';
@@ -281,7 +373,6 @@
                 },
 
                 init() {
-                    // Make sure structure is consistent and has a unique key for tracking
                     this.items = this.items.map((item, idx) => ({
                         uid: item.uid || 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx,
                         material_id: item.material_id || '',
@@ -297,6 +388,40 @@
                     if(this.items.length === 0) {
                         this.addItem();
                     }
+
+                    // Hook select2 change event for routing reference
+                    $('#routing_id').on('change.select2', (e) => {
+                        this.selectedRoutingId = e.target.value;
+                        this.loadOperations();
+                    });
+
+                    // Trigger initial load
+                    this.loadOperations();
+                },
+
+                loadOperations() {
+                    // Pull routing ID directly from DOM select input to guarantee sync
+                    var routingEl = document.getElementById('routing_id');
+                    if (routingEl) {
+                        this.selectedRoutingId = routingEl.value;
+                    }
+
+                    if (!this.selectedRoutingId) {
+                        this.operations = [];
+                        return;
+                    }
+                    this.loadingOperations = true;
+                    fetch('/production/routing/' + this.selectedRoutingId + '/operations')
+                        .then(res => res.json())
+                        .then(data => {
+                            this.operations = data;
+                            this.loadingOperations = false;
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            this.operations = [];
+                            this.loadingOperations = false;
+                        });
                 },
 
                 addItem() {
@@ -329,7 +454,7 @@
                         // Initialize select2 with bootstrap-5 theme
                         $select.select2({
                             theme: "bootstrap-5",
-                            dropdownParent: $(rowEl).closest('.table-responsive-container')
+                            dropdownParent: $(rowEl).closest('.table-responsive')
                         });
                         
                         // Capture type on init
@@ -363,7 +488,6 @@
         });
     </script>
 
-    {{-- Global master quick-create modals (rendered once, shared by all selects with master=) --}}
+    {{-- Global master quick-create modals --}}
     <x-ui.master-modals :masters="['product', 'uom']" />
 @endsection
-

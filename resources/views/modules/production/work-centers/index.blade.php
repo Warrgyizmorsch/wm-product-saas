@@ -4,6 +4,16 @@
 @section('page-title', 'Work Center Master')
 @section('breadcrumb', 'Work Centers')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
+
 @section('page-actions')
     @can('create', App\Domains\Production\Models\WorkCenter::class)
         <a href="{{ route('production.work-centers.create') }}" class="btn btn-primary">
@@ -13,146 +23,126 @@
 @endsection
 
 @section('content')
-    <!-- Alerts -->
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-success text-white me-3">
-                    <i class="feather-check-circle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                    <p class="fs-12 mb-0">{{ session('success') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
+    <div class="erp-single-panel bg-white">
+        <!-- Success & Error Messages -->
+        @if (session('success'))
+            <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Success!</h6>
+                <p class="fs-12 mb-0">{{ session('success') }}</p>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-    @if (session('error'))
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                    <p class="fs-12 mb-0">{{ session('error') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
+        @if (session('error'))
+            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+                <p class="fs-12 mb-0">{{ session('error') }}</p>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-    <!-- Filters -->
-    <x-ui.card class="mb-4">
-        <form method="GET" action="{{ route('production.work-centers.index') }}">
+        <!-- Inlined Filters Section -->
+        <form method="GET" action="{{ route('production.work-centers.index') }}" class="mb-4 pb-3 border-bottom">
             <div class="row g-3">
                 <div class="col-md-4">
-                    <x-ui.input label="Search Work Center" name="search" placeholder="Code, name, or department..." value="{{ request('search') }}" />
+                    <x-ui.input name="search" placeholder="Search code, name, or department..." value="{{ request('search') }}" />
                 </div>
                 <div class="col-md-3">
-                    <x-ui.select label="Filter by Type" name="work_center_type" :options="['' => 'All Types'] + $workCenterTypes" selected="{{ request('work_center_type') }}" />
+                    <x-ui.select name="work_center_type" :options="['' => 'All Types'] + $workCenterTypes" selected="{{ request('work_center_type') }}" data-select2-selector="default" />
                 </div>
                 <div class="col-md-3">
-                    <x-ui.select label="Filter by Status" name="status" :options="[
+                    <x-ui.select name="status" :options="[
                         '' => 'All Statuses',
                         'active' => 'Active',
                         'inactive' => 'Inactive'
-                    ]" selected="{{ request('status') }}" />
+                    ]" selected="{{ request('status') }}" data-select2-selector="default" />
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-2 d-flex align-items-start">
                     <div class="d-grid w-100">
-                        <button type="submit" class="btn btn-light-brand h-42">
+                        <button type="submit" class="btn btn-secondary h-40">
                             <i class="feather-filter me-2"></i>Filter
                         </button>
                     </div>
                 </div>
             </div>
         </form>
-    </x-ui.card>
 
-    <!-- Work Centers Table -->
-    <x-ui.card>
-        <x-ui.table title="Manufacturing Work Centers" striped hoverable>
-            <thead>
-                <tr>
-                    <th>Code</th>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Department</th>
-                    <th>Location</th>
-                    <th class="text-end">Capacity/Hour</th>
-                    <th class="text-end">Efficiency</th>
-                    <th class="text-end">Cost/Hour</th>
-                    <th class="text-center">Machines</th>
-                    <th>Status</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($workCenters as $wc)
+        <!-- Work Centers Table (Dense & Thin row) -->
+        <div class="table-responsive">
+            <table class="erp-thin-table">
+                <thead>
                     <tr>
-                        <td>
-                            <a href="{{ route('production.work-centers.show', $wc->id) }}" class="fw-bold text-primary">
-                                {{ $wc->code }}
-                            </a>
-                        </td>
-                        <td>{{ $wc->name }}</td>
-                        <td>
-                            <span class="badge bg-soft-primary text-primary text-uppercase fs-10">
-                                {{ $workCenterTypes[$wc->work_center_type] ?? $wc->work_center_type ?? 'N/A' }}
-                            </span>
-                        </td>
-                        <td>{{ $wc->department_name ?? '—' }}</td>
-                        <td>{{ $wc->location ?? '—' }}</td>
-                        <td class="text-end fw-semibold">
-                            {{ $wc->capacity_per_hour !== null ? number_format($wc->capacity_per_hour, 2) : 'Unlimited' }}
-                        </td>
-                        <td class="text-end">{{ number_format($wc->efficiency_percentage, 0) }}%</td>
-                        <td class="text-end fw-semibold">${{ number_format($wc->cost_per_hour, 2) }}</td>
-                        <td class="text-center">
-                            <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}" class="badge bg-soft-info text-info rounded-pill">
-                                {{ $wc->machines_count }}
-                            </a>
-                        </td>
-                        <td>
-                            @if ($wc->isActive())
-                                <span class="badge bg-soft-success text-success">Active</span>
-                            @else
-                                <span class="badge bg-soft-danger text-danger">Inactive</span>
-                            @endif
-                        </td>
-                        <td class="text-end">
-                            <div class="d-inline-flex gap-1">
-                                <a href="{{ route('production.work-centers.show', $wc->id) }}" class="btn btn-icon btn-light" title="View Details">
-                                    <i class="feather-eye"></i>
+                        <th style="width: 10%">Code</th>
+                        <th style="width: 20%">Name</th>
+                        <th style="width: 12%">Type</th>
+                        <th style="width: 15%">Department</th>
+                        <th style="width: 12%">Location</th>
+                        <th style="width: 10%" class="text-end">Capacity/Hr</th>
+                        <th style="width: 8%" class="text-end">Efficiency</th>
+                        <th style="width: 8%" class="text-end">Cost/Hr</th>
+                        <th style="width: 8%" class="text-center">Machines</th>
+                        <th style="width: 8%">Status</th>
+                        <th style="width: 10%" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($workCenters as $wc)
+                        <tr>
+                            <td class="align-middle">
+                                <a href="{{ route('production.work-centers.show', $wc->id) }}" class="fw-bold text-primary">
+                                    {{ $wc->code }}
                                 </a>
-                                @can('update', $wc)
-                                    <a href="{{ route('production.work-centers.edit', $wc->id) }}" class="btn btn-icon btn-light" title="Edit">
-                                        <i class="feather-edit"></i>
-                                    </a>
-                                @endcan
-                                @can('delete', $wc)
-                                    <form action="{{ route('production.work-centers.destroy', $wc->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this work center?');" class="d-inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-icon btn-light text-danger" title="Delete">
-                                            <i class="feather-trash-2"></i>
-                                        </button>
-                                    </form>
-                                @endcan
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="11" class="text-center py-4 text-muted">
-                            <i class="feather-info me-2"></i>No work centers found.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </x-ui.table>
-    </x-ui.card>
+                            </td>
+                            <td class="align-middle text-dark fw-medium">{{ $wc->name }}</td>
+                            <td class="align-middle">
+                                <span class="badge bg-soft-primary text-primary text-uppercase fs-10 rounded-pill px-2 py-1">
+                                    {{ $workCenterTypes[$wc->work_center_type] ?? $wc->work_center_type ?? 'N/A' }}
+                                </span>
+                            </td>
+                            <td class="align-middle">{{ $wc->department_name ?? '—' }}</td>
+                            <td class="align-middle">{{ $wc->location ?? '—' }}</td>
+                            <td class="text-end align-middle fw-semibold">
+                                {{ $wc->capacity_per_hour !== null ? number_format($wc->capacity_per_hour, 2) : 'Unlimited' }}
+                            </td>
+                            <td class="text-end align-middle text-muted">{{ number_format($wc->efficiency_percentage, 0) }}%</td>
+                            <td class="text-end align-middle fw-semibold text-dark">${{ number_format($wc->cost_per_hour, 2) }}</td>
+                            <td class="text-center align-middle">
+                                <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}" class="badge bg-soft-info text-info rounded-pill px-2 py-1 fw-bold">
+                                    {{ $wc->machines_count }}
+                                </a>
+                            </td>
+                            <td class="align-middle">
+                                @if ($wc->isActive())
+                                    <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">Active</span>
+                                @else
+                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">Inactive</span>
+                                @endif
+                            </td>
+                            <td class="text-end align-middle">
+                                <div class="d-inline-flex gap-1">
+                                    <x-ui.icon-btn href="{{ route('production.work-centers.show', $wc->id) }}" variant="light" size="sm" icon="feather-eye" title="View Details" />
+                                    @can('update', $wc)
+                                        <x-ui.icon-btn href="{{ route('production.work-centers.edit', $wc->id) }}" variant="light" size="sm" icon="feather-edit" title="Edit" />
+                                    @endcan
+                                    @can('delete', $wc)
+                                        <form action="{{ route('production.work-centers.destroy', $wc->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this work center?');" class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <x-ui.icon-btn type="submit" variant="light" size="sm" icon="feather-trash-2" class="text-danger" title="Delete" />
+                                        </form>
+                                    @endcan
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="11" class="text-center py-4 text-muted">
+                                <i class="feather-info me-2"></i>No work centers found.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 @endsection

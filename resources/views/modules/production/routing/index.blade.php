@@ -4,6 +4,16 @@
 @section('page-title', 'Routing Master Data')
 @section('breadcrumb', 'Routings')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
+
 @section('page-actions')
     @can('create', App\Domains\Production\Models\Routing::class)
         <a href="{{ route('production.routing.create') }}" class="btn btn-primary">
@@ -13,167 +23,147 @@
 @endsection
 
 @section('content')
-    <!-- Success & Error Alerts -->
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-success text-white me-3">
-                    <i class="feather-check-circle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                    <p class="fs-12 mb-0">{{ session('success') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
+    <div class="erp-single-panel bg-white">
+        <!-- Success & Error Alerts -->
+        @if (session('success'))
+            <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Success!</h6>
+                <p class="fs-12 mb-0">{{ session('success') }}</p>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-    @if (session('error'))
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                    <p class="fs-12 mb-0">{{ session('error') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
+        @if (session('error'))
+            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+                <p class="fs-12 mb-0">{{ session('error') }}</p>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-    <!-- Filters Card -->
-    <x-ui.card class="mb-4">
-        <form method="GET" action="{{ route('production.routing.index') }}">
+        <!-- Inlined Filters Section -->
+        <form method="GET" action="{{ route('production.routing.index') }}" class="mb-4 pb-3 border-bottom">
             <div class="row g-3">
                 <div class="col-md-4">
-                    <x-ui.input label="Search Routing" name="search" placeholder="Number, name, or finished product SKU..." value="{{ request('search') }}" />
+                    <x-ui.input name="search" placeholder="Search number, name, or SKU..." value="{{ request('search') }}" />
                 </div>
                 <div class="col-md-3">
-                    <x-ui.select label="Filter by Product" name="product_id" :options="['' => 'All Products'] + $products->pluck('name', 'id')->toArray()" selected="{{ request('product_id') }}" />
+                    <x-ui.select name="product_id" :options="['' => 'All Finished Products'] + $products->pluck('name', 'id')->toArray()" selected="{{ request('product_id') }}" data-select2-selector="default" />
                 </div>
                 <div class="col-md-3">
-                    <x-ui.select label="Filter by Status" name="status" :options="[
+                    <x-ui.select name="status" :options="[
                         '' => 'All Statuses',
                         'draft' => 'Draft',
                         'pending_approval' => 'Pending Approval',
                         'active' => 'Active',
                         'historical' => 'Historical',
                         'cancelled' => 'Cancelled'
-                    ]" selected="{{ request('status') }}" />
+                    ]" selected="{{ request('status') }}" data-select2-selector="default" />
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-2 d-flex align-items-start">
                     <div class="d-grid w-100">
-                        <button type="submit" class="btn btn-light-brand h-42">
+                        <button type="submit" class="btn btn-secondary h-40">
                             <i class="feather-filter me-2"></i>Filter
                         </button>
                     </div>
                 </div>
             </div>
         </form>
-    </x-ui.card>
 
-    <!-- Routings List Table -->
-    <x-ui.card>
-        <x-ui.table title="Manufacturing Process Routings" striped hoverable>
-            <thead>
-                <tr>
-                    <th>Routing Number</th>
-                    <th>Routing Name</th>
-                    <th>Product to Manufacture</th>
-                    <th>Ver</th>
-                    <th class="text-center">Operations</th>
-                    <th>Effective From</th>
-                    <th>Effective To</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($routings as $routing)
+        <!-- Routings Table (Dense & Thin row) -->
+        <div class="table-responsive">
+            <table class="erp-thin-table">
+                <thead>
                     <tr>
-                        <td>
-                            <a href="{{ route('production.routing.show', $routing->id) }}" class="fw-bold text-primary">
-                                {{ $routing->routing_number }}
-                            </a>
-                        </td>
-                        <td>{{ $routing->name }}</td>
-                        <td>
-                            @if ($routing->product)
-                                <span class="fw-semibold text-dark">{{ $routing->product->name }}</span>
-                                <small class="text-muted d-block">{{ $routing->product->sku }}</small>
-                            @else
-                                <span class="text-muted">No Product</span>
-                            @endif
-                        </td>
-                        <td>
-                            {{ $routing->version }}
-                            @if ($routing->revision > 0)
-                                <small class="text-muted">(Rev {{ $routing->revision }})</small>
-                            @endif
-                        </td>
-                        <td class="text-center">
-                            <span class="badge bg-soft-info text-info rounded-pill">
-                                {{ $routing->operations_count }}
-                            </span>
-                        </td>
-                        <td>{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : 'Immediate' }}</td>
-                        <td>{{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : 'Indefinite' }}</td>
-                        <td>
-                            @if ($routing->is_default)
-                                <span class="badge bg-soft-success text-success fs-10">Primary</span>
-                            @else
-                                <span class="badge bg-soft-warning text-warning fs-10">Alternative</span>
-                            @endif
-                        </td>
-                        <td>
-                            @if ($routing->isDraft())
-                                <span class="badge bg-soft-secondary text-secondary">Draft</span>
-                            @elseif ($routing->isPendingApproval())
-                                <span class="badge bg-soft-warning text-warning">Pending Approval</span>
-                            @elseif ($routing->isActive())
-                                <span class="badge bg-soft-success text-success">Active</span>
-                            @elseif ($routing->isHistorical())
-                                <span class="badge bg-soft-info text-info">Historical</span>
-                            @else
-                                <span class="badge bg-soft-danger text-danger">Cancelled</span>
-                            @endif
-                        </td>
-                        <td class="text-end">
-                            <div class="d-inline-flex gap-1">
-                                <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-icon btn-light" title="View Details">
-                                    <i class="feather-eye"></i>
+                        <th style="width: 12%">Routing Number</th>
+                        <th style="width: 18%">Routing Name</th>
+                        <th style="width: 22%">Product to Manufacture</th>
+                        <th style="width: 8%">Version</th>
+                        <th style="width: 8%" class="text-center">Operations</th>
+                        <th style="width: 10%">Effective From</th>
+                        <th style="width: 10%">Effective To</th>
+                        <th style="width: 6%">Type</th>
+                        <th style="width: 6%">Status</th>
+                        <th style="width: 5%" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($routings as $routing)
+                        <tr>
+                            <td class="align-middle">
+                                <a href="{{ route('production.routing.show', $routing->id) }}" class="fw-bold text-primary">
+                                    {{ $routing->routing_number }}
                                 </a>
-                                @can('update', $routing)
-                                    <a href="{{ route('production.routing.edit', $routing->id) }}" class="btn btn-icon btn-light" title="Edit">
-                                        <i class="feather-edit"></i>
-                                    </a>
-                                @endcan
-                                @if ($routing->isDraft())
-                                    @can('delete', $routing)
-                                        <form action="{{ route('production.routing.destroy', $routing->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this draft routing?');" class="d-inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-icon btn-light text-danger" title="Delete Draft">
-                                                <i class="feather-trash-2"></i>
-                                            </button>
-                                        </form>
-                                    @endcan
+                            </td>
+                            <td class="align-middle text-dark fw-medium">{{ $routing->name }}</td>
+                            <td class="align-middle">
+                                @if ($routing->product)
+                                    <span class="fw-semibold text-dark">{{ $routing->product->name }}</span>
+                                    <small class="text-muted d-block fs-10">{{ $routing->product->sku }}</small>
+                                @else
+                                    <span class="text-muted">No Product</span>
                                 @endif
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="10" class="text-center py-4 text-muted">
-                            <i class="feather-info me-2"></i>No process routings found.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </x-ui.table>
-    </x-ui.card>
+                            </td>
+                            <td class="align-middle">
+                                {{ $routing->version }}
+                                @if ($routing->revision > 0)
+                                    <small class="text-muted">(Rev {{ $routing->revision }})</small>
+                                @endif
+                            </td>
+                            <td class="text-center align-middle">
+                                <span class="badge bg-soft-info text-info rounded-pill px-2 py-1 fw-bold">
+                                    {{ $routing->operations_count }}
+                                </span>
+                            </td>
+                            <td class="align-middle text-muted">{{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : 'Immediate' }}</td>
+                            <td class="align-middle text-muted">{{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : 'Indefinite' }}</td>
+                            <td class="align-middle">
+                                @if ($routing->is_default)
+                                    <span class="badge bg-soft-success text-success px-2 py-1 rounded-pill fs-10">Primary</span>
+                                @else
+                                    <span class="badge bg-soft-warning text-warning px-2 py-1 rounded-pill fs-10">Alt</span>
+                                @endif
+                            </td>
+                            <td class="align-middle">
+                                @if ($routing->isDraft())
+                                    <span class="badge bg-soft-secondary text-secondary rounded-pill px-2 py-1">Draft</span>
+                                @elseif ($routing->isPendingApproval())
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1">Pending</span>
+                                @elseif ($routing->isActive())
+                                    <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">Active</span>
+                                @elseif ($routing->isHistorical())
+                                    <span class="badge bg-soft-info text-info rounded-pill px-2 py-1">Historical</span>
+                                @else
+                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">Cancelled</span>
+                                @endif
+                            </td>
+                            <td class="text-end align-middle">
+                                <div class="d-inline-flex gap-1">
+                                    <x-ui.icon-btn href="{{ route('production.routing.show', $routing->id) }}" variant="light" size="sm" icon="feather-eye" title="View Details" />
+                                    @can('update', $routing)
+                                        <x-ui.icon-btn href="{{ route('production.routing.edit', $routing->id) }}" variant="light" size="sm" icon="feather-edit" title="Edit" />
+                                    @endcan
+                                    @if ($routing->isDraft())
+                                        @can('delete', $routing)
+                                            <form action="{{ route('production.routing.destroy', $routing->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this draft routing?');" class="d-inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <x-ui.icon-btn type="submit" variant="light" size="sm" icon="feather-trash-2" class="text-danger" title="Delete Draft" />
+                                            </form>
+                                        @endcan
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="10" class="text-center py-4 text-muted">
+                                <i class="feather-info me-2"></i>No process routings found.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 @endsection

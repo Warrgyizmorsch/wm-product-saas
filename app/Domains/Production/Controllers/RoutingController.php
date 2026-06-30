@@ -252,4 +252,34 @@ class RoutingController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
+
+    public function getOperationsForAjax(int $id): \Illuminate\Http\JsonResponse
+    {
+        $routing = \App\Domains\Production\Models\Routing::with([
+            'operations' => function($q) {
+                $q->orderBy('sequence', 'asc');
+            },
+            'operations.workCenter',
+            'operations.machine'
+        ])->find($id);
+
+        if (!$routing) {
+            return response()->json(['error' => 'Routing not found'], 404);
+        }
+
+        $ops = $routing->operations->map(function($op) {
+            return [
+                'sequence' => $op->sequence,
+                'name' => $op->name,
+                'operation_type' => $op->operation_type,
+                'work_center_name' => $op->workCenter ? $op->workCenter->name : 'N/A',
+                'machine_name' => $op->machine ? $op->machine->name : 'N/A',
+                'setup_time_minutes' => $op->setup_time_minutes,
+                'processing_time_minutes' => $op->processing_time_minutes,
+                'expected_yield_percentage' => $op->expected_yield_percentage,
+            ];
+        });
+
+        return response()->json($ops);
+    }
 }
