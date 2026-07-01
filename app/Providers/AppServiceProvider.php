@@ -43,13 +43,6 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Bypass all authorization checks (including for guest/unauthenticated users) on dev/local environments
-        \Illuminate\Support\Facades\Gate::before(function ($user = null, $ability = null) {
-            if (!app()->environment('testing')) {
-                return true;
-            }
-        });
-
         // ── Production Policies ───────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionBom::class,

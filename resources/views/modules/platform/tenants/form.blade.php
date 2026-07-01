@@ -4,7 +4,7 @@
 
 <div class="row">
     <div class="col-xxl-8 col-xl-9 mx-auto">
-        <form action="{{ $action }}" method="POST">
+        <form action="{{ $action }}" method="POST" enctype="multipart/form-data">
             @csrf
             @if ($method !== 'POST')
                 @method($method)
@@ -22,6 +22,11 @@
                             <label class="form-label fw-semibold text-dark">Company Name <span class="text-danger">*</span></label>
                             <input type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $tenant->name) }}" required>
                             @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">Display Name</label>
+                            <input type="text" name="display_name" class="form-control @error('display_name') is-invalid @enderror" value="{{ old('display_name', $settings['display_name'] ?? $tenant->name) }}" placeholder="shown in header and sidebar">
+                            @error('display_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold text-dark">Slug</label>
@@ -75,6 +80,26 @@
                             <label class="form-label fw-semibold text-dark">Financial Year</label>
                             <input type="text" name="financial_year" class="form-control @error('financial_year') is-invalid @enderror" value="{{ old('financial_year', $settings['financial_year'] ?? 'FY '.now()->format('Y')) }}">
                             @error('financial_year')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">Full Logo</label>
+                            <input type="file" name="logo_full" class="form-control @error('logo_full') is-invalid @enderror" accept=".jpg,.jpeg,.png,.webp,.svg,image/*">
+                            @error('logo_full')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            @if (!empty($settings['logo_full']))
+                                <div class="mt-2 p-2 border rounded bg-light d-inline-flex align-items-center">
+                                    <img src="{{ tenant_branding_url($settings['logo_full'], 'assets/images/logo-full.png') }}" alt="{{ $settings['display_name'] ?? $tenant->name }} logo" style="max-height: 36px; max-width: 180px;">
+                                </div>
+                            @endif
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-dark">Abbreviated Logo</label>
+                            <input type="file" name="logo_abbr" class="form-control @error('logo_abbr') is-invalid @enderror" accept=".jpg,.jpeg,.png,.webp,.svg,image/*">
+                            @error('logo_abbr')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            @if (!empty($settings['logo_abbr']))
+                                <div class="mt-2 p-2 border rounded bg-light d-inline-flex align-items-center">
+                                    <img src="{{ tenant_branding_url($settings['logo_abbr'], 'assets/images/logo-abbr.png') }}" alt="{{ $settings['display_name'] ?? $tenant->name }} logo" style="max-height: 36px; max-width: 80px;">
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>

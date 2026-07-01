@@ -2,6 +2,7 @@
     $resolvedTenant = tenant();
     $tenantSettings = $resolvedTenant?->settings ?? [];
     $tenantPlan = ucfirst((string) ($resolvedTenant?->plan ?? 'Starter'));
+    $branding = tenant_branding($resolvedTenant);
 
     $modules = [
         __('ui.workspace') => [
@@ -56,9 +57,18 @@
 <nav class="nxl-navigation">
     <div class="navbar-wrapper">
         <div class="m-header">
-            <a href="{{ route('dashboard') }}" class="b-brand">
-                <img src="{{ asset('assets/images/logo-full.png') }}" alt="SaaS ERP" class="logo logo-lg logo-full">
-                <img src="{{ asset('assets/images/logo-abbr.png') }}" alt="SaaS ERP" class="logo logo-sm logo-abbr">
+            <a href="{{ route('dashboard') }}" class="b-brand erp-tenant-brand">
+                @if ($branding['has_full_logo'])
+                    <img src="{{ $branding['full_logo'] }}" alt="{{ $branding['name'] }}" class="logo logo-lg logo-full erp-brand-logo-full">
+                @else
+                    <span class="logo logo-lg logo-full erp-brand-wordmark">{{ $branding['name'] }}</span>
+                @endif
+
+                @if ($branding['has_abbr_logo'])
+                    <img src="{{ $branding['abbr_logo'] }}" alt="{{ $branding['name'] }}" class="logo logo-sm logo-abbr erp-brand-logo-abbr">
+                @else
+                    <span class="logo logo-sm logo-abbr erp-brand-mark">{{ strtoupper(substr($branding['name'], 0, 1)) }}</span>
+                @endif
             </a>
         </div>
         <div class="navbar-content">

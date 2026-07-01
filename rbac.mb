@@ -1,0 +1,196 @@
+For a **large-scale SaaS ERP** with multiple tenants and modules, the **best architecture for RBAC** combines **Role-Based Access Control**, **permission scoping**, and **modular separation**. Here’s the recommended architecture for Laravel:
+
+---
+
+# 1️⃣ Core Principles
+
+1. **Single Source of Truth**
+
+   * One `users` table, one `roles` table, one `permissions` table.
+   * Devs, platform admins, and tenant users coexist with role flags.
+
+2. **Role + Permission Separation**
+
+   * Roles define coarse-grained access (e.g., Super Admin, Tenant Owner, Sales Manager).
+   * Permissions define fine-grained module actions (`crm.leads.view_own`, `inventory.stock.adjust`).
+
+3. **Scope-Aware**
+
+   * Permissions are scoped:
+
+     * `own` → user can see their own records.
+     * `team` → user's team.
+     * `branch` → branch/office records.
+     * `tenant` → tenant-wide records.
+     * `platform` → all tenants (for Super Admin or Devs).
+
+---
+
+# 2️⃣ Database Schema
+
+```text id="rbac-schema"
+users
+ ├── id
+ ├── name
+ ├── email
+ ├── password
+ ├── tenant_id (nullable for platform users)
+ ├── role_id
+ └── is_dev (boolean flag for devs)
+
+roles
+ ├── id
+ ├── name
+ ├── tenant_id (nullable for platform roles)
+ └── description
+
+permissions
+ ├── id
+ ├── name (crm.leads.create, inventory.items.view)
+ ├── module
+ └── action
+
+role_permissions
+ ├── role_id
+ ├── permission_id
+
+user_permissions (optional overrides)
+ ├── user_id
+ ├── permission_id
+ ├── scope (own/team/branch/tenant/platform)
+```
+
+---
+
+# 3️⃣ Laravel Implementation
+
+### Use Spatie Laravel Permission package
+
+* Supports roles, permissions, caching, and multi-guard auth.
+* Extend with `tenant_id`, `branch_id`, `department_id`, and `scope`.
+
+### Models:
+
+```php
+class User extends Authenticatable {
+    use HasRoles, HasPermissions;
+    protected $fillable = ['name','email','password','tenant_id','role_id','is_dev'];
+}
+
+class Role extends Model {
+    protected $fillable = ['name','tenant_id'];
+}
+
+class Permission extends Model {
+    protected $fillable = ['name','module','action'];
+}
+```
+
+---
+
+# 4️⃣ Middleware Layer
+
+* `CheckPermission` middleware:
+
+  * Reads current user
+  * Checks role + permission
+  * Checks scope (tenant, branch, own)
+* `IdentifyTenant` middleware ensures tenant context for every request.
+* Optional: `IsDev` middleware bypasses tenant scope for developers.
+
+---
+
+# 5️⃣ Request Flow
+
+```text id="rbac-flow"
+Request → IdentifyTenant Middleware → Auth Middleware → CheckPermission Middleware → Controller → Service Layer → Events → Response
+```
+
+* Tenant-aware queries use **BaseModel global scope** for `tenant_id`.
+* Scoped permissions filter records for `branch`, `team`, or `own`.
+
+---
+
+# 6️⃣ Module Isolation
+
+* Each ERP module (CRM, Inventory, Finance, HRMS, Projects, Accounting) is **isolated** in `app/Domains/ModuleName`.
+* Module-specific permissions only operate inside their domain.
+* Cross-module actions use **Events** (e.g., invoice creation triggers inventory and accounting events).
+
+---
+
+# 7️⃣ Auditing & Security
+
+1. **Audit logs**
+
+   * Track: `who did what, when, on which tenant/branch`.
+2. **Soft deletes** on all modules.
+3. **Rate limiting per tenant**
+4. **Tenant isolation enforcement**:
+
+   * Queries automatically scoped by tenant middleware and global model scopes.
+
+---
+
+# 8️⃣ Example Permission Scopes
+
+```text id="rbac-scope"
+crm.leads.view_own          → only your leads
+crm.leads.view_team         → leads from your team
+crm.leads.view_branch       → leads from your branch
+crm.leads.view_tenant       → all leads in tenant
+crm.leads.view_platform     → all leads across tenants (super admin/dev)
+```
+
+---
+
+# 9️⃣ Recommended Default Roles
+
+```text id="rbac-roles"
+Super Admin
+Tenant Owner
+Company Admin
+Branch Manager
+Department Manager
+Sales Manager
+Sales Executive
+CRM User
+Production Manager
+Inventory Manager
+Purchase Executive
+Finance Manager
+HR Manager
+Payroll Officer
+Project Manager
+Auditor
+Read-Only User
+Customer Portal User
+Vendor Portal User
+```
+
+* Assign modules and scope per role.
+* Override with `user_permissions` when needed.
+
+---
+
+# ✅ Key Takeaways
+
+* **Single `users` table** works for tenants and devs.
+* Use **RBAC + scoped permissions** for module-specific control.
+* **Tenant isolation middleware + BaseModel scopes** enforce security.
+* **Audit logs** ensure traceability for large-scale ERP operations.
+* Developers can access multiple tenants safely via role flags and `is_dev`.
+
+---
+
+If you want, I can also **draw a complete diagram of this RBAC architecture**, showing:
+
+* Users table
+* Roles / Permissions
+* Tenant / Branch / Scope
+* Middleware flow
+* Module isolation
+
+This would be a **visual blueprint** ready for your SaaS ERP Laravel implementation.
+
+Do you want me to create that diagram?

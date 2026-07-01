@@ -2,50 +2,29 @@
 
 namespace App\Models\Concerns;
 
+use App\Services\Access\AccessService;
+
 /**
- * HasProductionPermissions — Authorization Abstraction Trait
+ * Authorization bridge used by existing Production policies.
  *
- * A5: No hardcoded role strings in policies. All permission checks route through
- * this single method. When full RBAC module is implemented, only this method's
- * internals change — zero policy rewrites required.
- *
- * Current implementation: maps permissions to roles via config/production.php
- * Future implementation: queries a roles_permissions table via RBAC service
+ * Keep policy code stable while RBAC internals evolve behind AccessService.
  */
 trait HasProductionPermissions
 {
     /**
      * Check if the user has a specific production permission.
      *
-     * @param string $permission  e.g. 'production.routing.approve'
+     * @param string $permission e.g. 'production.routing.approve'
      */
     public function hasProductionPermission(string $permission): bool
     {
-        // Bypass permission checks on local/dev environments to allow testing in the browser
-        if (!app()->environment('testing')) {
-            return true;
-        }
-
-        // Superadmin bypass — always has all permissions
-        if (($this->role ?? null) === 'admin') {
-            return true;
-        }
-
-        // Load permission-to-role mapping from config
-        $permissionMap = config('production.permissions', []);
-        $allowedRoles  = $permissionMap[$permission] ?? [];
-
-        if (empty($allowedRoles)) {
-            return false;
-        }
-
-        $userRole = $this->role ?? 'user';
-
-        return in_array($userRole, $allowedRoles, true);
+        return app(AccessService::class)->allows($this, $permission, [
+            'tenant_id' => $this->tenant_id,
+        ]);
     }
 
     /**
-     * Check if the user can manage production master data (work centers, machines).
+     * Check if the user can manage production master data.
      */
     public function canManageProductionMasterData(): bool
     {
@@ -53,7 +32,7 @@ trait HasProductionPermissions
     }
 
     /**
-     * Check if the user can create/update routings.
+     * Check if the user can create or update routings.
      */
     public function canManageRoutings(): bool
     {
