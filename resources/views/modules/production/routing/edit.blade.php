@@ -4,215 +4,212 @@
 @section('page-title', 'Edit Process Routing')
 @section('breadcrumb', 'Edit Routing')
 
-@section('page-actions')
-    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-secondary">
-        <i class="feather-arrow-left me-2"></i>Back to Details
-    </a>
-@endsection
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <style>
+        /* Compact inputs in table cells */
+        .erp-thin-table td .form-control,
+        .erp-thin-table td .form-select {
+            height: 34px !important;
+            padding: 4px 8px !important;
+            font-size: 12px !important;
+        }
+        .erp-thin-table td .mb-3, .erp-thin-table td .mb-2 {
+            margin-bottom: 0 !important;
+        }
+    </style>
+@endpush
 
 @push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <!-- Load Alpine.js for dynamic operations grid management -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 @endpush
 
 @section('content')
-    @if ($errors->any())
-        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-            <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
-            <ul class="mb-0 fs-12 ps-3">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </x-ui.alert>
-        <div class="mb-4"></div>
-    @endif
+    <div class="erp-single-panel bg-white">
+        <!-- Header with Close Button -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <h4 class="fw-bold text-dark mb-0">Edit Process Routing ({{ $routing->routing_number }})</h4>
+            <a href="{{ route('production.routing.show', $routing->id) }}" class="text-muted hover-danger fs-18">
+                <i class="feather-x"></i>
+            </a>
+        </div>
 
-    <form method="POST" action="{{ route('production.routing.update', $routing->id) }}" x-data="routingForm()">
-        @csrf
-        @method('PUT')
-        <div class="row g-4">
-            <!-- Header Information -->
-            <div class="col-xl-12">
-                <x-ui.card title="Routing General Header">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <x-ui.input label="Routing Document Number" name="routing_number" value="{{ $routing->routing_number }}" readonly required />
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.input label="Routing Process Name" name="name" value="{{ old('name', $routing->name) }}" required />
-                        </div>
-                        <div class="col-md-4">
-                            <x-ui.select label="Target Finished/Semi-Finished Product" name="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id', $routing->product_id) }}" required />
-                        </div>
-                        <div class="col-md-2">
-                            <x-ui.input label="Version ID" name="version" value="{{ old('version', $routing->version) }}" required />
-                        </div>
+        <!-- Validation Errors -->
+        @if ($errors->any())
+            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
+                <ul class="mb-0 fs-12 ps-3">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-                        <div class="col-md-3">
-                            <x-ui.input label="Effective Start Date" name="effective_from" type="date" value="{{ old('effective_from', $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '') }}" required />
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.input label="Effective Expiry Date" name="effective_to" type="date" value="{{ old('effective_to', $routing->effective_to ? $routing->effective_to->format('Y-m-d') : '') }}" />
-                        </div>
-                        <div class="col-md-3">
-                            <x-ui.select label="Routing Class Type" name="is_default" :options="[
-                                '1' => 'Primary / Standard Routing',
-                                '0' => 'Alternative / Backup Routing'
-                            ]" selected="{{ old('is_default', $routing->is_default ? '1' : '0') }}" required />
-                        </div>
-                        <div class="col-md-3 d-flex align-items-center mt-4">
-                            <div class="form-check form-switch mt-2">
-                                <input class="form-check-input" type="checkbox" id="auto_sequence" x-model="autoSequence">
-                                <label class="form-check-label fw-semibold text-dark fs-12 ms-2" for="auto_sequence">Auto-Manage Sequence Numbers</label>
-                            </div>
-                        </div>
+        <form method="POST" action="{{ route('production.routing.update', $routing->id) }}" x-data="routingForm()">
+            @csrf
+            @method('PUT')
+            
+            <!-- Routing General Header -->
+            <div class="row g-4 mb-4">
+                <!-- Left Column -->
+                <div class="col-md-6">
+                    <x-ui.input label="Routing Document Number*" name="routing_number" value="{{ $routing->routing_number }}" readonly required />
+                    
+                    <x-ui.input label="Routing Process Name*" name="name" value="{{ old('name', $routing->name) }}" required />
+                    
+                    <x-ui.select label="Target Finished/Semi-Finished Product*" name="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id', $routing->product_id) }}" data-select2-selector="default" required />
+                    
+                    <x-ui.input label="Version ID*" name="version" value="{{ old('version', $routing->version) }}" required />
+                </div>
 
-                        <div class="col-12">
-                            <label class="form-label fw-semibold text-dark fs-12 text-uppercase mb-2">Process Overview / Engineering Description</label>
-                            <textarea class="form-control" name="description" rows="3" placeholder="Enter high-level description, manufacturing objectives, or routing change logs...">{{ old('description', $routing->description) }}</textarea>
+                <!-- Right Column -->
+                <div class="col-md-6">
+                    <x-ui.input label="Effective Start Date*" name="effective_from" type="date" value="{{ old('effective_from', $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '') }}" required />
+                    
+                    <x-ui.input label="Effective Expiry Date" name="effective_to" type="date" value="{{ old('effective_to', $routing->effective_to ? $routing->effective_to->format('Y-m-d') : '') }}" />
+                    
+                    <x-ui.select label="Routing Class Type*" name="is_default" :options="[
+                        '1' => 'Primary / Standard Routing',
+                        '0' => 'Alternative / Backup Routing'
+                    ]" selected="{{ old('is_default', $routing->is_default ? '1' : '0') }}" data-select2-selector="default" required />
+
+                    <div class="mb-4 mt-2">
+                        <label class="form-label d-block fw-semibold text-dark fs-12 text-uppercase mb-2">Sequence Control</label>
+                        <div class="form-check form-switch pt-1">
+                            <input class="form-check-input" type="checkbox" id="auto_sequence" x-model="autoSequence">
+                            <label class="form-check-label fw-semibold text-dark fs-12 ms-2" for="auto_sequence">Auto-Manage Sequence Numbers</label>
                         </div>
                     </div>
-                </x-ui.card>
+                </div>
+
+                <div class="col-12">
+                    <x-ui.textarea label="Process Overview / Notes" name="description" placeholder="Enter high-level description, manufacturing objectives, or routing change logs..." value="{{ old('description', $routing->description) }}" rows="3" />
+                </div>
             </div>
 
             <!-- Operations Dynamic Grid -->
-            <div class="col-xl-12">
-                <x-ui.card title="Routing Operations Sequence Grid">
-                    <div class="table-responsive">
-                        <table class="table table-bordered align-middle">
-                            <thead class="table-light fs-11 text-uppercase text-dark">
+            <div class="border-top pt-4 mb-4">
+                <h5 class="fw-bold text-dark mb-3">Routing Operations Sequence Grid</h5>
+                
+                <div class="table-responsive mb-3">
+                    <table class="erp-thin-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 6%" class="text-center">Seq</th>
+                                <th style="width: 25%">Operation Name & Yield</th>
+                                <th style="width: 14%">Type</th>
+                                <th style="width: 18%">Work Center</th>
+                                <th style="width: 18%">Machine</th>
+                                <th style="width: 8%" class="text-end">Setup (m)</th>
+                                <th style="width: 8%" class="text-end">Run (m)</th>
+                                <th style="width: 5%" class="text-center">QC?</th>
+                                <th style="width: 8%" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(operation, index) in operations" :key="operation.uid">
                                 <tr>
-                                    <th style="width: 6%">Seq</th>
-                                    <th style="width: 22%">Operation Name</th>
-                                    <th style="width: 14%">Type</th>
-                                    <th style="width: 18%">Work Center</th>
-                                    <th style="width: 18%">Machine</th>
-                                    <th style="width: 8%">Setup (Min)</th>
-                                    <th style="width: 8%">Process (Min)</th>
-                                    <th style="width: 6%" class="text-center">QC?</th>
-                                    <th style="width: 10%" class="text-center">Actions</th>
+                                    <!-- Sequence -->
+                                    <td class="align-middle">
+                                        <x-ui.input type="number" x-bind:name="'operations['+index+'][sequence]'" class="text-center font-monospace" x-model="operation.sequence" x-bind:readonly="autoSequence" required min="1" />
+                                    </td>
+                                    
+                                    <!-- Operation Name & Details -->
+                                    <td class="align-middle">
+                                        <x-ui.input type="text" x-bind:name="'operations['+index+'][name]'" placeholder="e.g. Drilling pilot holes" x-model="operation.name" required />
+                                        
+                                        <div class="d-flex flex-wrap gap-3 mt-1.5 align-items-center">
+                                            <x-ui.checkbox label="External/Outsourced" x-model="operation.is_external" x-bind:name="'operations['+index+'][is_external]'" x-bind:id="'ext_' + operation.uid" />
+                                            <div class="d-flex align-items-center gap-1.5">
+                                                <span class="fs-10 text-muted">Yield %:</span>
+                                                <x-ui.input type="number" step="any" x-bind:name="'operations['+index+'][expected_yield_percentage]'" style="width: 70px; height: 26px !important; padding: 2px 4px !important; font-size: 11px !important;" x-model="operation.expected_yield_percentage" min="0.01" max="100.00" required />
+                                            </div>
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Operation Type -->
+                                    <td class="align-middle">
+                                        <x-ui.select x-bind:name="'operations['+index+'][operation_type]'" x-model="operation.operation_type" required>
+                                            @foreach ($operationTypes as $val => $label)
+                                                <option value="{{ $val }}">{{ $label }}</option>
+                                            @endforeach
+                                        </x-ui.select>
+                                    </td>
+                                    
+                                    <!-- Work Center -->
+                                    <td class="align-middle">
+                                        <x-ui.select x-bind:name="'operations['+index+'][work_center_id]'" x-model="operation.work_center_id" x-on:change="workCenterChanged(index)" required>
+                                            <option value="">Select Center...</option>
+                                            @foreach ($workCenters as $wc)
+                                                <option value="{{ $wc->id }}">{{ $wc->name }} ({{ $wc->code }})</option>
+                                            @endforeach
+                                        </x-ui.select>
+                                    </td>
+                                    
+                                    <!-- Machine -->
+                                    <td class="align-middle">
+                                        <x-ui.select x-bind:name="'operations['+index+'][machine_id]'" x-model="operation.machine_id" x-bind:disabled="!operation.work_center_id">
+                                            <option value="">No Specific Machine</option>
+                                            <template x-for="m in operation.availableMachines" :key="m.id">
+                                                <option :value="m.id" x-text="m.label" :selected="m.id == operation.machine_id"></option>
+                                            </template>
+                                        </x-ui.select>
+                                    </td>
+                                    
+                                    <!-- Setup Time -->
+                                    <td class="align-middle">
+                                        <x-ui.input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_minutes]'" class="text-end" x-model="operation.setup_time_minutes" min="0" required />
+                                    </td>
+                                    
+                                    <!-- Process Time -->
+                                    <td class="align-middle">
+                                        <x-ui.input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="text-end" x-model="operation.processing_time_minutes" min="0" required />
+                                    </td>
+                                    
+                                    <!-- Quality Required -->
+                                    <td class="text-center align-middle">
+                                        <x-ui.checkbox x-model="operation.quality_required" x-bind:name="'operations['+index+'][quality_required]'" value="1" />
+                                    </td>
+                                    
+                                    <!-- Actions -->
+                                    <td class="text-end align-middle">
+                                        <div class="d-inline-flex gap-1">
+                                            <x-ui.icon-btn variant="light" size="sm" icon="feather-arrow-up" x-on:click="moveUp(index)" x-bind:disabled="index === 0" title="Move Up" />
+                                            <x-ui.icon-btn variant="light" size="sm" icon="feather-arrow-down" x-on:click="moveDown(index)" x-bind:disabled="index === operations.length - 1" title="Move Down" />
+                                            <x-ui.icon-btn variant="light" size="sm" icon="feather-copy" class="text-primary" x-on:click="duplicateOperation(index)" title="Duplicate Operation" />
+                                            <x-ui.icon-btn variant="light" size="sm" icon="feather-trash-2" class="text-danger" x-on:click="removeOperation(index)" title="Remove Operation" />
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="(operation, index) in operations" :key="operation.uid">
-                                    <tr>
-                                        <!-- Sequence -->
-                                        <td>
-                                            <input type="number" x-bind:name="'operations['+index+'][sequence]'" class="form-control text-center font-monospace" x-model="operation.sequence" x-bind:readonly="autoSequence" required min="1">
-                                        </td>
-                                        
-                                        <!-- Operation Name -->
-                                        <td>
-                                            <input type="text" x-bind:name="'operations['+index+'][name]'" class="form-control" placeholder="e.g. Drilling pilot holes" x-model="operation.name" required>
-                                            
-                                            <!-- Subcontracting / External check box -->
-                                            <div class="mt-2 d-flex align-items-center gap-4">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" x-model="operation.is_external" x-bind:name="'operations['+index+'][is_external]'" x-bind:id="'ext_' + operation.uid">
-                                                    <label class="form-check-label fs-11 text-muted ms-1" x-bind:for="'ext_' + operation.uid">External/Outsourced Operation</label>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Yield Percentage Input -->
-                                            <div class="mt-2 row g-2 align-items-center">
-                                                <div class="col-auto">
-                                                    <span class="fs-11 text-muted">Expected Yield %:</span>
-                                                </div>
-                                                <div class="col-6">
-                                                    <input type="number" step="any" x-bind:name="'operations['+index+'][expected_yield_percentage]'" class="form-control form-control-sm text-end" x-model="operation.expected_yield_percentage" min="0.01" max="100.00" required>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        
-                                        <!-- Operation Type -->
-                                        <td>
-                                            <select x-bind:name="'operations['+index+'][operation_type]'" class="form-select" x-model="operation.operation_type" required>
-                                                @foreach ($operationTypes as $val => $label)
-                                                    <option value="{{ $val }}">{{ $label }}</option>
-                                                @endforeach
-                                            </select>
-                                        </td>
-                                        
-                                        <!-- Work Center -->
-                                        <td>
-                                            <select x-bind:name="'operations['+index+'][work_center_id]'" class="form-select" x-model="operation.work_center_id" x-on:change="workCenterChanged(index)" required>
-                                                <option value="">Select Center...</option>
-                                                @foreach ($workCenters as $wc)
-                                                    <option value="{{ $wc->id }}">{{ $wc->name }} ({{ $wc->code }})</option>
-                                                @endforeach
-                                            </select>
-                                        </td>
-                                        
-                                        <!-- Machine -->
-                                        <td>
-                                            <select x-bind:name="'operations['+index+'][machine_id]'" class="form-select" x-model="operation.machine_id" x-bind:disabled="!operation.work_center_id">
-                                                <option value="">No Specific Machine</option>
-                                                <template x-for="m in operation.availableMachines" :key="m.id">
-                                                    <option :value="m.id" x-text="m.label" :selected="m.id == operation.machine_id"></option>
-                                                </template>
-                                            </select>
-                                        </td>
-                                        
-                                        <!-- Setup Time -->
-                                        <td>
-                                            <input type="number" step="any" x-bind:name="'operations['+index+'][setup_time_minutes]'" class="form-control text-end" x-model="operation.setup_time_minutes" min="0" required>
-                                        </td>
-                                        
-                                        <!-- Process Time -->
-                                        <td>
-                                            <input type="number" step="any" x-bind:name="'operations['+index+'][processing_time_minutes]'" class="form-control text-end" x-model="operation.processing_time_minutes" min="0" required>
-                                        </td>
-                                        
-                                        <!-- Quality Required -->
-                                        <td class="text-center">
-                                            <div class="form-check d-inline-block">
-                                                <input class="form-check-input" type="checkbox" x-model="operation.quality_required" x-bind:name="'operations['+index+'][quality_required]'" value="1">
-                                            </div>
-                                        </td>
-                                        
-                                        <!-- Actions -->
-                                        <td class="text-center">
-                                            <div class="d-flex justify-content-center gap-1">
-                                                <button type="button" class="btn btn-icon btn-light btn-sm" x-on:click="moveUp(index)" :disabled="index === 0" title="Move Up">
-                                                    <i class="feather-arrow-up"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-icon btn-light btn-sm" x-on:click="moveDown(index)" :disabled="index === operations.length - 1" title="Move Down">
-                                                    <i class="feather-arrow-down"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-icon btn-light btn-sm text-primary" x-on:click="duplicateOperation(index)" title="Duplicate Operation">
-                                                    <i class="feather-copy"></i>
-                                                </button>
-                                                <button type="button" class="btn btn-icon btn-light btn-sm text-danger" x-on:click="removeOperation(index)" title="Remove Operation">
-                                                    <i class="feather-trash-2"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
 
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <button type="button" class="btn btn-soft-primary" x-on:click="addOperation()">
-                            <i class="feather-plus me-2"></i>Add Operation Stage
-                        </button>
-                        
-                        <div class="text-muted fs-12">
-                            Total Operations: <span class="fw-bold text-dark" x-text="operations.length"></span>
-                        </div>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <button type="button" class="btn btn-light-brand" x-on:click="addOperation()">
+                        <i class="feather-plus me-2"></i>Add Operation Stage
+                    </button>
+                    
+                    <div class="text-muted fs-12 fw-medium">
+                        Total Operations: <span class="fw-bold text-dark" x-text="operations.length"></span>
                     </div>
-                </x-ui.card>
+                </div>
             </div>
-            
-            <div class="col-12 text-end">
-                <button type="submit" class="btn btn-primary btn-lg px-5">
-                    <i class="feather-save me-2"></i>Update Routing
-                </button>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2 pt-3 border-top mt-4">
+                <button type="submit" class="btn btn-primary px-4">Update Routing</button>
+                <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-secondary px-4">Cancel</a>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 
     <script>
         function routingForm() {

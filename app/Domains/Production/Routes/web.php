@@ -32,5 +32,6 @@ Route::prefix('production')
         Route::post('routing/{routing}/reject',    [RoutingController::class, 'reject'])->name('routing.reject');
         Route::post('routing/{routing}/cancel',    [RoutingController::class, 'cancel'])->name('routing.cancel');
         Route::post('routing/{routing}/duplicate', [RoutingController::class, 'duplicateVersion'])->name('routing.duplicate');
+        Route::get('routing/{routing}/operations', [RoutingController::class, 'getOperationsForAjax'])->name('routing.operations');
         Route::resource('routing', RoutingController::class);
     });

@@ -4,6 +4,16 @@
 @section('page-title', 'Machine Master')
 @section('breadcrumb', 'Machines')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
+
 @section('page-actions')
     @can('create', App\Domains\Production\Models\Machine::class)
         <a href="{{ route('production.machines.create') }}" class="btn btn-primary">
@@ -13,137 +23,119 @@
 @endsection
 
 @section('content')
-    <!-- Success & Error Alerts -->
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-success text-white me-3">
-                    <i class="feather-check-circle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                    <p class="fs-12 mb-0">{{ session('success') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
+    <div class="erp-single-panel bg-white">
+        <!-- Success & Error Alerts -->
+        @if (session('success'))
+            <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Success!</h6>
+                <p class="fs-12 mb-0">{{ session('success') }}</p>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-    @if (session('error'))
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                    <p class="fs-12 mb-0">{{ session('error') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
+        @if (session('error'))
+            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+                <p class="fs-12 mb-0">{{ session('error') }}</p>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-    <!-- Filters -->
-    <x-ui.card class="mb-4">
-        <form method="GET" action="{{ route('production.machines.index') }}">
+        <!-- Inlined Filters Section -->
+        <form method="GET" action="{{ route('production.machines.index') }}" class="mb-4 pb-3 border-bottom">
             <div class="row g-3">
                 <div class="col-md-4">
-                    <x-ui.input label="Search Machine" name="search" placeholder="Code, name, model, type..." value="{{ request('search') }}" />
+                    <x-ui.input name="search" placeholder="Search code, name, model, type..." value="{{ request('search') }}" />
                 </div>
                 <div class="col-md-3">
-                    <x-ui.select label="Filter by Work Center" name="work_center_id" :options="['' => 'All Work Centers'] + $workCenters->pluck('name', 'id')->toArray()" selected="{{ request('work_center_id') }}" />
+                    <x-ui.select name="work_center_id" :options="['' => 'All Work Centers'] + $workCenters->pluck('name', 'id')->toArray()" selected="{{ request('work_center_id') }}" data-select2-selector="default" />
                 </div>
                 <div class="col-md-3">
-                    <x-ui.select label="Filter by Status" name="status" :options="['' => 'All Statuses'] + $statuses" selected="{{ request('status') }}" />
+                    <x-ui.select name="status" :options="['' => 'All Statuses'] + $statuses" selected="{{ request('status') }}" data-select2-selector="default" />
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
+                <div class="col-md-2 d-flex align-items-start">
                     <div class="d-grid w-100">
-                        <button type="submit" class="btn btn-light-brand h-42">
+                        <button type="submit" class="btn btn-secondary h-40">
                             <i class="feather-filter me-2"></i>Filter
                         </button>
                     </div>
                 </div>
             </div>
         </form>
-    </x-ui.card>
 
-    <!-- Machines List Table -->
-    <x-ui.card>
-        <x-ui.table title="Equipment & Machine Master Data" striped hoverable>
-            <thead>
-                <tr>
-                    <th>Code</th>
-                    <th>Name</th>
-                    <th>Work Center</th>
-                    <th>Type</th>
-                    <th>Manufacturer</th>
-                    <th>Model Number</th>
-                    <th class="text-end">Capacity/Hour</th>
-                    <th>Status</th>
-                    <th>Installation Date</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($machines as $machine)
+        <!-- Machines Table (Dense & Thin row) -->
+        <div class="table-responsive">
+            <table class="erp-thin-table">
+                <thead>
                     <tr>
-                        <td class="fw-bold">{{ $machine->code }}</td>
-                        <td>{{ $machine->name }}</td>
-                        <td>
-                            @if ($machine->workCenter)
-                                <a href="{{ route('production.work-centers.show', $machine->work_center_id) }}" class="fw-semibold text-primary">
-                                    {{ $machine->workCenter->name }} ({{ $machine->workCenter->code }})
-                                </a>
-                            @else
-                                <span class="text-muted">Orphaned</span>
-                            @endif
-                        </td>
-                        <td>{{ $machine->machine_type ?? '—' }}</td>
-                        <td>{{ $machine->manufacturer ?? '—' }}</td>
-                        <td>{{ $machine->model_number ?? '—' }}</td>
-                        <td class="text-end fw-semibold">
-                            {{ $machine->capacity !== null ? number_format($machine->capacity, 2) : 'Flexible' }}
-                        </td>
-                        <td>
-                            @if ($machine->isActive())
-                                <span class="badge bg-soft-success text-success">Active</span>
-                            @elseif ($machine->isUnderMaintenance())
-                                <span class="badge bg-soft-warning text-warning">Under Maintenance</span>
-                            @elseif ($machine->isDecommissioned())
-                                <span class="badge bg-soft-dark text-dark">Decommissioned</span>
-                            @else
-                                <span class="badge bg-soft-danger text-danger">Inactive</span>
-                            @endif
-                        </td>
-                        <td>{{ $machine->installation_date ? $machine->installation_date->format('Y-m-d') : '—' }}</td>
-                        <td class="text-end">
-                            <div class="d-inline-flex gap-1">
-                                @can('update', $machine)
-                                    <a href="{{ route('production.machines.edit', $machine->id) }}" class="btn btn-icon btn-light" title="Edit Machine">
-                                        <i class="feather-edit"></i>
+                        <th style="width: 10%">Code</th>
+                        <th style="width: 15%">Name</th>
+                        <th style="width: 20%">Work Center</th>
+                        <th style="width: 10%">Type</th>
+                        <th style="width: 10%">Manufacturer</th>
+                        <th style="width: 10%">Model Number</th>
+                        <th style="width: 8%" class="text-end">Capacity/Hr</th>
+                        <th style="width: 10%">Status</th>
+                        <th style="width: 10%">Installed Date</th>
+                        <th style="width: 5%" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($machines as $machine)
+                        <tr>
+                            <td class="align-middle fw-bold text-dark">{{ $machine->code }}</td>
+                            <td class="align-middle text-dark fw-medium">{{ $machine->name }}</td>
+                            <td class="align-middle">
+                                @if ($machine->workCenter)
+                                    <a href="{{ route('production.work-centers.show', $machine->work_center_id) }}" class="fw-semibold text-primary">
+                                        {{ $machine->workCenter->name }} ({{ $machine->workCenter->code }})
                                     </a>
-                                @endcan
-                                @can('delete', $machine)
-                                    <form action="{{ route('production.machines.destroy', $machine->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this machine?');" class="d-inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-icon btn-light text-danger" title="Delete">
-                                            <i class="feather-trash-2"></i>
-                                        </button>
-                                    </form>
-                                @endcan
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="10" class="text-center py-4 text-muted">
-                            <i class="feather-info me-2"></i>No machines found.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </x-ui.table>
-    </x-ui.card>
+                                @else
+                                    <span class="text-muted">Orphaned</span>
+                                @endif
+                            </td>
+                            <td class="align-middle">{{ $machine->machine_type ?? '—' }}</td>
+                            <td class="align-middle">{{ $machine->manufacturer ?? '—' }}</td>
+                            <td class="align-middle">{{ $machine->model_number ?? '—' }}</td>
+                            <td class="text-end align-middle fw-semibold">
+                                {{ $machine->capacity !== null ? number_format($machine->capacity, 2) : 'Flexible' }}
+                            </td>
+                            <td class="align-middle">
+                                @if ($machine->isActive())
+                                    <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">Active</span>
+                                @elseif ($machine->isUnderMaintenance())
+                                    <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1">Maint.</span>
+                                @elseif ($machine->isDecommissioned())
+                                    <span class="badge bg-soft-dark text-dark rounded-pill px-2 py-1">Decom.</span>
+                                @else
+                                    <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">Inactive</span>
+                                @endif
+                            </td>
+                            <td class="align-middle">{{ $machine->installation_date ? $machine->installation_date->format('Y-m-d') : '—' }}</td>
+                            <td class="text-end align-middle">
+                                <div class="d-inline-flex gap-1">
+                                    @can('update', $machine)
+                                        <x-ui.icon-btn href="{{ route('production.machines.edit', $machine->id) }}" variant="light" size="sm" icon="feather-edit" title="Edit Machine" />
+                                    @endcan
+                                    @can('delete', $machine)
+                                        <form action="{{ route('production.machines.destroy', $machine->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this machine?');" class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <x-ui.icon-btn type="submit" variant="light" size="sm" icon="feather-trash-2" class="text-danger" title="Delete" />
+                                        </form>
+                                    @endcan
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="10" class="text-center py-4 text-muted">
+                                <i class="feather-info me-2"></i>No machines found.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 @endsection

@@ -4,77 +4,75 @@
 @section('page-title', 'Create Machine')
 @section('breadcrumb', 'Create Machine')
 
-@section('page-actions')
-    <a href="{{ route('production.machines.index') }}" class="btn btn-secondary">
-        <i class="feather-x me-2"></i>Cancel
-    </a>
-@endsection
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
 
 @section('content')
-    @if ($errors->any())
-        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-            <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
-            <ul class="mb-0 fs-12 ps-3">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </x-ui.alert>
-        <div class="mb-4"></div>
-    @endif
+    <div class="erp-single-panel bg-white">
+        <!-- Header with Close Button -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <h4 class="fw-bold text-dark mb-0">New Machine Asset</h4>
+            <a href="{{ route('production.machines.index') }}" class="text-muted hover-danger fs-18">
+                <i class="feather-x"></i>
+            </a>
+        </div>
 
-    <form method="POST" action="{{ route('production.machines.store') }}">
-        @csrf
-        <div class="row g-4">
-            <div class="col-xl-8">
-                <x-ui.card title="Machine Master Details">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <x-ui.select label="Work Center Assignment" name="work_center_id" :options="['' => 'Select Work Center'] + $workCenters->pluck('name', 'id')->toArray()" selected="{{ old('work_center_id', $selectedWorkCenterId ?? '') }}" required />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Machine Name" name="name" placeholder="e.g. Laser Cutter 3" value="{{ old('name') }}" required />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Unique Machine Asset Code" name="code" placeholder="e.g. MCH-LSR-03" value="{{ old('code') }}" required />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Machine Type / Category" name="machine_type" placeholder="e.g. CNC Laser" value="{{ old('machine_type') }}" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Manufacturer" name="manufacturer" placeholder="e.g. Trumpf" value="{{ old('manufacturer') }}" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Model Number" name="model_number" placeholder="e.g. TruLaser 3030" value="{{ old('model_number') }}" />
-                        </div>
-                    </div>
-                </x-ui.card>
-            </div>
+        <!-- Validation Errors -->
+        @if ($errors->any())
+            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
+                <ul class="mb-0 fs-12 ps-3">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-            <div class="col-xl-4">
-                <x-ui.card title="Operational Settings">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <x-ui.input label="Machine Hourly Capacity" name="capacity" type="number" step="any" placeholder="e.g. 100.00" value="{{ old('capacity') }}" helperText="Throughput per hour in standard units" />
-                        </div>
-                        <div class="col-12">
-                            <x-ui.select label="Status" name="status" :options="$statuses" selected="{{ old('status', 'active') }}" required />
-                        </div>
-                        <div class="col-12">
-                            <x-ui.input label="Installation Date" name="installation_date" type="date" value="{{ old('installation_date') }}" />
-                        </div>
-                        <div class="col-12">
-                            <x-ui.input label="Maintenance Details" name="maintenance_status" placeholder="e.g. Normal, Scheduled" value="{{ old('maintenance_status') }}" />
-                        </div>
-                    </div>
-                </x-ui.card>
+        <form method="POST" action="{{ route('production.machines.store') }}">
+            @csrf
+            
+            <div class="row g-4">
+                <!-- Left Column -->
+                <div class="col-md-6">
+                    <x-ui.select label="Work Center Assignment*" name="work_center_id" :options="['' => 'Select Work Center'] + $workCenters->pluck('name', 'id')->toArray()" selected="{{ old('work_center_id', $selectedWorkCenterId ?? '') }}" data-select2-selector="default" required />
+                    
+                    <x-ui.input label="Machine Name*" name="name" placeholder="e.g. Laser Cutter 3" value="{{ old('name') }}" required />
+                    
+                    <x-ui.input label="Machine Asset Code*" name="code" placeholder="e.g. MCH-LSR-03" value="{{ old('code') }}" required />
+                    
+                    <x-ui.input label="Machine Type / Category" name="machine_type" placeholder="e.g. CNC Laser" value="{{ old('machine_type') }}" />
+                    
+                    <x-ui.input label="Manufacturer" name="manufacturer" placeholder="e.g. Trumpf" value="{{ old('manufacturer') }}" />
+                    
+                    <x-ui.input label="Model Number" name="model_number" placeholder="e.g. TruLaser 3030" value="{{ old('model_number') }}" />
+                </div>
 
-                <div class="d-grid mt-4">
-                    <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="feather-save me-2"></i>Save Machine Asset
-                    </button>
+                <!-- Right Column -->
+                <div class="col-md-6">
+                    <x-ui.input label="Machine Hourly Capacity" name="capacity" type="number" step="any" placeholder="e.g. 100.00" value="{{ old('capacity') }}" helperText="Throughput per hour in standard units" />
+                    
+                    <x-ui.select label="Status*" name="status" :options="$statuses" selected="{{ old('status', 'active') }}" data-select2-selector="default" required />
+                    
+                    <x-ui.input label="Installation Date" name="installation_date" type="date" value="{{ old('installation_date') }}" />
+                    
+                    <x-ui.input label="Maintenance Details" name="maintenance_status" placeholder="e.g. Normal, Scheduled" value="{{ old('maintenance_status') }}" />
                 </div>
             </div>
-        </div>
-    </form>
+
+            <!-- Footer Action Buttons -->
+            <div class="d-flex gap-2 pt-3 border-top mt-4">
+                <button type="submit" class="btn btn-primary px-4">Save Machine Asset</button>
+                <a href="{{ route('production.machines.index') }}" class="btn btn-secondary px-4">Cancel</a>
+            </div>
+        </form>
+    </div>
 @endsection

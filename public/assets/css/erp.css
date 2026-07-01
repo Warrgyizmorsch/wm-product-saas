@@ -1,4 +1,4 @@
-﻿:root {
+:root {
     --bs-primary: #0000FF;
 }
 
@@ -795,3 +795,178 @@ a.btn:hover, a.btn:focus, a.btn:active { text-decoration: none !important; }
 /* Child BOM CTA strip */
 .erp-child-bom-cta { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .erp-child-bom-cta a, .erp-child-bom-cta button { font-size: 11px !important; padding: 3px 8px !important; height: auto !important; border-radius: 6px !important; }
+
+/* ==========================================
+   ERP SINGLE PANEL FULL-PAGE DESIGN
+   ========================================== */
+.erp-single-panel {
+    background-color: #fff !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 24px 32px !important;
+    min-height: calc(100vh - 120px);
+}
+
+.erp-form-row {
+    margin-bottom: 12px;
+}
+
+.erp-form-label {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    margin-bottom: 0 !important;
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+}
+
+.erp-form-label.required {
+    color: #b91c1c !important; /* Premium red for required label */
+}
+
+.erp-form-input-col {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.erp-form-input-col .form-control,
+.erp-form-input-col .form-select {
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    color: #1e293b !important;
+    height: 40px !important;
+    box-shadow: none !important;
+}
+
+.erp-form-input-col textarea.form-control {
+    height: auto !important;
+    min-height: 80px !important;
+}
+
+/* Tab controls */
+.erp-tabs-nav {
+    border-bottom: 1px solid #e2e8f0;
+    margin-top: 32px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 24px;
+}
+
+.erp-tabs-link {
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    padding-bottom: 12px;
+    text-decoration: none !important;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.erp-tabs-link.active {
+    color: #2563eb;
+    border-bottom-color: #2563eb;
+}
+
+.erp-tabs-link:hover {
+    color: #1e293b;
+}
+
+/* Thin row table styles */
+.erp-thin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.erp-thin-table th {
+    background-color: #f8fafc !important;
+    color: #475569 !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    padding: 10px 12px !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    border-top: 1px solid #e2e8f0 !important;
+}
+
+.erp-thin-table td {
+    padding: 8px 12px !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    font-size: 13px !important;
+    color: #1e293b !important;
+}
+
+.erp-thin-table tr:hover td {
+    background-color: #f8fafc !important;
+}
+
+.erp-thin-table .form-control,
+.erp-thin-table .form-select {
+    height: 34px !important;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+}
+
+.erp-thin-table .select2-container--bootstrap-5 .select2-selection {
+    min-height: 34px !important;
+    height: 34px !important;
+    padding: 3px 8px !important;
+    font-size: 12px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+}
+
+.erp-btn-delete {
+    color: #ef4444;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.erp-btn-delete:hover {
+    opacity: 0.7;
+}
+
+.erp-badge-active {
+    background-color: #dcfce7 !important;
+    color: #15803d !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 4px 10px !important;
+    border-radius: 4px !important;
+    display: inline-block;
+    text-transform: uppercase;
+}
+
+.erp-badge-draft {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 4px 10px !important;
+    border-radius: 4px !important;
+    display: inline-block;
+    text-transform: uppercase;
+}
+
+.erp-badge-pending {
+    background-color: #fef9c3 !important;
+    color: #a16207 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 4px 10px !important;
+    border-radius: 4px !important;
+    display: inline-block;
+    text-transform: uppercase;
+}
+
