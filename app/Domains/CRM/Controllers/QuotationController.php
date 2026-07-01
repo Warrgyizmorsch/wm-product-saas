@@ -7,6 +7,7 @@ use App\Domains\CRM\Services\QuotationService;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
+use App\Domains\Inventory\Models\Product;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -28,14 +29,9 @@ class QuotationController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create()
     {
-        return view('modules.crm.quotations.create', [
-            'quotation'           => null,
-            'customers'           => $this->customers->latest(),
-            'users'               => User::query()->latest()->get(),
-            'nextQuotationNumber' => $this->quotations->getNextQuotationNumber(),
-        ]);
+        abort(404);
     }
 
     public function store(Request $request): RedirectResponse
@@ -48,16 +44,20 @@ class QuotationController extends Controller
             'quotation_date'      => ['required', 'date'],
             'expiry_date'         => ['nullable', 'date', 'after_or_equal:quotation_date'],
             'discount'            => ['nullable', 'numeric', 'min:0'],
-            'status'              => ['required', 'string', 'in:Draft,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
+            'status'              => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
             'terms_conditions'    => ['nullable', 'string'],
             'notes'               => ['nullable', 'string'],
-            'items'               => ['required', 'array', 'min:1'],
-            'items.*.item_name'   => ['required', 'string', 'max:255'],
+            'items.*.item_name'   => ['nullable', 'string', 'max:255'],
+            'items.*.product_id'  => ['nullable', 'integer', 'exists:products,id'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1'],
             'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
+
+        if (in_array($validated['status'], ['Quotation Sent', 'Accepted', 'Approved'])) {
+            return back()->withErrors(['status' => 'A new quotation must start as Draft or Pending Approval.'])->withInput();
+        }
 
         // Save lead_id into the validated data so QuotationService persists it
         if ($request->filled('lead_id')) {
@@ -84,7 +84,7 @@ class QuotationController extends Controller
 
         if ($leadId) {
             return redirect()
-                ->route('crm.leads.show', $leadId)
+                ->route('crm.leads.show', ['lead' => $leadId, 'view_quotation' => 1])
                 ->with('success', 'Quotation successfully created!');
         }
 
@@ -106,20 +106,9 @@ class QuotationController extends Controller
         ]);
     }
 
-    public function edit(int $id): View
+    public function edit(int $id)
     {
-        $quotation = $this->quotations->find($id);
-
-        if (!$quotation) {
-            abort(404, 'Quotation not found.');
-        }
-
-        return view('modules.crm.quotations.create', [
-            'quotation'           => $quotation,
-            'customers'           => $this->customers->latest(),
-            'users'               => User::query()->latest()->get(),
-            'nextQuotationNumber' => $this->quotations->getNextQuotationNumber(),
-        ]);
+        abort(404);
     }
 
     public function update(Request $request, int $id): RedirectResponse
@@ -138,16 +127,28 @@ class QuotationController extends Controller
             'quotation_date'      => ['required', 'date'],
             'expiry_date'         => ['nullable', 'date', 'after_or_equal:quotation_date'],
             'discount'            => ['nullable', 'numeric', 'min:0'],
-            'status'              => ['required', 'string', 'in:Draft,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
+            'status'              => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
             'terms_conditions'    => ['nullable', 'string'],
             'notes'               => ['nullable', 'string'],
-            'items'               => ['required', 'array', 'min:1'],
-            'items.*.item_name'   => ['required', 'string', 'max:255'],
+            'items.*.item_name'   => ['nullable', 'string', 'max:255'],
+            'items.*.product_id'  => ['nullable', 'integer', 'exists:products,id'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1'],
             'items.*.unit_price'  => ['required', 'numeric', 'min:0'],
             'items.*.tax_rate'    => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
+
+        $newStatus = $validated['status'];
+        if ($newStatus !== $quotation->status) {
+            // Cannot change status to Sent or Accepted directly unless it has been Approved
+            if (in_array($newStatus, ['Quotation Sent', 'Accepted']) && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Accepted'])) {
+                return back()->withErrors(['status' => 'A quotation must be Approved before it can be Sent or Accepted.'])->withInput();
+            }
+            // Cannot change status to Approved directly via form (must use approve action)
+            if ($newStatus === 'Approved' && $quotation->status !== 'Approved') {
+                return back()->withErrors(['status' => 'Quotation approval must be performed using the Approve button.'])->withInput();
+            }
+        }
 
         // Preserve lead_id — keep existing lead_id if not passed in form
         if ($request->filled('lead_id')) {
@@ -156,14 +157,14 @@ class QuotationController extends Controller
             $validated['lead_id'] = $quotation->lead_id;
         }
 
-        $this->quotations->update($quotation, $validated, $request->input('items'));
+        $quotation = $this->quotations->update($quotation, $validated, $request->input('items'));
 
         $leadId = $validated['lead_id'] ?? null;
         $this->handleQuotationStatusChange($quotation, $validated['status'], $leadId);
 
         if ($leadId) {
             return redirect()
-                ->route('crm.leads.show', $leadId)
+                ->route('crm.leads.show', ['lead' => $leadId, 'view_quotation' => 1])
                 ->with('success', 'Quotation successfully updated!');
         }
 
@@ -219,30 +220,104 @@ class QuotationController extends Controller
         }
 
         $validated = $request->validate([
-            'status' => ['required', 'string', 'in:Draft,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
+            'status' => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
         ]);
+
+        $newStatus = $validated['status'];
+        if ($newStatus !== $quotation->status) {
+            // Cannot change status to Sent or Accepted directly unless it has been Approved
+            if (in_array($newStatus, ['Quotation Sent', 'Accepted']) && !in_array($quotation->status, ['Approved', 'Quotation Sent', 'Accepted'])) {
+                return back()->withErrors(['status' => 'A quotation must be Approved before it can be Sent or Accepted.']);
+            }
+            // Cannot change status to Approved directly via form (must use approve action)
+            if ($newStatus === 'Approved' && $quotation->status !== 'Approved') {
+                return back()->withErrors(['status' => 'Quotation approval must be performed using the Approve button.']);
+            }
+        }
 
         $oldStatus = $quotation->status;
         $quotation->update([
-            'status' => $validated['status'],
+            'status' => $newStatus,
         ]);
 
-        if ($quotation->lead_id && $oldStatus !== $validated['status']) {
+        if ($quotation->lead_id && $oldStatus !== $newStatus) {
             $lead = Lead::find($quotation->lead_id);
             if ($lead) {
                 \App\Domains\CRM\Models\LeadHistory::logEvent(
                     $lead,
                     'quotation_status_changed',
                     $oldStatus,
-                    $validated['status'],
-                    "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to '{$validated['status']}'"
+                    $newStatus,
+                    "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to '{$newStatus}'"
                 );
             }
         }
 
-        $this->handleQuotationStatusChange($quotation, $validated['status'], $quotation->lead_id);
+        $this->handleQuotationStatusChange($quotation, $newStatus, $quotation->lead_id);
 
         return back()->with('success', 'Quotation status updated successfully!');
+    }
+
+    public function approve(int $id): RedirectResponse
+    {
+        $quotation = $this->quotations->find($id);
+
+        if (!$quotation) {
+            abort(404, 'Quotation not found.');
+        }
+
+        $oldStatus = $quotation->status;
+        $quotation->update([
+            'status' => 'Approved',
+        ]);
+
+        if ($quotation->lead_id && $oldStatus !== 'Approved') {
+            $lead = Lead::find($quotation->lead_id);
+            if ($lead) {
+                \App\Domains\CRM\Models\LeadHistory::logEvent(
+                    $lead,
+                    'quotation_status_changed',
+                    $oldStatus,
+                    'Approved',
+                    "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Approved'"
+                );
+            }
+        }
+
+        $this->handleQuotationStatusChange($quotation, 'Approved', $quotation->lead_id);
+
+        return back()->with('success', 'Quotation approved successfully!');
+    }
+
+    public function reject(int $id): RedirectResponse
+    {
+        $quotation = $this->quotations->find($id);
+
+        if (!$quotation) {
+            abort(404, 'Quotation not found.');
+        }
+
+        $oldStatus = $quotation->status;
+        $quotation->update([
+            'status' => 'Rejected',
+        ]);
+
+        if ($quotation->lead_id && $oldStatus !== 'Rejected') {
+            $lead = Lead::find($quotation->lead_id);
+            if ($lead) {
+                \App\Domains\CRM\Models\LeadHistory::logEvent(
+                    $lead,
+                    'quotation_status_changed',
+                    $oldStatus,
+                    'Rejected',
+                    "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Rejected'"
+                );
+            }
+        }
+
+        $this->handleQuotationStatusChange($quotation, 'Rejected', $quotation->lead_id);
+
+        return back()->with('success', 'Quotation rejected successfully!');
     }
 
     public function destroy(int $id): RedirectResponse

@@ -4,12 +4,6 @@
 @section('page-title', 'Quotations')
 @section('breadcrumb', 'CRM / Quotations')
 
-@section('page-actions')
-    <a href="{{ route('crm.quotations.create') }}" class="btn btn-primary">
-        <i class="feather-plus me-2"></i>New Quotation
-    </a>
-@endsection
-
 @section('content')
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
@@ -61,27 +55,34 @@
                                 <td>
                                     @php
                                         $badgeClass = 'bg-soft-secondary text-secondary';
-                                        if ($quotation->status === 'Sent') $badgeClass = 'bg-soft-info text-info';
-                                        elseif ($quotation->status === 'Accepted') $badgeClass = 'bg-soft-success text-success';
-                                        elseif ($quotation->status === 'Declined') $badgeClass = 'bg-soft-danger text-danger';
+                                        if ($quotation->status === 'Quotation Sent' || $quotation->status === 'Sent') $badgeClass = 'bg-soft-info text-info';
+                                        elseif ($quotation->status === 'Accepted' || $quotation->status === 'Approved') $badgeClass = 'bg-soft-success text-success';
+                                        elseif ($quotation->status === 'Rejected') $badgeClass = 'bg-soft-danger text-danger';
+                                        elseif ($quotation->status === 'Pending Approval') $badgeClass = 'bg-soft-warning text-warning';
+                                        elseif ($quotation->status === 'Quotation Rework') $badgeClass = 'bg-soft-warning text-warning';
                                     @endphp
                                     <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $quotation->status }}</span>
                                 </td>
                                 <td class="text-end pe-4">
-                                    <div class="d-flex justify-content-end gap-2">
+                                    <div class="d-flex justify-content-end gap-2 align-items-center">
+                                        @if ($quotation->status === 'Pending Approval')
+                                            <form action="{{ route('crm.quotations.approve', $quotation->id) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-soft-success py-1 px-2 fs-11 fw-bold border-0" data-bs-toggle="tooltip" title="Approve Quotation">
+                                                    <i class="feather feather-check me-1"></i>Approve
+                                                </button>
+                                            </form>
+                                            <form action="{{ route('crm.quotations.reject', $quotation->id) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-soft-danger py-1 px-2 fs-11 fw-bold border-0" data-bs-toggle="tooltip" title="Reject Quotation">
+                                                    <i class="feather feather-x me-1"></i>Reject
+                                                </button>
+                                            </form>
+                                        @endif
+
                                         <a href="{{ route('crm.quotations.show', $quotation->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Quotation">
                                             <i class="feather feather-eye"></i>
                                         </a>
-                                        <a href="{{ route('crm.quotations.edit', $quotation->id) }}" class="avatar-text avatar-md bg-soft-info text-info" data-bs-toggle="tooltip" title="Edit Quotation">
-                                            <i class="feather feather-edit-3"></i>
-                                        </a>
-                                        <form action="{{ route('crm.quotations.destroy', $quotation->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this quotation?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="avatar-text avatar-md bg-soft-danger text-danger border-0 p-0" data-bs-toggle="tooltip" title="Delete Quotation">
-                                                <i class="feather feather-trash-2"></i>
-                                            </button>
-                                        </form>
                                     </div>
                                 </td>
                             </tr>

@@ -39,7 +39,7 @@ class ProductController extends Controller
         ]);
 
         return response()->json([
-            'id' => $product->id,
+            'id'   => $product->id,
             'name' => $product->name,
             'type' => $product->type,
         ]);

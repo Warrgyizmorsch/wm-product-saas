@@ -71,7 +71,15 @@
                         <div class="col-lg-6">
                             <h6 class="fw-bold text-primary mb-3">Requirements & Pricing</h6>
 
-                            <x-ui.odoo-form-ui type="input" label="Product" name="product" :value="old('product', $lead->product)" placeholder="Interested Product" />
+                            <x-ui.odoo-form-ui type="select" label="Product" name="product_id" searchable="true" class="erp-premium-select" data-master="product">
+                                <option value="">Select Product...</option>
+                                <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>
+                                @foreach ($products as $p)
+                                    <option value="{{ $p->id }}" @selected(old('product_id', $lead->product_id) == $p->id)>
+                                        {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui type="input" label="Expected Amount" name="expected_amount" inputType="number" :value="old('expected_amount', $lead->expected_amount)" min="0" step="0.01" placeholder="Expected Revenue (₹)" />
 
@@ -140,6 +148,13 @@
                     format: 'YYYY-MM-DD hh:mm A'
                 }
             });
+
+            // Initialize select2 on the product dropdown
+            $('.odoo-select2').select2({
+                theme: "bootstrap-5",
+                width: "100%"
+            });
         });
     </script>
+    <x-ui.master-modals :masters="['product']" />
 @endpush

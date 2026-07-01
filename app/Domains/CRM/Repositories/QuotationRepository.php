@@ -23,6 +23,11 @@ class QuotationRepository
 
     public function latest(): \Illuminate\Database\Eloquent\Collection
     {
-        return Quotation::query()->with(['customer', 'salesPerson'])->latest()->get();
+        return Quotation::query()
+            ->with(['customer', 'salesPerson'])
+            ->where('is_current', true)
+            ->where('status', '!=', 'Draft')
+            ->latest()
+            ->get();
     }
 }
