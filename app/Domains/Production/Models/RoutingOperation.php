@@ -80,6 +80,11 @@ class RoutingOperation extends BaseModel
         return $this->belongsTo(Machine::class, 'machine_id');
     }
 
+    public function materials(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RoutingOperationMaterial::class, 'routing_operation_id');
+    }
+
     // ─── Operation Type Helpers ───────────────────────────────────────────────
 
     public function isManufacturing(): bool

@@ -50,6 +50,21 @@
                     
                     <x-ui.select label="Work Center Type" name="work_center_type" :options="['' => 'Select Type'] + $workCenterTypes" selected="{{ old('work_center_type', $workCenter->work_center_type) }}" data-select2-selector="default" />
                     
+                    @php
+                        $parentList = ['' => 'None / Top Level'];
+                        foreach ($parentOptions as $po) {
+                            $parentList[$po->id] = "{$po->name} ({$po->code})";
+                        }
+                    @endphp
+                    <x-ui.select label="Parent Work Center" name="parent_id" :options="$parentList" selected="{{ old('parent_id', $workCenter->parent_id) }}" data-select2-selector="default" />
+                    
+                    <x-ui.select label="Hierarchy Type*" name="type" :options="[
+                        'department' => 'Department',
+                        'section' => 'Section',
+                        'work_center' => 'Work Center',
+                        'machine_group' => 'Machine Group'
+                    ]" selected="{{ old('type', $workCenter->type ?? 'work_center') }}" data-select2-selector="default" required />
+                    
                     <x-ui.input label="Department Name" name="department_name" value="{{ old('department_name', $workCenter->department_name) }}" />
                     
                     <x-ui.input label="Physical Location" name="location" value="{{ old('location', $workCenter->location) }}" />

@@ -20,20 +20,35 @@ class ProductionBomNumberService
             ->first();
 
         if (!$latestBom) {
-            return $prefix . str_pad('1', 6, '0', STR_PAD_LEFT); // e.g. BOM-000001
+            $num = $prefix . str_pad('1', 6, '0', STR_PAD_LEFT);
+        } else {
+            $latestNumber = $latestBom->bom_number;
+            $numericPart = substr($latestNumber, strlen($prefix));
+
+            if (is_numeric($numericPart)) {
+                $nextVal = (int) $numericPart + 1;
+                $len = max(6, strlen($numericPart));
+                $num = $prefix . str_pad((string)$nextVal, $len, '0', STR_PAD_LEFT);
+            } else {
+                $num = $prefix . mt_rand(100000, 999999);
+            }
         }
 
-        $latestNumber = $latestBom->bom_number;
-        $numericPart = substr($latestNumber, strlen($prefix));
-
-        if (is_numeric($numericPart)) {
-            $nextVal = (int) $numericPart + 1;
-            $len = max(6, strlen($numericPart));
-            return $prefix . str_pad((string)$nextVal, $len, '0', STR_PAD_LEFT);
+        while (ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('bom_number', $num)
+            ->exists()) {
+            $numericPart = substr($num, strlen($prefix));
+            if (is_numeric($numericPart)) {
+                $nextVal = (int) $numericPart + 1;
+                $len = max(6, strlen($numericPart));
+                $num = $prefix . str_pad((string)$nextVal, $len, '0', STR_PAD_LEFT);
+            } else {
+                $num = $prefix . mt_rand(100000, 999999);
+            }
         }
 
-        // Suffix fallback if pattern is non-numeric
-        return $prefix . mt_rand(100000, 999999);
+        return $num;
     }
 
     /**

@@ -174,13 +174,41 @@
                                         <template x-if="errors && errors['items.' + index + '.material_id']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
                                         </template>
-                                        <template x-if="getMaterialType(item.material_id) === 'semi_finished'">
+                                        <template x-if="item.child_bom_loading">
+                                            <div class="mt-2 text-muted fs-11">
+                                                <span class="spinner-border spinner-border-sm text-secondary me-1" role="status" style="width: 12px; height: 12px;"></span>Checking child BOM...
+                                            </div>
+                                        </template>
+                                        <template x-if="!item.child_bom_loading && item.child_bom_status === 'approved'">
+                                            <div class="d-flex flex-column gap-1 mt-2">
+                                                <span class="badge bg-soft-success text-success fs-10 d-inline-block text-wrap" style="width: max-content;">Active Version: <span x-text="'v' + item.child_bom_version + ' (' + item.child_bom_number + ')'"></span></span>
+                                                <div class="d-flex gap-1">
+                                                    <a x-bind:href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1.5 fs-9 text-nowrap">
+                                                        <i class="feather-eye me-0.5"></i>View BOM
+                                                    </a>
+                                                    <form x-bind:action="'/production/boms/' + item.child_bom_id + '/create-revision'" method="POST" target="_blank" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-xs btn-soft-warning py-0.5 px-1.5 fs-9 text-nowrap">
+                                                            <i class="feather-copy me-0.5"></i>Create Revision
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="!item.child_bom_loading && item.child_bom_status === 'draft'">
+                                            <div class="d-flex flex-column gap-1 mt-2">
+                                                <span class="badge bg-soft-warning text-warning fs-10 d-inline-block text-wrap" style="width: max-content;">Draft Version: <span x-text="'v' + item.child_bom_version + ' (' + item.child_bom_number + ')'"></span></span>
+                                                <div>
+                                                    <a x-bind:href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1.5 fs-9 text-nowrap">
+                                                        <i class="feather-eye me-0.5"></i>View BOM
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="!item.child_bom_loading && item.child_bom_status === 'none' && (getMaterialType(item.material_id) === 'semi_finished' || getMaterialType(item.material_id) === 'finished_good')">
                                             <div class="erp-child-bom-cta mt-2">
-                                                <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-soft-primary">
-                                                    <i class="feather-plus me-1"></i>Create Child BOM
-                                                </a>
-                                                <a x-bind:href="'{{ route('production.boms.index') }}?product_id=' + item.material_id" target="_blank" class="btn btn-soft-info">
-                                                    <i class="feather-eye me-1"></i>View BOMs
+                                                <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-xs btn-soft-primary py-0.5 px-1.5 fs-9 text-nowrap">
+                                                    <i class="feather-plus me-0.5"></i>Create Child BOM
                                                 </a>
                                             </div>
                                         </template>
@@ -371,19 +399,59 @@
                     return mat ? mat.type : '';
                 },
 
+                fetchChildBomStatus(item) {
+                    if (!item.material_id) {
+                        item.child_bom_status = 'none';
+                        return;
+                    }
+                    item.child_bom_loading = true;
+                    fetch('/production/boms/check-child/' + item.material_id)
+                        .then(res => res.json())
+                        .then(data => {
+                            item.child_bom_status = data.status;
+                            item.child_bom_id = data.bom_id;
+                            item.child_bom_number = data.bom_number;
+                            item.child_bom_version = data.version;
+                            item.child_bom_name = data.bom_name;
+                            item.child_bom_loading = false;
+                        })
+                        .catch(err => {
+                            console.error(err);
+                            item.child_bom_status = 'none';
+                            item.child_bom_loading = false;
+                        });
+                },
+
+                refreshChildBomStatusForProduct(productId) {
+                    this.items.forEach(item => {
+                        if (item.material_id == productId) {
+                            this.fetchChildBomStatus(item);
+                        }
+                    });
+                },
+
                 init() {
-                    this.items = this.items.map((item, idx) => ({
-                        uid: item.uid || 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx,
-                        material_id: item.material_id || '',
-                        quantity: item.quantity || '',
-                        uom_id: item.uom_id || '',
-                        material_scrap_percentage: item.material_scrap_percentage || 0,
-                        is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
-                        alternative_group: item.alternative_group || '',
-                        priority: item.priority || 1,
-                        effective_from: item.effective_from || '',
-                        effective_to: item.effective_to || ''
-                    }));
+                    window.bomAlpineInstance = this;
+                    this.items = this.items.map((item, idx) => {
+                        const newItem = {
+                            uid: item.uid || 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx,
+                            material_id: item.material_id || '',
+                            quantity: item.quantity || '',
+                            uom_id: item.uom_id || '',
+                            material_scrap_percentage: item.material_scrap_percentage || 0,
+                            is_alternative: !!parseInt(item.is_alternative) || item.is_alternative === true,
+                            alternative_group: item.alternative_group || '',
+                            priority: item.priority || 1,
+                            effective_from: item.effective_from || '',
+                            effective_to: item.effective_to || '',
+                            child_bom_status: 'none',
+                            child_bom_loading: false
+                        };
+                        if (newItem.material_id) {
+                            this.fetchChildBomStatus(newItem);
+                        }
+                        return newItem;
+                    });
                     if(this.items.length === 0) {
                         this.addItem();
                     }
@@ -434,7 +502,9 @@
                         alternative_group: '',
                         priority: 1,
                         effective_from: '',
-                        effective_to: ''
+                        effective_to: '',
+                        child_bom_status: 'none',
+                        child_bom_loading: false
                     });
                 },
 
@@ -447,8 +517,14 @@
                 },
 
                 initRowSelects(rowEl, item) {
+                    var self = this;
                     $(rowEl).find('[data-select2-selector="default"]').each(function() {
                         var $select = $(this);
+                        
+                        if ($select.data('select2-initialized')) {
+                            return;
+                        }
+                        $select.data('select2-initialized', true);
                         
                         // Initialize select2 with bootstrap-5 theme
                         $select.select2({
@@ -470,9 +546,12 @@
                             var nameAttr = $select.attr('name') || '';
                             
                             if (nameAttr.indexOf('material_id') !== -1) {
-                                item.material_id = val;
-                                var selectedOption = $select.find('option[value="' + val + '"]');
-                                item.material_type = selectedOption.attr('data-type') || '';
+                                if (item.material_id !== val) {
+                                    item.material_id = val;
+                                    var selectedOption = $select.find('option[value="' + val + '"]');
+                                    item.material_type = selectedOption.attr('data-type') || '';
+                                    self.fetchChildBomStatus(item);
+                                }
                             } else if (nameAttr.indexOf('uom_id') !== -1) {
                                 item.uom_id = val;
                             }
@@ -484,6 +563,14 @@
                     });
                 }
             }));
+
+            window.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'CHILD_BOM_CREATED') {
+                    if (window.bomAlpineInstance) {
+                        window.bomAlpineInstance.refreshChildBomStatusForProduct(event.data.product_id);
+                    }
+                }
+            });
         });
     </script>
 

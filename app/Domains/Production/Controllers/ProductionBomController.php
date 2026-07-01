@@ -22,7 +22,10 @@ class ProductionBomController extends Controller
     public function __construct(
         private readonly ProductionBomRepositoryInterface $bomRepository,
         private readonly ProductionBomService $bomService,
-        private readonly BomExplosionService $explosionService
+        private readonly BomExplosionService $explosionService,
+        private readonly \App\Domains\Production\Services\ProductionBomVersionService $versionService,
+        private readonly \App\Domains\Production\Services\ProductionCostService $costService,
+        private readonly \App\Domains\Production\Services\BomWhereUsedService $whereUsedService
     ) {
     }
 
@@ -34,6 +37,85 @@ class ProductionBomController extends Controller
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
 
         return view('modules.production.bom.index', compact('boms', 'products'));
+    }
+
+    public function checkChildBom(int $productId)
+    {
+        $tenantId = tenant_id() ?? 1;
+
+        $approvedBom = ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('status', 'approved')
+            ->first();
+
+        if ($approvedBom) {
+            return response()->json([
+                'status' => 'approved',
+                'bom_id' => $approvedBom->id,
+                'bom_number' => $approvedBom->bom_number,
+                'version' => $approvedBom->version,
+                'bom_name' => $approvedBom->bom_name,
+            ]);
+        }
+
+        $otherBom = ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->whereIn('status', ['draft', 'pending_approval', 'under_revision'])
+            ->first();
+
+        if ($otherBom) {
+            return response()->json([
+                'status' => 'draft',
+                'bom_id' => $otherBom->id,
+                'bom_number' => $otherBom->bom_number,
+                'version' => $otherBom->version,
+                'bom_name' => $otherBom->bom_name,
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'none',
+        ]);
+    }
+
+    public function createRevision(int $id, Request $request): RedirectResponse
+    {
+        $bom = $this->bomRepository->find($id);
+        abort_if(!$bom, 404, 'BOM not found.');
+
+        $bumpType = $request->input('bump_type', 'patch');
+
+        $newVersion = match ($bumpType) {
+            'major' => $this->versionService->incrementMajor($bom->version),
+            'minor' => $this->versionService->incrementMinor($bom->version),
+            default => $this->versionService->incrementPatch($bom->version),
+        };
+
+        $tenantId = tenant_id() ?? 1;
+        while (ProductionBom::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $bom->product_id)
+            ->where('version', $newVersion)
+            ->exists()) {
+            $newVersion = match ($bumpType) {
+                'major' => $this->versionService->incrementMajor($newVersion),
+                'minor' => $this->versionService->incrementMinor($newVersion),
+                default => $this->versionService->incrementPatch($newVersion),
+            };
+        }
+
+        try {
+            $newBom = $this->bomService->duplicateVersion($id, $newVersion, auth()->id() ?: 1);
+            return redirect()
+                ->route('production.boms.edit', $newBom->id)
+                ->with('success', "New BOM version {$newBom->version} created as draft. Review and save components.");
+        } catch (\Exception $e) {
+            return redirect()
+                ->back()
+                ->with('error', $e->getMessage());
+        }
     }
 
     public function show(int $id, Request $request): View
@@ -81,7 +163,29 @@ class ProductionBomController extends Controller
             ->get()
             ->groupBy('product_id');
 
-        return view('modules.production.bom.show', compact('bom', 'explosion', 'calcQty', 'costSummary', 'componentBoms'));
+        $materialCost = $this->costService->calculateMaterialCost($bom);
+        $routingCost = $this->costService->calculateRoutingCost($bom);
+        $totalMfgCost = $this->costService->calculateTotalManufacturingCost($bom);
+        $whereUsedParents = $this->whereUsedService->findParents($bom->product);
+
+        $parentProduct = null;
+        $parentBom = null;
+        if ($request->filled('parent_product_id')) {
+            $parentProduct = Product::find($request->input('parent_product_id'));
+            if ($parentProduct) {
+                $parentBom = ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $bom->tenant_id)
+                    ->where('product_id', $parentProduct->id)
+                    ->orderByRaw("case when status = 'approved' then 1 when status = 'draft' then 2 else 3 end")
+                    ->first();
+            }
+        }
+
+        return view('modules.production.bom.show', compact(
+            'bom', 'explosion', 'calcQty', 'costSummary', 'componentBoms',
+            'materialCost', 'routingCost', 'totalMfgCost', 'whereUsedParents',
+            'parentProduct', 'parentBom'
+        ));
     }
 
     public function create(Request $request): View

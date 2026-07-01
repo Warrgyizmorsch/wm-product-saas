@@ -33,6 +33,14 @@ class UpdateWorkCenterRequest extends FormRequest
             'efficiency_percentage' => 'nullable|numeric|min:0|max:100',
             'cost_per_hour'         => 'nullable|numeric|min:0',
             'status'                => 'required|in:active,inactive',
+            'parent_id'             => [
+                'nullable', 'integer',
+                Rule::exists('production_work_centers', 'id')->where('tenant_id', $tenantId)
+            ],
+            'type'                  => [
+                'nullable', 'string',
+                Rule::in(['department', 'section', 'work_center', 'machine_group'])
+            ],
         ];
     }
 }

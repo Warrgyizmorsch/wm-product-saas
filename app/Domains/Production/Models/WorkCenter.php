@@ -13,6 +13,8 @@ class WorkCenter extends BaseModel
 {
     use HasFactory, SoftDeletes, Loggable;
 
+    public const TYPES = ['department', 'section', 'work_center', 'machine_group'];
+
     protected $table = 'production_work_centers';
 
     protected $fillable = [
@@ -27,15 +29,28 @@ class WorkCenter extends BaseModel
         'efficiency_percentage',
         'cost_per_hour',
         'status',
+        'parent_id',
+        'type',
     ];
 
     protected $casts = [
         'capacity_per_hour'      => 'float',
         'efficiency_percentage'  => 'float',
         'cost_per_hour'          => 'float',
+        'parent_id'              => 'integer',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
+
+    public function parent(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
 
     public function machines(): HasMany
     {
