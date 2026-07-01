@@ -15,6 +15,8 @@ class WorkCenterDTO
         public readonly ?float  $capacity_per_hour = null,
         public readonly float   $efficiency_percentage = 100.00,
         public readonly float   $cost_per_hour = 0.0000,
+        public readonly ?int    $parent_id = null,
+        public readonly ?string $type = 'work_center',
     ) {}
 
     public static function fromArray(array $data): self
@@ -30,6 +32,8 @@ class WorkCenterDTO
             capacity_per_hour:     isset($data['capacity_per_hour']) ? (float) $data['capacity_per_hour'] : null,
             efficiency_percentage: isset($data['efficiency_percentage']) ? (float) $data['efficiency_percentage'] : 100.00,
             cost_per_hour:         isset($data['cost_per_hour']) ? (float) $data['cost_per_hour'] : 0.0000,
+            parent_id:             !empty($data['parent_id']) ? (int) $data['parent_id'] : null,
+            type:                  $data['type'] ?? 'work_center',
         );
     }
 
@@ -46,6 +50,8 @@ class WorkCenterDTO
             'capacity_per_hour'     => $this->capacity_per_hour,
             'efficiency_percentage' => $this->efficiency_percentage,
             'cost_per_hour'         => $this->cost_per_hour,
+            'parent_id'             => $this->parent_id,
+            'type'                  => $this->type,
         ];
     }
 }

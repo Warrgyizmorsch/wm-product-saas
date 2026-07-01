@@ -43,6 +43,19 @@ class WorkCenterService
             );
         }
 
+        if ($dto->parent_id) {
+            if ($dto->parent_id === $id) {
+                throw new \InvalidArgumentException('A work center cannot be its own parent.');
+            }
+            $parent = $this->repository->find($dto->parent_id);
+            while ($parent) {
+                if ($parent->id === $id) {
+                    throw new \InvalidArgumentException('Circular work center hierarchy cycle detected.');
+                }
+                $parent = $parent->parent_id ? $this->repository->find($parent->parent_id) : null;
+            }
+        }
+
         return $this->repository->update($id, $dto->toArray());
     }
 

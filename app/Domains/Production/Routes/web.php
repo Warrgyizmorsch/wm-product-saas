@@ -11,6 +11,8 @@ Route::prefix('production')
     ->group(function (): void {
 
         // ── BOM (Frozen) ──────────────────────────────────────────────────────
+        Route::get('boms/check-child/{productId}', [ProductionBomController::class, 'checkChildBom'])->name('boms.check-child');
+        Route::post('boms/{bom}/create-revision',  [ProductionBomController::class, 'createRevision'])->name('boms.create-revision');
         Route::post('boms/{bom}/submit',    [ProductionBomController::class, 'submitApproval'])->name('boms.submit');
         Route::post('boms/{bom}/approve',   [ProductionBomController::class, 'approve'])->name('boms.approve');
         Route::post('boms/{bom}/reject',    [ProductionBomController::class, 'reject'])->name('boms.reject');

@@ -46,20 +46,35 @@
 @section('content')
     <div class="erp-single-panel bg-white">
         <!-- Success & Error Banners -->
-        @if(request()->has('parent_product_id'))
-            <x-ui.alert variant="success" icon="feather-check-circle" class="mb-4">
-                <div class="d-flex align-items-center justify-content-between w-100" style="width: 100%;">
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Child BOM Saved Successfully!</h6>
-                        <p class="fs-12 mb-0">The child BOM for <strong>{{ $bom->product->name }}</strong> is now saved. You can close this tab and return to the parent tab.</p>
+        @if(isset($parentProduct))
+            <div class="alert alert-success border-success bg-soft-success d-flex align-items-center justify-content-between p-3 mb-4 rounded shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <div class="avatar-text avatar-md bg-success text-white me-3">
+                        <i class="feather-check-circle"></i>
                     </div>
                     <div>
-                        <button type="button" class="btn btn-success btn-sm ms-3" onclick="window.close();">
-                            <i class="feather-x-circle me-1"></i>Close & Return
-                        </button>
+                        <h6 class="alert-heading fw-bold mb-1 text-success">Child BOM Created Successfully!</h6>
+                        <p class="fs-12 mb-0 text-success-800">Configure child BOM for <strong>{{ $bom->product->name }}</strong>. The parent form has been updated automatically. You can close this tab now to return to the parent form.</p>
                     </div>
                 </div>
-            </x-ui.alert>
+                <div class="d-flex gap-2 align-items-center">
+                    @if(isset($parentBom))
+                        <a href="{{ route('production.boms.show', $parentBom->id) }}" class="btn btn-success btn-sm text-white">
+                            <i class="feather-arrow-left me-1"></i>Return to Parent BOM
+                        </a>
+                        <a href="{{ route('production.boms.edit', $parentBom->id) }}" class="btn btn-outline-success btn-sm bg-white">
+                            <i class="feather-edit me-1"></i>Edit Parent BOM
+                        </a>
+                    @else
+                        <a href="{{ route('production.boms.create') }}?product_id={{ $parentProduct->id }}" class="btn btn-success btn-sm text-white">
+                            <i class="feather-plus me-1"></i>Return to Add Parent BOM
+                        </a>
+                    @endif
+                    <button type="button" class="btn btn-secondary btn-sm ms-2" onclick="window.close();">
+                        <i class="feather-x me-1"></i>Close Tab
+                    </button>
+                </div>
+            </div>
         @elseif (session('success'))
             <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
                 <div class="d-flex align-items-center">
@@ -196,10 +211,11 @@
 
         <!-- TAB NAVIGATION -->
         <div class="erp-tabs-nav">
-            <a class="erp-tabs-link active" id="btn-tab-components" onclick="switchTab('components')">Components List</a>
-            <a class="erp-tabs-link" id="btn-tab-costing" onclick="switchTab('costing')">Cost Preview</a>
-            <a class="erp-tabs-link" id="btn-tab-hierarchy" onclick="switchTab('hierarchy')">BOM Explosion Tree</a>
-            <a class="erp-tabs-link" id="btn-tab-history" onclick="switchTab('history')">Approval & Audit History</a>
+            <a class="erp-tabs-link active" id="btn-tab-components" onclick="switchTab('components')">All Components</a>
+            <a class="erp-tabs-link" id="btn-tab-explosion" onclick="switchTab('explosion')">Expanded Material Explosion</a>
+            <a class="erp-tabs-link" id="btn-tab-routing" onclick="switchTab('routing')">Routing Process</a>
+            <a class="erp-tabs-link" id="btn-tab-costing" onclick="switchTab('costing')">Cost Summary</a>
+            <a class="erp-tabs-link" id="btn-tab-history" onclick="switchTab('history')">Approval History</a>
         </div>
 
         <!-- TAB CONTENT CONTAINER (No cards, sits flat) -->
@@ -226,6 +242,15 @@
                                         <div class="d-flex flex-column">
                                             <span class="fw-bold text-dark">{{ $item->material->name }}</span>
                                             <small class="text-muted font-monospace fs-10">{{ $item->material->sku }}</small>
+                                            @if($item->material->type === 'semi_finished' || $item->material->type === 'finished_good')
+                                                @if(isset($componentBoms[$item->material_id]))
+                                                    <small class="mt-1">
+                                                        <a href="{{ route('production.boms.show', $componentBoms[$item->material_id]->first()->id) }}" class="badge bg-soft-info text-info">
+                                                            <i class="feather-link me-1"></i>Subassembly BOM: v{{ $componentBoms[$item->material_id]->first()->version }}
+                                                        </a>
+                                                    </small>
+                                                @endif
+                                            @endif
                                             @if($item->notes)
                                                 <small class="text-muted mt-1"><i class="feather-info me-1"></i>{{ $item->notes }}</small>
                                             @endif
@@ -249,33 +274,215 @@
                 </div>
             </div>
 
-            <!-- Tab 2: Costing -->
+            <!-- Tab 2: Expanded Material Explosion -->
+            <div class="tab-pane-custom d-none" id="tab-explosion">
+                <h5 class="fw-bold text-dark mb-3">MRP-Ready Expanded Material Explosion</h5>
+                <p class="text-muted fs-12 mb-3">Below is the recursive, multi-level material explosion detailing all required sub-assemblies and direct raw materials scaled to the target production quantity.</p>
+                
+                @php
+                    if (!function_exists('renderExplosionTableRows')) {
+                        function renderExplosionTableRows($node, $level = 1) {
+                            $padding = ($level - 1) * 20;
+                            $isLeaf = empty($node['children']);
+                            $bomVersion = $node['bom_version'] ?? 'N/A';
+                            
+                            $qty = isset($node['net_quantity']) ? $node['net_quantity'] : $node['quantity'];
+                            $gross = isset($node['gross_quantity']) ? $node['gross_quantity'] : $node['quantity'];
+                            $scrap = isset($node['material_scrap_percentage']) ? $node['material_scrap_percentage'] : 0.0;
+                            
+                            echo '<tr>';
+                            echo '<td class="font-monospace text-center">' . $level . '</td>';
+                            echo '<td>';
+                            echo '<div style="padding-left: ' . $padding . 'px;" class="d-flex align-items-center">';
+                            if (!$isLeaf) {
+                                echo '<i class="feather-package text-primary me-2 fs-14"></i>';
+                            } else {
+                                echo '<i class="feather-box text-muted me-2 fs-12"></i>';
+                            }
+                            echo '<div class="d-flex flex-column">';
+                            echo '<span class="fw-bold text-dark">' . e($node['product_name']) . '</span>';
+                            echo '<small class="text-muted font-monospace fs-10">' . e($node['product_sku']) . '</small>';
+                            echo '</div>';
+                            echo '</div>';
+                            echo '</td>';
+                            
+                            echo '<td class="text-end fw-bold">' . number_format($qty, 4) . '</td>';
+                            echo '<td>' . e($node['uom_code']) . '</td>';
+                            echo '<td class="text-end text-danger">' . number_format($scrap, 2) . '%</td>';
+                            echo '<td class="text-end fw-bold text-primary">' . number_format($gross, 4) . '</td>';
+                            echo '<td>' . e($bomVersion !== 'N/A' ? "v{$bomVersion}" : '—') . '</td>';
+                            echo '<td>';
+                            if (isset($node['has_sub_bom']) && $node['has_sub_bom']) {
+                                echo '<span class="badge bg-soft-success text-success">Approved</span>';
+                            } else {
+                                echo '<span class="badge bg-soft-secondary text-secondary">—</span>';
+                            }
+                            echo '</td>';
+                            echo '</tr>';
+                            
+                            if (!empty($node['children'])) {
+                                foreach ($node['children'] as $child) {
+                                    renderExplosionTableRows($child, $level + 1);
+                                }
+                            }
+                        }
+                    }
+                @endphp
+
+                <div class="table-responsive">
+                    <table class="erp-thin-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 8%" class="text-center">Level</th>
+                                <th style="width: 32%">Material Component</th>
+                                <th style="width: 15%" class="text-end">Qty Required</th>
+                                <th style="width: 10%">UOM</th>
+                                <th style="width: 10%" class="text-end">Scrap %</th>
+                                <th style="width: 15%" class="text-end">Gross Required</th>
+                                <th style="width: 10%">Version</th>
+                                <th style="width: 10%">BOM Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @php renderExplosionTableRows($explosion['tree']) @endphp
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Routing Process -->
+            <div class="tab-pane-custom d-none" id="tab-routing">
+                @if($bom->routing)
+                    <div class="mb-4 p-3 bg-light rounded border border-light">
+                        <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-1">Routing Header Reference</span>
+                        <h5 class="fw-bold text-dark mb-1">{{ $bom->routing->name }} ({{ $bom->routing->routing_number }})</h5>
+                        <span class="fs-12 text-muted">Version: v{{ $bom->routing->version }} | Status: 
+                            <span class="badge bg-soft-success text-success text-uppercase font-monospace fs-10">{{ $bom->routing->status }}</span>
+                        </span>
+                    </div>
+
+                    <h5 class="fw-bold text-dark mb-3">Operations Stage Sequence</h5>
+                    <div class="table-responsive">
+                        <table class="erp-thin-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 5%" class="text-center">Seq</th>
+                                    <th style="width: 25%">Operation Detail</th>
+                                    <th style="width: 15%">Operation Type</th>
+                                    <th style="width: 20%">Work Center Location</th>
+                                    <th style="width: 15%">Machine Asset</th>
+                                    <th class="text-end" style="width: 10%">Setup / Process</th>
+                                    <th class="text-center" style="width: 10%">QC Gate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($bom->routing->operations as $op)
+                                    <tr>
+                                        <td class="fw-bold text-center font-monospace align-middle">{{ $op->sequence }}</td>
+                                        <td class="align-middle">
+                                            <span class="fw-bold text-dark">{{ $op->name }}</span>
+                                            <span class="badge bg-soft-primary text-primary font-monospace ms-1 fs-9">{{ $op->operation_number }}</span>
+                                            @if ($op->description)
+                                                <small class="text-muted d-block mt-1">{{ $op->description }}</small>
+                                            @endif
+                                            @if ($op->is_external)
+                                                <span class="badge bg-soft-danger text-danger mt-1 fs-9 text-uppercase">Outsourced</span>
+                                            @endif
+                                            
+                                            <!-- Consumed operation-level materials -->
+                                            @if($op->materials->count() > 0)
+                                                <div class="mt-2 bg-white p-2 rounded border border-dashed">
+                                                    <small class="fw-bold text-muted d-block mb-1 text-uppercase fs-9">Allocated Consumed Materials:</small>
+                                                    <ul class="mb-0 ps-3 fs-10 text-muted">
+                                                        @foreach($op->materials as $opMat)
+                                                            <li>
+                                                                <strong>{{ $opMat->material->name }}</strong>: {{ number_format($opMat->quantity, 4) }} {{ $opMat->uom->code }}
+                                                                <span class="badge bg-light text-dark fs-8">{{ $opMat->consumption_type ?? 'manual' }}</span>
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                </div>
+                                            @endif
+                                        </td>
+                                        <td class="align-middle">
+                                            <span class="badge bg-soft-secondary text-secondary text-uppercase fs-10">
+                                                {{ config('production.operation_types')[$op->operation_type] ?? $op->operation_type }}
+                                            </span>
+                                        </td>
+                                        <td class="align-middle">
+                                            @if ($op->workCenter)
+                                                <a href="{{ route('production.work-centers.show', $op->work_center_id) }}" class="fw-semibold text-primary">
+                                                    {{ $op->workCenter->name }}
+                                                </a>
+                                                <small class="text-muted d-block fs-10">{{ $op->workCenter->code }}</small>
+                                            @else
+                                                <span class="text-danger">Missing</span>
+                                            @endif
+                                        </td>
+                                        <td class="align-middle">
+                                            @if ($op->machine)
+                                                <span class="fw-semibold text-dark">{{ $op->machine->name }}</span>
+                                                <small class="text-muted d-block fs-10">{{ $op->machine->code }}</small>
+                                            @else
+                                                <span class="text-muted">Generic Capacity</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end align-middle font-monospace fs-11">
+                                            <div>Setup: {{ number_format($op->setup_time_minutes, 1) }} min</div>
+                                            <div>Run: {{ number_format($op->processing_time_minutes, 1) }} min</div>
+                                        </td>
+                                        <td class="text-center align-middle">
+                                            @if ($op->quality_required)
+                                                <span class="badge bg-soft-danger text-danger"><i class="feather-shield"></i> QC</span>
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">No operation stages defined in this routing.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="p-4 text-center border rounded bg-light text-muted">
+                        <i class="feather-info me-2"></i>No Routing Reference associated with this BOM.
+                    </div>
+                @endif
+            </div>
+
+            <!-- Tab 4: Cost Summary -->
             <div class="tab-pane-custom d-none" id="tab-costing">
-                <h5 class="fw-bold text-dark mb-3">Cost Breakdown of Raw Components</h5>
+                <h5 class="fw-bold text-dark mb-3">Total Manufacturing Cost Summary Breakdown</h5>
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">Total Material Cost</span>
-                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['total_cost'], 4) }}</h4>
-                            <small class="text-muted">For base recipe size</small>
+                            <span class="text-muted fs-11 text-uppercase fw-bold">Material Cost</span>
+                            <h4 class="text-dark fw-bold mt-1">${{ number_format($materialCost, 4) }}</h4>
+                            <small class="text-muted">For recipe quantity basis</small>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">Base Recipe Quantity</span>
-                            <h4 class="text-dark fw-bold mt-1">{{ number_format($bom->base_quantity, 2) }}</h4>
-                            <small class="text-muted">{{ $bom->baseUom ? $bom->baseUom->code : 'PCS' }}</small>
+                            <span class="text-muted fs-11 text-uppercase fw-bold">Routing labor / machine cost</span>
+                            <h4 class="text-dark fw-bold mt-1">${{ number_format($routingCost, 4) }}</h4>
+                            <small class="text-muted">Direct operations overhead</small>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">Cost Per Unit</span>
-                            <h4 class="text-primary fw-bold mt-1">${{ number_format($costSummary['cost_per_unit'], 4) }}</h4>
-                            <small class="text-muted">Estimated manufacturing unit cost</small>
+                        <div class="bg-light p-3 rounded border text-center bg-soft-primary border-primary">
+                            <span class="text-primary fs-11 text-uppercase fw-bold">Total Manufacturing Cost</span>
+                            <h4 class="text-primary fw-bold mt-1">${{ number_format($totalMfgCost, 4) }}</h4>
+                            <small class="text-primary">Material + routing costs</small>
                         </div>
                     </div>
                 </div>
 
+                <!-- Cost Details Item Table -->
+                <h6 class="fw-bold text-dark mb-3">Direct Component Cost Contributions</h6>
                 <div class="table-responsive">
                     <table class="erp-thin-table">
                         <thead>
@@ -310,71 +517,14 @@
                             @endforelse
                             <tr class="table-light fw-bold">
                                 <td colspan="5" class="text-end">Estimated Total Material Cost:</td>
-                                <td class="text-end text-primary fs-14">${{ number_format($costSummary['total_cost'], 4) }}</td>
+                                <td class="text-end text-primary fs-14">${{ number_format($materialCost, 4) }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Tab 3: Hierarchy Tree -->
-            <div class="tab-pane-custom d-none" id="tab-hierarchy">
-                <h5 class="fw-bold text-dark mb-3">Recursive Multi-Level BOM Structure</h5>
-                <p class="text-muted fs-12 mb-3">Below is the complete engineering bill of materials structure showing recursively expanded sub-assemblies (semi-finished products) down to raw components.</p>
-                
-                @php
-                    if (!function_exists('renderHtmlBomTree')) {
-                        function renderHtmlBomTree($node) {
-                            echo '<li class="mb-2 list-unstyled">';
-                            echo '<div class="d-flex align-items-center gap-3 p-2 bg-light rounded border border-light">';
-                            
-                            if (!empty($node['children'])) {
-                                echo '<i class="feather-package text-primary fs-16"></i>';
-                            } else {
-                                echo '<i class="feather-box text-muted fs-14"></i>';
-                            }
-                            
-                            echo '<div>';
-                            echo '<span class="fw-bold text-dark fs-13">' . e($node['product_name']) . '</span>';
-                            echo '<span class="text-muted fs-11 ms-2">[' . e($node['product_sku']) . ']</span>';
-                            if (isset($node['bom_number'])) {
-                                echo ' <span class="badge bg-soft-info text-info fs-10 ms-2">BOM: ' . e($node['bom_number']) . ' v' . e($node['bom_version']) . '</span>';
-                            }
-                            echo '</div>';
-                            
-                            echo '<div class="ms-auto text-end">';
-                            if (isset($node['net_quantity'])) {
-                                echo '<span class="text-muted fs-12 me-3">Net: ' . number_format($node['net_quantity'], 4) . ' ' . e($node['uom_code']) . '</span>';
-                                echo '<span class="fw-bold text-dark fs-12">Gross (With Scrap): ' . number_format($node['gross_quantity'], 4) . ' ' . e($node['uom_code']) . '</span>';
-                                if ($node['material_scrap_percentage'] > 0) {
-                                    echo '<small class="text-danger d-block fs-10">Scrap: +' . number_format($node['material_scrap_percentage'], 1) . '%</small>';
-                                }
-                            } else {
-                                echo '<span class="fw-bold text-dark fs-12">Target Batch Size: ' . number_format($node['quantity'], 4) . ' ' . e($node['uom_code']) . '</span>';
-                            }
-                            echo '</div>';
-                            echo '</div>';
-                            
-                            if (!empty($node['children'])) {
-                                echo '<ul class="ps-4 border-start border-primary border-2 ms-3 mt-2">';
-                                foreach ($node['children'] as $child) {
-                                    renderHtmlBomTree($child);
-                                }
-                                echo '</ul>';
-                            }
-                            echo '</li>';
-                        }
-                    }
-                @endphp
-
-                <div class="bom-hierarchy-tree p-3 bg-white border rounded">
-                    <ul class="ps-0 mb-0">
-                        @php renderHtmlBomTree($explosion['tree']) @endphp
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Tab 4: History -->
+            <!-- Tab 5: Approval History -->
             <div class="tab-pane-custom d-none" id="tab-history">
                 <h5 class="fw-bold text-dark mb-3">Workflow approvals & system audit timeline logs</h5>
                 <div class="table-responsive">
@@ -393,7 +543,7 @@
                                     <td>{{ $approval->created_at->format('d/m/Y H:i:s') }}</td>
                                     <td>{{ $approval->user ? $approval->user->name : 'System / Auto' }}</td>
                                     <td>
-                                        <span class="badge bg-soft-info text-info text-capitalize">{{ str_replace('_', ' ', $approval->transition_type) }}</span>
+                                        <span class="badge bg-soft-info text-info text-capitalize">{{ str_replace('_', ' ', $approval->action ?? $approval->transition_type ?? '') }}</span>
                                     </td>
                                     <td>
                                         <span class="text-muted">{{ $approval->comments ?: '—' }}</span>
@@ -408,6 +558,43 @@
                     </table>
                 </div>
             </div>
+        </div>
+
+        <!-- Where Used Section (Display parents consuming this product at the bottom of details) -->
+        <div class="mt-4 pt-4 border-top">
+            <h5 class="fw-bold text-dark mb-3"><i class="feather-git-merge me-2 text-primary"></i>Where Used (Consumed In Parent BOMs)</h5>
+            @if($whereUsedParents->count() > 0)
+                <div class="table-responsive">
+                    <table class="erp-thin-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40%">Parent Product Name</th>
+                                <th style="width: 30%">SKU</th>
+                                <th style="width: 20%">Product Type</th>
+                                <th style="width: 10%" class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($whereUsedParents as $parentProduct)
+                                <tr>
+                                    <td class="fw-bold text-dark">{{ $parentProduct->name }}</td>
+                                    <td class="font-monospace">{{ $parentProduct->sku }}</td>
+                                    <td class="text-capitalize fs-12">{{ str_replace('_', ' ', $parentProduct->type) }}</td>
+                                    <td class="text-end">
+                                        <a href="{{ route('production.boms.index') }}?product_id={{ $parentProduct->id }}" class="btn btn-xs btn-soft-primary px-2 py-1 fs-11 text-nowrap">
+                                            <i class="feather-eye me-1"></i>View Parent BOMs
+                                        </a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="p-3 text-center border rounded bg-light text-muted fs-12">
+                    <i class="feather-info me-2"></i>This product is not consumed in any other parent assembly BOMs.
+                </div>
+            @endif
         </div>
 
         <!-- Modals -->
@@ -452,6 +639,16 @@
     </div>
 
     <script>
+        @if(isset($parentProduct))
+            // Notify opener (parent BOM page) about the newly created child BOM
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                    type: 'CHILD_BOM_CREATED',
+                    product_id: '{{ $bom->product_id }}'
+                }, '*');
+            }
+        @endif
+
         function switchTab(tabId) {
             // Remove active class from all links
             document.querySelectorAll('.erp-tabs-link').forEach(link => {

@@ -42,7 +42,8 @@ class WorkCenterController extends Controller
         }
 
         $workCenterTypes = config('production.work_center_types', []);
-        return view('modules.production.work-centers.create', compact('workCenterTypes'));
+        $parentOptions = WorkCenter::orderBy('name')->get();
+        return view('modules.production.work-centers.create', compact('workCenterTypes', 'parentOptions'));
     }
 
     public function store(StoreWorkCenterRequest $request): RedirectResponse
@@ -86,7 +87,8 @@ class WorkCenterController extends Controller
         }
 
         $workCenterTypes = config('production.work_center_types', []);
-        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes'));
+        $parentOptions = WorkCenter::where('id', '!=', $id)->orderBy('name')->get();
+        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'parentOptions'));
     }
 
     public function update(UpdateWorkCenterRequest $request, int $id): RedirectResponse
