@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\HRMS\Controllers\OrgController;
+use App\Domains\HRMS\Controllers\SalaryStructureController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('hrms')
@@ -22,4 +23,20 @@ Route::prefix('hrms')
         Route::get('/org/designation/create', [OrgController::class, 'createDesignation'])->name('designation.create');
         Route::post('/org/designation/store', [OrgController::class, 'storeDesignation'])->name('designation.store');
         Route::post('/org/designation/update/{designation}', [OrgController::class, 'updateDesignation'])->name('designation.update');
+
+        Route::get('/salary-structure', [SalaryStructureController::class, 'index'])->name('salary-structure.index');
+        Route::post('/salary-structure/component/store', [SalaryStructureController::class, 'storeComponent'])->name('salary-structure.store');
+        Route::post('/salary-structure/component/update/{salaryComponent}', [SalaryStructureController::class, 'updateComponent'])->name('salary-structure.update');
+        Route::delete('/salary-structure/component/delete/{salaryComponent}', [SalaryStructureController::class, 'destroyComponent'])->name('salary-structure.destroy');
+
+        Route::post('/org/salary-component/store', [OrgController::class, 'storeSalaryComponent'])->name('salary-component.store');
+        Route::post('/org/salary-component/update/{salaryComponent}', [OrgController::class, 'updateSalaryComponent'])->name('salary-component.update');
+
+        // Delete routes
+        Route::delete('/org/company/delete/{company}', [OrgController::class, 'destroy'])->name('company.destroy');
+        Route::delete('/org/business-unit/delete/{businessUnit}', [OrgController::class, 'destroyBusinessUnit'])->name('business-unit.destroy');
+        Route::delete('/org/branch/delete/{branch}', [OrgController::class, 'destroyBranch'])->name('branch.destroy');
+        Route::delete('/org/department/delete/{department}', [OrgController::class, 'destroyDepartment'])->name('department.destroy');
+        Route::delete('/org/designation/delete/{designation}', [OrgController::class, 'destroyDesignation'])->name('designation.destroy');
+        Route::delete('/org/salary-component/delete/{salaryComponent}', [OrgController::class, 'destroySalaryComponent'])->name('salary-component.destroy');
     });

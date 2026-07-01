@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Branch extends Model
 {
     protected $fillable = [
+        'company_id',
         'business_unit_id',
         'name',
         'code',
@@ -24,6 +25,14 @@ class Branch extends Model
     protected $casts = [
         'status' => 'boolean',
     ];
+
+    /**
+     * Branch belongs to a Company (when business unit is skipped).
+     */
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     /**
      * Branch belongs to a Business Unit.

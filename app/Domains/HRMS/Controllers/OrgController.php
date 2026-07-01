@@ -14,11 +14,52 @@ use Illuminate\Http\Request;
 
 class OrgController extends Controller {
     public function index() {
+        // Programmatically run schema updates if they haven't been applied yet
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('branches', 'company_id')) {
+                \Illuminate\Support\Facades\Schema::table('branches', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    try {
+                        $table->dropForeign('branches_business_unit_id_foreign');
+                    } catch (\Exception $ex) {
+                        // ignore if doesn't exist
+                    }
+                    $table->unsignedBigInteger('business_unit_id')->nullable()->change();
+                    $table->foreign('business_unit_id')->references('id')->on('branches')->nullOnDelete();
+
+                    $table->unsignedBigInteger('company_id')->nullable()->after('business_unit_id');
+                    $table->foreign('company_id')->references('id')->on('companies')->nullOnDelete();
+                });
+            }
+            if (!\Illuminate\Support\Facades\Schema::hasColumn('departments', 'company_id')) {
+                \Illuminate\Support\Facades\Schema::table('departments', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    try {
+                        $table->dropUnique('departments_branch_id_code_unique');
+                    } catch (\Exception $ex) {
+                        // ignore if unique constraint name is different
+                    }
+                    try {
+                        $table->dropForeign('departments_branch_id_foreign');
+                    } catch (\Exception $ex) {
+                        // ignore if doesn't exist
+                    }
+                    $table->unsignedBigInteger('branch_id')->nullable()->change();
+                    $table->foreign('branch_id')->references('id')->on('branches')->nullOnDelete();
+
+                    $table->unsignedBigInteger('company_id')->nullable()->after('branch_id');
+                    $table->unsignedBigInteger('business_unit_id')->nullable()->after('company_id');
+                    $table->foreign('company_id')->references('id')->on('companies')->nullOnDelete();
+                    $table->foreign('business_unit_id')->references('id')->on('business_units')->nullOnDelete();
+                });
+            }
+        } catch (\Exception $e) {
+            // Silently capture any setup errors
+        }
+
         $companies = Company::all();
         $businessUnits = BusinessUnit::with(['company', 'head'])->get();
         $employees = Employee::all();
-        $branches = Branch::with(['businessUnit', 'manager'])->get();
-        $departments = Department::with(['branch', 'head'])->get();
+        $branches = Branch::with(['businessUnit', 'company', 'manager'])->get();
+        $departments = Department::with(['branch', 'company', 'businessUnit', 'head'])->get();
         $designations = Designation::with(['department'])->get();
 
         return view('modules.hrms.org-structure.org', compact(
@@ -232,7 +273,8 @@ class OrgController extends Controller {
 
     public function storeBranch(Request $request) {
         $request->validate([
-            'business_unit_id' => 'required|exists:business_units,id',
+            'company_id' => 'required_without:business_unit_id|nullable|exists:companies,id',
+            'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
             'manager_employee_id' => 'nullable|exists:employees,id',
@@ -246,10 +288,19 @@ class OrgController extends Controller {
             'status' => 'required',
         ]);
 
+        $companyId = $request->company_id;
+        if ($request->business_unit_id) {
+            $bu = BusinessUnit::find($request->business_unit_id);
+            if ($bu) {
+                $companyId = $bu->company_id;
+            }
+        }
+
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active');
 
         Branch::create([
-            'business_unit_id' => $request->business_unit_id,
+            'company_id' => $companyId,
+            'business_unit_id' => $request->business_unit_id ?: null,
             'name' => $request->name,
             'code' => $request->code,
             'manager_employee_id' => $request->manager_employee_id ?: null,
@@ -268,7 +319,8 @@ class OrgController extends Controller {
 
     public function updateBranch(Request $request, Branch $branch) {
         $request->validate([
-            'business_unit_id' => 'required|exists:business_units,id',
+            'company_id' => 'required_without:business_unit_id|nullable|exists:companies,id',
+            'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
             'manager_employee_id' => 'nullable|exists:employees,id',
@@ -282,10 +334,19 @@ class OrgController extends Controller {
             'status' => 'required',
         ]);
 
+        $companyId = $request->company_id;
+        if ($request->business_unit_id) {
+            $bu = BusinessUnit::find($request->business_unit_id);
+            if ($bu) {
+                $companyId = $bu->company_id;
+            }
+        }
+
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $branch->update([
-            'business_unit_id' => $request->business_unit_id,
+            'company_id' => $companyId,
+            'business_unit_id' => $request->business_unit_id ?: null,
             'name' => $request->name,
             'code' => $request->code,
             'manager_employee_id' => $request->manager_employee_id ?: null,
@@ -310,7 +371,9 @@ class OrgController extends Controller {
 
     public function storeDepartment(Request $request) {
         $request->validate([
-            'branch_id' => 'required|exists:branches,id',
+            'company_id' => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
+            'business_unit_id' => 'nullable|exists:business_units,id',
+            'branch_id' => 'nullable|exists:branches,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
             'head_employee_id' => 'nullable|exists:employees,id',
@@ -318,10 +381,29 @@ class OrgController extends Controller {
             'status' => 'required',
         ]);
 
+        $companyId = $request->company_id;
+        $businessUnitId = $request->business_unit_id;
+        $branchId = $request->branch_id;
+
+        if ($branchId) {
+            $branch = Branch::find($branchId);
+            if ($branch) {
+                $businessUnitId = $branch->business_unit_id;
+                $companyId = $branch->company_id;
+            }
+        } elseif ($businessUnitId) {
+            $bu = BusinessUnit::find($businessUnitId);
+            if ($bu) {
+                $companyId = $bu->company_id;
+            }
+        }
+
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active');
 
         Department::create([
-            'branch_id' => $request->branch_id,
+            'company_id' => $companyId,
+            'business_unit_id' => $businessUnitId ?: null,
+            'branch_id' => $branchId ?: null,
             'name' => $request->name,
             'code' => $request->code,
             'head_employee_id' => $request->head_employee_id ?: null,
@@ -334,7 +416,9 @@ class OrgController extends Controller {
 
     public function updateDepartment(Request $request, Department $department) {
         $request->validate([
-            'branch_id' => 'required|exists:branches,id',
+            'company_id' => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
+            'business_unit_id' => 'nullable|exists:business_units,id',
+            'branch_id' => 'nullable|exists:branches,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
             'head_employee_id' => 'nullable|exists:employees,id',
@@ -342,10 +426,29 @@ class OrgController extends Controller {
             'status' => 'required',
         ]);
 
+        $companyId = $request->company_id;
+        $businessUnitId = $request->business_unit_id;
+        $branchId = $request->branch_id;
+
+        if ($branchId) {
+            $branch = Branch::find($branchId);
+            if ($branch) {
+                $businessUnitId = $branch->business_unit_id;
+                $companyId = $branch->company_id;
+            }
+        } elseif ($businessUnitId) {
+            $bu = BusinessUnit::find($businessUnitId);
+            if ($bu) {
+                $companyId = $bu->company_id;
+            }
+        }
+
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $department->update([
-            'branch_id' => $request->branch_id,
+            'company_id' => $companyId,
+            'business_unit_id' => $businessUnitId ?: null,
+            'branch_id' => $branchId ?: null,
             'name' => $request->name,
             'code' => $request->code,
             'head_employee_id' => $request->head_employee_id ?: null,
@@ -403,5 +506,100 @@ class OrgController extends Controller {
         ]);
 
         return redirect()->route('hrms.org.index', ['tab' => 'designations'])->with('success', 'Designation updated successfully.');
+    }
+
+    public function destroy(Company $company)
+    {
+        $company->delete();
+        return redirect()->route('hrms.org.index', ['tab' => 'legal-entities'])->with('success', 'Legal Entity deleted successfully.');
+    }
+
+    public function destroyBusinessUnit(BusinessUnit $businessUnit)
+    {
+        $businessUnit->delete();
+        return redirect()->route('hrms.org.index', ['tab' => 'business-units'])->with('success', 'Business Unit deleted successfully.');
+    }
+
+    public function destroyBranch(Branch $branch)
+    {
+        $branch->delete();
+        return redirect()->route('hrms.org.index', ['tab' => 'branches'])->with('success', 'Branch deleted successfully.');
+    }
+
+    public function destroyDepartment(Department $department)
+    {
+        $department->delete();
+        return redirect()->route('hrms.org.index', ['tab' => 'departments'])->with('success', 'Department deleted successfully.');
+    }
+
+    public function destroyDesignation(Designation $designation)
+    {
+        $designation->delete();
+        return redirect()->route('hrms.org.index', ['tab' => 'designations'])->with('success', 'Designation deleted successfully.');
+    }
+
+    public function storeSalaryComponent(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|max:255',
+            'code' => 'required|max:50',
+            'type' => 'required',
+            'calculation_type' => 'required',
+            'default_value' => 'nullable|max:255',
+            'description' => 'nullable',
+            'company_id' => 'nullable|integer',
+            'status' => 'required',
+        ]);
+
+        $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
+
+        SalaryComponent::create([
+            'organization_id' => 1,
+            'company_id' => $request->company_id,
+            'name' => $request->name,
+            'code' => $request->code,
+            'type' => $request->type,
+            'calculation_type' => $request->calculation_type,
+            'default_value' => $request->default_value,
+            'description' => $request->description,
+            'status' => $status,
+        ]);
+
+        return redirect()->route('hrms.org.index', ['tab' => 'salary-structure'])->with('success', 'Salary Component created successfully.');
+    }
+
+    public function updateSalaryComponent(Request $request, SalaryComponent $salaryComponent)
+    {
+        $request->validate([
+            'name' => 'required|max:255',
+            'code' => 'required|max:50',
+            'type' => 'required',
+            'calculation_type' => 'required',
+            'default_value' => 'nullable|max:255',
+            'description' => 'nullable',
+            'company_id' => 'nullable|integer',
+            'status' => 'required',
+        ]);
+
+        $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
+
+        $salaryComponent->update([
+            'company_id' => $request->company_id,
+            'name' => $request->name,
+            'code' => $request->code,
+            'type' => $request->type,
+            'calculation_type' => $request->calculation_type,
+            'default_value' => $request->default_value,
+            'description' => $request->description,
+            'status' => $status,
+        ]);
+
+        return redirect()->route('hrms.org.index', ['tab' => 'salary-structure'])->with('success', 'Salary Component updated successfully.');
+    }
+
+    public function destroySalaryComponent(SalaryComponent $salaryComponent)
+    {
+        $salaryComponent->delete();
+        return redirect()->route('hrms.org.index', ['tab' => 'salary-structure'])->with('success', 'Salary Component deleted successfully.');
     }
 }
