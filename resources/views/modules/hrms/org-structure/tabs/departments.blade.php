@@ -1,300 +1,134 @@
-<style>
-    .dept-link {
-        transition: all 0.2s ease-in-out;
-    }
-    .dept-link.active-entity {
-        background-color: rgba(13, 110, 253, 0.08) !important;
-    }
-    .dept-link.active-entity td:first-child {
-        border-left: 4px solid var(--bs-primary, #0d6efd) !important;
-    }
-</style>
-
 <div class="row">
+    <!-- List Table Card -->
+    <div class="col-12">
+        <x-ui.card title="Departments" stretch bodyClass="p-0">
+            <x-slot name="headerAction">
+                <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDeptModal">
+                    Add Department
+                </x-ui.button>
+            </x-slot>
 
-    <!-- Details Card -->
-    <div class="col-xxl-8">
-        <div class="card stretch stretch-full">
-            <div class="card-body">
-                @php
-                    $dept = $departments->first();
-                @endphp
-                @if($dept)
-                <div id="dept_details_view_mode">
-                    <div class="d-flex justify-content-between">
-                        <div class="d-flex align-items-center gap-3 mb-4 border-bottom pb-3">
-                            <div class="avatar-text avatar-lg rounded bg-soft-primary text-primary" id="detail_dept_avatar" style="width: 50px; height: 50px; min-width: 50px; min-height: 50px; font-size: 16px;">
-                                {{ substr($dept->name ?? 'DP', 0, 2) }}
-                            </div>
-                            <div>
-                                <h4 class="mb-1" id="detail_dept_name">{{ $dept->name }}</h4>
-                                <span class="fs-12 text-muted" id="detail_dept_branch_name">{{ $dept->branch->name ?? 'N/A' }}</span>
-                            </div>
-                        </div>
-                        <a id="edit_dept_details_toggle" href="javascript:void(0);" class="avatar-text avatar-md" data-bs-toggle="tooltip" title="Edit Department Details">
-                            <i class="feather-edit"></i>
-                        </a>
-                    </div>
-                    <div class="row g-4">
-                        <div class="col-md-6">
-                            <label class="fs-12 fw-semibold text-muted mb-1">Department Name</label>
-                            <p class="mb-3" id="dept_name">{{ $dept->name }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="fs-12 fw-semibold text-muted mb-1">Department Code</label>
-                            <p class="mb-3" id="dept_code">{{ $dept->code }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="fs-12 fw-semibold text-muted mb-1">Parent Branch</label>
-                            <p class="mb-3" id="dept_branch_name_text">{{ $dept->branch->name ?? 'N/A' }}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="fs-12 fw-semibold text-muted mb-1">Department Head</label>
-                            <p class="mb-3" id="dept_head_name">
-                                {{ $dept->head ? ($dept->head->first_name . ' ' . $dept->head->last_name) : 'N/A' }}
-                            </p>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="fs-12 fw-semibold text-muted mb-1">Status</label>
-                            <p class="mb-3" id="dept_status">
-                                @if($dept->status)
-                                    <span class="badge bg-soft-success text-success">Active</span>
-                                @else
-                                    <span class="badge bg-soft-danger text-danger">Inactive</span>
-                                @endif
-                            </p>
-                        </div>
-                        <div class="col-12">
-                            <label class="fs-12 fw-semibold text-muted mb-1">Description</label>
-                            <p class="mb-0" id="dept_description">{{ $dept->description ?? 'No description provided.' }}</p>
-                        </div>
-                    </div> <!-- Close row g-4 -->
-                </div> <!-- Close dept_details_view_mode -->
-
-                <!-- Edit Mode Container -->
-                <div id="dept_details_edit_mode" class="d-none">
-                    <form id="dept_edit_form" action="{{ route('hrms.department.update', $dept->id ?? 0) }}" method="POST">
-                        @csrf
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Department Name</label>
-                                <input type="text" class="form-control" name="name" id="edit_dept_name" value="{{ $dept->name }}">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Department Code</label>
-                                <input type="text" class="form-control" name="code" id="edit_dept_code" value="{{ $dept->code }}">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Parent Branch</label>
-                                <select class="form-control" name="branch_id" id="edit_dept_branch_id">
-                                    @foreach($branches as $branch)
-                                        <option value="{{ $branch->id }}" {{ $branch->id == $dept->branch_id ? 'selected' : '' }}>
-                                            {{ $branch->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Department Head</label>
-                                <select class="form-control" name="head_employee_id" id="edit_dept_head_id">
-                                    <option value="">Select Department Head</option>
-                                    @foreach($employees as $employee)
-                                        <option value="{{ $employee->id }}" {{ $employee->id == $dept->head_employee_id ? 'selected' : '' }}>
-                                            {{ $employee->first_name }} {{ $employee->last_name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Status</label>
-                                <select class="form-control" name="status" id="edit_dept_status">
-                                    <option value="1" {{ $dept->status ? 'selected' : '' }}>Active</option>
-                                    <option value="0" {{ !$dept->status ? 'selected' : '' }}>Inactive</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Description</label>
-                                <textarea class="form-control" name="description" id="edit_dept_description" rows="3">{{ $dept->description }}</textarea>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-4 text-end">
-                            <button type="button" class="btn btn-light me-2" id="cancel_dept_edit_btn">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Update Details</button>
-                        </div>
-                    </form>
-                </div>
-                @else
-                <div class="text-center py-5">
-                    <p class="text-muted mb-0">No Departments found. Click "Add Department" to create one.</p>
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
-
-    <!-- Sidebar List Card -->
-    <div class="col-xxl-4 h-100">
-        <div class="card stretch stretch-full">
-            <div class="card-header">
-                <h5 class="card-title">Departments</h5>
-                <a href="/hrms/org/department/create" class="btn btn-sm btn-primary" data-bs-toggle="tooltip" title="Add Department">
-                    <i class="feather-plus"></i>
-                </a>
-            </div>
-            <div class="card-body p-0">
+            <div class="table-responsive">
                 <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="60">#</th>
+                            <!-- <th width="80">Avatar</th> -->
+                            <th>Department Name</th>
+                            <th>Department Code</th>
+                            <th>Branch</th>
+                            <th>Department Head</th>
+                            <th>Status</th>
+                            <th width="150" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         @foreach($departments as $d)
-                        <tr class="dept-link @if($loop->first) active-entity @endif"
-                            data-dept='@json($d)'
-                            style="cursor: pointer;">
-
-                            <td>
-                                <div class="hstack gap-3">
-                                    <div class="avatar-text avatar-lg rounded bg-soft-primary text-primary" style="width: 40px; height: 40px; min-width: 40px; min-height: 40px;">
-                                        {{ substr($d->name, 0, 2) }}
-                                    </div>
-                                    <div>
-                                        <span class="d-block fw-semibold">
-                                            {{ $d->name }}
-                                        </span>
-                                        <span class="fs-12 text-muted">
-                                            {{ $d->branch->name ?? 'N/A' }}
-                                        </span>
-                                    </div>
+                        <tr>
+                            <td>{{ $loop->iteration }}</td>
+                            <!-- <td>
+                                <div class="avatar-text avatar-md rounded bg-soft-primary text-primary d-flex align-items-center justify-content-center fw-bold fs-12" style="width: 40px; height: 40px; min-width: 40px; min-height: 40px;">
+                                    {{ substr($d->name ?? 'DP', 0, 2) }}
                                 </div>
-                            </td>
-
-                            <!-- <td width="120">
-                                <small class="text-muted d-block">Code</small>
-                                <span>{{ $d->code }}</span>
                             </td> -->
-
-                            <td class="text-end">
+                            <td><span class="fw-bold text-dark">{{ $d->name }}</span></td>
+                            <td><code>{{ $d->code }}</code></td>
+                            <td>{{ $d->branch->name ?? ($d->businessUnit->name ?? ($d->company->company_name ?? 'N/A')) }}</td>
+                            <td>{{ $d->head ? ($d->head->first_name . ' ' . $d->head->last_name) : 'N/A' }}</td>
+                            <td>
                                 @if($d->status)
-                                    <span class="badge bg-soft-success text-success">
-                                        Active
-                                    </span>
+                                    <x-ui.badge variant="success" soft>Active</x-ui.badge>
                                 @else
-                                    <span class="badge bg-soft-danger text-danger">
-                                        Inactive
-                                    </span>
+                                    <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
                                 @endif
+                            </td>
+                            <td class="text-end">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <x-ui.icon-btn variant="soft-primary" icon="feather-eye" class="btn-view-dept" data-bs-toggle="modal" data-bs-target="#viewDeptModal" data-dept="{{ base64_encode($d->toJson()) }}" title="View" />
+                                    <x-ui.icon-btn variant="soft-info" icon="feather-edit" class="btn-edit-dept" data-bs-toggle="modal" data-bs-target="#editDeptModal" data-dept="{{ base64_encode($d->toJson()) }}" title="Edit" />
+                                    <form action="{{ route('hrms.department.destroy', $d->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this department?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete" />
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         @endforeach
+                        @if($departments->isEmpty())
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                No Departments found. Click "Add Department" to create one.
+                            </td>
+                        </tr>
+                        @endif
                     </tbody>
                 </table>
             </div>
-        </div>
+        </x-ui.card>
     </div>
 </div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Toggle Edit Mode Logic
-        let isDeptEditMode = false;
-        const viewModeDept = document.getElementById('dept_details_view_mode');
-        const editModeDept = document.getElementById('dept_details_edit_mode');
-        const toggleDeptBtn = document.getElementById('edit_dept_details_toggle');
-        const cancelDeptBtn = document.getElementById('cancel_dept_edit_btn');
+        function getInitials(name, fallback) {
+            const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
 
-        function toggleDeptEdit(edit) {
-            isDeptEditMode = edit;
-            if (!viewModeDept || !editModeDept) return;
-            if (isDeptEditMode) {
-                viewModeDept.classList.add('d-none');
-                editModeDept.classList.remove('d-none');
-                if (toggleDeptBtn) {
-                    toggleDeptBtn.innerHTML = '<i class="feather-x"></i>';
-                    toggleDeptBtn.setAttribute('title', 'Cancel Edit');
-                }
-            } else {
-                viewModeDept.classList.remove('d-none');
-                editModeDept.classList.add('d-none');
-                if (toggleDeptBtn) {
-                    toggleDeptBtn.innerHTML = '<i class="feather-edit"></i>';
-                    toggleDeptBtn.setAttribute('title', 'Edit Department Details');
-                }
+            if (words.length >= 2) {
+                return (words[0][0] + words[1][0]).toUpperCase();
             }
+
+            return (words[0] || fallback || '').substring(0, 2).toUpperCase();
         }
 
-        if (toggleDeptBtn) {
-            toggleDeptBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                toggleDeptEdit(!isDeptEditMode);
-            });
-        }
-
-        if (cancelDeptBtn) {
-            cancelDeptBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                toggleDeptEdit(false);
-            });
-        }
-
-        // Sidebar click handler to select department
-        document.querySelectorAll('.dept-link').forEach(link => {
-            link.addEventListener('click', function(e){
-                e.preventDefault();
-
-                // Close edit mode on switch
-                toggleDeptEdit(false);
-
-                // Toggle active highlights on list rows
-                document.querySelectorAll('.dept-link').forEach(row => {
-                    row.classList.remove('active-entity');
-                });
-                this.classList.add('active-entity');
-
-                let dept = JSON.parse(this.dataset.dept);
-
-                // Update text fields dynamically
-                if (document.getElementById('dept_name')) document.getElementById('dept_name').innerText = dept.name || '';
-                if (document.getElementById('dept_code')) document.getElementById('dept_code').innerText = dept.code || '';
-                if (document.getElementById('dept_branch_name_text')) {
-                    document.getElementById('dept_branch_name_text').innerText = (dept.branch && dept.branch.name) ? dept.branch.name : 'N/A';
-                }
-                if (document.getElementById('dept_head_name')) {
-                    document.getElementById('dept_head_name').innerText = (dept.head) ? (dept.head.first_name + ' ' + dept.head.last_name) : 'N/A';
-                }
-                if (document.getElementById('dept_description')) document.getElementById('dept_description').innerText = dept.description || 'No description provided.';
-                if (document.getElementById('detail_dept_name')) document.getElementById('detail_dept_name').innerText = dept.name || '';
-                if (document.getElementById('detail_dept_branch_name')) {
-                    document.getElementById('detail_dept_branch_name').innerText = (dept.branch && dept.branch.name) ? dept.branch.name : 'N/A';
-                }
-
-                // Update Initials Avatar
-                let avatarEl = document.getElementById('detail_dept_avatar');
+        // View Action Trigger
+        document.querySelectorAll('.btn-view-dept').forEach(btn => {
+            btn.addEventListener('click', function() {
+                let dept = JSON.parse(atob(this.dataset.dept));
+                
+                document.getElementById('modal_view_dept_name').innerText = dept.name;
+                document.getElementById('modal_view_dept_branch').innerText = (dept.branch && dept.branch.name) ? dept.branch.name : ((dept.business_unit && dept.business_unit.name) ? dept.business_unit.name : ((dept.company && dept.company.company_name) ? dept.company.company_name : 'N/A'));
+                document.getElementById('modal_view_dept_code').innerText = dept.code;
+                document.getElementById('modal_view_dept_head').innerText = (dept.head) ? (dept.head.first_name + ' ' + dept.head.last_name) : 'N/A';
+                document.getElementById('modal_view_dept_desc').innerText = dept.description || 'No description provided.';
+                
+                let avatarEl = document.getElementById('modal_view_dept_avatar');
                 if (avatarEl) {
-                    avatarEl.innerText = (dept.name) ? dept.name.substring(0, 2) : 'DP';
+                    avatarEl.innerText = getInitials(dept.name, 'DP');
                 }
-
-                // Update edit fields dynamically
-                if (document.getElementById('edit_dept_name')) document.getElementById('edit_dept_name').value = dept.name || '';
-                if (document.getElementById('edit_dept_code')) document.getElementById('edit_dept_code').value = dept.code || '';
-                if (document.getElementById('edit_dept_branch_id')) document.getElementById('edit_dept_branch_id').value = dept.branch_id || '';
-                if (document.getElementById('edit_dept_head_id')) document.getElementById('edit_dept_head_id').value = dept.head_employee_id || '';
-                if (document.getElementById('edit_dept_description')) document.getElementById('edit_dept_description').value = dept.description || '';
-                if (document.getElementById('edit_dept_status')) {
-                    document.getElementById('edit_dept_status').value = (dept.status === true || dept.status === 1 || dept.status === '1') ? '1' : '0';
-                }
-
-                // Update form action URL to point to current department
-                let editForm = document.getElementById('dept_edit_form');
-                if (editForm) {
-                    editForm.action = '/hrms/org/department/update/' + dept.id;
-                }
-
-                // Update Status Badge
-                let statusEl = document.getElementById('dept_status');
+                
+                let statusEl = document.getElementById('modal_view_dept_status');
                 if (statusEl) {
                     if (dept.status === true || dept.status === 1 || dept.status === '1') {
                         statusEl.innerHTML = '<span class="badge bg-soft-success text-success">Active</span>';
                     } else {
                         statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">Inactive</span>';
                     }
+                }
+            });
+        });
+
+        // Edit Action Trigger
+        document.querySelectorAll('.btn-edit-dept').forEach(btn => {
+            btn.addEventListener('click', function() {
+                let dept = JSON.parse(atob(this.dataset.dept));
+                
+                document.getElementById('edit_dept_name').value = dept.name || '';
+                document.getElementById('edit_dept_code').value = dept.code || '';
+                document.getElementById('edit_dept_branch_id').value = dept.branch_id || '';
+                document.getElementById('edit_dept_company_id').value = dept.company_id || '';
+                document.getElementById('edit_dept_bu_id').value = dept.business_unit_id || '';
+                document.getElementById('edit_dept_head_id').value = dept.head_employee_id || '';
+                document.getElementById('edit_dept_description').value = dept.description || '';
+                
+                let statusSelect = document.getElementById('edit_dept_status');
+                if (statusSelect) {
+                    statusSelect.value = (dept.status === true || dept.status === 1 || dept.status === '1') ? '1' : '0';
+                }
+                
+                let form = document.getElementById('dept_edit_form');
+                if (form) {
+                    form.action = '/hrms/org/department/update/' + dept.id;
                 }
             });
         });
