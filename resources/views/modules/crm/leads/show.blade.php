@@ -41,1054 +41,1356 @@
         </div>
     @endif
 
-    <!-- Odoo CRM Unified Workspace Canvas -->
-    <div class="card border-0 shadow-sm bg-white" style="overflow: visible;">
-        <!-- Hidden form for stage status updates via clickable chevrons -->
-        <form id="statusChangeForm" action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" style="display: none;">
-            @csrf
-            @method('PATCH')
-            <input type="hidden" name="status" id="statusChangeInput">
-        </form>
+    <!-- Hidden form for stage status updates via clickable/action triggers -->
+    <form id="statusChangeForm" action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" style="display: none;">
+        @csrf
+        @method('PATCH')
+        <input type="hidden" name="status" id="statusChangeInput">
+    </form>
 
-        <div class="card-body p-4 bg-white">
-            <!-- Header Banner Section -->
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-3 mb-4 border-bottom">
-                <div class="d-flex align-items-center">
-                    <!-- Avatar Circle -->
-                    <div class="avatar-text avatar-lg bg-soft-primary text-primary fs-4 fw-bold me-3 shadow-sm" style="width: 54px; height: 54px; line-height: 54px;">
-                        {{ strtoupper(substr($lead->company_name, 0, 1)) }}
-                    </div>
-                    <div>
-                        <div class="d-flex align-items-center flex-wrap gap-2">
-                            <h4 class="fw-bold text-dark mb-0 me-2 fs-18">{{ $lead->company_name }}</h4>
-                            
-                            @php
-                                $statusClass = 'bg-soft-primary text-primary';
-                                if($lead->status === 'Follow-up Scheduled') $statusClass = 'bg-soft-warning text-warning';
-                                elseif($lead->status === 'Contacted') $statusClass = 'bg-soft-info text-info';
-                                elseif($lead->status === 'Qualified') $statusClass = 'bg-soft-teal text-teal';
-                                elseif($lead->status === 'Converted') $statusClass = 'bg-soft-success text-success';
-                                elseif($lead->status === 'Lost') $statusClass = 'bg-soft-danger text-danger';
-                            @endphp
-                            <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ $lead->status ?: 'New' }}</span>
-                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ $lead->segment ?: 'No Segment' }}</span>
-                        </div>
-                        <p class="text-muted mb-0 fs-12 mt-1">
-                            <i class="feather-user me-1 text-muted"></i> {{ $lead->owner?->name ?: 'Unassigned' }}
-                        </p>
-                    </div>
+    <!-- Zoho CRM Layout Outer Card Container -->
+    <div class="card border-0 shadow-sm bg-white d-flex flex-column zoho-lead-card-container d-print-block" style="height: calc(100vh - 195px); min-height: 550px; overflow: hidden; border-radius: 4px;">
+        
+        <!-- ==================== STICKY HEADER BANNER ==================== -->
+        <div class="zoho-header-banner p-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-3 d-print-none" style="flex-shrink: 0; background-color: #ffffff; z-index: 100;">
+            <div class="d-flex align-items-center">
+                <!-- Lead Profile Avatar with Initials -->
+                <div class="zoho-avatar bg-soft-primary text-primary fs-5 fw-bold me-3 text-uppercase shadow-sm d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.05); font-family: 'Inter', sans-serif;">
+                    {{ strtoupper(substr($lead->company_name, 0, 1)) }}
                 </div>
                 
-                <!-- Action Buttons on the Right Side of the Banner -->
-                <div class="d-flex gap-2 flex-wrap align-items-center d-print-none">
-                    @if ($lead->is_customer || $lead->status === 'Converted')
-                        <button class="btn btn-success btn-xs fw-bold text-uppercase fs-10 py-1.5 px-2.5" disabled>
-                            <i class="feather-check-circle me-1"></i>Customer Created
+                <!-- Title & Tags -->
+                <div>
+                    <div class="d-flex align-items-center flex-wrap gap-2">
+                        <h4 class="fw-bold text-dark mb-0 fs-15" style="font-family: 'Inter', sans-serif;">
+                            {{ $lead->contact_person ?: 'Contact' }} - {{ $lead->company_name }}
+                        </h4>
+                        
+                        @php
+                            $statusClass = 'bg-soft-primary text-primary';
+                            if($lead->status === 'Follow-up Scheduled') $statusClass = 'bg-soft-warning text-warning';
+                            elseif($lead->status === 'Contacted') $statusClass = 'bg-soft-info text-info';
+                            elseif($lead->status === 'Qualified') $statusClass = 'bg-soft-teal text-teal';
+                            elseif($lead->status === 'Converted') $statusClass = 'bg-soft-success text-success';
+                            elseif($lead->status === 'Lost') $statusClass = 'bg-soft-danger text-danger';
+                        @endphp
+                        <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ $lead->status ?: 'New' }}</span>
+                        <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ $lead->segment ?: 'No Segment' }}</span>
+                    </div>
+                    <!-- Tag Button -->
+                    <div class="mt-1 d-flex align-items-center">
+                        <button type="button" class="btn btn-xs btn-outline-secondary zoho-tag-btn d-inline-flex align-items-center text-muted px-2 py-0.5 border" style="font-size: 10px; border-radius: 3px;">
+                            <i class="feather-tag me-1 fs-9"></i> Add Tags
                         </button>
-                    @elseif ($activeQuotation)
-                        <a href="{{ route('crm.quotations.show', $activeQuotation->id) }}" class="btn btn-xs fw-bold text-uppercase fs-10 py-1.5 px-2.5 text-white" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
-                            <i class="feather-file-text me-1"></i>View Quotation
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right-side Action Buttons -->
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <!-- Send Email Button -->
+                @if ($lead->email)
+                    <a href="mailto:{{ $lead->email }}" class="btn btn-primary fw-bold fs-11 py-1.5 px-3 rounded shadow-sm d-inline-flex align-items-center text-white text-uppercase" style="background-color: #1e40af; border-color: #1e40af; font-family: 'Inter', sans-serif;">
+                        <i class="feather-mail me-1.5 fs-11"></i> Send Email
+                    </a>
+                @endif
+                
+                @if ($lead->is_customer || $lead->status === 'Converted')
+                    <button class="btn btn-outline-success fw-bold fs-11 py-1.5 px-3 rounded bg-white text-uppercase" style="font-family: 'Inter', sans-serif;" disabled>
+                        <i class="feather-check-circle me-1.5"></i> Converted
+                    </button>
+                @elseif ($activeQuotation)
+                    <a href="{{ route('crm.quotations.show', $activeQuotation->id) }}" class="btn btn-outline-primary fw-bold fs-11 py-1.5 px-3 rounded bg-white text-uppercase" style="color: var(--bs-primary); border-color: var(--bs-primary); font-family: 'Inter', sans-serif;">
+                        View Quotation
+                    </a>
+                @elseif ($lead->status === 'Qualified')
+                    <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-success fw-bold fs-11 py-1.5 px-3 rounded shadow-sm d-inline-flex align-items-center text-white text-uppercase" style="background-color: #16a34a; border-color: #16a34a; font-family: 'Inter', sans-serif;">
+                            <i class="feather-shuffle me-1.5"></i> Convert to Quotation
+                        </button>
+                    </form>
+                @endif
+
+                <!-- Edit Button -->
+                <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="btn btn-outline-secondary fw-bold fs-11 py-1.5 px-3 rounded bg-white text-dark border-secondary text-uppercase" style="font-family: 'Inter', sans-serif;">
+                    Edit Lead
+                </a>
+                
+                <!-- Back Button -->
+                <a href="{{ route('crm.leads.index') }}" class="btn btn-outline-secondary fw-bold fs-11 py-1.5 px-3 rounded bg-white text-dark border-secondary text-uppercase d-inline-flex align-items-center" style="font-family: 'Inter', sans-serif;">
+                    <i class="feather-arrow-left me-1"></i> Back
+                </a>
+                
+                <!-- Pagination Arrows -->
+                <div class="d-flex align-items-center ms-1 border rounded px-1 py-0.5 bg-white">
+                    @if($prevLead)
+                        <a href="{{ route('crm.leads.show', $prevLead->id) }}" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="Previous Lead">
+                            <i class="feather-chevron-left fs-12"></i>
                         </a>
-                        <button class="btn btn-xs fw-bold text-uppercase fs-10 py-1.5 px-2.5" disabled style="background-color: #F7E4C3; color: #8A6D3B; border: 1px solid #F7E4C3;">
-                            <i class="feather-clock me-1"></i>Quotation Pending
+                    @else
+                        <button class="btn btn-xs btn-link p-1 border-0 d-inline-flex align-items-center justify-content-center text-muted opacity-50" style="cursor: not-allowed;" disabled>
+                            <i class="feather-chevron-left fs-12"></i>
                         </button>
-                    @elseif (($lead->status ?: 'New') === 'Qualified' && !$lead->is_customer)
-                        <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
-                            @csrf
-                            <button type="submit" class="btn btn-primary btn-xs fw-bold text-uppercase fs-10 py-1.5 px-2.5" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
-                                <i class="feather-file-plus me-1"></i>Convert to Quotation
-                            </button>
-                        </form>
                     @endif
-                    
-                    @if ($lead->status !== 'Converted' && $lead->status !== 'Lost' && !$lead->is_customer)
-                        <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline">
-                            @csrf
-                            @method('PATCH')
-                            <input type="hidden" name="status" value="Lost">
-                            <button type="submit" class="btn btn-outline-danger btn-xs fw-bold text-uppercase fs-10 py-1.5 px-2.5">Mark Lost</button>
-                        </form>
+
+                    @if($nextLead)
+                        <a href="{{ route('crm.leads.show', $nextLead->id) }}" class="btn btn-xs btn-link text-dark p-1 border-0 d-inline-flex align-items-center justify-content-center" title="Next Lead">
+                            <i class="feather-chevron-right fs-12"></i>
+                        </a>
+                    @else
+                        <button class="btn btn-xs btn-link p-1 border-0 d-inline-flex align-items-center justify-content-center text-muted opacity-50" style="cursor: not-allowed;" disabled>
+                            <i class="feather-chevron-right fs-12"></i>
+                        </button>
                     @endif
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ZOHO CRM TWO-COLUMN FLEX CONTENT ==================== -->
+        <div class="d-flex flex-grow-1 overflow-hidden" style="min-height: 0;">
+            
+            <!-- Left Sidebar Menu (STICKY / fixed height column) -->
+            <div class="zoho-sidebar-col border-end bg-white d-print-none h-100 overflow-auto" style="width: 200px; flex-shrink: 0; user-select: none;">
+                <div class="p-3">
+                    <h6 class="text-uppercase fw-bold text-muted mb-3" style="font-size: 10px; letter-spacing: 0.8px;">Related List</h6>
+                    <ul class="nav flex-column zoho-sidebar-nav gap-1" id="zohoSidebarLinks">
+                        <li class="nav-item">
+                            <a href="#sectionNotes" class="nav-link active py-1.5 px-2 fs-12 rounded text-dark fw-medium">Notes</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#subtab-interactions" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Open Activities</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#subtab-history" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">History</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionLeadInfo" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Lead Information</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionAddressInfo" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Address Details</a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#sectionRequirements" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Requirements</a>
+                        </li>
+                        <li class="nav-item mt-2">
+                            <a href="javascript:void(0)" class="nav-link py-1 px-2 fs-11 text-primary fw-semibold border-top-0"><i class="feather-plus-circle me-1"></i> Add Related List</a>
+                        </li>
+                    </ul>
                     
-                    <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="btn btn-link text-dark btn-xs text-decoration-none fw-bold text-uppercase fs-10 py-1.5 px-2.5">
-                        <i class="feather-edit-3 me-1"></i>Edit Lead
-                    </a>
-                    <a href="{{ route('crm.leads.index') }}" class="btn btn-link text-dark btn-xs text-decoration-none fw-bold text-uppercase fs-10 py-1.5 px-2.5">
-                        <i class="feather-arrow-left me-1"></i>Back
-                    </a>
+                    <h6 class="text-uppercase fw-bold text-muted mt-4 mb-2" style="font-size: 10px; letter-spacing: 0.8px;">Links</h6>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a href="javascript:void(0)" class="nav-link py-1 px-2 fs-11 text-primary fw-semibold"><i class="feather-plus me-1"></i> Add Link</a>
+                        </li>
+                    </ul>
                 </div>
             </div>
 
-            <!-- Tabs & Status Row -->
-            <div class="d-flex justify-content-between align-items-center border-bottom mb-4 flex-wrap gap-3">
-                <!-- Zoho Style Navigation Tab Menu -->
-                <ul class="nav nav-tabs border-bottom-0 mb-0" id="leadTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link fw-bold px-3 py-2 fs-13 {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="true">
-                            Overview
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link fw-bold px-3 py-2 fs-13" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab" aria-controls="timeline-pane" aria-selected="false">
-                            Activities & History
-                        </button>
-                    </li>
-                    @if ($activeQuotation || request()->has('create_quotation'))
+            <!-- Right Content Area (SCROLLABLE column) -->
+            <div class="zoho-main-col h-100 overflow-auto flex-grow-1" style="scroll-behavior: smooth; background-color: #f8fafc;" id="zohoMainScrollable">
+                
+                <!-- Tab Menu Row (Sticky inside the scrollable container) -->
+                <div class="d-flex align-items-center justify-content-between border-bottom px-3 py-2 bg-light-50 flex-wrap gap-2 sticky-top" style="z-index: 90; background-color: #f8fafc;">
+                    <ul class="nav nav-pills zoho-nav-tabs" id="zohoLeadTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link fw-bold px-3 py-2 fs-13 {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-tab" data-bs-toggle="tab" data-bs-target="#quotation-pane" type="button" role="tab" aria-controls="quotation-pane" aria-selected="false">
-                                Quotation
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') ? 'active' : '' }}" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="true">
+                                Overview
                             </button>
                         </li>
-                    @endif
-                </ul>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline-pane" type="button" role="tab" aria-controls="timeline-pane" aria-selected="false">
+                                Timeline
+                            </button>
+                        </li>
+                        @if ($activeQuotation || request()->has('create_quotation'))
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link px-3 py-1 fw-bold fs-12 rounded-pill {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-tab" data-bs-toggle="tab" data-bs-target="#quotation-pane" type="button" role="tab" aria-controls="quotation-pane" aria-selected="false">
+                                    Quotation
+                                </button>
+                            </li>
+                        @endif
+                    </ul>
 
-                <!-- Right Odoo Chevron Status Steps -->
-                <div class="d-flex align-items-center odoo-statusbar shadow-sm mb-1 d-print-none">
-                    @foreach(['New', 'Follow-up Scheduled', 'Contacted', 'Qualified', 'Converted'] as $statusOption)
-                        @php
-                            $isActive = ($lead->status ?: 'New') === $statusOption;
-                            $statusOrder = ['New', 'Follow-up Scheduled', 'Contacted', 'Qualified', 'Converted', 'Lost'];
-                            $currentIdx = array_search($lead->status ?: 'New', $statusOrder);
-                            $optIdx = array_search($statusOption, $statusOrder);
-                            $isCompleted = $optIdx < $currentIdx;
-                        @endphp
-                        <div class="odoo-status-step {{ $isActive ? 'active' : '' }} {{ $isCompleted ? 'completed' : '' }}" 
-                             data-status="{{ $statusOption }}" 
-                             style="cursor: pointer;"
-                             title="Click to transition to {{ $statusOption }}">
-                            {{ $statusOption }}
-                        </div>
-                    @endforeach
-                    @if($lead->status === 'Lost')
-                        <div class="odoo-status-step active bg-danger text-white border-danger" data-status="Lost" style="cursor: pointer;">
-                            Lost
-                        </div>
-                    @endif
+                    <!-- Clock / Last Update Information -->
+                    <div class="d-flex align-items-center text-muted fs-11 fw-medium" style="font-family: 'Inter', sans-serif;">
+                        <i class="feather-clock me-1.5 text-muted fs-12"></i> 
+                        Last Update : {{ $lead->updated_at ? $lead->updated_at->diffForHumans() : 'Recently' }}
+                    </div>
                 </div>
-            </div>
 
-        <!-- Tab Contents -->
-        <div class="tab-content" id="leadTabsContent">
-            
-            <!-- TAB 1: OVERVIEW PANE -->
-            <div class="tab-pane fade show {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') ? 'active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
-                <div class="py-2">
-                            @if (request()->has('edit_lead'))
-                                <!-- ==================== STATE 4: EDIT LEAD FORM ==================== -->
-                                <form action="{{ route('crm.leads.update', $lead->id) }}" method="POST">
-                                    @csrf
-                                    @method('PUT')
-                                    
-                                    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
-                                        <h4 class="fw-bold text-dark mb-0">Edit Lead details</h4>
-                                        <div class="d-flex gap-2">
-                                            <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-sm btn-light border">Cancel</a>
-                                            <button type="submit" class="btn btn-sm btn-primary py-1.5 px-3 fw-bold" style="background-color: #714B67; border-color: #714B67;">Save Changes</button>
+                <!-- Main Scrollable Tab Content View -->
+                <div class="pt-2 px-3 pb-3 tab-content" id="zohoLeadTabsContent">
+                    
+                    <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
+                    <div class="tab-pane fade show {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') ? 'active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
+                        
+                        @if (request()->has('edit_lead'))
+                            <!-- ==================== STATE: EDIT LEAD FORM ==================== -->
+                            <form action="{{ route('crm.leads.update', $lead->id) }}" method="POST">
+                                @csrf
+                                @method('PUT')
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
+                                    <h5 class="fw-bold text-dark mb-0">Edit Lead details</h5>
+                                    <div class="d-flex gap-2">
+                                        <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-sm btn-light border fs-12">Cancel</a>
+                                        <button type="submit" class="btn btn-sm btn-primary py-1.5 px-3 fw-bold fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Changes</button>
+                                    </div>
+                                </div>
+
+                                <div class="row g-4 fs-13 text-dark">
+                                    <div class="col-md-6 border-end">
+                                        <h6 class="fw-bold text-primary mb-3">Company & Contact Info</h6>
+                                        
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Company Name <span class="text-danger">*</span></label>
+                                            <div class="flex-grow-1">
+                                                <input type="text" name="company_name" value="{{ old('company_name', $lead->company_name) }}" class="odoo-form-control" required placeholder="e.g. Acme Corporation">
+                                            </div>
+                                        </div>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Contact Person</label>
+                                            <div class="flex-grow-1">
+                                                <input type="text" name="contact_person" value="{{ old('contact_person', $lead->contact_person) }}" class="odoo-form-control" placeholder="Contact Representative">
+                                            </div>
+                                        </div>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Email Address</label>
+                                            <div class="flex-grow-1">
+                                                <input type="email" name="email" value="{{ old('email', $lead->email) }}" class="odoo-form-control" placeholder="email@address.com">
+                                            </div>
+                                        </div>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Phone Number</label>
+                                            <div class="flex-grow-1">
+                                                <input type="text" name="phone" value="{{ old('phone', $lead->phone) }}" class="odoo-form-control" placeholder="+00 000 000 0000">
+                                            </div>
+                                        </div>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Lead Owner</label>
+                                            <div class="flex-grow-1">
+                                                <select name="lead_owner_id" class="odoo-form-control form-select-sm">
+                                                    <option value="">Unassigned</option>
+                                                    @foreach($users as $user)
+                                                        <option value="{{ $user->id }}" @selected(old('lead_owner_id', $lead->lead_owner_id) == $user->id)>{{ $user->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <h6 class="fw-bold text-primary mb-3 mt-4">Location Details</h6>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Street Address</label>
+                                            <div class="flex-grow-1">
+                                                <textarea name="address" rows="2" class="odoo-form-control" placeholder="Street address...">{{ old('address', $lead->address) }}</textarea>
+                                            </div>
+                                        </div>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">City / State / Country</label>
+                                            <div class="flex-grow-1 d-flex gap-2">
+                                                <input type="text" name="city" value="{{ old('city', $lead->city) }}" class="odoo-form-control" placeholder="City">
+                                                <input type="text" name="state" value="{{ old('state', $lead->state) }}" class="odoo-form-control" placeholder="State">
+                                                <input type="text" name="country" value="{{ old('country', $lead->country) }}" class="odoo-form-control" placeholder="Country">
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div class="row g-4 fs-13 text-dark">
-                                        <div class="col-md-6 border-end">
-                                            <h6 class="fw-bold text-primary mb-3">Company & Contact Info</h6>
-                                            
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Company Name <span class="text-danger">*</span></label>
-                                                <div class="flex-grow-1">
-                                                    <input type="text" name="company_name" value="{{ old('company_name', $lead->company_name) }}" class="odoo-form-control" required placeholder="e.g. Acme Corporation">
-                                                </div>
-                                            </div>
+                                    <div class="col-md-6">
+                                        <h6 class="fw-bold text-primary mb-3">Requirements & Pricing</h6>
 
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Contact Person</label>
-                                                <div class="flex-grow-1">
-                                                    <input type="text" name="contact_person" value="{{ old('contact_person', $lead->contact_person) }}" class="odoo-form-control" placeholder="Contact Representative">
-                                                </div>
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Product Interest</label>
+                                            <div class="flex-grow-1">
+                                                <input type="text" name="product" value="{{ old('product', $lead->product) }}" class="odoo-form-control" placeholder="Interested Product">
                                             </div>
+                                        </div>
 
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Email Address</label>
-                                                <div class="flex-grow-1">
-                                                    <input type="email" name="email" value="{{ old('email', $lead->email) }}" class="odoo-form-control" placeholder="email@address.com">
-                                                </div>
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Expected Revenue (₹)</label>
+                                            <div class="flex-grow-1">
+                                                <input type="number" name="expected_amount" value="{{ old('expected_amount', $lead->expected_amount) }}" min="0" step="0.01" class="odoo-form-control" placeholder="Expected Revenue (₹)">
                                             </div>
+                                        </div>
 
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Phone Number</label>
-                                                <div class="flex-grow-1">
-                                                    <input type="text" name="phone" value="{{ old('phone', $lead->phone) }}" class="odoo-form-control" placeholder="+00 000 000 0000">
-                                                </div>
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Expected Sale Date</label>
+                                            <div class="flex-grow-1">
+                                                <input type="date" name="expected_sale_date" value="{{ old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '') }}" class="odoo-form-control">
                                             </div>
+                                        </div>
 
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Lead Owner</label>
-                                                <div class="flex-grow-1">
-                                                    <select name="lead_owner_id" class="odoo-form-control form-select-sm">
-                                                        <option value="">Unassigned</option>
-                                                        @foreach($users as $user)
-                                                            <option value="{{ $user->id }}" @selected(old('lead_owner_id', $lead->lead_owner_id) == $user->id)>{{ $user->name }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
+                                        <h6 class="fw-bold text-primary mb-3 mt-4">Segmentation & Sources</h6>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Lead Source</label>
+                                            <div class="flex-grow-1">
+                                                <select name="source" class="odoo-form-control form-select-sm">
+                                                    <option value="Select an Option">Select an Option</option>
+                                                    @foreach (['Cold Call', 'Employee Referral', 'Partner', 'Web Search', 'Advertisement', 'Trade Show'] as $srcOption)
+                                                        <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ $srcOption }}</option>
+                                                    @endforeach
+                                                </select>
                                             </div>
-                                            
-                                            <h6 class="fw-bold text-primary mb-3 mt-4">Location Details</h6>
+                                        </div>
 
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Street Address</label>
-                                                <div class="flex-grow-1">
-                                                    <textarea name="address" rows="2" class="odoo-form-control" placeholder="Street address...">{{ old('address', $lead->address) }}</textarea>
-                                                </div>
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Priority</label>
+                                            <div class="flex-grow-1">
+                                                <select name="priority" class="odoo-form-control form-select-sm">
+                                                    <option value="Select an Option">Select an Option</option>
+                                                    @foreach (['Low', 'Medium', 'High'] as $prioOption)
+                                                        <option value="{{ $prioOption }}" @selected(old('priority', $lead->priority) === $prioOption)>{{ $prioOption }}</option>
+                                                    @endforeach
+                                                </select>
                                             </div>
+                                        </div>
 
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">City / State / Country</label>
-                                                <div class="flex-grow-1 d-flex gap-2">
-                                                    <input type="text" name="city" value="{{ old('city', $lead->city) }}" class="odoo-form-control" placeholder="City">
-                                                    <input type="text" name="state" value="{{ old('state', $lead->state) }}" class="odoo-form-control" placeholder="State">
-                                                    <input type="text" name="country" value="{{ old('country', $lead->country) }}" class="odoo-form-control" placeholder="Country">
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Segment</label>
+                                            <div class="flex-grow-1">
+                                                <select name="segment" class="odoo-form-control form-select-sm">
+                                                    <option value="Select an Option">Select an Option</option>
+                                                    @foreach (['SMB', 'Mid-Market', 'Enterprise'] as $segOption)
+                                                        <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ $segOption }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Industry Type</label>
+                                            <div class="flex-grow-1">
+                                                <input type="text" name="industry_type" value="{{ old('industry_type', $lead->industry_type) }}" class="odoo-form-control" placeholder="Industry/Vertical">
+                                            </div>
+                                        </div>
+
+                                        <div class="odoo-form-group mb-3">
+                                            <label class="odoo-form-label">Initial Call Date</label>
+                                            <div class="flex-grow-1">
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text bg-light border-0 border-bottom rounded-0"><i class="feather-calendar fs-11 text-muted"></i></span>
+                                                    <input type="text" class="form-control odoo-form-control" name="call_date" id="lead_call_date_picker" value="{{ old('call_date', $lead->call_date ? $lead->call_date->format('Y-m-d h:i A') : '') }}" placeholder="Call Schedule">
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div class="col-md-6">
-                                            <h6 class="fw-bold text-primary mb-3">Requirements & Pricing</h6>
-
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Product Interest</label>
-                                                <div class="flex-grow-1">
-                                                    <input type="text" name="product" value="{{ old('product', $lead->product) }}" class="odoo-form-control" placeholder="Interested Product">
-                                                </div>
-                                            </div>
-
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Expected Revenue (₹)</label>
-                                                <div class="flex-grow-1">
-                                                    <input type="number" name="expected_amount" value="{{ old('expected_amount', $lead->expected_amount) }}" min="0" step="0.01" class="odoo-form-control" placeholder="Expected Revenue (₹)">
-                                                </div>
-                                            </div>
-
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Expected Sale Date</label>
-                                                <div class="flex-grow-1">
-                                                    <input type="date" name="expected_sale_date" value="{{ old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '') }}" class="odoo-form-control">
-                                                </div>
-                                            </div>
-
-                                            <h6 class="fw-bold text-primary mb-3 mt-4">Segmentation & Sources</h6>
-
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Lead Source</label>
-                                                <div class="flex-grow-1">
-                                                    <select name="source" class="odoo-form-control form-select-sm">
-                                                        <option value="Select an Option">Select an Option</option>
-                                                        @foreach (['Cold Call', 'Employee Referral', 'Partner', 'Web Search', 'Advertisement', 'Trade Show'] as $srcOption)
-                                                            <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ $srcOption }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Priority</label>
-                                                <div class="flex-grow-1">
-                                                    <select name="priority" class="odoo-form-control form-select-sm">
-                                                        <option value="Select an Option">Select an Option</option>
-                                                        @foreach (['Low', 'Medium', 'High'] as $prioOption)
-                                                            <option value="{{ $prioOption }}" @selected(old('priority', $lead->priority) === $prioOption)>{{ $prioOption }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Segment</label>
-                                                <div class="flex-grow-1">
-                                                    <select name="segment" class="odoo-form-control form-select-sm">
-                                                        <option value="Select an Option">Select an Option</option>
-                                                        @foreach (['SMB', 'Mid-Market', 'Enterprise'] as $segOption)
-                                                            <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ $segOption }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Industry Type</label>
-                                                <div class="flex-grow-1">
-                                                    <input type="text" name="industry_type" value="{{ old('industry_type', $lead->industry_type) }}" class="odoo-form-control" placeholder="Industry/Vertical">
-                                                </div>
-                                            </div>
-
-                                            <div class="odoo-form-group">
-                                                <label class="odoo-form-label">Initial Call Date</label>
-                                                <div class="flex-grow-1">
-                                                    <div class="input-group input-group-sm">
-                                                        <span class="input-group-text bg-light border-0 border-bottom rounded-0"><i class="feather-calendar fs-11 text-muted"></i></span>
-                                                        <input type="text" class="form-control odoo-form-control" name="call_date" id="call_date_picker" value="{{ old('call_date', $lead->call_date ? $lead->call_date->format('Y-m-d h:i A') : '') }}" placeholder="Call Schedule">
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="mt-4">
-                                                <label class="form-label fw-bold text-muted text-uppercase mb-1" style="font-size: 10px;">Requirement Description</label>
-                                                <textarea name="requirement" rows="4" class="form-control" style="border: 1px solid #ced4da; padding: 6px; border-radius: 4px;" placeholder="Details about initial inquiry, product scope, business size, etc...">{{ old('requirement', $lead->requirement) }}</textarea>
-                                            </div>
+                                        <div class="mt-4">
+                                            <label class="form-label fw-bold text-muted text-uppercase mb-1" style="font-size: 10px;">Requirement Description</label>
+                                            <textarea name="requirement" rows="4" class="form-control text-dark" style="border: 1px solid #ced4da; padding: 6px; border-radius: 4px;" placeholder="Details about initial inquiry, product scope, business size, etc...">{{ old('requirement', $lead->requirement) }}</textarea>
                                         </div>
                                     </div>
-                                </form>
-                            @else
-                                <!-- ==================== STATE 5: ORIGINAL LEAD DETAILS VIEW (DEFAULT) ==================== -->
-                                <div class="mb-4">
-                                    <div class="row g-4 fs-13 text-dark">
-                                        <div class="col-md-6 border-end">
-                                            <table class="table table-sm table-borderless align-middle mb-0">
-                                                <tr>
-                                                    <td class="text-muted py-2" style="width: 35%;">Lead Owner</td>
-                                                    <td class="py-2">
+                                </div>
+                            </form>
+                        @else
+                            <!-- ==================== DEFAULT VIEW: ZOHO CRM FIELD CONTAINER ==================== -->
+                            @if($lead->status === 'Qualified' && !$activeQuotation)
+                                <!-- CRM Next Step Suggestion Banner -->
+                                <div class="alert alert-success d-flex align-items-center justify-content-between p-3 mb-3 border-0 shadow-sm" style="background-color: #f0fdf4; border-left: 4px solid #16a34a !important; border-radius: 4px;">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fs-18">💡</span>
+                                        <div>
+                                            <h6 class="fw-bold text-success mb-0.5 fs-13">Qualified Lead</h6>
+                                            <p class="text-muted mb-0 fs-11" style="font-family: 'Inter', sans-serif;">This lead has been qualified. Convert it to a quotation to proceed with the sales process.</p>
+                                        </div>
+                                    </div>
+                                    <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline m-0">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-success fw-bold px-3 py-1.5 d-flex align-items-center gap-1.5 text-uppercase fs-11" style="background-color: #16a34a; border-color: #16a34a;">
+                                            <i class="feather-shuffle fs-12"></i> Convert to Quotation
+                                        </button>
+                                    </form>
+                                </div>
+                            @endif
+
+                            <!-- 2. Detailed Fields Section -->
+                            <div id="detailedFieldsContainer" style="transition: all 0.3s ease;">
+                                <!-- Lead Information Card -->
+                                <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionLeadInfo">
+                                    <div class="card-body p-3">
+                                        <h5 class="zoho-section-title fs-13 text-dark fw-bold pb-2 border-bottom mb-3" style="font-family: 'Inter', sans-serif;">Lead Information</h5>
+                                        <div class="row g-0">
+                                            <div class="col-md-6 pe-md-4">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Lead Owner</div>
+                                                    <div class="zoho-field-value text-dark">
                                                         <form action="{{ route('crm.leads.updateOwner', $lead->id) }}" method="POST" class="d-inline">
                                                             @csrf
                                                             @method('PATCH')
-                                                            <select name="lead_owner_id" class="form-select form-select-sm fw-semibold d-inline-block w-auto py-0.5 px-2 border-0 bg-transparent text-primary" onchange="this.form.submit()">
+                                                            <select name="lead_owner_id" class="form-select form-select-sm fw-semibold d-inline-block w-auto py-0.5 px-2 border-0 bg-transparent text-primary" onchange="this.form.submit()" style="box-shadow: none; font-size: 13px; padding-left: 0;">
                                                                 <option value="">Unassigned</option>
                                                                 @foreach($users as $user)
                                                                     <option value="{{ $user->id }}" @selected($lead->lead_owner_id == $user->id)>{{ $user->name }}</option>
                                                                 @endforeach
                                                             </select>
                                                         </form>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-muted py-2">Lead Status</td>
-                                                    <td class="py-2">
-                                                        @php
-                                                            $statusClass = 'bg-soft-primary text-primary';
-                                                            if($lead->status === 'Follow-up Scheduled') $statusClass = 'bg-soft-warning text-warning';
-                                                            elseif($lead->status === 'Contacted') $statusClass = 'bg-soft-info text-info';
-                                                            elseif($lead->status === 'Qualified') $statusClass = 'bg-soft-teal text-teal';
-                                                            elseif($lead->status === 'Converted') $statusClass = 'bg-soft-success text-success';
-                                                            elseif($lead->status === 'Lost') $statusClass = 'bg-soft-danger text-danger';
-                                                        @endphp
-                                                        <span class="badge {{ $statusClass }} px-2.5 py-1.5 fs-11 fw-semibold">{{ $lead->status ?: 'New' }}</span>
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-muted py-2">Contact Representative</td>
-                                                    <td class="fw-semibold text-dark py-2">{{ $lead->contact_person ?: '—' }}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-muted py-2">Email</td>
-                                                    <td class="py-2">
+                                                    </div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Lead Name</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->contact_person ?: '—' }}</div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Email</div>
+                                                    <div class="zoho-field-value">
                                                         @if($lead->email)
-                                                            <a href="mailto:{{ $lead->email }}" class="fw-semibold text-primary"><i class="feather-mail me-1"></i>{{ $lead->email }}</a>
+                                                            <a href="mailto:{{ $lead->email }}" class="text-primary hover-underline">{{ $lead->email }}</a>
                                                         @else
-                                                            <span class="text-muted">No Email</span>
+                                                            —
                                                         @endif
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-muted py-2">Phone</td>
-                                                    <td class="fw-semibold text-dark py-2">{{ $lead->phone ?: '—' }}</td>
-                                                </tr>
-                                            </table>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <table class="table table-sm table-borderless align-middle mb-0">
-                                                <tr>
-                                                    <td class="text-muted py-2" style="width: 35%;">Expected Revenue</td>
-                                                    <td class="fw-bold text-dark py-2">₹{{ $lead->expected_amount ? number_format($lead->expected_amount, 2) : '0.00' }}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-muted py-2">Product Interested</td>
-                                                    <td class="fw-bold text-dark py-2">{{ $lead->product ?: '—' }}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-muted py-2">Expected Sale Date</td>
-                                                    <td class="fw-semibold text-dark py-2">{{ $lead->expected_sale_date ? $lead->expected_sale_date->format('d/m/Y') : '—' }}</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-muted py-2">Lead Source</td>
-                                                    <td class="py-2"><span class="badge bg-soft-secondary text-secondary px-2.5 py-1">{{ $lead->source ?: '—' }}</span></td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-muted py-2">Address</td>
-                                                    <td class="py-2 text-dark fs-12">{{ $lead->address ?: 'No street address specified' }}<br>{{ $lead->city }} {{ $lead->state }} {{ $lead->country }}</td>
-                                                </tr>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    <!-- Requirement Section -->
-                                    <div class="border-top pt-3 mt-4">
-                                        <h6 class="fs-11 text-uppercase fw-bold text-muted mb-2"><i class="feather-file-text me-1 text-primary"></i>Requirements Details</h6>
-                                        @if ($lead->requirement)
-                                            <div class="text-dark fs-13 bg-light-50 p-3 rounded" style="white-space: pre-wrap; line-height: 1.6;">{{ $lead->requirement }}</div>
-                                        @else
-                                            <p class="text-muted fs-13 italic mb-0">No requirements details specified for this lead.</p>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endif
-                </div>
-            </div> <!-- End TAB 1: OVERVIEW PANE -->
-
-            @if ($activeQuotation || request()->has('create_quotation'))
-            <!-- TAB 3: QUOTATION PANE -->
-            <div class="tab-pane fade show {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-pane" role="tabpanel" aria-labelledby="quotation-tab">
-                <div class="py-2">
-                            @if (request()->has('create_quotation'))
-                                <!-- ==================== STATE 1: CREATE QUOTATION FORM ==================== -->
-                                <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm">
-                                    @csrf
-                                    <input type="hidden" name="lead_id" value="{{ $lead->id }}">
-                                    
-                                    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-                                        <h3 class="fw-bold text-dark mb-0">New Quotation</h3>
-                                        <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-sm btn-light border">Cancel</a>
-                                    </div>
-
-                                    <div class="row g-4 mb-4 fs-13 text-dark">
-                                        <div class="col-md-6">
-                                            <input type="hidden" name="customer_id" value="{{ $customer ? $customer->id : '' }}">
-                                            <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display"
-                                                :value="$lead->contact_person ?: ($lead->company_name ?: 'N/A')"
-                                                readonly="true"
-                                                style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
-
-                                            <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $lead->email)" />
-                                            <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $lead->phone)" />
-                                        </div>
-                                        <div class="col-md-6">
-                                            <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
-                                                :value="old('quotation_number', $nextQuotationNumber)" readonly="true"
-                                                style="font-weight: bold; color: #495057;" />
-
-                                            <x-ui.odoo-form-ui type="input" label="Date" name="quotation_date"
-                                                :value="old('quotation_date', date('Y-m-d'))" />
-
-                                            <x-ui.odoo-form-ui type="input" label="Expiration" name="expiration_date"
-                                                :value="old('expiration_date', date('Y-m-d', strtotime('+30 days')))" />
-
-                                            <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
-                                                <option value="Draft" @selected(old('status') === 'Draft')>Draft</option>
-                                                <option value="Quotation Sent" @selected(old('status') === 'Quotation Sent')>Quotation Sent</option>
-                                                <option value="Accepted" @selected(old('status') === 'Accepted')>Accepted</option>
-                                                <option value="Rejected" @selected(old('status') === 'Rejected')>Rejected</option>
-                                                <option value="Quotation Rework" @selected(old('status') === 'Quotation Rework')>Quotation Rework</option>
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-                                    </div>
-
-                                    <!-- Odoo Style Items Lines Table -->
-                                    <div class="border-top pt-4">
-                                        <h5 class="fw-bold text-dark mb-3">Order Lines</h5>
-                                        <div class="table-responsive">
-                                            <table class="table odoo-table align-middle" id="itemsTable">
-                                                <thead>
-                                                    <tr>
-                                                        <th style="width: 45%;">Product / Description</th>
-                                                        <th class="text-end" style="width: 12%;">Quantity</th>
-                                                        <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
-                                                        <th class="text-end" style="width: 12%;">Taxes (%)</th>
-                                                        <th class="text-end" style="width: 16%;">Amount</th>
-                                                        <th class="text-center" style="width: 5%;"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <!-- Dynamically generated rows -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div class="mt-2.5">
-                                            <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow">
-                                                <i class="feather-plus me-1"></i>Add a product
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Calculation Totals aligned Right Odoo Sheet Footer -->
-                                    <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
-                                        <div class="col-md-4">
-                                            <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted fw-semibold">Untaxed Amount:</span>
-                                                <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted fw-semibold">Taxes:</span>
-                                                <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                <span class="text-muted fw-semibold">Discount (₹):</span>
-                                                <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('discount', 0) }}" min="0" step="0.01">
-                                            </div>
-                                            <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
-                                                <span class="text-dark fw-bold">Total:</span>
-                                                <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                                        <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm">Discard</a>
-                                        <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm" style="background-color: #714B67; border-color: #714B67;">Save Quotation</button>
-                                    </div>
-                                </form>
-
-                            @elseif (request()->has('edit_quotation') && $activeQuotation)
-                                <!-- ==================== STATE 2: EDIT QUOTATION FORM ==================== -->
-                                <form action="{{ route('crm.quotations.update', $activeQuotation->id) }}" method="POST" id="quotationForm">
-                                    @csrf
-                                    @method('PUT')
-                                    <input type="hidden" name="lead_id" value="{{ $lead->id }}">
-
-                                    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-                                        <h3 class="fw-bold text-dark mb-0">Edit Quotation: {{ $activeQuotation->quotation_number }}</h3>
-                                        <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'view_quotation' => 1]) }}" class="btn btn-sm btn-light border">Cancel</a>
-                                    </div>
-
-                                    <div class="row g-4 mb-4 fs-13 text-dark">
-                                        <div class="col-md-6">
-                                            <input type="hidden" name="customer_id" value="{{ $customer ? $customer->id : '' }}">
-                                            <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display"
-                                                :value="$lead->contact_person ?: ($lead->company_name ?: 'N/A')"
-                                                readonly="true"
-                                                style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
-
-                                            <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $activeQuotation->email ?: $lead->email)" />
-                                            <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $activeQuotation->phone ?: $lead->phone)" />
-                                        </div>
-                                        <div class="col-md-6">
-                                            <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
-                                                :value="$activeQuotation->quotation_number" readonly="true"
-                                                style="font-weight: bold; color: #495057;" />
-
-                                            <x-ui.odoo-form-ui type="input" label="Date" name="quotation_date"
-                                                :value="old('quotation_date', $activeQuotation->quotation_date->format('Y-m-d'))" />
-
-                                            <x-ui.odoo-form-ui type="input" label="Expiration" name="expiration_date"
-                                                :value="old('expiration_date', $activeQuotation->expiration_date ? $activeQuotation->expiration_date->format('Y-m-d') : '')" />
-
-                                            <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
-                                                <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
-                                                <option value="Quotation Sent" @selected(old('status', $activeQuotation->status) === 'Quotation Sent')>Quotation Sent</option>
-                                                <option value="Accepted" @selected(old('status', $activeQuotation->status) === 'Accepted')>Accepted</option>
-                                                <option value="Rejected" @selected(old('status', $activeQuotation->status) === 'Rejected')>Rejected</option>
-                                                <option value="Quotation Rework" @selected(old('status', $activeQuotation->status) === 'Quotation Rework')>Quotation Rework</option>
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-                                    </div>
-
-                                    <!-- Odoo Style Items Lines Table -->
-                                    <div class="border-top pt-4">
-                                        <h5 class="fw-bold text-dark mb-3">Order Lines</h5>
-                                        <div class="table-responsive">
-                                            <table class="table odoo-table align-middle" id="itemsTable">
-                                                <thead>
-                                                    <tr>
-                                                        <th style="width: 45%;">Product / Description</th>
-                                                        <th class="text-end" style="width: 12%;">Quantity</th>
-                                                        <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
-                                                        <th class="text-end" style="width: 12%;">Taxes (%)</th>
-                                                        <th class="text-end" style="width: 16%;">Amount</th>
-                                                        <th class="text-center" style="width: 5%;"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <!-- Dynamically generated rows -->
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div class="mt-2.5">
-                                            <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow">
-                                                <i class="feather-plus me-1"></i>Add a product
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Calculation Totals aligned Right Odoo Sheet Footer -->
-                                    <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
-                                        <div class="col-md-4">
-                                            <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted fw-semibold">Untaxed Amount:</span>
-                                                <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted fw-semibold">Taxes:</span>
-                                                <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                <span class="text-muted fw-semibold">Discount (₹):</span>
-                                                <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('discount', $activeQuotation->discount) }}" min="0" step="0.01">
-                                            </div>
-                                            <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
-                                                <span class="text-dark fw-bold">Total:</span>
-                                                <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                                        <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm">Discard</a>
-                                        <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm" style="background-color: #714B67; border-color: #714B67;">Save Changes</button>
-                                    </div>
-                                </form>
-
-                            @elseif ($activeQuotation)
-                                <!-- ==================== STATE 3: LINKED QUOTATION DETAILS VIEW ==================== -->
-                                <div id="quotation-print-area">
-                                    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2.5 flex-wrap gap-2 d-print-none">
-                                        <h4 class="fw-bold text-dark mb-0">Quotation Details</h4>
-                                        <div class="d-flex gap-2 align-items-center">
-                                            <!-- Quotation Status Dropdown -->
-                                            <div class="d-inline-block" style="width: 180px; min-width: 180px;">
-                                                <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <select name="status" class="form-control status-select" data-select2-selector="status" style="width: 100%; display: inline-block; vertical-align: middle;">
-                                                        @foreach(['Draft', 'Quotation Sent', 'Accepted', 'Rejected', 'Quotation Rework'] as $qStatus)
-                                                            @php
-                                                                $bgClass = 'bg-primary';
-                                                                if ($qStatus === 'Quotation Sent') $bgClass = 'bg-info';
-                                                                elseif ($qStatus === 'Accepted') $bgClass = 'bg-success';
-                                                                elseif ($qStatus === 'Rejected') $bgClass = 'bg-danger';
-                                                                elseif ($qStatus === 'Quotation Rework') $bgClass = 'bg-warning';
-                                                            @endphp
-                                                            <option value="{{ $qStatus }}" data-bg="{{ $bgClass }}" @selected($activeQuotation->status === $qStatus)>
-                                                                {{ $qStatus }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                </form>
-                                            </div>
-
-                                            <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_quotation' => 1]) }}" class="btn btn-sm btn-light border fw-semibold">
-                                                <i class="feather-edit me-1"></i>Edit Quotation
-                                            </a>
-                                        </div>
-                                    </div>
-
-                                    <div class="row g-4 mb-4 fs-13 text-dark">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Customer / Client</label>
-                                                <div class="fw-bold text-primary fs-15">{{ $lead->company_name }}</div>
-                                                @if($lead->contact_person)
-                                                    <div class="text-muted fs-12 mt-0.5"><i class="feather-user me-1"></i>{{ $lead->contact_person }}</div>
-                                                @endif
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Email</label>
-                                                <div class="fw-semibold">{{ $activeQuotation->email ?: ($lead->email ?: '—') }}</div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Phone</label>
-                                                <div class="fw-semibold">{{ $activeQuotation->phone ?: ($lead->phone ?: '—') }}</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Ref</label>
-                                                <div class="fw-bold text-dark fs-15">{{ $activeQuotation->quotation_number }}</div>
-                                            </div>
-                                            <div class="mb-3 mb-md-0">
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Date</label>
-                                                        <div class="fw-semibold">{{ $activeQuotation->quotation_date ? $activeQuotation->quotation_date->format('d M Y') : '—' }}</div>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Expires</label>
-                                                        <div class="fw-semibold text-danger">{{ $activeQuotation->expiration_date ? $activeQuotation->expiration_date->format('d M Y') : '—' }}</div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Status</label>
-                                                <div class="fw-semibold"><span class="badge bg-soft-primary text-primary">{{ $activeQuotation->status }}</span></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Items Order Lines Table -->
-                                    <div class="border-top pt-4">
-                                        <h5 class="fw-bold text-dark mb-3">Order Lines</h5>
-                                        <div class="table-responsive">
-                                            <table class="table table-bordered table-sm align-middle fs-13 text-dark">
-                                                <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
-                                                    <tr>
-                                                        <th class="ps-3" style="width: 50%;">Product Description</th>
-                                                        <th class="text-center" style="width: 10%;">Quantity</th>
-                                                        <th class="text-end" style="width: 15%;">Unit Price</th>
-                                                        <th class="text-end" style="width: 10%;">Taxes</th>
-                                                        <th class="text-end pe-3" style="width: 15%;">Amount</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach ($activeQuotation->items as $item)
-                                                        <tr>
-                                                            <td class="ps-3">
-                                                                <strong class="text-dark">{{ $item->item_name }}</strong>
-                                                                @if($item->description)
-                                                                    <small class="text-muted d-block mt-0.5">{{ $item->description }}</small>
-                                                                @endif
-                                                            </td>
-                                                            <td class="text-center">{{ $item->quantity }}</td>
-                                                            <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
-                                                            <td class="text-end">{{ number_format($item->tax_rate, 2) }}%</td>
-                                                            <td class="text-end pe-3 fw-bold">₹{{ number_format($item->amount, 2) }}</td>
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    <!-- Calculation Totals -->
-                                    <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
-                                        <div class="col-md-4">
-                                            <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted fw-semibold">Untaxed Amount:</span>
-                                                <span class="fw-bold text-dark">₹{{ number_format($activeQuotation->subtotal, 2) }}</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between py-1 border-bottom">
-                                                <span class="text-muted fw-semibold">Taxes:</span>
-                                                <span class="fw-bold text-dark">₹{{ number_format($activeQuotation->tax_amount, 2) }}</span>
-                                            </div>
-                                            @if($activeQuotation->discount > 0)
-                                                <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">Discount:</span>
-                                                    <span class="fw-bold text-danger">-₹{{ number_format($activeQuotation->discount, 2) }}</span>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Phone</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->phone ?: '—' }}</div>
                                                 </div>
-                                            @endif
-                                            <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
-                                                <span class="text-dark fw-bold">Total:</span>
-                                                <span class="fw-extrabold text-primary fs-16">₹{{ number_format($activeQuotation->total_amount, 2) }}</span>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Lead Source</div>
+                                                    <div class="zoho-field-value">
+                                                        <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ $lead->source ?: '—' }}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Product Interested</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->product ?: '—' }}</div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Segment</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->segment ?: '—' }}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif
-                </div>
-            </div>
-            @endif
-
-            <!-- TAB 2: ACTIVITIES & HISTORY PANE -->
-            <div class="tab-pane fade" id="timeline-pane" role="tabpanel" aria-labelledby="timeline-tab">
-                <div class="py-2">
-                    
-                    <div class="row">
-                        <!-- Column 1: Activities (6 cols) -->
-                        <div class="col-md-6 border-end">
-                            <h5 class="fw-bold text-dark fs-14 mb-3"><i class="feather-activity text-primary me-2"></i>Activities</h5>
-                            
-                            <!-- Inline Chatter Control Buttons -->
-                            <div class="d-flex gap-2 mb-4">
-                                <button type="button" class="btn btn-md btn-primary fw-bold px-4" data-bs-toggle="modal" data-bs-target="#modalLogNote" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
-                                    <i class="feather-file-text me-1"></i>Log Note
-                                </button>
-                                <button type="button" class="btn btn-md btn-outline-primary fw-bold px-4" data-bs-toggle="modal" data-bs-target="#modalScheduleActivity">
-                                    <i class="feather-calendar me-1"></i>Schedule Activity
-                                </button>
-                            </div>
-
-                            <!-- Chatter Timeline Feed -->
-                            <div class="odoo-chatter-timeline py-2" style="max-height: 800px; overflow-y: auto; scrollbar-width: thin;">
-                                @if($lead->followups->isEmpty())
-                                    <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
-                                        <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
-                                        No chatter history recorded.
-                                    </div>
-                                @else
-                                    <div class="activity-feed-2 ms-3">
-                                        @foreach($lead->followups as $followup)
-                                            @php
-                                                $feedClass = 'feed-item-primary';
-                                                $bgBadge = 'bg-soft-primary text-primary';
-                                                if($followup->type === 'Email') {
-                                                    $feedClass = 'feed-item-info';
-                                                    $bgBadge = 'bg-soft-info text-info';
-                                                } elseif($followup->type === 'Meeting') {
-                                                    $feedClass = 'feed-item-success';
-                                                    $bgBadge = 'bg-soft-success text-success';
-                                                } elseif($followup->type === 'Demo') {
-                                                    $feedClass = 'feed-item-warning';
-                                                    $bgBadge = 'bg-soft-warning text-warning';
-                                                }
-                                                
-                                                if($followup->status === 'Pending') {
-                                                    $feedClass = 'feed-item-warning';
-                                                }
-                                            @endphp
-                                            <div class="feed-item {{ $feedClass }}">
-                                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
-                                                    <span class="lead_date fs-10 text-uppercase">
-                                                        {{ $followup->followup_date->diffForHumans() }} ({{ $followup->followup_date->format('d M Y, h:i A') }})
-                                                    </span>
-                                                    
-                                                    <!-- Action Buttons -->
-                                                    <div class="d-flex gap-1">
-                                                        @if($followup->status === 'Pending')
-                                                            <form action="{{ route('crm.followups.update', $followup->id) }}" method="POST" class="d-inline">
-                                                                @csrf
-                                                                @method('PUT')
-                                                                <input type="hidden" name="status" value="Completed">
-                                                                <button type="submit" class="btn btn-icon btn-xs btn-soft-success" title="Mark Done" style="width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">
-                                                                    <i class="feather-check" style="font-size: 10px;"></i>
-                                                                </button>
-                                                            </form>
-                                                        @endif
-                                                        <form action="{{ route('crm.followups.destroy', $followup->id) }}" method="POST" class="d-inline">
+                                            <div class="col-md-6 ps-md-4">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Company</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->company_name }}</div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Lead Status</div>
+                                                    <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 250px;">
+                                                        <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
                                                             @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="btn btn-icon btn-xs btn-soft-danger" onclick="return confirm('Are you sure you want to delete this log?')" style="width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">
-                                                                <i class="feather-trash-2" style="font-size: 10px;"></i>
-                                                            </button>
+                                                            @method('PATCH')
+                                                            <select class="form-select odoo-select2 status-select" name="status" style="border-radius:0;">
+                                                                <option value="New" @selected($lead->status === 'New' || !$lead->status)>New</option>
+                                                                <option value="Contacted" @selected($lead->status === 'Contacted')>Contacted</option>
+                                                                <option value="Follow-up Scheduled" @selected($lead->status === 'Follow-up Scheduled')>Follow-up Scheduled</option>
+                                                                <option value="Qualified" @selected($lead->status === 'Qualified')>Qualified</option>
+                                                                <option value="Converted" @selected($lead->status === 'Converted')>Converted</option>
+                                                                <option value="Lost" @selected($lead->status === 'Lost')>Lost</option>
+                                                            </select>
                                                         </form>
                                                     </div>
                                                 </div>
-                                                
-                                                <div class="mt-1.5">
-                                                    <span class="badge {{ $bgBadge }} fs-9 py-0.5 px-1.5 fw-bold text-uppercase">{{ $followup->type }}</span>
-                                                    @if($followup->status === 'Pending')
-                                                        <span class="badge bg-soft-warning text-warning fs-9 py-0.5 px-1 ms-1 fw-semibold">Pending</span>
-                                                    @else
-                                                        <span class="badge bg-soft-success text-success fs-9 py-0.5 px-1 ms-1 fw-semibold">Done</span>
-                                                    @endif
-                                                    
-                                                    @if($followup->notes)
-                                                        <span class="text fs-12.5 d-block fw-bold text-dark mt-2" style="white-space: pre-wrap; line-height: 1.4;">{{ $followup->notes }}</span>
-                                                    @endif
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Expected Revenue</div>
+                                                    <div class="zoho-field-value text-dark fw-bold">₹{{ $lead->expected_amount ? number_format($lead->expected_amount, 2) : '0.00' }}</div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Expected Sale Date</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->expected_sale_date ? $lead->expected_sale_date->format('d/m/Y') : '—' }}</div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Priority</div>
+                                                    <div class="zoho-field-value">
+                                                        @php
+                                                            $prioBadge = 'bg-secondary';
+                                                            if($lead->priority === 'High') $prioBadge = 'bg-danger';
+                                                            elseif($lead->priority === 'Medium') $prioBadge = 'bg-warning text-dark';
+                                                            elseif($lead->priority === 'Low') $prioBadge = 'bg-info text-white';
+                                                        @endphp
+                                                        <span class="badge {{ $prioBadge }} px-2 py-0.5" style="font-size: 11px;">{{ $lead->priority ?: '—' }}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Industry Type</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->industry_type ?: '—' }}</div>
                                                 </div>
                                             </div>
-                                        @endforeach
+                                        </div>
                                     </div>
-                                @endif
+                                </div>
+
+                                <!-- Address Details Card -->
+                                <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionAddressInfo">
+                                    <div class="card-body p-3">
+                                        <h5 class="zoho-section-title fs-13 text-dark fw-bold pb-2 border-bottom mb-3" style="font-family: 'Inter', sans-serif;">Address Details</h5>
+                                        <div class="row g-0">
+                                            <div class="col-md-6 pe-md-4">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Street</div>
+                                                    <div class="zoho-field-value text-wrap text-dark" style="max-width: 350px;">{{ $lead->address ?: 'No street address specified' }}</div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">State</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->state ?: '—' }}</div>
+                                                </div>
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">Country</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->country ?: '—' }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6 ps-md-4">
+                                                <div class="zoho-field-row">
+                                                    <div class="zoho-field-label">City</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->city ?: '—' }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Requirements Details Card -->
+                                <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionRequirements">
+                                    <div class="card-body p-3">
+                                        <h5 class="zoho-section-title fs-13 text-dark fw-bold pb-2 border-bottom mb-3" style="font-family: 'Inter', sans-serif;">Requirements Details</h5>
+                                        @if ($lead->requirement)
+                                            <div class="text-dark fs-13 bg-light-50 p-3 border rounded" style="white-space: pre-wrap; line-height: 1.6; font-family: 'Inter', sans-serif;">{{ $lead->requirement }}</div>
+                                        @else
+                                            <p class="text-muted fs-12 italic mb-0">No requirements details specified for this lead.</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Static Notes Display Card -->
+                            <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff; font-family: 'Inter', sans-serif;" id="sectionNotes">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                        <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-file-text me-2 text-primary"></i>Notes / Logs</h6>
+                                        <button class="btn btn-xs btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#modalLogNote" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-plus me-1"></i> Add Note</button>
+                                    </div>
+                                    @if($lead->followups->isEmpty())
+                                        <p class="text-muted fs-12 mb-0 italic">No notes created yet. Click "Add Note" to log lead interaction notes.</p>
+                                    @else
+                                        <div class="activity-feed-compact fs-12 text-dark">
+                                            @foreach($lead->followups->take(3) as $followup)
+                                                <div class="p-2 border-bottom bg-white rounded mb-2">
+                                                    <div class="d-flex justify-content-between text-muted fs-10 mb-1">
+                                                        <span class="fw-semibold text-uppercase text-primary">{{ $followup->type }}</span>
+                                                        <span>{{ $followup->followup_date->diffForHumans() }}</span>
+                                                    </div>
+                                                    <p class="mb-0 fw-medium text-dark">{{ $followup->notes }}</p>
+                                                </div>
+                                            @endforeach
+                                            @if($lead->followups->count() > 3)
+                                                <a href="javascript:void(0)" onclick="$('#timeline-tab').tab('show')" class="text-primary fs-11 fw-semibold d-inline-block mt-1">View all {{ $lead->followups->count() }} notes in Timeline &rarr;</a>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                    </div> <!-- End TAB 1: OVERVIEW PANE -->
+
+                    <!-- ==================== TAB 2: TIMELINE PANE (ACTIVITIES & HISTORY) ==================== -->
+                    <div class="tab-pane fade" id="timeline-pane" role="tabpanel" aria-labelledby="timeline-tab">
+                        <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
+                            <div class="card-body p-3">
+                                
+                                <!-- Subtabs selector row -->
+                                <div class="border-bottom pb-1 mb-3">
+                                    <ul class="nav nav-tabs border-bottom-0 zoho-timeline-subtabs" id="zohoTimelineSubTabs" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active py-2 px-3 border-0 bg-transparent" id="subtab-history-tab" data-bs-toggle="tab" data-bs-target="#subtab-history" type="button" role="tab" aria-controls="subtab-history" aria-selected="true">
+                                                History
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link py-2 px-3 border-0 bg-transparent" id="subtab-interactions-tab" data-bs-toggle="tab" data-bs-target="#subtab-interactions" type="button" role="tab" aria-controls="subtab-interactions" aria-selected="false">
+                                                Interactions
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                                
+                                <!-- Subtabs Content -->
+                                <div class="tab-content" id="zohoTimelineSubTabsContent">
+                                    
+                                    <!-- SUBTAB 1: HISTORY TIMELINE -->
+                                    <div class="tab-pane fade show active" id="subtab-history" role="tabpanel" aria-labelledby="subtab-history-tab">
+                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <h5 class="fw-bold text-dark fs-14 mb-0">Timeline History</h5>
+                                                <button class="btn btn-xs btn-outline-secondary border-0 p-1" title="Filter History"><i class="feather-filter fs-12"></i></button>
+                                            </div>
+                                            <div class="text-muted fs-11" style="font-family: 'Inter', sans-serif;">
+                                                No upcoming automated actions &bull; <a href="javascript:void(0)" class="text-primary hover-underline">Hide Upcoming Automated Actions</a>
+                                            </div>
+                                        </div>
+
+                                        <div class="zoho-timeline-container">
+                                            @php
+                                                $groupedHistory = $lead->histories->groupBy(function($item) {
+                                                    return $item->created_at->format('d/m/Y');
+                                                });
+                                            @endphp
+
+                                            @if($groupedHistory->isEmpty())
+                                                <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
+                                                    <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
+                                                    No history tracking events recorded yet.
+                                                </div>
+                                            @else
+                                                @foreach($groupedHistory as $date => $items)
+                                                    <!-- Date Header -->
+                                                    <div class="zoho-timeline-date-group">
+                                                        <div class="zoho-timeline-date-header">{{ $date }}</div>
+                                                        
+                                                        @foreach($items as $item)
+                                                            <!-- Timeline Row -->
+                                                            <div class="zoho-timeline-event d-flex align-items-start">
+                                                                <div class="zoho-timeline-line"></div>
+                                                                
+                                                                @php
+                                                                    $icon = 'feather-info';
+                                                                    if ($item->event_type === 'created') $icon = 'feather-plus';
+                                                                    elseif ($item->event_type === 'assigned') $icon = 'feather-user';
+                                                                    elseif ($item->event_type === 'status_changed') $icon = 'feather-refresh-cw';
+                                                                    elseif ($item->event_type === 'quotation_created') $icon = 'feather-file-text';
+                                                                    elseif ($item->event_type === 'quotation_status_changed') $icon = 'feather-edit';
+                                                                    elseif ($item->event_type === 'activity_scheduled') $icon = 'feather-calendar';
+                                                                    elseif ($item->event_type === 'activity_completed') $icon = 'feather-check-circle';
+                                                                    elseif ($item->event_type === 'activity_deleted') $icon = 'feather-trash-2';
+                                                                @endphp
+                                                                <div class="zoho-timeline-icon">
+                                                                    <i class="{{ $icon }}"></i>
+                                                                </div>
+                                                                
+                                                                <div class="zoho-timeline-content d-flex align-items-center gap-3 w-100">
+                                                                    <div class="zoho-timeline-time">{{ $item->created_at->format('h:i A') }}</div>
+                                                                    <div>
+                                                                        <span class="fs-13 fw-semibold text-dark">{{ $item->notes }}</span>
+                                                                        @if($item->old_value || $item->new_value)
+                                                                            <span class="fs-11 text-muted ms-2 bg-light px-1.5 py-0.5 rounded">
+                                                                                @if($item->old_value)
+                                                                                    <del>{{ $item->old_value }}</del> <i class="feather-arrow-right mx-0.5"></i>
+                                                                                @endif
+                                                                                <strong class="text-success">{{ $item->new_value }}</strong>
+                                                                            </span>
+                                                                        @endif
+                                                                        <div class="text-muted fs-11 mt-0.5">
+                                                                            by {{ $item->user?->name ?: 'System' }} {{ $item->created_at->format('d/m/Y') }}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    <!-- SUBTAB 2: INTERACTIONS (ACTIVITIES) TIMELINE -->
+                                    <div class="tab-pane fade" id="subtab-interactions" role="tabpanel" aria-labelledby="subtab-interactions-tab">
+                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
+                                            <h5 class="fw-bold text-dark fs-14 mb-0">Interactions / Scheduled Activities</h5>
+                                            <button type="button" class="btn btn-xs btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#modalScheduleActivity">
+                                                <i class="feather-calendar me-1"></i>Schedule Activity
+                                            </button>
+                                        </div>
+
+                                        <div class="zoho-timeline-container">
+                                            @php
+                                                $groupedFollowups = $lead->followups->groupBy(function($item) {
+                                                    return $item->followup_date->format('d/m/Y');
+                                                });
+                                            @endphp
+
+                                            @if($groupedFollowups->isEmpty())
+                                                <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
+                                                    <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
+                                                    No activity or interaction logs recorded yet.
+                                                </div>
+                                            @else
+                                                @foreach($groupedFollowups as $date => $items)
+                                                    <!-- Date Header -->
+                                                    <div class="zoho-timeline-date-group">
+                                                        <div class="zoho-timeline-date-header">{{ $date }}</div>
+                                                        
+                                                        @foreach($items as $item)
+                                                            <!-- Timeline Row -->
+                                                            <div class="zoho-timeline-event d-flex align-items-start">
+                                                                <div class="zoho-timeline-line"></div>
+                                                                
+                                                                @php
+                                                                    $icon = 'feather-phone';
+                                                                    if($item->type === 'Email') $icon = 'feather-mail';
+                                                                    elseif($item->type === 'Meeting') $icon = 'feather-users';
+                                                                    elseif($item->type === 'Demo') $icon = 'feather-monitor';
+                                                                @endphp
+                                                                <div class="zoho-timeline-icon">
+                                                                    <i class="{{ $icon }}"></i>
+                                                                </div>
+                                                                
+                                                                <div class="zoho-timeline-content d-flex align-items-start gap-3 w-100">
+                                                                    <div class="zoho-timeline-time mt-0.5">{{ $item->followup_date->format('h:i A') }}</div>
+                                                                    <div class="flex-grow-1">
+                                                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                                                            <div>
+                                                                                <span class="badge bg-soft-primary text-primary text-uppercase fs-10 px-2 py-0.5 fw-bold me-2">{{ $item->type }}</span>
+                                                                                @if($item->status === 'Pending')
+                                                                                    <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 fw-bold">Pending</span>
+                                                                                @else
+                                                                                    <span class="badge bg-soft-success text-success fs-10 px-1.5 py-0.5 fw-bold">Completed</span>
+                                                                                @endif
+                                                                            </div>
+                                                                            
+                                                                            <!-- Action Buttons -->
+                                                                            <div class="d-flex gap-1 d-print-none">
+                                                                                @if($item->status === 'Pending')
+                                                                                    <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
+                                                                                        @csrf
+                                                                                        @method('PUT')
+                                                                                        <input type="hidden" name="status" value="Completed">
+                                                                                        <button type="submit" class="btn btn-icon btn-xs btn-soft-success" title="Mark Done" style="width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">
+                                                                                            <i class="feather-check" style="font-size: 10px;"></i>
+                                                                                        </button>
+                                                                                    </form>
+                                                                                @endif
+                                                                                <form action="{{ route('crm.followups.destroy', $item->id) }}" method="POST" class="d-inline">
+                                                                                    @csrf
+                                                                                    @method('DELETE')
+                                                                                    <button type="submit" class="btn btn-icon btn-xs btn-soft-danger" onclick="return confirm('Are you sure you want to delete this log?')" style="width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">
+                                                                                        <i class="feather-trash-2" style="font-size: 10px;"></i>
+                                                                                    </button>
+                                                                                </form>
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        <span class="fs-13 fw-semibold text-dark d-block mt-2">{{ $item->notes }}</span>
+                                                                        <div class="text-muted fs-11 mt-0.5">
+                                                                            by {{ $lead->owner?->name ?: 'System' }} {{ $item->followup_date->format('d/m/Y') }}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+
                             </div>
                         </div>
-                        
-                        <!-- Column 2: Lead History (6 cols) -->
-                        <div class="col-md-6 ps-md-4">
-                            <h5 class="fw-bold text-dark fs-14 mb-3"><i class="feather-clock text-primary me-2"></i>Lead History</h5>
-                            
-                            <div class="lead-history-panel py-2" style="max-height: 860px; overflow-y: auto; scrollbar-width: thin;">
-                                @if($lead->histories->isEmpty())
-                                    <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
-                                        <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
-                                        No tracking history recorded yet.
-                                    </div>
+                    </div> <!-- End TAB 2: TIMELINE PANE -->
+
+                    <!-- ==================== TAB 3: QUOTATION PANE ==================== -->
+                    @if ($activeQuotation || request()->has('create_quotation'))
+                        <div class="tab-pane fade show {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-pane" role="tabpanel" aria-labelledby="quotation-tab">
+                            <div class="py-1">
+                                
+                                @if (request()->has('create_quotation'))
+                                    <!-- CREATE QUOTATION FORM -->
+                                    <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm">
+                                        @csrf
+                                        <input type="hidden" name="lead_id" value="{{ $lead->id }}">
+                                        
+                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                                            <h5 class="fw-bold text-dark mb-0">New Quotation</h5>
+                                            <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-sm btn-light border">Cancel</a>
+                                        </div>
+
+                                        <div class="row g-4 mb-4 fs-13 text-dark">
+                                            <div class="col-md-6">
+                                                <input type="hidden" name="customer_id" value="{{ $customer ? $customer->id : '' }}">
+                                                <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display"
+                                                    :value="$lead->contact_person ?: ($lead->company_name ?: 'N/A')"
+                                                    readonly="true"
+                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $lead->email)" />
+                                                <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $lead->phone)" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
+                                                    :value="old('quotation_number', $nextQuotationNumber)" readonly="true"
+                                                    style="font-weight: bold; color: #495057;" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Date" name="quotation_date"
+                                                    :value="old('quotation_date', date('Y-m-d'))" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Expiration" name="expiration_date"
+                                                    :value="old('expiration_date', date('Y-m-d', strtotime('+30 days')))" />
+
+                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
+                                                    <option value="Draft" @selected(old('status') === 'Draft')>Draft</option>
+                                                    <option value="Quotation Sent" @selected(old('status') === 'Quotation Sent')>Quotation Sent</option>
+                                                    <option value="Accepted" @selected(old('status') === 'Accepted')>Accepted</option>
+                                                    <option value="Rejected" @selected(old('status') === 'Rejected')>Rejected</option>
+                                                    <option value="Quotation Rework" @selected(old('status') === 'Quotation Rework')>Quotation Rework</option>
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                        </div>
+
+                                        <!-- Order Lines Table -->
+                                        <div class="border-top pt-4">
+                                            <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                                            <div class="table-responsive">
+                                                <table class="table odoo-table align-middle" id="itemsTable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 45%;">Product / Description</th>
+                                                            <th class="text-end" style="width: 12%;">Quantity</th>
+                                                            <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
+                                                            <th class="text-end" style="width: 12%;">Taxes (%)</th>
+                                                            <th class="text-end" style="width: 16%;">Amount</th>
+                                                            <th class="text-center" style="width: 5%;"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Dynamically generated rows -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="mt-2.5">
+                                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow">
+                                                    <i class="feather-plus me-1"></i>Add a product
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Subtotal / Discount / Totals -->
+                                        <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
+                                            <div class="col-md-4">
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Untaxed Amount:</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Taxes:</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                    <span class="text-muted fw-semibold">Discount (₹):</span>
+                                                    <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('discount', 0) }}" min="0" step="0.01">
+                                                </div>
+                                                <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
+                                                    <span class="text-dark fw-bold">Total:</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                                            <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
+                                            <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Quotation</button>
+                                        </div>
+                                    </form>
+
+                                @elseif (request()->has('edit_quotation') && $activeQuotation)
+                                    <!-- EDIT QUOTATION FORM -->
+                                    <form action="{{ route('crm.quotations.update', $activeQuotation->id) }}" method="POST" id="quotationForm">
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="lead_id" value="{{ $lead->id }}">
+
+                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                                            <h5 class="fw-bold text-dark mb-0">Edit Quotation: {{ $activeQuotation->quotation_number }}</h5>
+                                            <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'view_quotation' => 1]) }}" class="btn btn-sm btn-light border">Cancel</a>
+                                        </div>
+
+                                        <div class="row g-4 mb-4 fs-13 text-dark">
+                                            <div class="col-md-6">
+                                                <input type="hidden" name="customer_id" value="{{ $customer ? $customer->id : '' }}">
+                                                <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display"
+                                                    :value="$lead->contact_person ?: ($lead->company_name ?: 'N/A')"
+                                                    readonly="true"
+                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $activeQuotation->email ?: $lead->email)" />
+                                                <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $activeQuotation->phone ?: $lead->phone)" />
+                                            </div>
+                                            <div class="col-md-6">
+                                                <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
+                                                    :value="$activeQuotation->quotation_number" readonly="true"
+                                                    style="font-weight: bold; color: #495057;" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Date" name="quotation_date"
+                                                    :value="old('quotation_date', $activeQuotation->quotation_date->format('Y-m-d'))" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Expiration" name="expiration_date"
+                                                    :value="old('expiration_date', $activeQuotation->expiration_date ? $activeQuotation->expiration_date->format('Y-m-d') : '')" />
+
+                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
+                                                    <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
+                                                    <option value="Quotation Sent" @selected(old('status', $activeQuotation->status) === 'Quotation Sent')>Quotation Sent</option>
+                                                    <option value="Accepted" @selected(old('status', $activeQuotation->status) === 'Accepted')>Accepted</option>
+                                                    <option value="Rejected" @selected(old('status', $activeQuotation->status) === 'Rejected')>Rejected</option>
+                                                    <option value="Quotation Rework" @selected(old('status', $activeQuotation->status) === 'Quotation Rework')>Quotation Rework</option>
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                        </div>
+
+                                        <!-- Order Lines Table -->
+                                        <div class="border-top pt-4">
+                                            <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                                            <div class="table-responsive">
+                                                <table class="table odoo-table align-middle" id="itemsTable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 45%;">Product / Description</th>
+                                                            <th class="text-end" style="width: 12%;">Quantity</th>
+                                                            <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
+                                                            <th class="text-end" style="width: 12%;">Taxes (%)</th>
+                                                            <th class="text-end" style="width: 16%;">Amount</th>
+                                                            <th class="text-center" style="width: 5%;"></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Dynamically generated rows -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="mt-2.5">
+                                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow">
+                                                    <i class="feather-plus me-1"></i>Add a product
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- Subtotal / Discount / Totals -->
+                                        <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
+                                            <div class="col-md-4">
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Untaxed Amount:</span>
+                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Taxes:</span>
+                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                    <span class="text-muted fw-semibold">Discount (₹):</span>
+                                                    <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('discount', $activeQuotation->discount) }}" min="0" step="0.01">
+                                                </div>
+                                                <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
+                                                    <span class="text-dark fw-bold">Total:</span>
+                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                                            <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'view_quotation' => 1]) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
+                                            <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Changes</button>
+                                        </div>
+                                    </form>
+
                                 @else
-                                    <div class="activity-feed-2 ms-3">
-                                        @foreach($lead->histories as $history)
-                                            @php
-                                                $feedClass = 'feed-item-primary';
-                                                if ($history->event_type === 'created') {
-                                                    $feedClass = 'feed-item-success';
-                                                } elseif ($history->event_type === 'assigned') {
-                                                    $feedClass = 'feed-item-info';
-                                                } elseif ($history->event_type === 'status_changed') {
-                                                    $feedClass = 'feed-item-warning';
-                                                } elseif ($history->event_type === 'quotation_created') {
-                                                    $feedClass = 'feed-item-primary';
-                                                } elseif ($history->event_type === 'quotation_status_changed') {
-                                                    $feedClass = 'feed-item-secondary';
-                                                } elseif ($history->event_type === 'activity_scheduled') {
-                                                    $feedClass = 'feed-item-info';
-                                                } elseif ($history->event_type === 'activity_completed') {
-                                                    $feedClass = 'feed-item-success';
-                                                } elseif ($history->event_type === 'activity_deleted') {
-                                                    $feedClass = 'feed-item-danger';
-                                                }
-                                            @endphp
-                                            <div class="feed-item {{ $feedClass }}">
-                                                <span class="lead_date fs-10 text-uppercase">{{ $history->created_at->diffForHumans() }} ({{ $history->created_at->format('d M Y, h:i A') }})</span>
-                                                <span class="text fs-12.5 d-block fw-bold text-dark">{{ $history->notes }}</span>
-                                                @if($history->old_value || $history->new_value)
-                                                    <div class="mt-1 fs-11 text-muted bg-light p-1.5 rounded d-inline-block">
-                                                        @if($history->old_value)
-                                                            <span class="text-danger"><del>{{ $history->old_value }}</del></span>
-                                                            <i class="feather-arrow-right mx-1"></i>
-                                                        @endif
-                                                        <span class="text-success fw-bold">{{ $history->new_value }}</span>
+                                    <!-- VIEW QUOTATION DETAILS -->
+                                    <div class="odoo-sheet rounded border p-4 bg-white" id="quotation-print-area">
+                                        <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4 flex-wrap gap-2 d-print-none">
+                                            <h4 class="fw-bold text-dark mb-0 fs-16">Quotation Sheet: {{ $activeQuotation->quotation_number }}</h4>
+                                            <div class="d-flex gap-2">
+                                                <button type="button" class="btn btn-sm btn-light border" onclick="window.print()"><i class="feather-printer me-1"></i>Print PDF</button>
+                                                <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_quotation' => 1]) }}" class="btn btn-sm btn-light border"><i class="feather-edit-2 me-1"></i>Edit Quotation</a>
+                                                
+                                                @if ($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
+                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="Quotation Sent">
+                                                        <button type="submit" class="btn btn-sm btn-primary" style="background-color: #1e40af; border-color: #1e40af;">Mark Sent</button>
+                                                    </form>
+                                                @elseif ($activeQuotation->status === 'Quotation Sent')
+                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="Accepted">
+                                                        <button type="submit" class="btn btn-sm btn-success">Accept Quotation</button>
+                                                    </form>
+                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="Rejected">
+                                                        <button type="submit" class="btn btn-sm btn-danger">Reject</button>
+                                                    </form>
+                                                @endif
+                                            </div>
+                                        </div>
+
+                                        <!-- Quotation Details Table -->
+                                        <div class="row g-4 mb-4 fs-13 text-dark">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Customer / Account</label>
+                                                    <div class="fw-bold text-dark fs-14">{{ $lead->company_name }}</div>
+                                                    <div class="text-muted fs-12">{{ $lead->contact_person }}</div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Billing Address</label>
+                                                    <div class="fs-12">{{ $lead->address ?: 'No address specified' }}<br>{{ $lead->city }} {{ $lead->state }} {{ $lead->country }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6 border-start-md">
+                                                <div class="row">
+                                                    <div class="col-6 mb-3">
+                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Date</label>
+                                                        <div class="fw-semibold">{{ $activeQuotation->quotation_date->format('d M Y') }}</div>
+                                                    </div>
+                                                    <div class="col-6 mb-3">
+                                                        <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Expiration Date</label>
+                                                        <div class="fw-semibold text-danger">{{ $activeQuotation->expiration_date ? $activeQuotation->expiration_date->format('d M Y') : '—' }}</div>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Status</label>
+                                                    <div class="fw-semibold"><span class="badge bg-soft-primary text-primary">{{ $activeQuotation->status }}</span></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Items Order Lines Table -->
+                                        <div class="border-top pt-4">
+                                            <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered table-sm align-middle fs-13 text-dark">
+                                                    <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
+                                                        <tr>
+                                                            <th class="ps-3" style="width: 50%;">Product Description</th>
+                                                            <th class="text-center" style="width: 10%;">Quantity</th>
+                                                            <th class="text-end" style="width: 15%;">Unit Price</th>
+                                                            <th class="text-end" style="width: 10%;">Taxes</th>
+                                                            <th class="text-end pe-3" style="width: 15%;">Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($activeQuotation->items as $item)
+                                                            <tr>
+                                                                <td class="ps-3">
+                                                                    <strong class="text-dark">{{ $item->item_name }}</strong>
+                                                                    @if($item->description)
+                                                                        <small class="text-muted d-block mt-0.5">{{ $item->description }}</small>
+                                                                    @endif
+                                                                </td>
+                                                                <td class="text-center">{{ $item->quantity }}</td>
+                                                                <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
+                                                                <td class="text-end">{{ number_format($item->tax_rate, 2) }}%</td>
+                                                                <td class="text-end pe-3 fw-bold">₹{{ number_format($item->amount, 2) }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        <!-- Calculation Totals -->
+                                        <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
+                                            <div class="col-md-4">
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Untaxed Amount:</span>
+                                                    <span class="fw-bold text-dark">₹{{ number_format($activeQuotation->subtotal, 2) }}</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between py-1 border-bottom">
+                                                    <span class="text-muted fw-semibold">Taxes:</span>
+                                                    <span class="fw-bold text-dark">₹{{ number_format($activeQuotation->tax_amount, 2) }}</span>
+                                                </div>
+                                                @if($activeQuotation->discount > 0)
+                                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                                        <span class="text-muted fw-semibold">Discount:</span>
+                                                        <span class="fw-bold text-danger">-₹{{ number_format($activeQuotation->discount, 2) }}</span>
                                                     </div>
                                                 @endif
-                                                <div class="mt-1 text-muted fs-11">
-                                                    <span>by {{ $history->user?->name ?: 'System' }}</span>
+                                                <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
+                                                    <span class="text-dark fw-bold">Total:</span>
+                                                    <span class="fw-extrabold text-primary fs-16">₹{{ number_format($activeQuotation->total_amount, 2) }}</span>
                                                 </div>
                                             </div>
-                                        @endforeach
+                                        </div>
                                     </div>
                                 @endif
                             </div>
                         </div>
-                    </div>
-                    
-                </div>
-            </div>
-            </div>
+                    @endif
+                </div> <!-- Closes tab-content -->
+            </div> <!-- Closes right-main-panel -->
+        </div> <!-- Closes row -->
+    </div> <!-- Closes card wrapper -->
 
-        </div> <!-- Closes tab-content -->
-    </div> <!-- Closes card-body -->
-</div> <!-- Closes card -->
-
-<!-- Log Note Modal -->
-<x-ui.modal id="modalLogNote" title="LOG DISCUSSION NOTE" :centered="true" :formAction="route('crm.leads.followups.store', $lead->id)" formMethod="POST" submitText="Log Note" closeText="Cancel">
-    <input type="hidden" name="type" value="Call">
-    <input type="hidden" name="status" value="Completed">
-    <input type="hidden" name="followup_date" value="{{ date('Y-m-d H:i') }}">
-    
-    <div class="mb-3 text-start">
-        <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Interaction Type</label>
-        <select class="form-select form-select-sm fw-semibold" name="type_select" onchange="this.form.type.value = this.value">
-            <option value="Call">Call Log</option>
-            <option value="Email">Email sent/received</option>
-            <option value="Meeting">Meeting description</option>
-            <option value="Demo">System demo log</option>
-        </select>
-    </div>
-    <div class="mb-3 text-start">
-        <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Notes / Summary</label>
-        <textarea name="notes" class="form-control form-control-sm" rows="4" required placeholder="Describe what was discussed..."></textarea>
-    </div>
-</x-ui.modal>
-
-<!-- Schedule Activity Modal -->
-<x-ui.modal id="modalScheduleActivity" title="SCHEDULE NEXT ACTIVITY" :centered="true" :formAction="route('crm.leads.followups.store', $lead->id)" formMethod="POST" submitText="Schedule" closeText="Cancel">
-    <input type="hidden" name="status" value="Pending">
-    
-    <div class="mb-3 text-start">
-        <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Activity Type</label>
-        <select class="form-select form-select-sm fw-semibold" name="type" required>
-            <option value="Call">Scheduled Call</option>
-            <option value="Email">Scheduled Email</option>
-            <option value="Meeting">Scheduled Meeting</option>
-            <option value="Demo">Scheduled Demo</option>
-        </select>
-    </div>
-    <div class="mb-3 text-start">
-        <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Due Date & Time</label>
-        <div class="input-group input-group-sm">
-            <span class="input-group-text bg-light"><i class="feather-calendar fs-11 text-muted"></i></span>
-            <input type="text" class="form-control form-control-sm" name="followup_date" id="inline_activity_datepicker" required autocomplete="off">
+    <!-- Log Note Modal -->
+    <x-ui.modal id="modalLogNote" title="LOG DISCUSSION NOTE" :centered="true" :formAction="route('crm.leads.followups.store', $lead->id)" formMethod="POST" submitText="Log Note" closeText="Cancel">
+        <input type="hidden" name="type" value="Call">
+        <input type="hidden" name="status" value="Completed">
+        <input type="hidden" name="followup_date" value="{{ date('Y-m-d H:i') }}">
+        
+        <div class="mb-3 text-start">
+            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Interaction Type</label>
+            <select class="form-select form-select-sm fw-semibold text-dark" name="type_select" onchange="this.form.type.value = this.value">
+                <option value="Call">Call Log</option>
+                <option value="Email">Email sent/received</option>
+                <option value="Meeting">Meeting description</option>
+                <option value="Demo">System demo log</option>
+            </select>
         </div>
-    </div>
-    <div class="mb-3 text-start">
-        <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Description / Plan</label>
-        <textarea name="notes" class="form-control form-control-sm" rows="4" placeholder="What needs to be discussed?"></textarea>
-    </div>
-</x-ui.modal>
+        <div class="mb-3 text-start">
+            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Notes / Summary</label>
+            <textarea name="notes" class="form-control form-control-sm text-dark" rows="4" required placeholder="Describe what was discussed..."></textarea>
+        </div>
+    </x-ui.modal>
+
+    <!-- Schedule Activity Modal -->
+    <x-ui.modal id="modalScheduleActivity" title="SCHEDULE NEXT ACTIVITY" :centered="true" :formAction="route('crm.leads.followups.store', $lead->id)" formMethod="POST" submitText="Schedule" closeText="Cancel">
+        <input type="hidden" name="status" value="Pending">
+        
+        <div class="mb-3 text-start">
+            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Activity Type</label>
+            <select class="form-select form-select-sm fw-semibold text-dark" name="type" required>
+                <option value="Call">Scheduled Call</option>
+                <option value="Email">Scheduled Email</option>
+                <option value="Meeting">Scheduled Meeting</option>
+                <option value="Demo">Scheduled Demo</option>
+            </select>
+        </div>
+        <div class="mb-3 text-start">
+            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Due Date & Time</label>
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light"><i class="feather-calendar fs-11 text-muted"></i></span>
+                <input type="text" class="form-control form-control-sm text-dark" name="followup_date" id="inline_activity_datepicker" required autocomplete="off">
+            </div>
+        </div>
+        <div class="mb-3 text-start">
+            <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Description / Plan</label>
+            <textarea name="notes" class="form-control form-control-sm text-dark" rows="4" placeholder="What needs to be discussed?"></textarea>
+        </div>
+    </x-ui.modal>
 @endsection
 
 @push('styles')
     <!-- Select2 Styles -->
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <link class="d-print-none" rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link class="d-print-none" rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
-        /* Custom Tab Styles matching Zoho/Duralux theme */
-        .nav-tabs {
-            border-bottom: 1px solid #dee2e6;
-        }
-        .nav-tabs .nav-link {
-            border: none;
-            color: #6c757d;
-            background: transparent;
-            border-bottom: 2px solid transparent;
-            padding: 8px 16px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-        }
-        .nav-tabs .nav-link:hover {
-            color: var(--bs-primary);
-            border-bottom-color: #dee2e6;
-        }
-        .nav-tabs .nav-link.active {
-            color: var(--bs-primary) !important;
-            border-bottom: 2px solid var(--bs-primary) !important;
-            background: transparent !important;
-            font-weight: 700;
+        /* Zoho CRM Inspired Premium Styles */
+        .zoho-header-banner {
+            background-color: #ffffff;
+            border-bottom: 1px solid #cbd5e1;
+            font-family: 'Inter', sans-serif;
         }
 
-        .odoo-statusbar {
+        .zoho-sidebar-col {
+            background-color: #ffffff;
+        }
+
+        .zoho-sidebar-nav .nav-link {
+            color: #475569 !important;
+            padding: 8px 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .zoho-sidebar-nav .nav-link:hover {
+            background-color: #e2e8f0;
+            color: #0f172a !important;
+            text-decoration: none;
+        }
+
+        .zoho-sidebar-nav .nav-link.active {
+            background-color: #cbd5e1;
+            color: #000000 !important;
+            font-weight: 600;
+        }
+
+        .zoho-nav-tabs {
+            gap: 6px;
+        }
+
+        .zoho-nav-tabs .nav-link {
+            border: 1px solid #cbd5e1;
+            background-color: #ffffff;
+            color: #475569;
+            padding: 6px 16px;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .zoho-nav-tabs .nav-link:hover {
+            background-color: #f8fafc;
+            color: #0f172a;
+        }
+
+        .zoho-nav-tabs .nav-link.active {
+            background-color: #eef2f6 !important;
+            color: #0f172a !important;
+            border-color: #94a3b8 !important;
+        }
+
+        .zoho-quick-info-box {
+            border-color: #e2e8f0 !important;
+        }
+
+        .border-end-md {
+            border-right: 1px solid #e2e8f0;
+        }
+
+        @media (max-width: 767.98px) {
+            .border-end-md {
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+                padding-bottom: 12px;
+                margin-bottom: 12px;
+            }
+        }
+
+        .zoho-section-title {
+            letter-spacing: 0.3px;
+        }
+
+        .zoho-section-title::after {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 2px;
+            background-color: #1e40af;
+            margin-top: 4px;
+        }
+
+        .zoho-field-row {
             display: flex;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-            background-color: #f8f9fa;
-            overflow-x: auto;
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE/Edge */
-            flex-wrap: nowrap;
-            max-width: 100%;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed #e2e8f0;
         }
-        .odoo-statusbar::-webkit-scrollbar {
-            display: none; /* Chrome/Safari/Opera */
+        .zoho-field-label {
+            width: 160px;
+            color: #64748b;
+            font-weight: 500;
+            font-size: 13px;
+            flex-shrink: 0;
+            padding-right: 10px;
         }
-        .odoo-status-step {
-            padding: 6px 16px 6px 26px;
+        .zoho-field-value {
+            color: #0f172a;
+            font-weight: 600;
+            font-size: 13px;
+            word-break: break-word;
+            flex-grow: 1;
+        }
+
+        /* Zoho CRM Timeline Styles */
+        .zoho-timeline-container {
+            position: relative;
+            padding-left: 10px;
+            margin-top: 10px;
+        }
+        .zoho-timeline-date-group {
+            margin-bottom: 25px;
+            position: relative;
+        }
+        .zoho-timeline-date-header {
             font-size: 11px;
             font-weight: 700;
-            color: #6c757d;
+            background-color: #f1f5f9;
+            color: #475569;
+            padding: 4px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 15px;
+            font-family: 'Inter', sans-serif;
+            border: 1px solid #cbd5e1;
+        }
+        .zoho-timeline-event {
             position: relative;
-            background-color: #f8f9fa;
-            border-right: 1px solid #dee2e6;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            flex-shrink: 0;
+            padding-left: 32px;
+            margin-bottom: 20px;
         }
-        .odoo-status-step:first-child {
-            padding-left: 16px;
-        }
-        .odoo-status-step:last-child {
-            border-right: none;
-        }
-        .odoo-status-step.active {
-            background-color: var(--bs-primary);
-            color: #ffffff;
-        }
-        .odoo-status-step::after {
-            content: "";
+        .zoho-timeline-line {
             position: absolute;
-            right: -10px;
+            left: 10px;
+            top: 20px;
+            bottom: -25px;
+            width: 1px;
+            background-color: #cbd5e1;
+            z-index: 1;
+        }
+        .zoho-timeline-event:last-child .zoho-timeline-line {
+            display: none;
+        }
+        .zoho-timeline-icon {
+            position: absolute;
+            left: 0;
             top: 0;
-            width: 0;
-            height: 0;
-            border-top: 16px solid transparent;
-            border-bottom: 16px solid transparent;
-            border-left: 10px solid #f8f9fa;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
             z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
-        .odoo-status-step.active::after {
-            border-left-color: var(--bs-primary);
+        .zoho-timeline-icon i {
+            font-size: 10px;
+            color: #64748b;
         }
-        .odoo-status-step.completed {
-            color: var(--bs-primary);
-            background-color: #eef2f7;
+        .zoho-timeline-time {
+            font-size: 11px;
+            color: #64748b;
+            width: 80px;
+            flex-shrink: 0;
+            font-weight: 500;
+            font-family: 'Inter', sans-serif;
         }
-        .odoo-status-step.completed::after {
-            border-left-color: #eef2f7;
+        .zoho-timeline-content {
+            font-size: 13px;
+            color: #0f172a;
+            font-family: 'Inter', sans-serif;
         }
-        .odoo-sheet {
-            background: #ffffff;
-            border: 1px solid #dee2e6;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            padding: 24px;
+        
+        .zoho-timeline-subtabs .nav-link {
+            color: #64748b !important;
+            border-bottom: 2px solid transparent !important;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            font-size: 12px;
         }
+        .zoho-timeline-subtabs .nav-link.active {
+            color: #1e40af !important;
+            border-bottom: 2px solid #1e40af !important;
+            font-weight: 700 !important;
+        }
+
+        .cursor-pointer {
+            cursor: pointer;
+        }
+
+        .hover-scale {
+            transition: transform 0.15s ease;
+        }
+        .hover-scale:hover {
+            transform: scale(1.1);
+        }
+
+        .activity-feed-compact .p-2 {
+            border: 1px solid #e2e8f0 !important;
+            transition: border-color 0.15s ease;
+        }
+        .activity-feed-compact .p-2:hover {
+            border-color: #cbd5e1 !important;
+        }
+
         .odoo-chatter-timeline {
             position: relative;
-        }
-        .odoo-inline-form {
-            animation: slideDown 0.2s ease-out;
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         /* Odoo-style Inputs */
         .odoo-form-group {
             display: flex;
             align-items: center;
-            margin-bottom: 10px;
         }
         .odoo-form-label {
-            width: 130px;
+            width: 140px;
             font-size: 13px;
             font-weight: 700;
             color: #495057;
@@ -1098,14 +1400,14 @@
             border: none;
             border-bottom: 1px solid #ced4da;
             border-radius: 0;
-            padding: 2px 0;
+            padding: 4px 0;
             background-color: transparent;
             font-size: 13px;
             color: #212529;
             width: 100%;
         }
         .odoo-form-control:focus {
-            border-color: #714B67;
+            border-color: #1e40af;
             outline: none;
             box-shadow: none;
         }
@@ -1144,7 +1446,7 @@
             font-size: 13px;
         }
         .odoo-table-input:focus {
-            border-bottom-color: #714B67;
+            border-bottom-color: #1e40af;
             outline: none;
             box-shadow: none;
         }
@@ -1157,11 +1459,10 @@
             cursor: pointer;
         }
         .odoo-table-select:focus {
-            border-bottom: 1px solid #714B67;
+            border-bottom: 1px solid #1e40af;
             outline: none;
         }
         
-        /* Odoo Action links */
         .odoo-action-link {
             color: #00A09D;
             font-weight: 600;
@@ -1173,7 +1474,7 @@
             text-decoration: underline;
         }
 
-        /* Borderless Select2 theme custom override for Odoo Look */
+        /* Borderless Select2 theme custom override */
         .select2-container--bootstrap-5 .select2-selection {
             border: none !important;
             border-bottom: 1px solid #ced4da !important;
@@ -1185,7 +1486,7 @@
         }
         .select2-container--bootstrap-5 .select2-selection:focus,
         .select2-container--bootstrap-5.select2-container--focus .select2-selection {
-            border-bottom-color: #714B67 !important;
+            border-bottom-color: #1e40af !important;
             box-shadow: none !important;
         }
         .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
@@ -1194,7 +1495,16 @@
             color: #212529 !important;
         }
 
+        /* Print styles override */
         @media print {
+            .zoho-lead-card-container {
+                height: auto !important;
+                overflow: visible !important;
+            }
+            .zoho-main-col {
+                height: auto !important;
+                overflow: visible !important;
+            }
             .nxl-sidebar,
             .nxl-navigation,
             .nxl-header,
@@ -1207,8 +1517,14 @@
             aside,
             .card-header,
             .col-lg-4,
-            .odoo-chatter-timeline {
+            .odoo-chatter-timeline,
+            .zoho-sidebar-col,
+            .zoho-header-banner .btn {
                 display: none !important;
+            }
+
+            .zoho-main-col {
+                width: 100% !important;
             }
 
             body {
@@ -1221,7 +1537,7 @@
             .nxl-container,
             .nxl-content,
             .main-content,
-            .card {
+            .bg-white {
                 background: #ffffff !important;
                 margin: 0 !important;
                 padding: 0 !important;
@@ -1232,25 +1548,13 @@
                 position: static !important;
             }
 
-            .col-lg-8 {
-                width: 100% !important;
-                max-width: 100% !important;
-                flex: 0 0 100% !important;
-                padding: 0 !important;
-            }
-
-            .odoo-sheet {
+            #quotation-print-area {
                 border: none !important;
                 box-shadow: none !important;
-                padding: 0 !important;
+                padding: 8mm 12mm !important;
                 margin: 0 !important;
                 background: #ffffff !important;
-            }
-
-            #quotation-print-area {
                 width: 100% !important;
-                margin: 0 !important;
-                padding: 8mm 12mm !important;
                 position: static !important;
             }
 
@@ -1276,10 +1580,53 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
         $(function () {
+            // Scroll behavior for related lists links
+            $('#zohoSidebarLinks a').on('click', function(e) {
+                var targetId = $(this).attr('href');
+                if (targetId.startsWith('#')) {
+                    var targetEl = $(targetId);
+                    if (targetEl.length) {
+                        e.preventDefault();
+                        
+                        // Switch to Overview tab if clicked details sections
+                        if (targetId === '#sectionLeadInfo' || targetId === '#sectionAddressInfo' || targetId === '#sectionRequirements' || targetId === '#sectionNotes') {
+                            $('#overview-tab').tab('show');
+                        } else if (targetId === '#subtab-history') {
+                            $('#timeline-tab').tab('show');
+                            $('#subtab-history-tab').tab('show');
+                        } else if (targetId === '#subtab-interactions') {
+                            $('#timeline-tab').tab('show');
+                            $('#subtab-interactions-tab').tab('show');
+                        }
+
+                        // Remove active class from all links and add to clicked one
+                        $('#zohoSidebarLinks a').removeClass('active');
+                        $(this).addClass('active');
+
+                        // Scroll inside our right column container #zohoMainScrollable
+                        var scrollContainer = $('#zohoMainScrollable');
+                        var relativeTop = targetEl.offset().top - scrollContainer.offset().top;
+                        var scrollTopPosition = scrollContainer.scrollTop() + relativeTop - 50; // Offset for sticky tabs
+
+                        scrollContainer.animate({
+                            scrollTop: scrollTopPosition
+                        }, 400);
+                    }
+                }
+            });
+
+            // Reset scroll position to top when switching main tabs
+            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+                $('#zohoMainScrollable').scrollTop(0);
+            });
+
+
+
             // Auto submit status forms when changed in Select2 status selector
             $('.status-select').on('change', function() {
                 $(this).closest('form').submit();
             });
+
             // Initialize inline activity datepicker inside modal
             $('#inline_activity_datepicker').daterangepicker({
                 singleDatePicker: true,
@@ -1312,15 +1659,6 @@
 
             $('#quotationStatusSelect').on('change', function() {
                 $(this).closest('form').submit();
-            });
-
-            // Odoo Status Chevron click handler
-            $('.odoo-status-step').on('click', function() {
-                var status = $(this).data('status');
-                if (status) {
-                    $('#statusChangeInput').val(status);
-                    $('#statusChangeForm').submit();
-                }
             });
 
             // ==================== DYNAMIC ITEMS TABLE FOR INLINE FORM ====================
@@ -1482,46 +1820,6 @@
                 $('#calcTax').text('₹' + taxTotal.toFixed(2));
                 $('#calcTotal').text('₹' + Math.max(0, grandTotal).toFixed(2));
             }
-
-            // Odoo Status Steps Click Handler
-            $(document).on('click', '.odoo-status-step', function() {
-                const newStatus = $(this).data('status');
-                if (newStatus) {
-                    $('#statusChangeInput').val(newStatus);
-                    $('#statusChangeForm').submit();
-                }
-            });
-
-            // Inline datepicker initialization
-            if ($('#inline_activity_datepicker').length) {
-                $('#inline_activity_datepicker').daterangepicker({
-                    singleDatePicker: true,
-                    timePicker: true,
-                    timePickerIncrement: 5,
-                    locale: {
-                        format: 'YYYY-MM-DD hh:mm A'
-                    }
-                });
-            }
-
-            // Toggle inline chatter forms
-            $('#btnLogNote').on('click', function() {
-                $('#formScheduleActivity').slideUp(150);
-                $('#formLogNote').slideToggle(150);
-            });
-
-            $('#btnScheduleActivity').on('click', function() {
-                $('#formLogNote').slideUp(150);
-                $('#formScheduleActivity').slideToggle(150);
-            });
-
-            $('#btnCancelLogNote').on('click', function() {
-                $('#formLogNote').slideUp(150);
-            });
-
-            $('#btnCancelScheduleActivity').on('click', function() {
-                $('#formScheduleActivity').slideUp(150);
-            });
         });
     </script>
 @endpush

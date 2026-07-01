@@ -85,7 +85,14 @@ class LeadController extends Controller
         $customers = Customer::orderBy('name')->get();
         $nextQuotationNumber = app(QuotationService::class)->getNextQuotationNumber();
 
-        return view('modules.crm.leads.show', compact('lead', 'users', 'customer', 'quotations', 'activeQuotation', 'customers', 'nextQuotationNumber'));
+        // Get previous and next leads based on ID order (latest chronological order)
+        $prevLead = Lead::where('id', '>', $lead->id)->orderBy('id', 'asc')->first();
+        $nextLead = Lead::where('id', '<', $lead->id)->orderBy('id', 'desc')->first();
+
+        return view('modules.crm.leads.show', compact(
+            'lead', 'users', 'customer', 'quotations', 'activeQuotation', 
+            'customers', 'nextQuotationNumber', 'prevLead', 'nextLead'
+        ));
     }
 
     /**
