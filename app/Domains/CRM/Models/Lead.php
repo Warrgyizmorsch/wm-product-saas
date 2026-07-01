@@ -32,7 +32,7 @@ class Lead extends Model
         'state',
         'city',
         'address',
-        'product',
+        'product_id',
         'status',
         'next_followup_date',
         'is_customer',
@@ -44,7 +44,16 @@ class Lead extends Model
         'expected_amount' => 'decimal:2',
         'next_followup_date' => 'datetime',
         'is_customer' => 'boolean',
+        'product_id' => 'integer',
     ];
+
+    /**
+     * Get the product interested.
+     */
+    public function product(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'product_id');
+    }
 
     /**
      * Get the owner (user) of the lead.

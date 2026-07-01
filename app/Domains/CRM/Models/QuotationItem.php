@@ -12,6 +12,7 @@ class QuotationItem extends Model
 
     protected $fillable = [
         'quotation_id',
+        'product_id',
         'item_name',
         'description',
         'quantity',
@@ -21,6 +22,7 @@ class QuotationItem extends Model
     ];
 
     protected $casts = [
+        'product_id' => 'integer',
         'quantity' => 'integer',
         'unit_price' => 'decimal:2',
         'tax_rate' => 'decimal:2',
@@ -30,5 +32,10 @@ class QuotationItem extends Model
     public function quotation(): BelongsTo
     {
         return $this->belongsTo(Quotation::class);
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'product_id');
     }
 }

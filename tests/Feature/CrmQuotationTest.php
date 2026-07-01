@@ -125,6 +125,15 @@ class CrmQuotationTest extends TestCase
         $this->lead->refresh();
         $this->assertEquals('Qualified', $this->lead->status);
 
+        // Approve the quotation first
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('crm.quotations.approve', $quotation->id));
+        $response->assertStatus(302);
+        
+        $quotation->refresh();
+        $this->assertEquals('Approved', $quotation->status);
+
         // 3. Update quotation status to Accepted
         $updateData = array_merge($quotationData, [
             'status' => 'Accepted',
@@ -135,8 +144,9 @@ class CrmQuotationTest extends TestCase
             ->put(route('crm.quotations.update', $quotation->id), $updateData);
 
         // Verify quotation status is Accepted
-        $quotation->refresh();
-        $this->assertEquals('Accepted', $quotation->status);
+        $activeQuotation = Quotation::where('parent_id', $quotation->id)->orWhere('id', $quotation->id)->where('is_current', true)->first();
+        $this->assertNotNull($activeQuotation);
+        $this->assertEquals('Accepted', $activeQuotation->status);
 
         // Verify customer is activated
         $customer->refresh();
@@ -226,6 +236,12 @@ class CrmQuotationTest extends TestCase
             'total_amount'     => 1000,
         ]);
 
+        // Approve the quotation first
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('crm.quotations.approve', $quotation->id));
+        $response->assertStatus(302);
+
         // 3. Patch status to 'Accepted'
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
@@ -247,5 +263,79 @@ class CrmQuotationTest extends TestCase
         $this->lead->refresh();
         $this->assertEquals('Converted', $this->lead->status);
         $this->assertTrue($this->lead->is_customer);
+    }
+
+    /** @test */
+    public function cannot_transition_draft_quotation_to_sent_without_approval()
+    {
+        $customer = Customer::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Acme Corp',
+            'email' => 'john@acme.com',
+            'phone' => '1234567890',
+            'status' => 'inactive',
+        ]);
+
+        $quotation = Quotation::create([
+            'tenant_id'        => $this->tenant->id,
+            'customer_id'      => $customer->id,
+            'lead_id'          => $this->lead->id,
+            'quotation_number' => 'QT-9999',
+            'quotation_date'   => now(),
+            'status'           => 'Draft',
+            'total_amount'     => 1000,
+        ]);
+
+        // Attempting to change status directly to 'Quotation Sent' should fail validation
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->patch(route('crm.quotations.updateStatus', $quotation->id), [
+                'status' => 'Quotation Sent'
+            ]);
+
+        $response->assertSessionHasErrors(['status']);
+        
+        $quotation->refresh();
+        $this->assertEquals('Draft', $quotation->status);
+    }
+
+    /** @test */
+    public function can_approve_and_reject_quotations_via_routes()
+    {
+        $customer = Customer::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Acme Corp',
+            'email' => 'john@acme.com',
+            'phone' => '1234567890',
+            'status' => 'inactive',
+        ]);
+
+        $quotation = Quotation::create([
+            'tenant_id'        => $this->tenant->id,
+            'customer_id'      => $customer->id,
+            'lead_id'          => $this->lead->id,
+            'quotation_number' => 'QT-9999',
+            'quotation_date'   => now(),
+            'status'           => 'Draft',
+            'total_amount'     => 1000,
+        ]);
+
+        // Approve it
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('crm.quotations.approve', $quotation->id));
+        
+        $response->assertStatus(302);
+        $quotation->refresh();
+        $this->assertEquals('Approved', $quotation->status);
+
+        // Reject it
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('crm.quotations.reject', $quotation->id));
+
+        $response->assertStatus(302);
+        $quotation->refresh();
+        $this->assertEquals('Rejected', $quotation->status);
     }
 }

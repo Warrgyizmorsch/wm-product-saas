@@ -26,7 +26,7 @@ class QuotationService
 
     public function getNextQuotationNumber(): string
     {
-        $latest = Quotation::query()->latest('id')->first();
+        $latest = Quotation::query()->whereNull('parent_id')->latest('id')->first();
 
         if (!$latest) {
             return 'QT-0001';
@@ -55,6 +55,7 @@ class QuotationService
                 $qty = intval($item['quantity'] ?? 0);
                 $price = floatval($item['unit_price'] ?? 0);
                 $taxRate = floatval($item['tax_rate'] ?? 0);
+                $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
 
                 $amount = $qty * $price;
                 $itemTax = $amount * ($taxRate / 100);
@@ -62,8 +63,17 @@ class QuotationService
                 $subtotal += $amount;
                 $tax += $itemTax;
 
+                $itemName = $item['item_name'] ?? 'Product/Service';
+                if ($productId) {
+                    $product = \App\Domains\Inventory\Models\Product::find($productId);
+                    if ($product) {
+                        $itemName = $product->name;
+                    }
+                }
+
                 $itemsData[] = [
-                    'item_name' => $item['item_name'],
+                    'product_id' => $productId,
+                    'item_name' => $itemName,
                     'description' => $item['description'] ?? null,
                     'quantity' => $qty,
                     'unit_price' => $price,
@@ -78,6 +88,8 @@ class QuotationService
             $data['subtotal'] = $subtotal;
             $data['tax'] = $tax;
             $data['total_amount'] = $totalAmount;
+            $data['is_current'] = true;
+            $data['revision_number'] = 0;
 
             // Save Quotation
             $quotation = $this->quotations->create($data);
@@ -92,6 +104,23 @@ class QuotationService
     public function update(Quotation $quotation, array $data, array $items): Quotation
     {
         return DB::transaction(function () use ($quotation, $data, $items) {
+            $rootParentId = $quotation->parent_id ?: $quotation->id;
+
+            // Get max revision number for this group
+            $latestRevision = Quotation::query()
+                ->where(function ($query) use ($rootParentId) {
+                    $query->where('parent_id', $rootParentId)
+                          ->orWhere('id', $rootParentId);
+                })
+                ->max('revision_number') ?? 0;
+
+            $newRevisionNumber = $latestRevision + 1;
+
+            // Extract base number
+            $rawNum = $quotation->getRawOriginal('quotation_number');
+            $baseNum = explode('-R', $rawNum)[0];
+            $newQuotationNumber = $baseNum . '-R' . $newRevisionNumber;
+
             // Calculate totals
             $subtotal = 0;
             $tax = 0;
@@ -101,6 +130,7 @@ class QuotationService
                 $qty = intval($item['quantity'] ?? 0);
                 $price = floatval($item['unit_price'] ?? 0);
                 $taxRate = floatval($item['tax_rate'] ?? 0);
+                $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
 
                 $amount = $qty * $price;
                 $itemTax = $amount * ($taxRate / 100);
@@ -108,8 +138,17 @@ class QuotationService
                 $subtotal += $amount;
                 $tax += $itemTax;
 
+                $itemName = $item['item_name'] ?? 'Product/Service';
+                if ($productId) {
+                    $product = \App\Domains\Inventory\Models\Product::find($productId);
+                    if ($product) {
+                        $itemName = $product->name;
+                    }
+                }
+
                 $itemsData[] = [
-                    'item_name' => $item['item_name'],
+                    'product_id' => $productId,
+                    'item_name' => $itemName,
                     'description' => $item['description'] ?? null,
                     'quantity' => $qty,
                     'unit_price' => $price,
@@ -121,18 +160,42 @@ class QuotationService
             $discount = floatval($data['discount'] ?? 0);
             $totalAmount = $subtotal + $tax - $discount;
 
-            $data['subtotal'] = $subtotal;
-            $data['tax'] = $tax;
-            $data['total_amount'] = $totalAmount;
+            // Prepare active revision data
+            $revData = [
+                'tenant_id' => $quotation->tenant_id,
+                'customer_id' => $data['customer_id'],
+                'lead_id' => $data['lead_id'] ?? $quotation->lead_id,
+                'sales_person_id' => $data['sales_person_id'] ?? $quotation->sales_person_id,
+                'quotation_number' => $newQuotationNumber,
+                'quotation_date' => $data['quotation_date'],
+                'expiry_date' => $data['expiry_date'] ?? null,
+                'status' => $data['status'],
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'discount' => $discount,
+                'total_amount' => $totalAmount,
+                'terms_conditions' => $data['terms_conditions'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'parent_id' => $rootParentId,
+                'revision_number' => $newRevisionNumber,
+                'is_current' => true,
+            ];
 
-            // Update Quotation metadata
-            $quotation->update($data);
+            // Mark all older revisions as inactive
+            Quotation::query()
+                ->where(function ($query) use ($rootParentId) {
+                    $query->where('parent_id', $rootParentId)
+                          ->orWhere('id', $rootParentId);
+                })
+                ->update(['is_current' => false]);
 
-            // Recreate Items (delete old, create new)
-            $quotation->items()->delete();
-            $quotation->items()->createMany($itemsData);
+            // Save new active Quotation revision
+            $newQuotation = $this->quotations->create($revData);
 
-            return $quotation;
+            // Save new items
+            $newQuotation->items()->createMany($itemsData);
+
+            return $newQuotation;
         });
     }
 

@@ -90,37 +90,27 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <!-- Send Email Button -->
                 @if ($lead->email)
-                    <a href="mailto:{{ $lead->email }}" class="btn btn-primary fw-bold fs-11 py-1.5 px-3 rounded shadow-sm d-inline-flex align-items-center text-white text-uppercase" style="background-color: #1e40af; border-color: #1e40af; font-family: 'Inter', sans-serif;">
-                        <i class="feather-mail me-1.5 fs-11"></i> Send Email
+                    <a href="mailto:{{ $lead->email }}" class="btn btn-xs btn-primary fw-bold py-1 px-2.5 rounded shadow-sm d-inline-flex align-items-center text-white" style="background-color: #1e40af; border-color: #1e40af; font-family: 'Inter', sans-serif; font-size: 11px;">
+                        <i class="feather-mail me-1"></i> Email
                     </a>
                 @endif
-                
-                @if ($lead->is_customer || $lead->status === 'Converted')
-                    <button class="btn btn-outline-success fw-bold fs-11 py-1.5 px-3 rounded bg-white text-uppercase" style="font-family: 'Inter', sans-serif;" disabled>
-                        <i class="feather-check-circle me-1.5"></i> Converted
-                    </button>
-                @elseif ($activeQuotation)
-                    <a href="{{ route('crm.quotations.show', $activeQuotation->id) }}" class="btn btn-outline-primary fw-bold fs-11 py-1.5 px-3 rounded bg-white text-uppercase" style="color: var(--bs-primary); border-color: var(--bs-primary); font-family: 'Inter', sans-serif;">
-                        View Quotation
-                    </a>
-                @elseif ($lead->status === 'Qualified')
-                    <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
-                        @csrf
-                        <button type="submit" class="btn btn-success fw-bold fs-11 py-1.5 px-3 rounded shadow-sm d-inline-flex align-items-center text-white text-uppercase" style="background-color: #16a34a; border-color: #16a34a; font-family: 'Inter', sans-serif;">
-                            <i class="feather-shuffle me-1.5"></i> Convert to Quotation
-                        </button>
-                    </form>
-                @endif
-
-                <!-- Edit Button -->
-                <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="btn btn-outline-secondary fw-bold fs-11 py-1.5 px-3 rounded bg-white text-dark border-secondary text-uppercase" style="font-family: 'Inter', sans-serif;">
-                    Edit Lead
-                </a>
                 
                 <!-- Back Button -->
-                <a href="{{ route('crm.leads.index') }}" class="btn btn-outline-secondary fw-bold fs-11 py-1.5 px-3 rounded bg-white text-dark border-secondary text-uppercase d-inline-flex align-items-center" style="font-family: 'Inter', sans-serif;">
+                <a href="{{ route('crm.leads.index') }}" class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2.5 rounded bg-white text-dark border-secondary d-inline-flex align-items-center" style="font-family: 'Inter', sans-serif; font-size: 11px;">
                     <i class="feather-arrow-left me-1"></i> Back
                 </a>
+
+                <!-- More Actions 3-Dot Dropdown -->
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2 rounded bg-white text-dark border-secondary d-inline-flex align-items-center justify-content-center" type="button" id="headerMoreActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 11px; height: 25px; width: 25px;">
+                        <i class="feather-more-horizontal fs-12"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="headerMoreActionsDropdown" style="font-size: 12px; min-width: 140px; border-radius: 4px;">
+                        <li>
+                            <a class="dropdown-item py-2" href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}">Edit Lead</a>
+                        </li>
+                    </ul>
+                </div>
                 
                 <!-- Pagination Arrows -->
                 <div class="d-flex align-items-center ms-1 border rounded px-1 py-0.5 bg-white">
@@ -173,16 +163,11 @@
                         <li class="nav-item">
                             <a href="#sectionRequirements" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Requirements</a>
                         </li>
-                        <li class="nav-item mt-2">
-                            <a href="javascript:void(0)" class="nav-link py-1 px-2 fs-11 text-primary fw-semibold border-top-0"><i class="feather-plus-circle me-1"></i> Add Related List</a>
-                        </li>
-                    </ul>
-                    
-                    <h6 class="text-uppercase fw-bold text-muted mt-4 mb-2" style="font-size: 10px; letter-spacing: 0.8px;">Links</h6>
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a href="javascript:void(0)" class="nav-link py-1 px-2 fs-11 text-primary fw-semibold"><i class="feather-plus me-1"></i> Add Link</a>
-                        </li>
+                        @if ($activeQuotation && $activeQuotation->getRevisionHistory()->count() > 1)
+                            <li class="nav-item">
+                                <a href="#sectionQuotationHistory" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Quotation Revision History</a>
+                            </li>
+                        @endif
                     </ul>
                 </div>
             </div>
@@ -308,7 +293,15 @@
                                         <div class="odoo-form-group mb-3">
                                             <label class="odoo-form-label">Product Interest</label>
                                             <div class="flex-grow-1">
-                                                <input type="text" name="product" value="{{ old('product', $lead->product) }}" class="odoo-form-control" placeholder="Interested Product">
+                                                <select name="product_id" class="odoo-form-control odoo-select2 erp-premium-select" data-master="product" style="width:100%;">
+                                                    <option value="">-- Select a Product --</option>
+                                                    <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>
+                                                    @foreach($products as $prod)
+                                                        <option value="{{ $prod->id }}" {{ old('product_id', $lead->product_id) == $prod->id ? 'selected' : '' }}>
+                                                            {{ $prod->name }} ({{ $prod->sku }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
                                             </div>
                                         </div>
 
@@ -390,31 +383,22 @@
                             </form>
                         @else
                             <!-- ==================== DEFAULT VIEW: ZOHO CRM FIELD CONTAINER ==================== -->
-                            @if($lead->status === 'Qualified' && !$activeQuotation)
-                                <!-- CRM Next Step Suggestion Banner -->
-                                <div class="alert alert-success d-flex align-items-center justify-content-between p-3 mb-3 border-0 shadow-sm" style="background-color: #f0fdf4; border-left: 4px solid #16a34a !important; border-radius: 4px;">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="fs-18">💡</span>
-                                        <div>
-                                            <h6 class="fw-bold text-success mb-0.5 fs-13">Qualified Lead</h6>
-                                            <p class="text-muted mb-0 fs-11" style="font-family: 'Inter', sans-serif;">This lead has been qualified. Convert it to a quotation to proceed with the sales process.</p>
-                                        </div>
-                                    </div>
-                                    <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline m-0">
-                                        @csrf
-                                        <button type="submit" class="btn btn-sm btn-success fw-bold px-3 py-1.5 d-flex align-items-center gap-1.5 text-uppercase fs-11" style="background-color: #16a34a; border-color: #16a34a;">
-                                            <i class="feather-shuffle fs-12"></i> Convert to Quotation
-                                        </button>
-                                    </form>
-                                </div>
-                            @endif
-
                             <!-- 2. Detailed Fields Section -->
                             <div id="detailedFieldsContainer" style="transition: all 0.3s ease;">
                                 <!-- Lead Information Card -->
                                 <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionLeadInfo">
                                     <div class="card-body p-3">
-                                        <h5 class="zoho-section-title fs-13 text-dark fw-bold pb-2 border-bottom mb-3" style="font-family: 'Inter', sans-serif;">Lead Information</h5>
+                                        <div class="d-flex justify-content-between align-items-center pb-2 border-bottom mb-3">
+                                            <h5 class="zoho-section-title fs-13 text-dark fw-bold mb-0" style="font-family: 'Inter', sans-serif; border-bottom: none;">Lead Information</h5>
+                                            @if($lead->status === 'Qualified' && !$activeQuotation && !request()->has('create_quotation'))
+                                                <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-xs btn-success text-white fw-bold px-2 py-0.5 d-inline-flex align-items-center shadow-sm text-uppercase" style="font-size: 10px; border-radius: 3px; background-color: #16a34a; border-color: #16a34a; white-space: nowrap; line-height: 1.4;">
+                                                        <i class="feather-shuffle me-1 fs-9"></i> Convert to Quotation
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
                                         <div class="row g-0">
                                             <div class="col-md-6 pe-md-4">
                                                 <div class="zoho-field-row">
@@ -458,7 +442,7 @@
                                                 </div>
                                                 <div class="zoho-field-row">
                                                     <div class="zoho-field-label">Product Interested</div>
-                                                    <div class="zoho-field-value text-dark">{{ $lead->product ?: '—' }}</div>
+                                                    <div class="zoho-field-value text-dark">{{ $lead->product?->name ?: '—' }}</div>
                                                 </div>
                                                 <div class="zoho-field-row">
                                                     <div class="zoho-field-label">Segment</div>
@@ -824,10 +808,7 @@
 
                                                 <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
                                                     <option value="Draft" @selected(old('status') === 'Draft')>Draft</option>
-                                                    <option value="Quotation Sent" @selected(old('status') === 'Quotation Sent')>Quotation Sent</option>
-                                                    <option value="Accepted" @selected(old('status') === 'Accepted')>Accepted</option>
-                                                    <option value="Rejected" @selected(old('status') === 'Rejected')>Rejected</option>
-                                                    <option value="Quotation Rework" @selected(old('status') === 'Quotation Rework')>Quotation Rework</option>
+                                                    <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Send for Approval</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
@@ -860,7 +841,19 @@
                                         </div>
 
                                         <!-- Subtotal / Discount / Totals -->
-                                        <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
+                                        <div class="row mt-4 pt-3 border-top text-dark fs-13">
+                                            <div class="col-md-8">
+                                                <div class="pe-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="fw-semibold text-muted mb-1 fs-12">Terms & Conditions</label>
+                                                        <textarea name="terms_conditions" class="form-control" rows="3" placeholder="Define payment terms, delivery schedules, etc." style="border-radius: 4px; font-size: 13px;">{{ old('terms_conditions') }}</textarea>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="fw-semibold text-muted mb-1 fs-12">Notes</label>
+                                                        <textarea name="notes" class="form-control" rows="2" placeholder="Internal remarks or custom notes..." style="border-radius: 4px; font-size: 13px;">{{ old('notes') }}</textarea>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">Untaxed Amount:</span>
@@ -922,11 +915,26 @@
                                                     :value="old('expiration_date', $activeQuotation->expiration_date ? $activeQuotation->expiration_date->format('Y-m-d') : '')" />
 
                                                 <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
-                                                    <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
-                                                    <option value="Quotation Sent" @selected(old('status', $activeQuotation->status) === 'Quotation Sent')>Quotation Sent</option>
-                                                    <option value="Accepted" @selected(old('status', $activeQuotation->status) === 'Accepted')>Accepted</option>
-                                                    <option value="Rejected" @selected(old('status', $activeQuotation->status) === 'Rejected')>Rejected</option>
-                                                    <option value="Quotation Rework" @selected(old('status', $activeQuotation->status) === 'Quotation Rework')>Quotation Rework</option>
+                                                     @if ($activeQuotation->status === 'Draft')
+                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
+                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval')>Send for Approval</option>
+                                                     @elseif ($activeQuotation->status === 'Pending Approval')
+                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval')>Pending Approval</option>
+                                                     @elseif ($activeQuotation->status === 'Approved')
+                                                         <option value="Approved" @selected(old('status', $activeQuotation->status) === 'Approved')>Approved</option>
+                                                         <option value="Quotation Sent" @selected(old('status', $activeQuotation->status) === 'Quotation Sent')>Quotation Sent</option>
+                                                         <option value="Accepted" @selected(old('status', $activeQuotation->status) === 'Accepted')>Accepted</option>
+                                                         <option value="Rejected" @selected(old('status', $activeQuotation->status) === 'Rejected')>Rejected</option>
+                                                         <option value="Quotation Rework" @selected(old('status', $activeQuotation->status) === 'Quotation Rework')>Quotation Rework</option>
+                                                     @else
+                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
+                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval')>Pending Approval</option>
+                                                         <option value="Approved" @selected(old('status', $activeQuotation->status) === 'Approved')>Approved</option>
+                                                         <option value="Quotation Sent" @selected(old('status', $activeQuotation->status) === 'Quotation Sent')>Quotation Sent</option>
+                                                         <option value="Accepted" @selected(old('status', $activeQuotation->status) === 'Accepted')>Accepted</option>
+                                                         <option value="Rejected" @selected(old('status', $activeQuotation->status) === 'Rejected')>Rejected</option>
+                                                         <option value="Quotation Rework" @selected(old('status', $activeQuotation->status) === 'Quotation Rework')>Quotation Rework</option>
+                                                     @endif
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
@@ -959,7 +967,19 @@
                                         </div>
 
                                         <!-- Subtotal / Discount / Totals -->
-                                        <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
+                                        <div class="row mt-4 pt-3 border-top text-dark fs-13">
+                                            <div class="col-md-8">
+                                                <div class="pe-md-4">
+                                                    <div class="mb-3">
+                                                        <label class="fw-semibold text-muted mb-1 fs-12">Terms & Conditions</label>
+                                                        <textarea name="terms_conditions" class="form-control" rows="3" placeholder="Define payment terms, delivery schedules, etc." style="border-radius: 4px; font-size: 13px;">{{ old('terms_conditions', $activeQuotation->terms_conditions) }}</textarea>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="fw-semibold text-muted mb-1 fs-12">Notes</label>
+                                                        <textarea name="notes" class="form-control" rows="2" placeholder="Internal remarks or custom notes..." style="border-radius: 4px; font-size: 13px;">{{ old('notes', $activeQuotation->notes) }}</textarea>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">Untaxed Amount:</span>
@@ -986,36 +1006,54 @@
                                         </div>
                                     </form>
 
-                                @else
+                                @elseif ($activeQuotation)
                                     <!-- VIEW QUOTATION DETAILS -->
                                     <div class="odoo-sheet rounded border p-4 bg-white" id="quotation-print-area">
                                         <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4 flex-wrap gap-2 d-print-none">
                                             <h4 class="fw-bold text-dark mb-0 fs-16">Quotation Sheet: {{ $activeQuotation->quotation_number }}</h4>
-                                            <div class="d-flex gap-2">
-                                                <button type="button" class="btn btn-sm btn-light border" onclick="window.print()"><i class="feather-printer me-1"></i>Print PDF</button>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <!-- Hidden Iframe to render exact print format from quotations.show -->
+                                                <iframe id="quotationPrintIframe" src="{{ route('crm.quotations.show', $activeQuotation->id) }}" style="display: none; width: 0; height: 0; border: none;"></iframe>
+                                                <button onclick="printQuotationIframe()" class="btn btn-sm btn-primary" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-printer me-1"></i>Print / Download</button>
+                                                <a href="{{ route('crm.quotations.show', $activeQuotation->id) }}" class="btn btn-sm btn-light border"><i class="feather-eye me-1"></i>View Full Quotation</a>
                                                 <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_quotation' => 1]) }}" class="btn btn-sm btn-light border"><i class="feather-edit-2 me-1"></i>Edit Quotation</a>
-                                                
                                                 @if ($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
-                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        @method('PATCH')
-                                                        <input type="hidden" name="status" value="Quotation Sent">
-                                                        <button type="submit" class="btn btn-sm btn-primary" style="background-color: #1e40af; border-color: #1e40af;">Mark Sent</button>
-                                                    </form>
-                                                @elseif ($activeQuotation->status === 'Quotation Sent')
-                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        @method('PATCH')
-                                                        <input type="hidden" name="status" value="Accepted">
-                                                        <button type="submit" class="btn btn-sm btn-success">Accept Quotation</button>
-                                                    </form>
-                                                    <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
-                                                        @csrf
-                                                        @method('PATCH')
-                                                        <input type="hidden" name="status" value="Rejected">
-                                                        <button type="submit" class="btn btn-sm btn-danger">Reject</button>
-                                                    </form>
-                                                @endif
+                                                     <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                         @csrf
+                                                         @method('PATCH')
+                                                         <input type="hidden" name="status" value="Pending Approval">
+                                                         <button type="submit" class="btn btn-sm btn-warning"><i class="feather-send me-1"></i>Send for Approval</button>
+                                                     </form>
+                                                 @elseif ($activeQuotation->status === 'Pending Approval')
+                                                     <form action="{{ route('crm.quotations.approve', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                         @csrf
+                                                         <button type="submit" class="btn btn-sm btn-success"><i class="feather-check me-1"></i>Approve</button>
+                                                     </form>
+                                                     <form action="{{ route('crm.quotations.reject', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                         @csrf
+                                                         <button type="submit" class="btn btn-sm btn-danger"><i class="feather-x me-1"></i>Reject</button>
+                                                     </form>
+                                                 @elseif ($activeQuotation->status === 'Approved')
+                                                     <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                         @csrf
+                                                         @method('PATCH')
+                                                         <input type="hidden" name="status" value="Quotation Sent">
+                                                         <button type="submit" class="btn btn-sm btn-primary" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-send me-1"></i>Mark Sent</button>
+                                                     </form>
+                                                 @elseif ($activeQuotation->status === 'Quotation Sent')
+                                                     <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                         @csrf
+                                                         @method('PATCH')
+                                                         <input type="hidden" name="status" value="Accepted">
+                                                         <button type="submit" class="btn btn-sm btn-success">Accept Quotation</button>
+                                                     </form>
+                                                     <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
+                                                         @csrf
+                                                         @method('PATCH')
+                                                         <input type="hidden" name="status" value="Rejected">
+                                                         <button type="submit" class="btn btn-sm btn-danger">Reject</button>
+                                                     </form>
+                                                 @endif
                                             </div>
                                         </div>
 
@@ -1044,9 +1082,17 @@
                                                     </div>
                                                 </div>
                                                 <div class="mb-3">
-                                                    <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Status</label>
-                                                    <div class="fw-semibold"><span class="badge bg-soft-primary text-primary">{{ $activeQuotation->status }}</span></div>
-                                                </div>
+                                                     <label class="text-muted fs-11 text-uppercase fw-bold d-block mb-1">Quotation Status</label>
+                                                     @php
+                                                         $activeQuoBadgeClass = 'bg-soft-secondary text-secondary';
+                                                         if ($activeQuotation->status === 'Quotation Sent' || $activeQuotation->status === 'Sent') $activeQuoBadgeClass = 'bg-soft-info text-info';
+                                                         elseif ($activeQuotation->status === 'Accepted' || $activeQuotation->status === 'Approved') $activeQuoBadgeClass = 'bg-soft-success text-success';
+                                                         elseif ($activeQuotation->status === 'Rejected') $activeQuoBadgeClass = 'bg-soft-danger text-danger';
+                                                         elseif ($activeQuotation->status === 'Pending Approval') $activeQuoBadgeClass = 'bg-soft-warning text-warning';
+                                                         elseif ($activeQuotation->status === 'Quotation Rework') $activeQuoBadgeClass = 'bg-soft-warning text-warning';
+                                                     @endphp
+                                                     <div class="fw-semibold"><span class="badge {{ $activeQuoBadgeClass }}">{{ $activeQuotation->status }}</span></div>
+                                                 </div>
                                             </div>
                                         </div>
 
@@ -1085,7 +1131,23 @@
                                         </div>
 
                                         <!-- Calculation Totals -->
-                                        <div class="row mt-4 pt-3 border-top justify-content-end text-dark fs-13">
+                                        <div class="row mt-4 pt-3 border-top text-dark fs-13">
+                                            <div class="col-md-8">
+                                                <div class="pe-md-4">
+                                                    @if($activeQuotation->terms_conditions)
+                                                        <div class="mb-3">
+                                                            <div class="fw-bold text-muted fs-11 text-uppercase mb-1">Terms & Conditions</div>
+                                                            <div class="text-dark fs-12 p-2 border bg-light-50 rounded" style="white-space: pre-wrap; line-height: 1.5; font-family: 'Inter', sans-serif;">{{ $activeQuotation->terms_conditions }}</div>
+                                                        </div>
+                                                    @endif
+                                                    @if($activeQuotation->notes)
+                                                        <div class="mb-3">
+                                                            <div class="fw-bold text-muted fs-11 text-uppercase mb-1">Notes</div>
+                                                            <div class="text-dark fs-12 p-2 border bg-light-50 rounded" style="white-space: pre-wrap; line-height: 1.5; font-family: 'Inter', sans-serif;">{{ $activeQuotation->notes }}</div>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
                                             <div class="col-md-4">
                                                 <div class="d-flex justify-content-between py-1 border-bottom">
                                                     <span class="text-muted fw-semibold">Untaxed Amount:</span>
@@ -1106,6 +1168,64 @@
                                                     <span class="fw-extrabold text-primary fs-16">₹{{ number_format($activeQuotation->total_amount, 2) }}</span>
                                                 </div>
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Revision History Card inside Lead details -->
+                                    @php
+                                        $revisions = $activeQuotation->getRevisionHistory();
+                                    @endphp
+                                    @if($revisions->count() > 1)
+                                        <div class="card border shadow-sm mt-3 bg-white d-print-none" id="sectionQuotationHistory" style="border-radius: 4px; border-color: #e2e8f0 !important;">
+                                            <div class="card-body p-3 text-dark">
+                                                <h6 class="fw-bold mb-3 pb-2 border-bottom text-uppercase fs-11" style="letter-spacing: 0.5px; font-family: 'Inter', sans-serif; font-size: 11px !important;">
+                                                    <i class="feather-git-commit me-1.5 text-primary"></i>Quotation Revision History
+                                                </h6>
+                                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                                    @foreach($revisions as $rev)
+                                                        <div class="d-flex align-items-center gap-2 p-2 border rounded bg-white" style="min-width: 170px; border-color: {{ $rev->id === $activeQuotation->id ? '#3b82f6 !important' : '#e2e8f0' }} !important; transition: all 0.2s; position: relative; {{ $rev->id === $activeQuotation->id ? 'box-shadow: 0 0 0 1px rgba(59,130,246,0.1); background-color: #f0f9ff !important;' : '' }}">
+                                                            @if($rev->id === $activeQuotation->id)
+                                                                <span class="position-absolute top-0 end-0 translate-middle-y badge rounded-pill bg-primary fs-8 text-uppercase px-1" style="font-size: 8px !important; margin-right: 10px;">Viewing</span>
+                                                            @endif
+                                                            <div class="avatar-text avatar-sm bg-soft-secondary text-secondary rounded-circle fw-bold d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; font-size: 10px;">
+                                                                R{{ $rev->revision_number }}
+                                                            </div>
+                                                            <div class="d-flex flex-column fs-11" style="font-family: 'Inter', sans-serif;">
+                                                                <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'view_quotation' => 1, 'active_quotation_id' => $rev->id]) }}" class="fw-bold text-dark text-decoration-none">
+                                                                    {{ $rev->quotation_number }}
+                                                                </a>
+                                                                <span class="text-muted mt-0.5" style="font-size: 9px;">₹{{ number_format($rev->total_amount, 2) }}</span>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+                                @else
+                                    <!-- NO QUOTATION EMPTY STATE -->
+                                    <div class="card border shadow-sm p-5 text-center bg-white" style="border-radius: 4px; border-color: #e2e8f0 !important;">
+                                        <div class="py-4">
+                                            <div class="mb-3 text-muted">
+                                                <i class="feather-file-text" style="font-size: 48px; color: #cbd5e1;"></i>
+                                            </div>
+                                            <h5 class="fw-bold text-dark mb-2">No Quotation Found</h5>
+                                            
+                                            @if($lead->status === 'Qualified')
+                                                <p class="text-muted fs-12 mx-auto mb-4" style="max-width: 400px; font-family: 'Inter', sans-serif;">
+                                                    This lead has been marked as <strong>Qualified</strong>. You can now generate a quotation draft to begin the order process.
+                                                </p>
+                                                <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-success fw-bold px-4 py-2 text-uppercase fs-11" style="background-color: #16a34a; border-color: #16a34a; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                                        <i class="feather-shuffle me-1.5 fs-11"></i> Convert to Quotation
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <p class="text-muted fs-12 mx-auto mb-0" style="max-width: 400px; font-family: 'Inter', sans-serif;">
+                                                    To generate a quotation for this lead, please set the <strong>Lead Status</strong> to <strong>Qualified</strong> first.
+                                                </p>
+                                            @endif
                                         </div>
                                     </div>
                                 @endif
@@ -1175,6 +1295,17 @@
             background-color: #ffffff;
             border-bottom: 1px solid #cbd5e1;
             font-family: 'Inter', sans-serif;
+        }
+
+        /* Open header dropdown on hover and style alignment offset */
+        .zoho-header-banner .dropdown:hover .dropdown-menu {
+            display: block;
+            margin-top: 0;
+        }
+
+        .zoho-header-banner .dropdown-menu-end {
+            right: 0 !important;
+            left: auto !important;
         }
 
         .zoho-sidebar-col {
@@ -1515,15 +1646,34 @@
             footer,
             nav,
             aside,
-            .card-header,
             .col-lg-4,
             .odoo-chatter-timeline,
             .zoho-sidebar-col,
-            .zoho-header-banner .btn {
+            .zoho-header-banner,
+            .zoho-nav-tabs,
+            #zohoLeadTabs,
+            #overview-pane,
+            #timeline-pane,
+            .zoho-quick-info-box,
+            .sticky-top,
+            .modal,
+            .modal-backdrop {
                 display: none !important;
             }
 
-            .zoho-main-col {
+            #quotation-pane {
+                display: block !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+                padding: 0 !important;
+            }
+
+            .zoho-main-col, #zohoMainScrollable {
+                height: auto !important;
+                overflow: visible !important;
+                background-color: #ffffff !important;
+                padding: 0 !important;
+                margin: 0 !important;
                 width: 100% !important;
             }
 
@@ -1578,8 +1728,70 @@
     <!-- Select2 & Quotation Rows logic -->
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
-    <script>
+<script>
+        function printQuotationIframe() {
+            var iframe = document.getElementById('quotationPrintIframe');
+            if (iframe) {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            }
+        }
+
         $(function () {
+            // Tab state persistence logic
+            var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};
+            var activeSubTabKey = 'lead_active_subtab_' + {{ $lead->id }};
+            
+            // Check query parameters first
+            var urlParams = new URLSearchParams(window.location.search);
+            var hasParam = urlParams.has('create_quotation') || 
+                           urlParams.has('edit_quotation') || 
+                           urlParams.has('view_quotation') || 
+                           urlParams.has('edit_lead');
+
+            if (hasParam) {
+                // If loaded with parameters, set active tab in localStorage
+                if (urlParams.has('create_quotation') || urlParams.has('edit_quotation') || urlParams.has('view_quotation')) {
+                    localStorage.setItem(activeTabKey, 'quotation-tab');
+                } else if (urlParams.has('edit_lead')) {
+                    localStorage.setItem(activeTabKey, 'overview-tab');
+                }
+                
+                // Clean up query parameters from the address bar to prevent stuck refresh state
+                if (window.history.replaceState) {
+                    var cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+                    window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+                }
+            } else {
+                // If clean load, restore tab from localStorage
+                var savedTabId = localStorage.getItem(activeTabKey);
+                if (savedTabId && $('#' + savedTabId).length) {
+                    setTimeout(function() {
+                        $('#' + savedTabId).tab('show');
+                        
+                        // If it's timeline tab, also restore the subtab
+                        if (savedTabId === 'timeline-tab') {
+                            var savedSubTabId = localStorage.getItem(activeSubTabKey);
+                            if (savedSubTabId && $('#' + savedSubTabId).length) {
+                                $('#' + savedSubTabId).tab('show');
+                            }
+                        }
+                    }, 50);
+                }
+            }
+
+            var scrollTargetOnTabShown = null;
+
+            function scrollToElement(targetEl) {
+                var scrollContainer = $('#zohoMainScrollable');
+                var relativeTop = targetEl.offset().top - scrollContainer.offset().top;
+                var scrollTopPosition = scrollContainer.scrollTop() + relativeTop - 50; // Offset for sticky tabs
+
+                scrollContainer.animate({
+                    scrollTop: scrollTopPosition
+                }, 400);
+            }
+
             // Scroll behavior for related lists links
             $('#zohoSidebarLinks a').on('click', function(e) {
                 var targetId = $(this).attr('href');
@@ -1588,39 +1800,69 @@
                     if (targetEl.length) {
                         e.preventDefault();
                         
-                        // Switch to Overview tab if clicked details sections
-                        if (targetId === '#sectionLeadInfo' || targetId === '#sectionAddressInfo' || targetId === '#sectionRequirements' || targetId === '#sectionNotes') {
-                            $('#overview-tab').tab('show');
-                        } else if (targetId === '#subtab-history') {
-                            $('#timeline-tab').tab('show');
-                            $('#subtab-history-tab').tab('show');
-                        } else if (targetId === '#subtab-interactions') {
-                            $('#timeline-tab').tab('show');
-                            $('#subtab-interactions-tab').tab('show');
-                        }
-
                         // Remove active class from all links and add to clicked one
                         $('#zohoSidebarLinks a').removeClass('active');
                         $(this).addClass('active');
 
-                        // Scroll inside our right column container #zohoMainScrollable
-                        var scrollContainer = $('#zohoMainScrollable');
-                        var relativeTop = targetEl.offset().top - scrollContainer.offset().top;
-                        var scrollTopPosition = scrollContainer.scrollTop() + relativeTop - 50; // Offset for sticky tabs
+                        var needTabSwitch = false;
+                        if (targetId === '#sectionLeadInfo' || targetId === '#sectionAddressInfo' || targetId === '#sectionRequirements' || targetId === '#sectionNotes') {
+                            if (!$('#overview-tab').hasClass('active')) {
+                                scrollTargetOnTabShown = targetEl;
+                                $('#overview-tab').tab('show');
+                                needTabSwitch = true;
+                            }
+                        } else if (targetId === '#subtab-history') {
+                            if (!$('#timeline-tab').hasClass('active')) {
+                                scrollTargetOnTabShown = targetEl;
+                                $('#timeline-tab').tab('show');
+                                $('#subtab-history-tab').tab('show');
+                                needTabSwitch = true;
+                            } else {
+                                $('#subtab-history-tab').tab('show');
+                            }
+                        } else if (targetId === '#subtab-interactions') {
+                            if (!$('#timeline-tab').hasClass('active')) {
+                                scrollTargetOnTabShown = targetEl;
+                                $('#timeline-tab').tab('show');
+                                $('#subtab-interactions-tab').tab('show');
+                                needTabSwitch = true;
+                            } else {
+                                $('#subtab-interactions-tab').tab('show');
+                            }
+                        } else if (targetId === '#sectionQuotationHistory') {
+                            if (!$('#quotation-tab').hasClass('active')) {
+                                scrollTargetOnTabShown = targetEl;
+                                $('#quotation-tab').tab('show');
+                                needTabSwitch = true;
+                            }
+                        }
 
-                        scrollContainer.animate({
-                            scrollTop: scrollTopPosition
-                        }, 400);
+                        if (!needTabSwitch) {
+                            // If tab is already active, scroll immediately
+                            scrollToElement(targetEl);
+                        }
                     }
                 }
             });
 
-            // Reset scroll position to top when switching main tabs
+            // Handle scroll after tab transition finishes, or reset to top if manual switch
             $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-                $('#zohoMainScrollable').scrollTop(0);
+                // Save active tab state in localStorage on change
+                if (e.target.id) {
+                    if (e.target.id === 'overview-tab' || e.target.id === 'timeline-tab' || e.target.id === 'quotation-tab') {
+                        localStorage.setItem(activeTabKey, e.target.id);
+                    } else if (e.target.id === 'subtab-history-tab' || e.target.id === 'subtab-interactions-tab') {
+                        localStorage.setItem(activeSubTabKey, e.target.id);
+                    }
+                }
+
+                if (scrollTargetOnTabShown) {
+                    scrollToElement(scrollTargetOnTabShown);
+                    scrollTargetOnTabShown = null;
+                } else {
+                    $('#zohoMainScrollable').scrollTop(0);
+                }
             });
-
-
 
             // Auto submit status forms when changed in Select2 status selector
             $('.status-select').on('change', function() {
@@ -1664,20 +1906,35 @@
             // ==================== DYNAMIC ITEMS TABLE FOR INLINE FORM ====================
             let rowIndex = 0;
 
-            function getRowHtml(index) {
+            // Products list from DB — used to build dynamic dropdown options
+            @php
+                $mappedProducts = $products->map(function($p) {
+                    return [
+                        'id' => $p->id,
+                        'name' => $p->name,
+                        'sku' => $p->sku,
+                        'unit_cost' => $p->unit_cost
+                    ];
+                });
+            @endphp
+            const crmProductsList = @json($mappedProducts);
+
+            function buildProductOptions(selectedId = '') {
+                let opts = '<option value="">Select Product...</option>';
+                opts += '<option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>';
+                crmProductsList.forEach(function(p) {
+                    const sel = (p.id == selectedId) ? ' selected' : '';
+                    opts += `<option value="${p.id}" data-unit-cost="${p.unit_cost ?? 0}"${sel}>${p.name} (${p.sku})</option>`;
+                });
+                return opts;
+            }
+
+            function getRowHtml(index, selectedId = '') {
                 return `
                     <tr class="item-row" data-row-id="${index}">
                         <td class="ps-3">
-                            <select name="items[${index}][item_name]" class="form-select item-name-input" required>
-                                <option value="">Select Item</option>
-                                <option value="ERP Software License">ERP Software License</option>
-                                <option value="Custom ERP Development">Custom ERP Development</option>
-                                <option value="SaaS Annual Subscription">SaaS Annual Subscription</option>
-                                <option value="CRM Integration Module">CRM Integration Module</option>
-                                <option value="Database Migration Services">Database Migration Services</option>
-                                <option value="IT Infrastructure Support">IT Infrastructure Support</option>
-                                <option value="Training Workshop (per day)">Training Workshop (per day)</option>
-                                <option value="Other">Other (Specify in details)</option>
+                            <select name="items[${index}][product_id]" class="form-select item-name-input erp-premium-select" data-master="product" required>
+                                ${buildProductOptions(selectedId)}
                             </select>
                             <div class="description-container mt-2" id="desc-container-${index}" style="display: none;">
                                 <textarea name="items[${index}][description]" class="form-control odoo-table-input" placeholder="Scope/details..."></textarea>
@@ -1711,7 +1968,7 @@
             const hasCreateQ = @json(request()->has('create_quotation'));
             const hasEditQ = @json(request()->has('edit_quotation'));
             const existingItems = hasEditQ ? @json(isset($activeQuotation) ? $activeQuotation->items : []) : [];
-            const prefillProduct = @json($lead->product);
+            const prefillProductId = @json($lead->product_id);
             const prefillAmount = @json($lead->expected_amount);
 
             if (hasCreateQ || hasEditQ) {
@@ -1719,9 +1976,9 @@
                     existingItems.forEach(function(item) {
                         addRow(item);
                     });
-                } else if (hasCreateQ && (prefillProduct || prefillAmount)) {
+                } else if (hasCreateQ && (prefillProductId || prefillAmount)) {
                     addRow({
-                        item_name: prefillProduct || 'ERP CRM Integration Product/Service',
+                        product_id: prefillProductId || '',
                         description: '',
                         quantity: 1,
                         unit_price: parseFloat(prefillAmount) || 0.00,
@@ -1769,7 +2026,8 @@
             });
 
             function addRow(item = null) {
-                const newRow = $(getRowHtml(rowIndex));
+                const selectedId = item ? (item.product_id || '') : '';
+                const newRow = $(getRowHtml(rowIndex, selectedId));
                 $('#itemsTable tbody').append(newRow);
 
                 // Initialize select2 on the newly added select element
@@ -1779,8 +2037,10 @@
                 });
 
                 // Prefill details
+                let isPrefilling = false;
                 if (item) {
-                    newRow.find('.item-name-input').val(item.item_name).trigger('change');
+                    isPrefilling = true;
+                    newRow.find('.item-name-input').val(item.product_id).trigger('change');
                     newRow.find('textarea').val(item.description || '');
                     if (item.description) {
                         $('#desc-container-' + rowIndex).show();
@@ -1789,7 +2049,19 @@
                     newRow.find('.qty-input').val(item.quantity);
                     newRow.find('.price-input').val(item.unit_price);
                     newRow.find('.tax-input').val(item.tax_rate);
+                    isPrefilling = false;
                 }
+
+                // Auto-fill unit price from product's unit_cost when product is selected by user
+                newRow.find('.item-name-input').on('change', function() {
+                    if (isPrefilling) return;
+                    const selectedOption = $(this).find('option:selected');
+                    const unitCost = parseFloat(selectedOption.attr('data-unit-cost')) || 0;
+                    if (unitCost > 0) {
+                        $(this).closest('tr').find('.price-input').val(unitCost.toFixed(2));
+                        calculateTotals();
+                    }
+                });
 
                 rowIndex++;
                 calculateTotals();
@@ -1822,4 +2094,7 @@
             }
         });
     </script>
+
+    {{-- Product quick-create modal --}}
+    <x-ui.master-modals :masters="['product']" />
 @endpush

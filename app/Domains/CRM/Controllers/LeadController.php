@@ -6,6 +6,7 @@ use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Services\QuotationService;
+use App\Domains\Inventory\Models\Product;
 use App\Models\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -47,7 +48,8 @@ class LeadController extends Controller
     {
         $lead = new Lead();
         $users = User::orderBy('name')->get();
-        return view('modules.crm.leads.create', compact('lead', 'users'));
+        $products = Product::orderBy('name')->get();
+        return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
     }
 
     /**
@@ -80,10 +82,15 @@ class LeadController extends Controller
 
         // Step 2: Get quotations ONLY for this specific lead (by lead_id)
         $quotations = Quotation::where('lead_id', $lead->id)->latest()->get();
-        $activeQuotation = $quotations->first();
+        if (request()->has('active_quotation_id')) {
+            $activeQuotation = Quotation::find(request()->input('active_quotation_id'));
+        } else {
+            $activeQuotation = $quotations->where('is_current', true)->first() ?: $quotations->first();
+        }
 
         $customers = Customer::orderBy('name')->get();
         $nextQuotationNumber = app(QuotationService::class)->getNextQuotationNumber();
+        $products = Product::orderBy('name')->get();
 
         // Get previous and next leads based on ID order (latest chronological order)
         $prevLead = Lead::where('id', '>', $lead->id)->orderBy('id', 'asc')->first();
@@ -91,7 +98,7 @@ class LeadController extends Controller
 
         return view('modules.crm.leads.show', compact(
             'lead', 'users', 'customer', 'quotations', 'activeQuotation', 
-            'customers', 'nextQuotationNumber', 'prevLead', 'nextLead'
+            'customers', 'nextQuotationNumber', 'prevLead', 'nextLead', 'products'
         ));
     }
 
@@ -117,7 +124,7 @@ class LeadController extends Controller
             'state' => 'nullable|string|max:255',
             'city' => 'nullable|string|max:255',
             'address' => 'nullable|string',
-            'product' => 'nullable|string|max:255',
+            'product_id' => 'nullable|integer|exists:products,id',
         ];
 
         if ($request->has('call_date')) {
@@ -173,7 +180,7 @@ class LeadController extends Controller
             'state' => $validated['state'] ?? null,
             'city' => $validated['city'] ?? null,
             'address' => $validated['address'] ?? null,
-            'product' => $validated['product'] ?? null,
+            'product_id' => $validated['product_id'] ?? null,
         ];
 
         // Direct DB save
@@ -208,7 +215,8 @@ class LeadController extends Controller
     public function edit(Lead $lead)
     {
         $users = User::orderBy('name')->get();
-        return view('modules.crm.leads.create', compact('lead', 'users'));
+        $products = Product::orderBy('name')->get();
+        return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
     }
 
     /**
@@ -233,7 +241,7 @@ class LeadController extends Controller
             'state' => 'nullable|string|max:255',
             'city' => 'nullable|string|max:255',
             'address' => 'nullable|string',
-            'product' => 'nullable|string|max:255',
+            'product_id' => 'nullable|integer|exists:products,id',
         ];
 
         if ($request->has('call_date')) {
@@ -289,7 +297,7 @@ class LeadController extends Controller
             'state' => $validated['state'] ?? null,
             'city' => $validated['city'] ?? null,
             'address' => $validated['address'] ?? null,
-            'product' => $validated['product'] ?? null,
+            'product_id' => $validated['product_id'] ?? null,
         ];
 
         $oldOwnerId = $lead->lead_owner_id;

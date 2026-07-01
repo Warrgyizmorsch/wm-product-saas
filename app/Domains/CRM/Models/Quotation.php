@@ -26,6 +26,9 @@ class Quotation extends BaseModel
         'tenant_id',
         'customer_id',
         'lead_id',        // Links this quotation to a specific lead (not just email)
+        'parent_id',      // Root parent quotation ID
+        'revision_number',// Revision count (0 = original, 1 = R1, etc)
+        'is_current',     // Active current revision status
         'sales_person_id',
         'quotation_number',
         'quotation_date',
@@ -40,12 +43,14 @@ class Quotation extends BaseModel
     ];
 
     protected $casts = [
-        'quotation_date' => 'date',
-        'expiry_date'    => 'date',
-        'subtotal'       => 'decimal:2',
-        'tax'            => 'decimal:2',
-        'discount'       => 'decimal:2',
-        'total_amount'   => 'decimal:2',
+        'quotation_date'  => 'date',
+        'expiry_date'     => 'date',
+        'subtotal'        => 'decimal:2',
+        'tax'             => 'decimal:2',
+        'discount'        => 'decimal:2',
+        'total_amount'    => 'decimal:2',
+        'is_current'      => 'boolean',
+        'revision_number' => 'integer',
     ];
 
     public function customer(): BelongsTo
@@ -69,5 +74,28 @@ class Quotation extends BaseModel
     public function items(): HasMany
     {
         return $this->hasMany(QuotationItem::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Quotation::class, 'parent_id');
+    }
+
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(Quotation::class, 'parent_id');
+    }
+
+    /**
+     * Get the entire revision history chain (original + all revisions) sorted chronologically.
+     */
+    public function getRevisionHistory()
+    {
+        $rootId = $this->parent_id ?: $this->id;
+        return self::query()
+            ->where('id', $rootId)
+            ->orWhere('parent_id', $rootId)
+            ->orderBy('revision_number', 'desc')
+            ->get();
     }
 }
