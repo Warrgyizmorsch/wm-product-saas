@@ -82,7 +82,7 @@ class RoutingOperation extends BaseModel
 
     public function materials(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(RoutingOperationMaterial::class, 'routing_operation_id');
+        return $this->hasMany(RoutingOperationMaterial::class, 'routing_operation_id')->orderBy('sequence');
     }
 
     // ─── Operation Type Helpers ───────────────────────────────────────────────

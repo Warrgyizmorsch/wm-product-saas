@@ -18,6 +18,7 @@ class ProductionBomItem extends BaseModel
         'tenant_id',
         'bom_id',
         'material_id',
+        'child_bom_id',
         'quantity',
         'uom_id',
         'material_scrap_percentage',
@@ -38,11 +39,17 @@ class ProductionBomItem extends BaseModel
         'sequence' => 'integer',
         'effective_from' => 'date',
         'effective_to' => 'date',
+        'child_bom_id' => 'integer',
     ];
 
     public function bom(): BelongsTo
     {
         return $this->belongsTo(ProductionBom::class, 'bom_id');
+    }
+
+    public function childBom(): BelongsTo
+    {
+        return $this->belongsTo(ProductionBom::class, 'child_bom_id');
     }
 
     public function material(): BelongsTo

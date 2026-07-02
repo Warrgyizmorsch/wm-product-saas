@@ -216,6 +216,7 @@
             <a class="erp-tabs-link" id="btn-tab-routing" onclick="switchTab('routing')">Routing Process</a>
             <a class="erp-tabs-link" id="btn-tab-costing" onclick="switchTab('costing')">Cost Summary</a>
             <a class="erp-tabs-link" id="btn-tab-history" onclick="switchTab('history')">Approval History</a>
+            <a class="erp-tabs-link" id="btn-tab-whereused" onclick="switchTab('whereused')">Where Used</a>
         </div>
 
         <!-- TAB CONTENT CONTAINER (No cards, sits flat) -->
@@ -242,13 +243,21 @@
                                         <div class="d-flex flex-column">
                                             <span class="fw-bold text-dark">{{ $item->material->name }}</span>
                                             <small class="text-muted font-monospace fs-10">{{ $item->material->sku }}</small>
-                                            @if($item->material->type === 'semi_finished' || $item->material->type === 'finished_good')
-                                                @if(isset($componentBoms[$item->material_id]))
-                                                    <small class="mt-1">
-                                                        <a href="{{ route('production.boms.show', $componentBoms[$item->material_id]->first()->id) }}" class="badge bg-soft-info text-info">
-                                                            <i class="feather-link me-1"></i>Subassembly BOM: v{{ $componentBoms[$item->material_id]->first()->version }}
-                                                        </a>
-                                                    </small>
+                                            @if($item->childBom)
+                                                <small class="mt-1">
+                                                    <a href="{{ route('production.boms.show', $item->childBom->id) }}" class="badge bg-soft-success text-success">
+                                                        <i class="feather-link me-1"></i>Linked BOM: {{ $item->childBom->bom_name ?: $item->childBom->bom_number }} v{{ $item->childBom->version }} ({{ $item->childBom->status }})
+                                                    </a>
+                                                </small>
+                                            @else
+                                                @if($item->material->type === 'semi_finished' || $item->material->type === 'finished_good')
+                                                    @if(isset($componentBoms[$item->material_id]))
+                                                        <small class="mt-1">
+                                                            <a href="{{ route('production.boms.show', $componentBoms[$item->material_id]->first()->id) }}" class="badge bg-soft-info text-info">
+                                                                <i class="feather-link me-1"></i>Subassembly BOM: v{{ $componentBoms[$item->material_id]->first()->version }}
+                                                            </a>
+                                                        </small>
+                                                    @endif
                                                 @endif
                                             @endif
                                             @if($item->notes)
@@ -396,6 +405,7 @@
                                                     <ul class="mb-0 ps-3 fs-10 text-muted">
                                                         @foreach($op->materials as $opMat)
                                                             <li>
+                                                                <span class="text-secondary fw-semibold">Seq {{ $opMat->sequence }}:</span>
                                                                 <strong>{{ $opMat->material->name }}</strong>: {{ number_format($opMat->quantity, 4) }} {{ $opMat->uom->code }}
                                                                 <span class="badge bg-light text-dark fs-8">{{ $opMat->consumption_type ?? 'manual' }}</span>
                                                             </li>
@@ -412,7 +422,7 @@
                                         <td class="align-middle">
                                             @if ($op->workCenter)
                                                 <a href="{{ route('production.work-centers.show', $op->work_center_id) }}" class="fw-semibold text-primary">
-                                                    {{ $op->workCenter->name }}
+                                                    {{ $op->workCenter->getHierarchyPath() }}
                                                 </a>
                                                 <small class="text-muted d-block fs-10">{{ $op->workCenter->code }}</small>
                                             @else
@@ -458,25 +468,52 @@
             <div class="tab-pane-custom d-none" id="tab-costing">
                 <h5 class="fw-bold text-dark mb-3">Total Manufacturing Cost Summary Breakdown</h5>
                 <div class="row g-3 mb-4">
+                    <!-- Net Material Cost -->
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">Material Cost</span>
-                            <h4 class="text-dark fw-bold mt-1">${{ number_format($materialCost, 4) }}</h4>
-                            <small class="text-muted">For recipe quantity basis</small>
+                            <span class="text-muted fs-11 text-uppercase fw-bold">Material Cost (Net)</span>
+                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['material_cost'] - $costSummary['scrap_adjustment'], 4) }}</h4>
+                            <small class="text-muted">Net of scrap loss</small>
                         </div>
                     </div>
+                    <!-- Scrap Loss -->
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
-                            <span class="text-muted fs-11 text-uppercase fw-bold">Routing labor / machine cost</span>
-                            <h4 class="text-dark fw-bold mt-1">${{ number_format($routingCost, 4) }}</h4>
-                            <small class="text-muted">Direct operations overhead</small>
+                            <span class="text-muted fs-11 text-uppercase fw-bold text-danger">Scrap Loss</span>
+                            <h4 class="text-danger fw-bold mt-1">${{ number_format($costSummary['scrap_adjustment'], 4) }}</h4>
+                            <small class="text-muted">Expected material scrap value</small>
                         </div>
                     </div>
+                    <!-- Labor Cost -->
+                    <div class="col-md-4">
+                        <div class="bg-light p-3 rounded border text-center">
+                            <span class="text-muted fs-11 text-uppercase fw-bold">Labor Cost</span>
+                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['labor_cost'], 4) }}</h4>
+                            <small class="text-muted">Routing setup & run labor</small>
+                        </div>
+                    </div>
+                    <!-- Machine Cost -->
+                    <div class="col-md-4">
+                        <div class="bg-light p-3 rounded border text-center">
+                            <span class="text-muted fs-11 text-uppercase fw-bold">Machine Cost</span>
+                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['machine_cost'], 4) }}</h4>
+                            <small class="text-muted">Machine runtime cost</small>
+                        </div>
+                    </div>
+                    <!-- Overhead Cost -->
+                    <div class="col-md-4">
+                        <div class="bg-light p-3 rounded border text-center">
+                            <span class="text-muted fs-11 text-uppercase fw-bold">Work Center Overhead</span>
+                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['overhead_cost'], 4) }}</h4>
+                            <small class="text-muted">WC hourly overhead rate x duration</small>
+                        </div>
+                    </div>
+                    <!-- Total Mfg Cost -->
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center bg-soft-primary border-primary">
                             <span class="text-primary fs-11 text-uppercase fw-bold">Total Manufacturing Cost</span>
-                            <h4 class="text-primary fw-bold mt-1">${{ number_format($totalMfgCost, 4) }}</h4>
-                            <small class="text-primary">Material + routing costs</small>
+                            <h4 class="text-primary fw-bold mt-1">${{ number_format($costSummary['total_cost'], 4) }}</h4>
+                            <small class="text-primary">Sum of all cost layers</small>
                         </div>
                     </div>
                 </div>
@@ -558,43 +595,62 @@
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- Where Used Section (Display parents consuming this product at the bottom of details) -->
-        <div class="mt-4 pt-4 border-top">
-            <h5 class="fw-bold text-dark mb-3"><i class="feather-git-merge me-2 text-primary"></i>Where Used (Consumed In Parent BOMs)</h5>
-            @if($whereUsedParents->count() > 0)
-                <div class="table-responsive">
-                    <table class="erp-thin-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 40%">Parent Product Name</th>
-                                <th style="width: 30%">SKU</th>
-                                <th style="width: 20%">Product Type</th>
-                                <th style="width: 10%" class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($whereUsedParents as $parentProduct)
+            <!-- Tab 6: Where Used -->
+            <div class="tab-pane-custom d-none" id="tab-whereused">
+                <h5 class="fw-bold text-dark mb-3"><i class="feather-git-merge me-2 text-primary"></i>Where Used (Consumed In Parent BOMs)</h5>
+                @if($whereUsedBoms->count() > 0)
+                    <div class="table-responsive">
+                        <table class="erp-thin-table">
+                            <thead>
                                 <tr>
-                                    <td class="fw-bold text-dark">{{ $parentProduct->name }}</td>
-                                    <td class="font-monospace">{{ $parentProduct->sku }}</td>
-                                    <td class="text-capitalize fs-12">{{ str_replace('_', ' ', $parentProduct->type) }}</td>
-                                    <td class="text-end">
-                                        <a href="{{ route('production.boms.index') }}?product_id={{ $parentProduct->id }}" class="btn btn-xs btn-soft-primary px-2 py-1 fs-11 text-nowrap">
-                                            <i class="feather-eye me-1"></i>View Parent BOMs
-                                        </a>
-                                    </td>
+                                    <th style="width: 30%">Parent Product Name</th>
+                                    <th style="width: 20%">BOM Number</th>
+                                    <th style="width: 10%">Version</th>
+                                    <th style="width: 15%">Status</th>
+                                    <th style="width: 10%">Effective Date</th>
+                                    <th style="width: 10%">Expiry Date</th>
+                                    <th style="width: 5%" class="text-end">Action</th>
                                 </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @else
-                <div class="p-3 text-center border rounded bg-light text-muted fs-12">
-                    <i class="feather-info me-2"></i>This product is not consumed in any other parent assembly BOMs.
-                </div>
-            @endif
+                            </thead>
+                            <tbody>
+                                @foreach($whereUsedBoms as $wBom)
+                                    <tr>
+                                        <td class="fw-bold text-dark">
+                                            {{ $wBom->product->name }}
+                                            <small class="text-muted d-block font-monospace fs-10">{{ $wBom->product->sku }}</small>
+                                        </td>
+                                        <td>{{ $wBom->bom_number }}</td>
+                                        <td>v{{ $wBom->version }}</td>
+                                        <td>
+                                            @if($wBom->status === 'approved')
+                                                <span class="badge bg-soft-success text-success">Approved</span>
+                                            @elseif($wBom->status === 'draft')
+                                                <span class="badge bg-soft-warning text-warning">Draft</span>
+                                            @elseif($wBom->status === 'pending_approval')
+                                                <span class="badge bg-soft-info text-info">Pending</span>
+                                            @else
+                                                <span class="badge bg-soft-secondary text-secondary text-uppercase">{{ $wBom->status }}</span>
+                                            @endif
+                                        </td>
+                                        <td>{{ $wBom->effective_date ? $wBom->effective_date->format('d/m/Y') : 'N/A' }}</td>
+                                        <td>{{ $wBom->expiry_date ? $wBom->expiry_date->format('d/m/Y') : 'No Expiry' }}</td>
+                                        <td class="text-end">
+                                            <a href="{{ route('production.boms.show', $wBom->id) }}" class="btn btn-xs btn-soft-primary px-2 py-1 fs-11 text-nowrap">
+                                                <i class="feather-eye me-1"></i>View BOM
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="p-3 text-center border rounded bg-light text-muted fs-12">
+                        <i class="feather-info me-2"></i>This product is not consumed in any other parent assembly BOMs.
+                    </div>
+                @endif
+            </div>
         </div>
 
         <!-- Modals -->

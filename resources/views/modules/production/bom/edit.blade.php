@@ -92,6 +92,13 @@
                         'phantom' => 'Phantom (Blow-Through)',
                         'subcontracting' => 'Subcontracting (Outsourced)'
                     ]" selected="{{ old('bom_type', $bom->bom_type) }}" data-select2-selector="default" required />
+
+                    <x-ui.select label="Usage Context*" name="usage_context" :options="[
+                        'manufacturing' => 'Manufacturing (Production execution ready)',
+                        'engineering' => 'Engineering (R&D staging)',
+                        'prototype' => 'Prototype (Sample testing)',
+                        'costing' => 'Costing (Simulation only)'
+                    ]" selected="{{ old('usage_context', $bom->usage_context) }}" data-select2-selector="default" required />
                 </div>
 
                 <!-- Right Column -->
@@ -174,38 +181,46 @@
                                         <template x-if="errors && errors['items.' + index + '.material_id']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
                                         </template>
+                                        <input type="hidden" x-bind:name="'items['+index+'][child_bom_id]'" x-model="item.child_bom_id">
                                         <template x-if="item.child_bom_loading">
                                             <div class="mt-2 text-muted fs-11">
                                                 <span class="spinner-border spinner-border-sm text-secondary me-1" role="status" style="width: 12px; height: 12px;"></span>Checking child BOM...
                                             </div>
                                         </template>
-                                        <template x-if="!item.child_bom_loading && item.child_bom_status === 'approved'">
-                                            <div class="d-flex flex-column gap-1 mt-2">
-                                                <span class="badge bg-soft-success text-success fs-10 d-inline-block text-wrap" style="width: max-content;">Active Version: <span x-text="'v' + item.child_bom_version + ' (' + item.child_bom_number + ')'"></span></span>
-                                                <div class="d-flex gap-1">
-                                                    <a x-bind:href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1.5 fs-9 text-nowrap">
-                                                        <i class="feather-eye me-0.5"></i>View BOM
-                                                    </a>
-                                                    <form x-bind:action="'/production/boms/' + item.child_bom_id + '/create-revision'" method="POST" target="_blank" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-xs btn-soft-warning py-0.5 px-1.5 fs-9 text-nowrap">
-                                                            <i class="feather-copy me-0.5"></i>Create Revision
-                                                        </button>
-                                                    </form>
+                                        <template x-if="!item.child_bom_loading && item.child_bom_versions && item.child_bom_versions.length > 0">
+                                            <div class="mt-2 p-2 border rounded bg-light" style="max-width: 250px;">
+                                                <label class="fs-10 fw-bold text-muted mb-1 d-block">Link specific BOM version:</label>
+                                                <select class="form-select form-select-xs py-0.5 fs-11" x-model="item.child_bom_id">
+                                                    <option value="">-- Explicit Selection --</option>
+                                                    <template x-for="v in item.child_bom_versions" :key="v.id">
+                                                        <option :value="v.id" x-text="'v' + v.version + ' (' + v.status + ')'"></option>
+                                                    </template>
+                                                </select>
+                                                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
+                                                    <div class="d-flex gap-1 align-items-center">
+                                                        <template x-if="item.child_bom_id">
+                                                            <a :href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1 fs-9 text-nowrap">
+                                                                <i class="feather-eye"></i> View
+                                                            </a>
+                                                        </template>
+                                                        <template x-if="item.child_bom_id && item.child_bom_versions.find(x => x.id == item.child_bom_id)?.status !== 'approved'">
+                                                            <span class="badge bg-soft-danger text-danger fs-9" title="Draft / non-approved versions warn user"><i class="feather-alert-triangle"></i> Non-Approved</span>
+                                                        </template>
+                                                    </div>
+                                                    <div class="d-flex gap-1">
+                                                        <template x-if="item.child_bom_id">
+                                                            <form :action="'/production/boms/' + item.child_bom_id + '/create-revision'" method="POST" target="_blank" class="d-inline">
+                                                                @csrf
+                                                                <button type="submit" class="btn btn-xs btn-soft-warning py-0.5 px-1 fs-9 text-nowrap">
+                                                                    <i class="feather-copy"></i> Revise
+                                                                </button>
+                                                            </form>
+                                                        </template>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </template>
-                                        <template x-if="!item.child_bom_loading && item.child_bom_status === 'draft'">
-                                            <div class="d-flex flex-column gap-1 mt-2">
-                                                <span class="badge bg-soft-warning text-warning fs-10 d-inline-block text-wrap" style="width: max-content;">Draft Version: <span x-text="'v' + item.child_bom_version + ' (' + item.child_bom_number + ')'"></span></span>
-                                                <div>
-                                                    <a x-bind:href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1.5 fs-9 text-nowrap">
-                                                        <i class="feather-eye me-0.5"></i>View BOM
-                                                    </a>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        <template x-if="!item.child_bom_loading && item.child_bom_status === 'none' && (getMaterialType(item.material_id) === 'semi_finished' || getMaterialType(item.material_id) === 'finished_good')">
+                                        <template x-if="!item.child_bom_loading && (!item.child_bom_versions || item.child_bom_versions.length === 0) && (getMaterialType(item.material_id) === 'semi_finished' || getMaterialType(item.material_id) === 'finished_good')">
                                             <div class="erp-child-bom-cta mt-2">
                                                 <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-xs btn-soft-primary py-0.5 px-1.5 fs-9 text-nowrap">
                                                     <i class="feather-plus me-0.5"></i>Create Child BOM
@@ -402,6 +417,7 @@
                 fetchChildBomStatus(item) {
                     if (!item.material_id) {
                         item.child_bom_status = 'none';
+                        item.child_bom_versions = [];
                         return;
                     }
                     item.child_bom_loading = true;
@@ -409,15 +425,17 @@
                         .then(res => res.json())
                         .then(data => {
                             item.child_bom_status = data.status;
-                            item.child_bom_id = data.bom_id;
+                            item.child_bom_id = item.child_bom_id || null;
                             item.child_bom_number = data.bom_number;
                             item.child_bom_version = data.version;
                             item.child_bom_name = data.bom_name;
+                            item.child_bom_versions = data.versions || [];
                             item.child_bom_loading = false;
                         })
                         .catch(err => {
                             console.error(err);
                             item.child_bom_status = 'none';
+                            item.child_bom_versions = [];
                             item.child_bom_loading = false;
                         });
                 },
@@ -436,6 +454,7 @@
                         const newItem = {
                             uid: item.uid || 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + idx,
                             material_id: item.material_id || '',
+                            child_bom_id: item.child_bom_id || null,
                             quantity: item.quantity || '',
                             uom_id: item.uom_id || '',
                             material_scrap_percentage: item.material_scrap_percentage || 0,
@@ -445,6 +464,7 @@
                             effective_from: item.effective_from || '',
                             effective_to: item.effective_to || '',
                             child_bom_status: 'none',
+                            child_bom_versions: [],
                             child_bom_loading: false
                         };
                         if (newItem.material_id) {
@@ -495,6 +515,7 @@
                     this.items.push({
                         uid: 'row_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                         material_id: '',
+                        child_bom_id: null,
                         quantity: '',
                         uom_id: '',
                         material_scrap_percentage: 0,
@@ -504,6 +525,7 @@
                         effective_from: '',
                         effective_to: '',
                         child_bom_status: 'none',
+                        child_bom_versions: [],
                         child_bom_loading: false
                     });
                 },

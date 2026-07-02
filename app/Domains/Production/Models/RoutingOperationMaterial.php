@@ -21,10 +21,12 @@ class RoutingOperationMaterial extends BaseModel
         'quantity',
         'uom_id',
         'consumption_type',
+        'sequence',
     ];
 
     protected $casts = [
         'quantity' => 'float',
+        'sequence' => 'integer',
     ];
 
     public function routingOperation(): BelongsTo

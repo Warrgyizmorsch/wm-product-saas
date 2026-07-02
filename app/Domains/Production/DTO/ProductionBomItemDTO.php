@@ -16,6 +16,7 @@ class ProductionBomItemDTO
         public readonly ?string $effective_from = null,
         public readonly ?string $effective_to = null,
         public readonly ?string $notes = null,
+        public readonly ?int $child_bom_id = null,
     ) {
     }
 
@@ -33,6 +34,7 @@ class ProductionBomItemDTO
             effective_from: !empty($data['effective_from']) ? $data['effective_from'] : null,
             effective_to: !empty($data['effective_to']) ? $data['effective_to'] : null,
             notes: $data['notes'] ?? null,
+            child_bom_id: !empty($data['child_bom_id']) ? (int) $data['child_bom_id'] : null,
         );
     }
 
@@ -50,6 +52,7 @@ class ProductionBomItemDTO
             'effective_from' => $this->effective_from,
             'effective_to' => $this->effective_to,
             'notes' => $this->notes,
+            'child_bom_id' => $this->child_bom_id,
         ];
     }
 }

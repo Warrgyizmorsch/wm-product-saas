@@ -48,10 +48,20 @@ class ProductionBomService
 
         $this->checkBomConflicts($dto->product_id, $dto->version);
 
+        if ($dto->routing_id) {
+            $this->validateRoutingAssignment(
+                $dto->product_id,
+                $dto->routing_id,
+                $tenantId,
+                $dto->usage_context ?? 'manufacturing'
+            );
+        }
+
         return DB::transaction(function () use ($dto, $bomNumber, $creatorUserId, $tenantId) {
             $bomData = array_merge($dto->toArray(), [
                 'tenant_id' => $tenantId,
                 'bom_number' => $bomNumber,
+                'usage_context' => $dto->usage_context ?? 'manufacturing',
                 'status' => 'draft',
                 'created_by' => $creatorUserId,
                 'revision' => 0,
@@ -60,6 +70,16 @@ class ProductionBomService
             $bom = $this->bomRepository->create($bomData);
 
             foreach ($dto->items as $index => $itemDto) {
+                if ($itemDto->child_bom_id) {
+                    $this->validateChildBomLink(
+                        $itemDto->child_bom_id,
+                        $itemDto->material_id,
+                        $bom->id,
+                        Carbon::parse($bom->effective_date)->toDateString(),
+                        $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null
+                    );
+                }
+
                 ProductionBomItem::create(array_merge($itemDto->toArray(), [
                     'tenant_id' => $tenantId,
                     'bom_id' => $bom->id,
@@ -101,14 +121,35 @@ class ProductionBomService
 
         $tenantId = $bom->tenant_id;
 
+        if ($dto->routing_id) {
+            $this->validateRoutingAssignment(
+                $dto->product_id,
+                $dto->routing_id,
+                $tenantId,
+                $dto->usage_context ?? 'manufacturing'
+            );
+        }
+
         return DB::transaction(function () use ($bom, $dto, $tenantId) {
-            $bomData = $dto->toArray();
+            $bomData = array_merge($dto->toArray(), [
+                'usage_context' => $dto->usage_context ?? 'manufacturing',
+            ]);
             $bom->update($bomData);
 
             // Recreate items to handle dynamic grids correctly
             $bom->items()->delete();
 
             foreach ($dto->items as $index => $itemDto) {
+                if ($itemDto->child_bom_id) {
+                    $this->validateChildBomLink(
+                        $itemDto->child_bom_id,
+                        $itemDto->material_id,
+                        $bom->id,
+                        Carbon::parse($bom->effective_date)->toDateString(),
+                        $bom->expiry_date ? Carbon::parse($bom->expiry_date)->toDateString() : null
+                    );
+                }
+
                 ProductionBomItem::create(array_merge($itemDto->toArray(), [
                     'tenant_id' => $tenantId,
                     'bom_id' => $bom->id,
@@ -275,6 +316,7 @@ class ProductionBomService
                 'bom_number' => $original->bom_number,
                 'bom_name' => $original->bom_name,
                 'bom_type' => $original->bom_type,
+                'usage_context' => $original->usage_context ?? 'manufacturing',
                 'product_id' => $original->product_id,
                 'base_quantity' => $original->base_quantity,
                 'base_uom_id' => $original->base_uom_id,
@@ -287,10 +329,21 @@ class ProductionBomService
             ]);
 
             foreach ($original->items as $item) {
+                if ($item->child_bom_id) {
+                    $this->validateChildBomLink(
+                        $item->child_bom_id,
+                        $item->material_id,
+                        $newBom->id,
+                        Carbon::parse($newBom->effective_date)->toDateString(),
+                        $newBom->expiry_date ? Carbon::parse($newBom->expiry_date)->toDateString() : null
+                    );
+                }
+
                 ProductionBomItem::create([
                     'tenant_id' => $tenantId,
                     'bom_id' => $newBom->id,
                     'material_id' => $item->material_id,
+                    'child_bom_id' => $item->child_bom_id,
                     'quantity' => $item->quantity,
                     'uom_id' => $item->uom_id,
                     'material_scrap_percentage' => $item->material_scrap_percentage,
@@ -368,6 +421,94 @@ class ProductionBomService
 
         if ($query->exists()) {
             throw new InvalidArgumentException("A BOM version '{$version}' already exists for this product.");
+        }
+    }
+
+    private function validateChildBomLink(
+        int $childBomId,
+        int $materialProductId,
+        ?int $parentBomId,
+        string $parentEffectiveDate,
+        ?string $parentExpiryDate
+    ): void {
+        if ($parentBomId && $childBomId === $parentBomId) {
+            throw new InvalidArgumentException("A BOM cannot link to itself as a child BOM.");
+        }
+
+        $childBom = ProductionBom::withoutGlobalScopes()->find($childBomId);
+        if (!$childBom) {
+            throw new InvalidArgumentException("Linked child BOM not found.");
+        }
+
+        if ($childBom->product_id !== $materialProductId) {
+            throw new InvalidArgumentException("Linked child BOM product does not match component material product.");
+        }
+
+        if ($parentBomId) {
+            $visited = [$parentBomId => true];
+            $this->detectCircularChildLink($childBomId, $parentBomId, $visited);
+        }
+
+        $childEffective = $childBom->effective_date ? Carbon::parse($childBom->effective_date)->toDateString() : null;
+        if ($childEffective && $childEffective > $parentEffectiveDate) {
+            throw new InvalidArgumentException("Child BOM effective date ({$childEffective}) must be less than or equal to parent BOM effective date ({$parentEffectiveDate}).");
+        }
+
+        if ($parentExpiryDate) {
+            $childExpiry = $childBom->expiry_date ? Carbon::parse($childBom->expiry_date)->toDateString() : null;
+            if ($childExpiry !== null && $childExpiry < $parentExpiryDate) {
+                throw new InvalidArgumentException("Child BOM expiry date ({$childExpiry}) must outlast parent BOM expiry date ({$parentExpiryDate}).");
+            }
+        }
+    }
+
+    private function detectCircularChildLink(int $currentBomId, int $parentBomId, array $visited): void
+    {
+        if ($currentBomId === $parentBomId) {
+            throw new InvalidArgumentException("Circular child BOM dependency detected.");
+        }
+
+        if (isset($visited[$currentBomId])) {
+            return;
+        }
+        $visited[$currentBomId] = true;
+
+        $bom = ProductionBom::withoutGlobalScopes()->with('items')->find($currentBomId);
+        if ($bom) {
+            foreach ($bom->items as $item) {
+                if ($item->child_bom_id) {
+                    $this->detectCircularChildLink($item->child_bom_id, $parentBomId, $visited);
+                }
+            }
+        }
+    }
+
+    private function validateRoutingAssignment(
+        int $productId,
+        int $routingId,
+        int $tenantId,
+        string $usageContext = 'manufacturing'
+    ): void {
+        $routing = \App\Domains\Production\Models\Routing::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->find($routingId);
+
+        if (!$routing) {
+            throw new InvalidArgumentException("The assigned routing does not exist or does not belong to the current organization.");
+        }
+
+        if ($usageContext === 'manufacturing') {
+            if ($routing->status !== 'active') {
+                throw new InvalidArgumentException("Only active routings can be assigned to manufacturing BOMs.");
+            }
+        } else {
+            if (!in_array($routing->status, ['draft', 'pending_approval', 'active'])) {
+                throw new InvalidArgumentException("The assigned routing status must be draft, pending_approval, or active.");
+            }
+        }
+
+        if ($routing->product_id && $routing->product_id !== $productId) {
+            throw new InvalidArgumentException("The assigned routing does not belong to the same finished product.");
         }
     }
 }

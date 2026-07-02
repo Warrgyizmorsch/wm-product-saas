@@ -21,6 +21,7 @@ class ProductionBomDTO
         public readonly ?string $expiry_date = null,
         public readonly ?string $notes = null,
         public readonly array $items = [],
+        public readonly ?string $usage_context = 'manufacturing',
     ) {
     }
 
@@ -47,6 +48,7 @@ class ProductionBomDTO
             expiry_date: $data['expiry_date'] ?? null,
             notes: $data['notes'] ?? null,
             items: $items,
+            usage_context: $data['usage_context'] ?? 'manufacturing',
         );
     }
 
@@ -65,6 +67,7 @@ class ProductionBomDTO
             'effective_date' => $this->effective_date,
             'expiry_date' => $this->expiry_date,
             'notes' => $this->notes,
+            'usage_context' => $this->usage_context,
         ];
     }
 }
