@@ -17,6 +17,7 @@ class UpdateProductionBomRequest extends FormRequest
             'bom_number' => 'required|string|max:255',
             'bom_name' => 'nullable|string|max:255',
             'bom_type' => 'required|in:manufacturing,engineering,sales,phantom,subcontracting',
+            'usage_context' => 'nullable|string|in:manufacturing,engineering,prototype,costing',
             'product_id' => 'required|exists:products,id',
             'base_quantity' => 'required|numeric|gt:0',
             'base_uom_id' => 'required|exists:uoms,id',
@@ -29,6 +30,7 @@ class UpdateProductionBomRequest extends FormRequest
             
             'items' => 'required|array|min:1',
             'items.*.material_id' => 'required|exists:products,id',
+            'items.*.child_bom_id' => 'nullable|integer|exists:production_boms,id',
             'items.*.quantity' => 'required|numeric|gt:0',
             'items.*.uom_id' => 'required|exists:uoms,id',
             'items.*.material_scrap_percentage' => 'nullable|numeric|min:0|max:100',

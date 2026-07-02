@@ -73,16 +73,17 @@
                 <thead>
                     <tr>
                         <th style="width: 10%">Code</th>
-                        <th style="width: 20%">Name</th>
-                        <th style="width: 12%">Type</th>
-                        <th style="width: 15%">Department</th>
-                        <th style="width: 12%">Location</th>
-                        <th style="width: 10%" class="text-end">Capacity/Hr</th>
-                        <th style="width: 8%" class="text-end">Efficiency</th>
-                        <th style="width: 8%" class="text-end">Cost/Hr</th>
-                        <th style="width: 8%" class="text-center">Machines</th>
-                        <th style="width: 8%">Status</th>
-                        <th style="width: 10%" class="text-end">Actions</th>
+                        <th style="width: 15%">Name</th>
+                        <th style="width: 18%">Hierarchy Path</th>
+                        <th style="width: 10%">Type</th>
+                        <th style="width: 12%">Department</th>
+                        <th style="width: 10%">Location</th>
+                        <th style="width: 7%" class="text-end">Capacity/Hr</th>
+                        <th style="width: 6%" class="text-end">Efficiency</th>
+                        <th style="width: 6%" class="text-end">Cost/Hr</th>
+                        <th style="width: 6%" class="text-center">Machines</th>
+                        <th style="width: 6%">Status</th>
+                        <th style="width: 8%" class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -94,6 +95,7 @@
                                 </a>
                             </td>
                             <td class="align-middle text-dark fw-medium">{{ $wc->name }}</td>
+                            <td class="align-middle fs-11 text-muted">{{ $wc->getHierarchyPath() }}</td>
                             <td class="align-middle">
                                 <span class="badge bg-soft-primary text-primary text-uppercase fs-10 rounded-pill px-2 py-1">
                                     {{ $workCenterTypes[$wc->work_center_type] ?? $wc->work_center_type ?? 'N/A' }}

@@ -543,8 +543,15 @@ class ProductionEnterpriseTest extends TestCase
         $expectedRoutingCost = 150 * ((50.00 / 60.0) + (25.00 / 60.0)) * 2.0 * (100 / 95.0);
         $this->assertEquals(round($expectedRoutingCost, 4), round($costs['routing_cost'], 4));
 
-        // 3. Total Cost:
-        $this->assertEquals(round($costs['material_cost'] + $costs['routing_cost'], 4), round($costs['total_cost'], 4));
+        // Overhead Cost: 150 mins * (25.00/60) * 2.0 * (100/95.0) = 131.5789
+        $expectedOverheadCost = 150 * (25.00 / 60.0) * 2.0 * (100 / 95.0);
+        $this->assertEquals(round($expectedOverheadCost, 4), round($costs['overhead_cost'], 4));
+
+        // Scrap Adjustment (value of scrap loss): 15.0 * (8/100) * 12.00 = 14.40
+        $this->assertEquals(14.40, round($costs['scrap_adjustment'], 4));
+
+        // 3. Total Cost: Material (194.40) + Routing (394.7368) + Overhead (131.5789) = 720.7158
+        $this->assertEquals(round($costs['material_cost'] + $costs['routing_cost'] + $costs['overhead_cost'], 4), round($costs['total_cost'], 4));
     }
 
     /**
@@ -692,4 +699,457 @@ class ProductionEnterpriseTest extends TestCase
             'bom_name' => 'Auto Unique BOM',
         ]);
     }
+
+    /**
+     * Test Work Center hierarchy path generation helper.
+     */
+    public function test_work_center_hierarchy_path_generation(): void
+    {
+        $dept = WorkCenter::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Fabrication',
+            'code' => 'DEPT-FAB',
+            'type' => 'department',
+            'status' => 'active',
+        ]);
+
+        $section = WorkCenter::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Cutting',
+            'code' => 'SEC-CUT',
+            'type' => 'section',
+            'parent_id' => $dept->id,
+            'status' => 'active',
+        ]);
+
+        $wc = WorkCenter::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Laser Cutting',
+            'code' => 'WC-LASER',
+            'type' => 'work_center',
+            'parent_id' => $section->id,
+            'status' => 'active',
+        ]);
+
+        $this->assertEquals('Fabrication > Cutting > Laser Cutting', $wc->getHierarchyPath());
+    }
+
+    /**
+     * Test Routing validation contexts (permissive for engineering, strict active-only for manufacturing).
+     */
+    public function test_routing_validation_context_constraints(): void
+    {
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-DRAFT-1',
+            'name' => 'Draft Routing',
+            'status' => 'draft',
+        ]);
+
+        $fg = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Engineered FG',
+            'sku' => 'FG-ENG',
+            'type' => 'finished_good',
+            'status' => 'active',
+        ]);
+
+        $rm = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Metal sheet',
+            'sku' => 'RM-METAL',
+            'type' => 'raw_material',
+            'status' => 'active',
+        ]);
+
+        // 1. Trying to link draft routing to manufacturing BOM should throw exception
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Only active routings can be assigned to manufacturing BOMs.");
+
+        $bomService = new \App\Domains\Production\Services\ProductionBomService(
+            new \App\Domains\Production\Repositories\ProductionBomRepository(),
+            new \App\Domains\Production\Services\ProductionBomNumberService()
+        );
+
+        $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
+            'bom_number' => 'BOM-ENG-1',
+            'bom_name' => 'Manufacturing BOM',
+            'bom_type' => 'manufacturing',
+            'usage_context' => 'manufacturing',
+            'product_id' => $fg->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'routing_id' => $routing->id,
+            'effective_date' => now()->toDateString(),
+            'items' => [
+                [
+                    'material_id' => $rm->id,
+                    'quantity' => 1.0,
+                    'uom_id' => $this->uom->id,
+                ]
+            ]
+        ]);
+
+        $bomService->create($dto, $this->user->id);
+    }
+
+    /**
+     * Test draft routing is permitted during engineering BOM creation.
+     */
+    public function test_draft_routing_is_permitted_for_engineering_context(): void
+    {
+        $routing = Routing::create([
+            'tenant_id' => $this->tenant->id,
+            'routing_number' => 'RT-DRAFT-2',
+            'name' => 'Draft Routing 2',
+            'status' => 'draft',
+        ]);
+
+        $fg = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Engineered FG 2',
+            'sku' => 'FG-ENG-2',
+            'type' => 'finished_good',
+            'status' => 'active',
+        ]);
+
+        $rm = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Metal sheet 2',
+            'sku' => 'RM-METAL-2',
+            'type' => 'raw_material',
+            'status' => 'active',
+        ]);
+
+        $bomService = new \App\Domains\Production\Services\ProductionBomService(
+            new \App\Domains\Production\Repositories\ProductionBomRepository(),
+            new \App\Domains\Production\Services\ProductionBomNumberService()
+        );
+
+        $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
+            'bom_number' => 'BOM-ENG-2',
+            'bom_name' => 'Engineering BOM',
+            'bom_type' => 'engineering',
+            'usage_context' => 'engineering',
+            'product_id' => $fg->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'routing_id' => $routing->id,
+            'effective_date' => now()->toDateString(),
+            'items' => [
+                [
+                    'material_id' => $rm->id,
+                    'quantity' => 1.0,
+                    'uom_id' => $this->uom->id,
+                ]
+            ]
+        ]);
+
+        $bom = $bomService->create($dto, $this->user->id);
+        $this->assertNotNull($bom);
+        $this->assertEquals($routing->id, $bom->routing_id);
+    }
+
+    /**
+     * Test circular child BOM linking prevention.
+     */
+    public function test_circular_child_bom_linking_detection(): void
+    {
+        $fg = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Parent Good',
+            'sku' => 'FG-PARENT',
+            'type' => 'finished_good',
+            'status' => 'active',
+        ]);
+
+        $sub = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Child Subassembly',
+            'sku' => 'SF-CHILD',
+            'type' => 'semi_finished',
+            'status' => 'active',
+        ]);
+
+        // Create Parent BOM (Draft)
+        $parentBom = ProductionBom::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_number' => 'BOM-PARENT',
+            'bom_name' => 'Parent BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $fg->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        // Create Child BOM (Draft) linking back to parent
+        $childBom = ProductionBom::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_number' => 'BOM-CHILD',
+            'bom_name' => 'Child BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $sub->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'status' => 'draft',
+        ]);
+
+        // Link parent to child item (BOM-CHILD has an item pointing to FG-PARENT with child_bom_id = BOM-PARENT)
+        ProductionBomItem::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_id' => $childBom->id,
+            'sequence' => 10,
+            'material_id' => $fg->id,
+            'quantity' => 1.0,
+            'uom_id' => $this->uom->id,
+            'child_bom_id' => $parentBom->id,
+        ]);
+
+        // Now if we try to update/create Parent BOM linking child item to BOM-CHILD, it should detect circular cycle!
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Circular child BOM dependency detected.");
+
+        $bomService = new \App\Domains\Production\Services\ProductionBomService(
+            new \App\Domains\Production\Repositories\ProductionBomRepository(),
+            new \App\Domains\Production\Services\ProductionBomNumberService()
+        );
+
+        $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
+            'bom_number' => 'BOM-PARENT',
+            'bom_name' => 'Parent BOM',
+            'bom_type' => 'manufacturing',
+            'usage_context' => 'manufacturing',
+            'product_id' => $fg->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'items' => [
+                [
+                    'material_id' => $sub->id,
+                    'quantity' => 1.0,
+                    'uom_id' => $this->uom->id,
+                    'child_bom_id' => $childBom->id,
+                ]
+            ]
+        ]);
+
+        $bomService->update($parentBom->id, $dto);
+    }
+
+    /**
+     * Test linked child BOM product must match component material product.
+     */
+    public function test_bom_item_child_bom_version_must_match_material_product(): void
+    {
+        $fg = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Finished Item',
+            'sku' => 'FG-ITEM',
+            'type' => 'finished_good',
+            'status' => 'active',
+        ]);
+
+        $sub1 = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Subassembly 1',
+            'sku' => 'SF-SUB1',
+            'type' => 'semi_finished',
+            'status' => 'active',
+        ]);
+
+        $sub2 = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Subassembly 2',
+            'sku' => 'SF-SUB2',
+            'type' => 'semi_finished',
+            'status' => 'active',
+        ]);
+
+        // Create BOM for Subassembly 2
+        $bom2 = ProductionBom::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_number' => 'BOM-SUB2',
+            'bom_name' => 'Subassembly 2 BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $sub2->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        // Try to link Subassembly 2's BOM to Subassembly 1's component row
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Linked child BOM product does not match component material product.");
+
+        $bomService = new \App\Domains\Production\Services\ProductionBomService(
+            new \App\Domains\Production\Repositories\ProductionBomRepository(),
+            new \App\Domains\Production\Services\ProductionBomNumberService()
+        );
+
+        $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
+            'bom_number' => 'BOM-FG-ERR',
+            'bom_name' => 'Invalid Link BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $fg->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'items' => [
+                [
+                    'material_id' => $sub1->id,
+                    'quantity' => 1.0,
+                    'uom_id' => $this->uom->id,
+                    'child_bom_id' => $bom2->id, // Mismatch: bom2 belongs to sub2 but material_id is sub1
+                ]
+            ]
+        ]);
+
+        $bomService->create($dto, $this->user->id);
+    }
+
+    /**
+     * Test child BOM effective date must predate parent BOM effective date.
+     */
+    public function test_child_bom_effective_date_must_predate_parent(): void
+    {
+        $fg = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Finished Item',
+            'sku' => 'FG-ITEM-2',
+            'type' => 'finished_good',
+            'status' => 'active',
+        ]);
+
+        $sub = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Subassembly',
+            'sku' => 'SF-SUB-2',
+            'type' => 'semi_finished',
+            'status' => 'active',
+        ]);
+
+        // Create child BOM with future effective date
+        $childBom = ProductionBom::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_number' => 'BOM-FUTURE-CHILD',
+            'bom_name' => 'Future Child BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $sub->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->addDays(5)->toDateString(), // 5 days in the future
+            'status' => 'approved',
+        ]);
+
+        // Try to create parent BOM effective today linking the future child BOM
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Child BOM effective date");
+
+        $bomService = new \App\Domains\Production\Services\ProductionBomService(
+            new \App\Domains\Production\Repositories\ProductionBomRepository(),
+            new \App\Domains\Production\Services\ProductionBomNumberService()
+        );
+
+        $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
+            'bom_number' => 'BOM-PARENT-ERR',
+            'bom_name' => 'Parent BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $fg->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(), // Effective today
+            'items' => [
+                [
+                    'material_id' => $sub->id,
+                    'quantity' => 1.0,
+                    'uom_id' => $this->uom->id,
+                    'child_bom_id' => $childBom->id,
+                ]
+            ]
+        ]);
+
+        $bomService->create($dto, $this->user->id);
+    }
+
+    /**
+     * Test child BOM expiry must outlast parent BOM expiry.
+     */
+    public function test_child_bom_expiry_must_outlast_parent(): void
+    {
+        $fg = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Finished Item',
+            'sku' => 'FG-ITEM-3',
+            'type' => 'finished_good',
+            'status' => 'active',
+        ]);
+
+        $sub = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Subassembly',
+            'sku' => 'SF-SUB-3',
+            'type' => 'semi_finished',
+            'status' => 'active',
+        ]);
+
+        // Create child BOM that expires in 2 days
+        $childBom = ProductionBom::create([
+            'tenant_id' => $this->tenant->id,
+            'bom_number' => 'BOM-EXPIRING-CHILD',
+            'bom_name' => 'Expiring Child BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $sub->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'expiry_date' => now()->addDays(2)->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        // Try to create parent BOM that expires in 5 days (outlasting child expiry)
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Child BOM expiry date");
+
+        $bomService = new \App\Domains\Production\Services\ProductionBomService(
+            new \App\Domains\Production\Repositories\ProductionBomRepository(),
+            new \App\Domains\Production\Services\ProductionBomNumberService()
+        );
+
+        $dto = \App\Domains\Production\DTO\ProductionBomDTO::fromArray([
+            'bom_number' => 'BOM-PARENT-EXP-ERR',
+            'bom_name' => 'Parent BOM',
+            'bom_type' => 'manufacturing',
+            'product_id' => $fg->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'effective_date' => now()->toDateString(),
+            'expiry_date' => now()->addDays(5)->toDateString(), // Expires in 5 days
+            'items' => [
+                [
+                    'material_id' => $sub->id,
+                    'quantity' => 1.0,
+                    'uom_id' => $this->uom->id,
+                    'child_bom_id' => $childBom->id,
+                ]
+            ]
+        ]);
+
+        $bomService->create($dto, $this->user->id);
+    }
 }
+

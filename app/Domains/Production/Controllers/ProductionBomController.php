@@ -43,40 +43,33 @@ class ProductionBomController extends Controller
     {
         $tenantId = tenant_id() ?? 1;
 
-        $approvedBom = ProductionBom::withoutGlobalScopes()
+        $boms = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('product_id', $productId)
-            ->where('status', 'approved')
-            ->first();
+            ->get();
 
-        if ($approvedBom) {
-            return response()->json([
-                'status' => 'approved',
-                'bom_id' => $approvedBom->id,
-                'bom_number' => $approvedBom->bom_number,
-                'version' => $approvedBom->version,
-                'bom_name' => $approvedBom->bom_name,
-            ]);
-        }
+        $versions = $boms->map(function ($bom) {
+            return [
+                'id' => $bom->id,
+                'bom_number' => $bom->bom_number,
+                'version' => $bom->version,
+                'bom_name' => $bom->bom_name,
+                'status' => $bom->status,
+                'effective_date' => $bom->effective_date ? $bom->effective_date->toDateString() : null,
+                'expiry_date' => $bom->expiry_date ? $bom->expiry_date->toDateString() : null,
+            ];
+        });
 
-        $otherBom = ProductionBom::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('product_id', $productId)
-            ->whereIn('status', ['draft', 'pending_approval', 'under_revision'])
-            ->first();
-
-        if ($otherBom) {
-            return response()->json([
-                'status' => 'draft',
-                'bom_id' => $otherBom->id,
-                'bom_number' => $otherBom->bom_number,
-                'version' => $otherBom->version,
-                'bom_name' => $otherBom->bom_name,
-            ]);
-        }
+        $approved = $boms->firstWhere('status', 'approved');
+        $draft = $boms->firstWhere('status', 'draft') ?? $boms->firstWhere('status', 'under_revision') ?? $boms->firstWhere('status', 'pending_approval');
 
         return response()->json([
-            'status' => 'none',
+            'status' => $approved ? 'approved' : ($draft ? 'draft' : 'none'),
+            'bom_id' => $approved ? $approved->id : ($draft ? $draft->id : null),
+            'bom_number' => $approved ? $approved->bom_number : ($draft ? $draft->bom_number : null),
+            'version' => $approved ? $approved->version : ($draft ? $draft->version : null),
+            'bom_name' => $approved ? $approved->bom_name : ($draft ? $draft->bom_name : null),
+            'versions' => $versions,
         ]);
     }
 
@@ -150,11 +143,12 @@ class ProductionBomController extends Controller
         }
         $costPerUnit = $bom->base_quantity > 0 ? ($totalCost / $bom->base_quantity) : 0.0;
 
-        $costSummary = [
+        $costCalculations = $this->costService->calculateCost($bom);
+        $costSummary = array_merge([
             'items' => $costDetails,
             'total_cost' => $totalCost,
             'cost_per_unit' => $costPerUnit,
-        ];
+        ], $costCalculations);
 
         $componentProductIds = $bom->items->pluck('material_id')->unique();
         $componentBoms = ProductionBom::withoutGlobalScopes()
@@ -167,6 +161,7 @@ class ProductionBomController extends Controller
         $routingCost = $this->costService->calculateRoutingCost($bom);
         $totalMfgCost = $this->costService->calculateTotalManufacturingCost($bom);
         $whereUsedParents = $this->whereUsedService->findParents($bom->product);
+        $whereUsedBoms = $this->whereUsedService->findParentBoms($bom->product);
 
         $parentProduct = null;
         $parentBom = null;
@@ -184,7 +179,7 @@ class ProductionBomController extends Controller
         return view('modules.production.bom.show', compact(
             'bom', 'explosion', 'calcQty', 'costSummary', 'componentBoms',
             'materialCost', 'routingCost', 'totalMfgCost', 'whereUsedParents',
-            'parentProduct', 'parentBom'
+            'parentProduct', 'parentBom', 'whereUsedBoms'
         ));
     }
 

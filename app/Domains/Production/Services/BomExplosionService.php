@@ -26,21 +26,20 @@ class BomExplosionService
         }
 
         $visited = [];
-        $tree = $this->buildExplosionTree($product, $quantity, $tenantId, 1, $visited);
+        $tree = $this->calculate($product, $quantity, $tenantId, 1, $visited);
         
-        $flat = [];
-        $this->consolidateRequirements($tree, $flat);
+        $flat = $this->generateRequirements($tree);
 
         return [
             'tree' => $tree,
-            'flat' => array_values($flat),
+            'flat' => $flat,
         ];
     }
 
     /**
-     * Recursively build the BOM tree hierarchy.
+     * Calculate explosion node for a given product at a specific level.
      */
-    private function buildExplosionTree(Product $product, float $quantity, int $tenantId, int $level, array $visited): array
+    protected function calculate(Product $product, float $quantity, int $tenantId, int $level, array $visited, ?int $forcedBomId = null): array
     {
         if (isset($visited[$product->id])) {
             throw new InvalidArgumentException("Circular dependency loop detected: product '{$product->name}' (SKU: {$product->sku}) references itself.");
@@ -59,13 +58,21 @@ class BomExplosionService
             'has_sub_bom' => false,
         ];
 
-        // Find the active approved BOM for this product
-        $bom = ProductionBom::withoutGlobalScopes()
-            ->where('tenant_id', $tenantId)
-            ->where('product_id', $product->id)
-            ->where('status', 'approved')
-            ->with(['items.material', 'items.uom'])
-            ->first();
+        // Find the BOM: either the forced child_bom_id or the default active approved BOM
+        if ($forcedBomId) {
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $forcedBomId)
+                ->with(['items.material', 'items.uom'])
+                ->first();
+        } else {
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $product->id)
+                ->where('status', 'approved')
+                ->with(['items.material', 'items.uom'])
+                ->first();
+        }
 
         if ($bom) {
             $node['has_sub_bom'] = true;
@@ -74,45 +81,69 @@ class BomExplosionService
             $node['bom_version'] = $bom->version;
             $node['uom_code'] = $bom->baseUom ? $bom->baseUom->code : 'PCS';
 
-            $baseQty = $bom->base_quantity > 0 ? $bom->base_quantity : 1.0;
-            $multiplier = $quantity / $baseQty;
-
-            foreach ($bom->items as $item) {
-                // Calculate Net Component Quantity
-                $netQty = $item->quantity * $multiplier;
-                // Calculate Gross Quantity including scrap
-                $scrapFactor = 1 + ($item->material_scrap_percentage / 100);
-                $grossQty = $netQty * $scrapFactor;
-
-                $childProduct = $item->material;
-
-                // Recurse for the component
-                $childTree = $this->buildExplosionTree($childProduct, $grossQty, $tenantId, $level + 1, $visited);
-                
-                // Set component properties
-                $childTree['net_quantity'] = $netQty;
-                $childTree['gross_quantity'] = $grossQty;
-                $childTree['material_scrap_percentage'] = $item->material_scrap_percentage;
-                $childTree['is_alternative'] = $item->is_alternative;
-                $childTree['alternative_group'] = $item->alternative_group;
-                $childTree['priority'] = $item->priority;
-                $childTree['uom_code'] = $item->uom ? $item->uom->code : 'PCS';
-
-                $node['children'][] = $childTree;
-            }
+            $node['children'] = $this->resolveChildren($bom, $quantity, $tenantId, $level, $visited);
         }
 
         return $node;
     }
 
     /**
-     * Consolidate nested requirements into a flat raw material lists.
+     * Resolve child items for a given BOM.
+     */
+    protected function resolveChildren(ProductionBom $bom, float $parentQty, int $tenantId, int $level, array $visited): array
+    {
+        $children = [];
+        $baseQty = $bom->base_quantity > 0 ? $bom->base_quantity : 1.0;
+        $multiplier = $parentQty / $baseQty;
+
+        foreach ($bom->items as $item) {
+            $netQty = $item->quantity * $multiplier;
+            $grossQty = $this->applyScrap($netQty, $item->material_scrap_percentage);
+
+            $childProduct = $item->material;
+
+            // Recurse using calculate
+            $childTree = $this->calculate($childProduct, $grossQty, $tenantId, $level + 1, $visited, $item->child_bom_id);
+            
+            $childTree['net_quantity'] = $netQty;
+            $childTree['gross_quantity'] = $grossQty;
+            $childTree['material_scrap_percentage'] = $item->material_scrap_percentage;
+            $childTree['is_alternative'] = $item->is_alternative;
+            $childTree['alternative_group'] = $item->alternative_group;
+            $childTree['priority'] = $item->priority;
+            $childTree['uom_code'] = $item->uom ? $item->uom->code : 'PCS';
+
+            $children[] = $childTree;
+        }
+
+        return $children;
+    }
+
+    /**
+     * Apply scrap loss calculation.
+     */
+    protected function applyScrap(float $netQty, float $scrapPct): float
+    {
+        $scrapFactor = 1 + ($scrapPct / 100);
+        return $netQty * $scrapFactor;
+    }
+
+    /**
+     * Generate consolidated flat list of requirements from the tree.
+     */
+    protected function generateRequirements(array $tree): array
+    {
+        $flat = [];
+        $this->consolidateRequirements($tree, $flat);
+        return array_values($flat);
+    }
+
+    /**
+     * Consolidate nested requirements into a flat list.
      */
     private function consolidateRequirements(array $node, array &$flat): void
     {
-        // If a node has no children, it's a leaf node (Raw Material or external component)
         if (empty($node['children'])) {
-            // Do not consolidate the root node if it's the target product itself
             if ($node['level'] === 1) {
                 return;
             }

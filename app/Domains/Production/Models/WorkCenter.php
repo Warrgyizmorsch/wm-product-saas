@@ -28,6 +28,7 @@ class WorkCenter extends BaseModel
         'capacity_per_hour',
         'efficiency_percentage',
         'cost_per_hour',
+        'overhead_rate',
         'status',
         'parent_id',
         'type',
@@ -37,6 +38,7 @@ class WorkCenter extends BaseModel
         'capacity_per_hour'      => 'float',
         'efficiency_percentage'  => 'float',
         'cost_per_hour'          => 'float',
+        'overhead_rate'          => 'float',
         'parent_id'              => 'integer',
     ];
 
@@ -101,5 +103,24 @@ class WorkCenter extends BaseModel
     public function effectiveCapacityPerHour(): float
     {
         return ($this->capacity_per_hour ?? 0) * ($this->efficiency_percentage / 100);
+    }
+
+    /**
+     * Get the breadcrumb path of the work center hierarchy.
+     * e.g. "Fabrication > Cutting > Laser Cutting"
+     */
+    public function getHierarchyPath(string $separator = ' > '): string
+    {
+        $path = [$this->name];
+        $current = $this;
+        $depth = 0;
+
+        while ($current->parent_id && $current->parent && $depth < 10) {
+            $current = $current->parent;
+            array_unshift($path, $current->name);
+            $depth++;
+        }
+
+        return implode($separator, $path);
     }
 }

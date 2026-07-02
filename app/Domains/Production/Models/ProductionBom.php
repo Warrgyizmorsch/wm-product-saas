@@ -18,11 +18,14 @@ class ProductionBom extends BaseModel
 
     protected $table = 'production_boms';
 
+    public const USAGE_CONTEXTS = ['manufacturing', 'engineering', 'prototype', 'costing'];
+
     protected $fillable = [
         'tenant_id',
         'bom_number',
         'bom_name',
         'bom_type', // manufacturing, engineering, sales, phantom, subcontracting
+        'usage_context', // manufacturing, engineering, prototype, costing
         'product_id',
         'base_quantity',
         'base_uom_id',

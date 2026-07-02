@@ -28,4 +28,24 @@ class BomWhereUsedService
             return $item->bom->product;
         })->unique('id')->values();
     }
+
+    /**
+     * Finds full parent BOM records consuming the product as a subassembly or component.
+     * Includes all statuses for full engineering traceability.
+     */
+    public function findParentBoms(Product $product): Collection
+    {
+        $tenantId = $product->tenant_id;
+
+        $items = ProductionBomItem::where('material_id', $product->id)
+            ->whereHas('bom', function ($query) use ($tenantId) {
+                $query->where('tenant_id', $tenantId);
+            })
+            ->with(['bom.product'])
+            ->get();
+
+        return $items->map(function ($item) {
+            return $item->bom;
+        })->unique('id')->values();
+    }
 }
