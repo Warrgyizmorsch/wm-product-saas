@@ -10,6 +10,7 @@ use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\Branch;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
+use App\Domains\HRMS\Models\SalaryComponent;
 use Illuminate\Http\Request;
 
 class OrgController extends Controller {
@@ -61,9 +62,10 @@ class OrgController extends Controller {
         $branches = Branch::with(['businessUnit', 'company', 'manager'])->get();
         $departments = Department::with(['branch', 'company', 'businessUnit', 'head'])->get();
         $designations = Designation::with(['department'])->get();
+        $salaryComponents = SalaryComponent::with(['company'])->get();
 
         return view('modules.hrms.org-structure.org', compact(
-            'companies', 'businessUnits', 'employees', 'branches', 'departments', 'designations'
+            'companies', 'businessUnits', 'employees', 'branches', 'departments', 'designations', 'salaryComponents'
         ));
     }
 

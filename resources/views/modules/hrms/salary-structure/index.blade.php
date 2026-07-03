@@ -74,6 +74,24 @@
             color: #fff !important;
             font-weight: 600;
         }
+
+        /* Underlined Horizontal Tabs to match Org Structure style */
+        #salaryStructureTabs .nav-link {
+            border: none !important;
+            background-color: transparent !important;
+            color: #64748b;
+            font-weight: 500;
+            padding: 12px 20px;
+            border-bottom: 2px solid transparent !important;
+            transition: all 0.2s ease-in-out;
+        }
+        #salaryStructureTabs .nav-link:hover {
+            color: var(--bs-primary);
+        }
+        #salaryStructureTabs .nav-link.active {
+            color: var(--bs-primary) !important;
+            border-bottom: 2px solid var(--bs-primary) !important;
+        }
     </style>
 
     <div class="settings-container">
@@ -95,9 +113,25 @@
                 </x-ui.alert>
             @endif
 
+            <!-- Nav tabs -->
+            <ul class="nav gap-2 border-bottom mb-4" id="salaryStructureTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active px-4 py-3" id="structures-tab" data-bs-toggle="tab" data-bs-target="#structures-pane" type="button" role="tab" aria-controls="structures-pane" aria-selected="true">
+                        <i class="feather-grid me-2"></i>Salary Structures (Slabs)
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link px-4 py-3" id="components-tab" data-bs-toggle="tab" data-bs-target="#components-pane" type="button" role="tab" aria-controls="components-pane" aria-selected="false">
+                        <i class="feather-list me-2"></i>Salary Components
+                    </button>
+                </li>
+            </ul>
+
             <div class="tab-content" id="settingsSubSidebarContent">
-                <!-- Salary Components List View -->
-                <div class="tab-pane fade show active" id="salary-structure-pane" role="tabpanel">
+                <div class="tab-pane fade show active" id="structures-pane" role="tabpanel" aria-labelledby="structures-tab">
+                    @include('modules.hrms.salary-structure.tabs.salary-structures')
+                </div>
+                <div class="tab-pane fade" id="components-pane" role="tabpanel" aria-labelledby="components-tab">
                     @include('modules.hrms.salary-structure.tabs.salary-components')
                 </div>
             </div>
@@ -113,6 +147,16 @@
             document.querySelectorAll('.modal').forEach(function(modal) {
                 document.body.appendChild(modal);
             });
+
+            // Automatically activate the correct tab if passed in query string (handles redirects after submit)
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabParam = urlParams.get('tab');
+            if (tabParam) {
+                const tabButton = document.getElementById(tabParam + '-tab');
+                if (tabButton) {
+                    tabButton.click();
+                }
+            }
 
             // Correctly initialize Select2 inside Salary Component modals when shown (avoiding width: 0px bug)
             $('#addSalaryComponentModal, #editSalaryComponentModal').on('shown.bs.modal', function () {

@@ -192,7 +192,7 @@
 
                 <!-- Salary Structure Pane -->
                 <div class="tab-pane fade" id="salary-structure-pane" role="tabpanel" aria-labelledby="salary-structure-menu">
-                    @include('modules.hrms.salary-structure.salary-components')
+                    @include('modules.hrms.salary-structure.tabs.salary-components')
                 </div>
 
                 <!-- Leave Structure Pane -->
