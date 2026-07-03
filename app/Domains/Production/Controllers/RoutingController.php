@@ -65,7 +65,7 @@ class RoutingController extends Controller
         }
 
         try {
-            $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
             $dto      = RoutingDTO::fromArray($request->validated());
             $routing  = $this->routingService->create($dto, $tenantId, auth()->id() ?: 1);
 

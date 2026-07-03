@@ -22,7 +22,7 @@ class ResolveTenant
         $tenant = $this->tenants->resolve($request);
 
         abort_if($tenant === null, Response::HTTP_NOT_FOUND, 'Tenant not found.');
-        abort_if($tenant->status !== 'active', Response::HTTP_FORBIDDEN, 'Tenant is not active.');
+        abort_unless($tenant->isAccessible(), Response::HTTP_FORBIDDEN, 'Tenant is not available.');
 
         $this->context->set($tenant);
         app(Tenancy::class)->set($tenant);

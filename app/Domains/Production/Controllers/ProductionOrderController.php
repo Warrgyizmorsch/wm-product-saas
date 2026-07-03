@@ -32,7 +32,7 @@ class ProductionOrderController extends Controller
             Gate::authorize('viewAny', ProductionOrder::class);
         }
 
-        $tenantId = Auth::user()?->tenant_id ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $query = ProductionOrder::with(['product', 'bom', 'routing']);
 
         if ($request->filled('search')) {
@@ -84,7 +84,7 @@ class ProductionOrderController extends Controller
             Gate::authorize('create', ProductionOrder::class);
         }
 
-        $tenantId = Auth::user()?->tenant_id ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         try {
             $order = $this->orderService->createDirect($request->validated(), $tenantId, Auth::id());

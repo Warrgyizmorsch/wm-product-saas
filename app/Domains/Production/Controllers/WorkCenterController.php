@@ -53,7 +53,7 @@ class WorkCenterController extends Controller
         }
 
         try {
-            $tenantId = tenant_id() ?? 1;
+            $tenantId = require_tenant_id();
             $dto      = WorkCenterDTO::fromArray($request->validated());
             $wc       = $this->service->create($dto, $tenantId);
 

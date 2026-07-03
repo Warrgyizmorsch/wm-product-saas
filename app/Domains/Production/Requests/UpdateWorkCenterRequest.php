@@ -14,7 +14,7 @@ class UpdateWorkCenterRequest extends FormRequest
 
     public function rules(): array
     {
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $workCenterId = $this->route('work_center');
 
         return [

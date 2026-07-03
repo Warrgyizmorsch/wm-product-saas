@@ -31,7 +31,7 @@ class ProductionPlanController extends Controller
             Gate::authorize('viewAny', ProductionPlan::class);
         }
 
-        $tenantId = Auth::user()?->tenant_id ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         // Fetch plans with query filtering
         $query = ProductionPlan::with(['product', 'bom', 'routing']);
@@ -78,7 +78,7 @@ class ProductionPlanController extends Controller
 
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         
-        $tenantId = Auth::user()?->tenant_id ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         // Load default BOM and Routing dropdowns
         $boms = ProductionBom::withoutGlobalScopes()
@@ -103,7 +103,7 @@ class ProductionPlanController extends Controller
         $dto = ProductionPlanDTO::fromArray($request->validated());
 
         try {
-            $tenantId = Auth::user()?->tenant_id ?? tenant_id() ?? 1;
+            $tenantId = require_tenant_id();
             $plan = $this->planService->create($dto, $tenantId, Auth::id());
             return redirect()
                 ->route('production.plans.show', $plan->id)
@@ -154,7 +154,7 @@ class ProductionPlanController extends Controller
 
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         
-        $tenantId = Auth::user()?->tenant_id ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $boms = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
@@ -338,7 +338,7 @@ class ProductionPlanController extends Controller
     public function getEngineeringOptions(Request $request)
     {
         $productId = $request->input('product_id');
-        $tenantId = Auth::user()?->tenant_id ?? tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $boms = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)

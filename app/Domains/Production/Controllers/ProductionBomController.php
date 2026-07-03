@@ -41,7 +41,7 @@ class ProductionBomController extends Controller
 
     public function checkChildBom(int $productId)
     {
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         $boms = ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
@@ -86,7 +86,7 @@ class ProductionBomController extends Controller
             default => $this->versionService->incrementPatch($bom->version),
         };
 
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         while (ProductionBom::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where('product_id', $bom->product_id)

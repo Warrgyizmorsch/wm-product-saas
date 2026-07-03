@@ -14,7 +14,7 @@ class StoreWorkCenterRequest extends FormRequest
 
     public function rules(): array
     {
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         return [
             'name'                  => 'required|string|max:255',

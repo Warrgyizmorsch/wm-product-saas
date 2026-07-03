@@ -58,7 +58,7 @@ class MachineController extends Controller
         }
 
         try {
-            $tenantId = tenant_id() ?? 1;
+            $tenantId = require_tenant_id();
             $dto      = MachineDTO::fromArray($request->validated());
             $machine  = $this->service->create($dto, $tenantId);
 

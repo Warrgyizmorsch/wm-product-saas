@@ -15,7 +15,7 @@ class UpdateMachineRequest extends FormRequest
 
     public function rules(): array
     {
-        $tenantId  = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
         $machineId = $this->route('machine');
 
         return [

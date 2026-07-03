@@ -15,7 +15,7 @@ class StoreMachineRequest extends FormRequest
 
     public function rules(): array
     {
-        $tenantId = tenant_id() ?? 1;
+        $tenantId = require_tenant_id();
 
         return [
             'work_center_id'     => 'required|exists:production_work_centers,id',

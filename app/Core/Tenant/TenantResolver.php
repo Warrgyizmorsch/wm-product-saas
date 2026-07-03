@@ -20,7 +20,7 @@ class TenantResolver
         if ($sessionTenantSlug) {
             return Tenant::query()
                 ->where('slug', $sessionTenantSlug)
-                ->where('status', 'active')
+                ->whereIn('status', Tenant::accessibleStatuses())
                 ->first();
         }
 
@@ -31,16 +31,22 @@ class TenantResolver
         }
 
         return Tenant::query()
-            ->where('domain', $host)
-            ->orWhere('slug', $this->subdomainFromHost($host))
+            ->whereIn('status', Tenant::accessibleStatuses())
+            ->where(function ($query) use ($host): void {
+                $query->where('domain', $host)
+                    ->orWhere('slug', $this->subdomainFromHost($host));
+            })
             ->first();
     }
 
     private function findByKey(string $tenantKey): ?Tenant
     {
         return Tenant::query()
-            ->where('slug', $tenantKey)
-            ->orWhere('domain', $tenantKey)
+            ->whereIn('status', Tenant::accessibleStatuses())
+            ->where(function ($query) use ($tenantKey): void {
+                $query->where('slug', $tenantKey)
+                    ->orWhere('domain', $tenantKey);
+            })
             ->first();
     }
 
@@ -55,7 +61,7 @@ class TenantResolver
         if ($slug) {
             $tenant = Tenant::query()
                 ->where('slug', $slug)
-                ->where('status', 'active')
+                ->whereIn('status', Tenant::accessibleStatuses())
                 ->first();
 
             if ($tenant !== null) {
@@ -64,7 +70,7 @@ class TenantResolver
         }
 
         return Tenant::query()
-            ->where('status', 'active')
+            ->whereIn('status', Tenant::accessibleStatuses())
             ->first();
     }
 

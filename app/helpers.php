@@ -19,6 +19,24 @@ if (! function_exists('tenant_id')) {
     }
 }
 
+if (! function_exists('current_tenant_id')) {
+    function current_tenant_id(): ?int
+    {
+        return auth()->user()?->tenant_id ?? tenant_id();
+    }
+}
+
+if (! function_exists('require_tenant_id')) {
+    function require_tenant_id(): int
+    {
+        $tenantId = current_tenant_id();
+
+        abort_if($tenantId === null, 403, 'Tenant context is required.');
+
+        return (int) $tenantId;
+    }
+}
+
 if (! function_exists('tenant_context')) {
     function tenant_context(): TenantContext
     {

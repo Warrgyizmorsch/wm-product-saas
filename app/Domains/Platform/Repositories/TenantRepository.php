@@ -10,6 +10,7 @@ class TenantRepository
     public function all(): Collection
     {
         return Tenant::query()
+            ->with('owner')
             ->latest()
             ->get();
     }
@@ -22,7 +23,21 @@ class TenantRepository
     public function activeCount(): int
     {
         return Tenant::query()
-            ->where('status', 'active')
+            ->where('status', Tenant::STATUS_ACTIVE)
+            ->count();
+    }
+
+    public function trialCount(): int
+    {
+        return Tenant::query()
+            ->where('status', Tenant::STATUS_TRIAL)
+            ->count();
+    }
+
+    public function suspendedCount(): int
+    {
+        return Tenant::query()
+            ->where('status', Tenant::STATUS_SUSPENDED)
             ->count();
     }
 

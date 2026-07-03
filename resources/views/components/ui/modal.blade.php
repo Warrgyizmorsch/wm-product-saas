@@ -8,7 +8,8 @@
     'submitText' => 'Save changes',
     'closeText' => 'Close',
     'formAction' => null,
-    'formMethod' => 'POST'
+    'formMethod' => 'POST',
+    'showFooter' => true
 ])
 
 <div class="modal fade" id="{{ $id }}" {{ $static ? 'data-bs-backdrop=static data-bs-keyboard=false' : '' }} tabindex="-1" aria-labelledby="{{ $id }}Label" aria-hidden="true" {{ $attributes->merge(['class' => '']) }}>
@@ -31,18 +32,20 @@
                 {{ $slot }}
             </div>
 
-            <div class="modal-footer">
-                @if(isset($footer))
-                    {{ $footer }}
-                @else
-                    <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ $closeText }}</button>
-                    @if($formAction)
-                        <button type="submit" class="btn btn-primary">{{ $submitText }}</button>
+            @if($showFooter)
+                <div class="modal-footer">
+                    @if(isset($footer))
+                        {{ $footer }}
                     @else
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">{{ $submitText }}</button>
+                        <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ $closeText }}</button>
+                        @if($formAction)
+                            <button type="submit" class="btn btn-primary">{{ $submitText }}</button>
+                        @else
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">{{ $submitText }}</button>
+                        @endif
                     @endif
-                @endif
-            </div>
+                </div>
+            @endif
 
             @if($formAction)
                 </form>

@@ -15,6 +15,7 @@
 
     $tenants = \Illuminate\Support\Facades\Schema::hasTable('tenants')
         ? \App\Models\Tenant::query()
+            ->whereIn('status', \App\Models\Tenant::accessibleStatuses())
             ->orderBy('name')
             ->get()
             ->map(fn ($tenant) => [
@@ -153,12 +154,13 @@
                         </div>
                     </div>
 
-                    <div class="dropdown nxl-h-item nxl-mega-menu">
-                        <a href="javascript:void(0);" class="btn btn-light-brand" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                            <i class="feather-grid me-2"></i>
-                            {{ __('ui.modules') }}
-                        </a>
-                        <div class="dropdown-menu nxl-h-dropdown erp-module-launcher" id="mega-menu-dropdown">
+                    <x-ui.dropdown class="nxl-h-item nxl-mega-menu" menu-class="nxl-h-dropdown erp-module-launcher" menu-id="mega-menu-dropdown">
+                        <x-slot name="trigger">
+                            <x-ui.button href="javascript:void(0);" variant="light-brand" icon="feather-grid" class="dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                                {{ __('ui.modules') }}
+                            </x-ui.button>
+                        </x-slot>
+
                             <div class="d-lg-flex align-items-start">
                                 <div class="nav flex-column nxl-mega-menu-tabs" role="tablist" aria-orientation="vertical">
                                     @foreach ($moduleTabs as $index => $tab)
@@ -188,7 +190,7 @@
                                             <div class="row g-3 erp-mega-module-grid">
                                                 @foreach ($tab['modules'] as $module)
                                                     <div class="col-lg-4">
-                                                        <a href="javascript:void(0);" class="dropdown-item erp-module-link">
+                                                        <x-ui.dropdown-item class="erp-module-link">
                                                             <span class="avatar-text avatar-md bg-soft-primary text-primary">
                                                                 <i class="{{ $module['icon'] }}"></i>
                                                             </span>
@@ -197,14 +199,14 @@
                                                                 <small>{{ $module['meta'] }}</small>
                                                             </span>
                                                             <i class="feather-arrow-right ms-auto me-0"></i>
-                                                        </a>
+                                                        </x-ui.dropdown-item>
                                                     </div>
                                                 @endforeach
                                             </div>
 
                                             <hr class="border-top-dashed">
                                             <div class="erp-module-footer">
-                                                <span class="badge bg-soft-success text-success">Enterprise</span>
+                                                <x-ui.badge variant="success" soft>Enterprise</x-ui.badge>
                                                 <span class="fs-11 text-muted">Tenant scoped</span>
                                                 <span class="fs-11 text-muted">Role aware</span>
                                                 <a href="javascript:void(0);" class="fs-12 fw-bold text-primary ms-auto">Access Control &rarr;</a>
@@ -213,27 +215,28 @@
                                     @endforeach
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                    </x-ui.dropdown>
 
-                    <div class="dropdown nxl-h-item erp-tenant-switcher d-none d-xl-flex">
-                        <a href="javascript:void(0);" class="btn btn-light-brand erp-tenant-button" data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                            <span class="avatar-text avatar-sm bg-soft-success text-success">
-                                <i class="feather-briefcase"></i>
-                            </span>
-                            <span class="erp-tenant-copy">
-                                <strong>{{ $currentTenant['name'] }}</strong>
-                                <small>{{ $currentTenant['branch'] }} - {{ $currentTenant['year'] }}</small>
-                            </span>
-                            <i class="feather-chevron-down ms-2"></i>
-                        </a>
-                        <div class="dropdown-menu nxl-h-dropdown erp-tenant-dropdown">
+                    <x-ui.dropdown class="nxl-h-item erp-tenant-switcher d-none d-xl-flex" menu-class="nxl-h-dropdown erp-tenant-dropdown">
+                        <x-slot name="trigger">
+                            <x-ui.button href="javascript:void(0);" variant="light-brand" class="erp-tenant-button dropdown-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside" role="button" aria-expanded="false">
+                                <span class="avatar-text avatar-sm bg-soft-success text-success">
+                                    <i class="feather-briefcase"></i>
+                                </span>
+                                <span class="erp-tenant-copy">
+                                    <strong>{{ $currentTenant['name'] }}</strong>
+                                    <small>{{ $currentTenant['branch'] }} - {{ $currentTenant['year'] }}</small>
+                                </span>
+                                <i class="feather-chevron-down ms-2"></i>
+                            </x-ui.button>
+                        </x-slot>
+
                             <div class="px-4 py-3 border-bottom">
                                 <h6 class="mb-1">{{ __('ui.switch_tenant') }}</h6>
                                 <p class="fs-11 text-muted mb-0">{{ $currentTenant['currency'] }} - {{ $currentTenant['plan'] }} Plan</p>
                             </div>
                             @foreach ($tenants as $tenant)
-                                <a href="{{ route('tenant.switch', $tenant['slug']) }}" class="dropdown-item {{ !empty($tenant['active']) ? 'active' : '' }}">
+                                <x-ui.dropdown-item href="{{ route('tenant.switch', $tenant['slug']) }}" :active="!empty($tenant['active'])">
                                     <span class="avatar-text avatar-sm bg-soft-primary text-primary">{{ substr($tenant['name'], 0, 1) }}</span>
                                     <span>
                                         <span class="d-block fw-semibold">{{ $tenant['name'] }}</span>
@@ -242,15 +245,13 @@
                                     @if (!empty($tenant['active']))
                                         <i class="feather-check ms-auto me-0 text-success"></i>
                                     @endif
-                                </a>
+                                </x-ui.dropdown-item>
                             @endforeach
                             <div class="dropdown-divider"></div>
-                            <a href="{{ route('platform.tenants.create') }}" class="dropdown-item">
-                                <i class="feather-plus"></i>
+                            <x-ui.dropdown-item href="{{ route('platform.tenants.create') }}" icon="feather-plus">
                                 <span>{{ __('ui.add_tenant') }}</span>
-                            </a>
-                        </div>
-                    </div>
+                            </x-ui.dropdown-item>
+                    </x-ui.dropdown>
                 </div>
             </div>
         </div>

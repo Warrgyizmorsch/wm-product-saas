@@ -60,7 +60,7 @@ class TenantController extends Controller
     public function status(Request $request, Tenant $tenant): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => ['required', 'string', Rule::in(['active', 'inactive'])],
+            'status' => ['required', 'string', Rule::in([Tenant::STATUS_ACTIVE, Tenant::STATUS_SUSPENDED])],
         ]);
 
         $this->tenants->updateStatus($tenant, $validated['status']);
@@ -89,8 +89,15 @@ class TenantController extends Controller
                 'max:255',
                 Rule::unique('tenants', 'domain')->ignore($tenantId),
             ],
-            'status' => ['required', 'string', Rule::in(['active', 'inactive'])],
-            'plan' => ['required', 'string', Rule::in(['starter', 'pro', 'enterprise'])],
+            'billing_email' => ['nullable', 'email', 'max:255'],
+            'status' => ['required', 'string', Rule::in(array_keys(Tenant::statuses()))],
+            'plan' => ['required', 'string', Rule::in(array_keys(Tenant::plans()))],
+            'subscription_status' => ['required', 'string', Rule::in(array_keys(Tenant::subscriptionStatuses()))],
+            'max_users' => ['nullable', 'integer', 'min:1'],
+            'max_storage_mb' => ['nullable', 'integer', 'min:1'],
+            'trial_ends_at' => ['nullable', 'date'],
+            'plan_started_at' => ['nullable', 'date'],
+            'plan_expires_at' => ['nullable', 'date', 'after_or_equal:plan_started_at'],
             'timezone' => ['required', 'string', 'max:100'],
             'locale' => ['required', 'string', 'max:10'],
             'display_name' => ['nullable', 'string', 'max:255'],
@@ -99,6 +106,9 @@ class TenantController extends Controller
             'branch' => ['nullable', 'string', 'max:255'],
             'currency' => ['nullable', 'string', 'max:10'],
             'financial_year' => ['nullable', 'string', 'max:50'],
+            'owner_name' => [$tenant ? 'nullable' : 'required_with:owner_email', 'nullable', 'string', 'max:255'],
+            'owner_email' => [$tenant ? 'nullable' : 'required_with:owner_name', 'nullable', 'email', 'max:255'],
+            'owner_password' => [$tenant ? 'nullable' : 'required_with:owner_email', 'nullable', 'string', 'min:8', 'confirmed'],
         ]);
     }
 }

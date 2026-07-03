@@ -9,7 +9,6 @@
             ['label' => __('ui.executive_dashboard'), 'icon' => 'feather-home', 'route' => 'dashboard'],
             ['label' => 'Tenant Console', 'icon' => 'feather-grid', 'url' => '#', 'children' => [
                 ['label' => 'Tenants', 'route' => 'platform.tenants.index'],
-                ['label' => __('ui.add_tenant'), 'route' => 'platform.tenants.create'],
                 ['label' => 'Subscriptions'],
                 ['label' => 'Usage Limits'],
             ]],

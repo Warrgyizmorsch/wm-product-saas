@@ -43,8 +43,12 @@ class ProductionBomSeeder extends Seeder
             $demoTenant = Tenant::create([
                 'name' => 'Demo Tenant',
                 'slug' => 'demo',
-                'status' => 'active',
-                'plan' => 'enterprise',
+                'status' => Tenant::STATUS_ACTIVE,
+                'plan' => Tenant::PLAN_ENTERPRISE,
+                'subscription_status' => Tenant::SUBSCRIPTION_ACTIVE,
+                'max_users' => 100,
+                'max_storage_mb' => 10240,
+                'plan_started_at' => now(),
             ]);
             $tenants = collect([$demoTenant]);
         }

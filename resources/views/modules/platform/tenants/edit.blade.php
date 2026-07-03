@@ -5,9 +5,9 @@
 @section('breadcrumb', 'Platform / Tenants / Edit')
 
 @section('page-actions')
-    <a href="{{ route('platform.tenants.index') }}" class="btn btn-light">
-        <i class="feather-arrow-left me-2"></i>Back to Tenants
-    </a>
+    <x-ui.button href="{{ route('platform.tenants.index') }}" variant="light" icon="feather-arrow-left">
+        Back to Tenants
+    </x-ui.button>
 @endsection
 
 @section('content')
@@ -16,5 +16,7 @@
         'action' => route('platform.tenants.update', $tenant),
         'method' => 'PUT',
         'submitLabel' => 'Update Tenant',
+        'formContext' => 'edit',
+        'tenantId' => $tenant->id,
     ])
 @endsection

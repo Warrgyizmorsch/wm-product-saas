@@ -10,7 +10,10 @@ class TenantSwitchController extends Controller
 {
     public function __invoke(Request $request, Tenant $tenant): RedirectResponse
     {
-        abort_if($tenant->status !== 'active', 403, 'Tenant is not active.');
+        abort_unless($tenant->isAccessible(), 403, 'Tenant is not available.');
+
+        $user = $request->user();
+        abort_if($user?->tenant_id !== null && (int) $user->tenant_id !== (int) $tenant->id, 403, 'You are not assigned to this tenant.');
 
         $request->session()->put('tenant_slug', $tenant->slug);
 
