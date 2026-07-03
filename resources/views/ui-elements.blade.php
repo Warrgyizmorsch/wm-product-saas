@@ -65,7 +65,7 @@
         <!-- Tab 1: Odoo Form UI & Inputs -->
         <div class="tab-pane fade show active" id="tab-odoo-forms" role="tabpanel" aria-labelledby="tab-odoo-forms-tab">
             <div class="row">
-                <div class="col-lg-8">
+                <div class="">
                     <!-- Odoo Sheet Container -->
                     <x-ui.odoo-form-ui type="sheet">
                         <div class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
@@ -170,7 +170,7 @@
                                         <td>
                                             <x-ui.odoo-form-ui type="input" inputType="number" step="any" class="text-end" value="5.00" name="grid_qty[]" />
                                         </td>
-                                        <td class="text-center">
+                                        <td>
                                             <x-ui.odoo-form-ui type="checkbox" name="grid_active[]" />
                                         </td>
                                     </tr>
@@ -183,32 +183,6 @@
                             <button type="button" class="btn btn-light border px-4">Discard</button>
                         </div>
                     </x-ui.odoo-form-ui>
-                </div>
-
-                <div class="col-lg-4">
-                    <!-- Standard Form Elements with Dropdown Quick-Create Modals -->
-                    <x-ui.card title="Standard Form & Quick-Create" stretch>
-                        <p class="fs-12 text-muted mb-3">
-                            Below is the standard <code>x-ui.select</code> component with the <code>master</code> attribute set. Choosing <strong>"+ Add New"</strong> opens the modal registry instantly.
-                        </p>
-                        
-                        <x-ui.select label="Select Material" name="material_dropdown_demo" master="product" required>
-                            <option value="">Select an option...</option>
-                            <option value="1">Copper Wire 5m</option>
-                            <option value="2">Brass Nut M8</option>
-                        </x-ui.select>
-
-                        <x-ui.select label="Select UOM" name="uom_dropdown_demo" master="uom" required>
-                            <option value="">Select an option...</option>
-                            <option value="1">Pieces (PCS)</option>
-                            <option value="2">Box (BOX)</option>
-                        </x-ui.select>
-                        
-                        <div class="alert alert-info border-0 p-3 mt-4" style="background-color: rgba(var(--bs-primary-rgb), 0.08);">
-                            <h6 class="alert-heading fw-bold fs-13"><i class="feather-info me-2"></i>Under the Hood</h6>
-                            <p class="fs-12 mb-0">The <code>master-modals</code> component at the bottom handles submissions asynchronously via AJAX, appending newly created records directly back to your selected dropdown.</p>
-                        </div>
-                    </x-ui.card>
                 </div>
             </div>
         </div>
@@ -315,7 +289,7 @@
                         </p>
                         
                         <div class="d-flex flex-wrap gap-2">
-                            <x-ui.button variant="warning" onclick="window.erpToasts['demoToast'].show()">
+                            <x-ui.button variant="warning" onclick="$('#demoToast').toast('show')">
                                 <i class="feather-bell me-2"></i>Trigger Live Toast
                             </x-ui.button>
                             <a href="javascript:void(0);" class="btn btn-light-brand successAlertMessage">
@@ -339,27 +313,63 @@
                     <div class="d-flex gap-2">
                         <!-- Custom Filter Component -->
                         <x-ui.filter label="Filter Materials" offset="0, 5">
-                            <div class="mb-2">
-                                <x-ui.odoo-form-ui type="input" label="Search Keyword" name="filter_keywords" placeholder="Enter keyword..." />
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            
+                            <!-- Search Bar (Name, Number, Code) -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-light border-end-0"><i class="feather-search text-muted"></i></span>
+                                    <input type="text" class="form-control form-control-sm border-start-0" name="filter_search" placeholder="Search by name, code...">
+                                </div>
                             </div>
-                            <div class="mb-2">
-                                <x-ui.odoo-form-ui type="select" label="Stock Status" name="filter_stock_status" :searchable="false">
+
+                            <!-- Stock Status Dropdown -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Stock Status</label>
+                                <select class="form-select form-select-sm" name="filter_status">
                                     <option value="">All Statuses</option>
                                     <option value="in_stock">In Stock</option>
                                     <option value="low_stock">Low Stock</option>
                                     <option value="out_of_stock">Out of Stock</option>
-                                </x-ui.odoo-form-ui>
+                                </select>
                             </div>
-                            <h6 class="fs-11 text-uppercase text-muted mt-3 mb-2">Category</h6>
-                            <div class="d-flex flex-column gap-2 mb-3">
-                                <x-ui.checkbox label="Raw Materials" name="raw_mat" checked />
-                                <x-ui.checkbox label="Sub-Assemblies" name="sub_ass" />
-                                <x-ui.checkbox label="Packaging" name="pack" />
+
+                            <!-- Date Range Picker Field -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date Range</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-light border-end-0"><i class="feather-calendar text-muted"></i></span>
+                                    <input type="text" id="filter_date_range" class="form-control form-control-sm border-start-0" placeholder="Select date range..." readonly>
+                                </div>
                             </div>
-                            <div class="dropdown-divider my-2"></div>
+
+                            <!-- Warehouse / Location -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Warehouse Location</label>
+                                <select class="form-select form-select-sm" name="filter_warehouse">
+                                    <option value="">All Warehouses</option>
+                                    <option value="main">Main Warehouse</option>
+                                    <option value="secondary">Secondary Storage</option>
+                                    <option value="qa">QA/Inspection Lab</option>
+                                </select>
+                            </div>
+
+                            <!-- Category Checkboxes -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Category</label>
+                                <div class="d-flex flex-column gap-2 mt-1">
+                                    <x-ui.checkbox label="Raw Materials" name="raw_mat" checked />
+                                    <x-ui.checkbox label="Sub-Assemblies" name="sub_ass" />
+                                    <x-ui.checkbox label="Packaging" name="pack" />
+                                </div>
+                            </div>
+
+                            <div class="dropdown-divider my-3"></div>
+
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-xs btn-primary flex-grow-1">Apply</button>
-                                <button type="button" class="btn btn-xs btn-light border flex-grow-1">Reset</button>
+                                <button type="button" class="btn btn-sm btn-primary flex-grow-1">Apply Filters</button>
+                                <button type="button" class="btn btn-sm btn-light border flex-grow-1" onclick="document.getElementById('filter_date_range').value=''">Reset</button>
                             </div>
                         </x-ui.filter>
                     </div>
@@ -510,3 +520,34 @@
     {{-- Global master quick-create modals --}}
     <x-ui.master-modals :masters="['product', 'uom']" />
 @endsection
+
+@push('scripts')
+    <script>
+        $(function () {
+            // Initialize Date Range Picker for Filter materials
+            $('#filter_date_range').daterangepicker({
+                autoUpdateInput: false,
+                locale: {
+                    cancelLabel: 'Clear',
+                    format: 'YYYY-MM-DD'
+                }
+            });
+
+            $('#filter_date_range').on('apply.daterangepicker', function(ev, picker) {
+                $(this).val(picker.startDate.format('YYYY-MM-DD') + ' to ' + picker.endDate.format('YYYY-MM-DD'));
+            });
+
+            $('#filter_date_range').on('cancel.daterangepicker', function(ev, picker) {
+                $(this).val('');
+            });
+
+            // Manually initialize dropdowns in case theme JS conflicts with Bootstrap automatic init
+            if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+                var dropdownElementList = [].slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"]'));
+                dropdownElementList.forEach(function (dropdownToggleEl) {
+                    bootstrap.Dropdown.getOrCreateInstance(dropdownToggleEl);
+                });
+            }
+        });
+    </script>
+@endpush
