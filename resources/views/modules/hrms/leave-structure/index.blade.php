@@ -4,6 +4,16 @@
 @section('page-title', 'Leave Plans Configuration')
 @section('breadcrumb', 'HRMS / Leave Plan Settings')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
+
 @section('content')
     <style>
         /* Sidebar and Workspace layout alignment */
@@ -309,28 +319,24 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Plan Name <span class="text-danger">*</span></label>
-                                <input type="text" name="name" class="form-control" placeholder="e.g. Corporate Plan 2026" required>
+                                <x-ui.input label="Plan Name" name="name" placeholder="e.g. Corporate Plan 2026" required />
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Legal Entity (Company)</label>
-                                <select name="company_id" class="form-select">
+                                <x-ui.select label="Legal Entity (Company)" name="company_id" data-select2-selector="default">
                                     <option value="">Apply to All Companies</option>
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Effective From <span class="text-danger">*</span></label>
-                                <input type="date" name="effective_from" class="form-control" required>
+                                <x-ui.input label="Effective From" name="effective_from" type="date" required />
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
-                                <select name="status" class="form-select">
+                                <x-ui.select label="Status" name="status" data-select2-selector="default" required>
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
-                                </select>
+                                </x-ui.select>
                             </div>
                             <div class="col-md-12 col-12">
                                 <label class="form-label fw-bold">Description</label>
@@ -339,8 +345,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Create Plan</button>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">Create Plan</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -362,28 +368,24 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Plan Name <span class="text-danger">*</span></label>
-                                <input type="text" name="name" id="edit_plan_name" class="form-control" required>
+                                <x-ui.input label="Plan Name" name="name" id="edit_plan_name" required />
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Legal Entity (Company)</label>
-                                <select name="company_id" id="edit_plan_company_id" class="form-select">
+                                <x-ui.select label="Legal Entity (Company)" name="company_id" id="edit_plan_company_id" data-select2-selector="default">
                                     <option value="">Apply to All Companies</option>
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Effective From <span class="text-danger">*</span></label>
-                                <input type="date" name="effective_from" id="edit_plan_effective_from" class="form-control" required>
+                                <x-ui.input label="Effective From" name="effective_from" id="edit_plan_effective_from" type="date" required />
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
-                                <select name="status" id="edit_plan_status" class="form-select">
+                                <x-ui.select label="Status" name="status" id="edit_plan_status" data-select2-selector="default" required>
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
-                                </select>
+                                </x-ui.select>
                             </div>
                             <div class="col-md-12 col-12">
                                 <label class="form-label fw-bold">Description</label>
@@ -392,8 +394,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">Save Changes</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -415,25 +417,21 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Leave Plan <span class="text-danger">*</span></label>
-                                <select name="leave_plan_id" id="add_type_plan_id" class="form-select" required>
+                                <x-ui.select label="Leave Plan" name="leave_plan_id" id="add_type_plan_id" data-select2-selector="default" required>
                                     <option value="">Select Leave Plan</option>
                                     @foreach($leavePlans as $plan)
                                         <option value="{{ $plan->id }}" {{ $selectedPlan && $selectedPlan->id === $plan->id ? 'selected' : '' }}>{{ $plan->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Type Name <span class="text-danger">*</span></label>
-                                <input type="text" name="name" class="form-control" placeholder="e.g. Sick Leave" required>
+                                <x-ui.input label="Type Name" name="name" placeholder="e.g. Sick Leave" required />
                             </div>
                             <div class="col-md-4 col-12">
-                                <label class="form-label fw-bold">Code <span class="text-danger">*</span></label>
-                                <input type="text" name="code" class="form-control" placeholder="e.g. SL" required>
+                                <x-ui.input label="Code" name="code" placeholder="e.g. SL" required />
                             </div>
                             <div class="col-md-4 col-12">
-                                <label class="form-label fw-bold">Annual Quota (Days) <span class="text-danger">*</span></label>
-                                <input type="number" step="0.5" name="quota" class="form-control" placeholder="e.g. 12" min="0" required>
+                                <x-ui.input label="Annual Quota (Days)" name="quota" type="number" step="0.5" placeholder="e.g. 12" min="0" required />
                             </div>
                             <div class="col-md-4 col-12">
                                 <label class="form-label fw-bold">Color Theme <span class="text-danger">*</span></label>
@@ -460,11 +458,10 @@
                                 </div>
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
-                                <select name="status" class="form-select">
+                                <x-ui.select label="Status" name="status" data-select2-selector="default" required>
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
-                                </select>
+                                </x-ui.select>
                             </div>
                             <div class="col-md-12 col-12">
                                 <label class="form-label fw-bold">Description</label>
@@ -473,8 +470,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Add Type</button>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">Add Type</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -496,25 +493,21 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Leave Plan <span class="text-danger">*</span></label>
-                                <select name="leave_plan_id" id="edit_type_plan_id" class="form-select" required>
+                                <x-ui.select label="Leave Plan" name="leave_plan_id" id="edit_type_plan_id" data-select2-selector="default" required>
                                     <option value="">Select Leave Plan</option>
                                     @foreach($leavePlans as $plan)
                                         <option value="{{ $plan->id }}">{{ $plan->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.select>
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Type Name <span class="text-danger">*</span></label>
-                                <input type="text" name="name" id="edit_type_name" class="form-control" required>
+                                <x-ui.input label="Type Name" name="name" id="edit_type_name" required />
                             </div>
                             <div class="col-md-4 col-12">
-                                <label class="form-label fw-bold">Code <span class="text-danger">*</span></label>
-                                <input type="text" name="code" id="edit_type_code" class="form-control" required>
+                                <x-ui.input label="Code" name="code" id="edit_type_code" required />
                             </div>
                             <div class="col-md-4 col-12">
-                                <label class="form-label fw-bold">Annual Quota (Days) <span class="text-danger">*</span></label>
-                                <input type="number" step="0.5" name="quota" id="edit_type_quota" class="form-control" min="0" required>
+                                <x-ui.input label="Annual Quota (Days)" name="quota" id="edit_type_quota" type="number" step="0.5" min="0" required />
                             </div>
                             <div class="col-md-4 col-12">
                                 <label class="form-label fw-bold">Color Theme <span class="text-danger">*</span></label>
@@ -541,11 +534,10 @@
                                 </div>
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
-                                <select name="status" id="edit_type_status" class="form-select">
+                                <x-ui.select label="Status" name="status" id="edit_type_status" data-select2-selector="default" required>
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
-                                </select>
+                                </x-ui.select>
                             </div>
                             <div class="col-md-12 col-12">
                                 <label class="form-label fw-bold">Description</label>
@@ -554,8 +546,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">Save Changes</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -564,6 +556,21 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            // Initialize Select2 dropdowns on modal open
+            $('#addLeavePlanModal, #editLeavePlanModal, #addLeaveTypeModal, #editLeaveTypeModal').on('shown.bs.modal', function () {
+                $(this).find('select').each(function() {
+                    var $select = $(this);
+                    if ($select.hasClass("select2-hidden-accessible")) {
+                        $select.select2('destroy');
+                    }
+                    $select.select2({
+                        theme: 'bootstrap-5',
+                        dropdownParent: $select.closest('.modal-content'),
+                        width: '100%'
+                    });
+                });
+            });
+
             // Move modals to body root to avoid stacking context issues
             document.querySelectorAll('.modal').forEach(modal => {
                 document.body.appendChild(modal);

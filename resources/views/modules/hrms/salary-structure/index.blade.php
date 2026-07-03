@@ -4,6 +4,16 @@
 @section('page-title', 'Salary Structure')
 @section('breadcrumb', 'HRMS / Salary Structure')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
+
 @section('content')
     <style>
         /* Modern layouts for connected settings sidebar */
@@ -158,43 +168,42 @@
                 }
             }
 
-            // Correctly initialize Select2 inside Salary Component modals when shown (avoiding width: 0px bug)
-            $('#addSalaryComponentModal, #editSalaryComponentModal').on('shown.bs.modal', function () {
-                $(this).find('select').each(function() {
+            // Generic modal Select2 initializer inside HRMS boundaries
+            $(document).on('shown.bs.modal', '.modal', function () {
+                var modal = $(this);
+                modal.find('select').each(function() {
                     var $select = $(this);
                     if ($select.hasClass("select2-hidden-accessible")) {
                         $select.select2('destroy');
                     }
-                    // Format status dropdown with colored status dots
-                    if ($select.attr('data-select2-selector') === 'status' && typeof bgformat === 'function') {
-                        $select.select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $select.closest('.modal'),
-                            width: '100%',
-                            templateResult: bgformat,
-                            templateSelection: bgformat,
-                            minimumResultsForSearch: Infinity
-                        });
-                    } else {
-                        $select.select2({
-                            theme: 'bootstrap-5',
-                            dropdownParent: $select.closest('.modal'),
-                            width: '100%',
-                            minimumResultsForSearch: 6
-                        });
+                    
+                    var selectorType = $select.attr('data-select2-selector') || 'default';
+                    var options = {
+                        theme: 'bootstrap-5',
+                        dropdownParent: modal.find('.modal-content'),
+                        width: '100%'
+                    };
+                    
+                    if (selectorType === 'status' && typeof bgformat === 'function') {
+                        options.templateResult = bgformat;
+                        options.templateSelection = bgformat;
+                        options.minimumResultsForSearch = Infinity;
+                    } else if (selectorType === 'currency' && typeof currencyformat === 'function') {
+                        options.templateResult = currencyformat;
+                        options.templateSelection = currencyformat;
+                    } else if (selectorType === 'country' && typeof countryformat === 'function') {
+                        options.templateResult = countryformat;
+                        options.templateSelection = countryformat;
+                    } else if (selectorType === 'tzone' && typeof tzoneformat === 'function') {
+                        options.templateResult = tzoneformat;
+                        options.templateSelection = tzoneformat;
                     }
+                    
+                    $select.select2(options);
                 });
             });
         });
     </script>
 @endsection
 
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
-@endpush
 
-@push('scripts')
-    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
-@endpush
