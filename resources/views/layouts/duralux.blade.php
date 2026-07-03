@@ -21,6 +21,11 @@
             }
         })();
     </script>
+    <style>
+        .nxl-container .nxl-content .main-content {
+            padding: 10px !important;
+        }
+    </style>
     @stack('styles')
 </head>
 <body>
@@ -165,7 +170,7 @@
         });
 
         // Generic Quick Create Master Dropdown handler
-        $(document).on('change', '.erp-premium-select', function() {
+        $(document).on('change', '.erp-premium-select, select[data-master]', function() {
             var select = $(this);
             if (select.val() === '__ADD_NEW__') {
                 var master = select.attr('data-master');

@@ -705,6 +705,10 @@
 .erp-icon-btn.btn-sm { width: 30px; height: 30px; font-size: 13px; }
 .erp-icon-btn.btn-lg { width: 40px; height: 40px; font-size: 16px; }
 .erp-icon-btn:active { transform: scale(0.9) !important; }
+/* Labeled variant: removes fixed square size so icon + text fits naturally */
+.erp-icon-btn.erp-icon-btn--labeled { width: auto !important; height: 34px !important; padding: 0 14px !important; gap: 6px; font-size: 13px; font-weight: 500; }
+.erp-icon-btn.erp-icon-btn--labeled.btn-sm { width: auto !important; height: 30px !important; padding: 0 10px !important; }
+.erp-icon-btn.erp-icon-btn--labeled.btn-lg { width: auto !important; height: 40px !important; padding: 0 18px !important; }
 
 /* Variant: primary */
 .erp-icon-btn--primary {
@@ -806,6 +810,12 @@ a.btn:hover, a.btn:focus, a.btn:active { text-decoration: none !important; }
     margin: 0 !important;
     padding: 24px 32px !important;
     min-height: calc(100vh - 120px);
+}
+
+@media (max-width: 768px) {
+    .erp-single-panel {
+        padding: 8px 12px !important;
+    }
 }
 
 .erp-form-row {

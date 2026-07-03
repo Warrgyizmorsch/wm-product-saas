@@ -21,47 +21,46 @@
 @endsection
 
 @section('content')
-    <!-- Dashboard Summary Row -->
+<div class="erp-single-panel bg-white">
+    <!-- KPI Status Summary -->
     <div class="row g-3 mb-4">
         <div class="col">
-            <div class="bg-white border rounded shadow-sm p-3 text-center">
+            <div class="bg-light border rounded p-3 text-center">
                 <span class="text-muted fs-11 text-uppercase fw-bold">Draft</span>
                 <h4 class="text-dark fw-bold mt-1 mb-0">{{ $statusCounts['draft'] ?? 0 }}</h4>
             </div>
         </div>
         <div class="col">
-            <div class="bg-white border rounded shadow-sm p-3 text-center">
+            <div class="bg-soft-warning border rounded p-3 text-center">
                 <span class="text-warning fs-11 text-uppercase fw-bold">Pending</span>
                 <h4 class="text-warning fw-bold mt-1 mb-0">{{ $statusCounts['pending_approval'] ?? 0 }}</h4>
             </div>
         </div>
         <div class="col">
-            <div class="bg-white border rounded shadow-sm p-3 text-center">
+            <div class="bg-soft-success border rounded p-3 text-center">
                 <span class="text-success fs-11 text-uppercase fw-bold">Approved</span>
                 <h4 class="text-success fw-bold mt-1 mb-0">{{ $statusCounts['approved'] ?? 0 }}</h4>
             </div>
         </div>
         <div class="col">
-            <div class="bg-white border rounded shadow-sm p-3 text-center">
+            <div class="bg-soft-info border rounded p-3 text-center">
                 <span class="text-info fs-11 text-uppercase fw-bold">MRP Generated</span>
                 <h4 class="text-info fw-bold mt-1 mb-0">{{ $statusCounts['mrp_generated'] ?? 0 }}</h4>
             </div>
         </div>
         <div class="col">
-            <div class="bg-white border rounded shadow-sm p-3 text-center">
+            <div class="bg-soft-primary border rounded p-3 text-center">
                 <span class="text-primary fs-11 text-uppercase fw-bold">Released</span>
                 <h4 class="text-primary fw-bold mt-1 mb-0">{{ $statusCounts['released'] ?? 0 }}</h4>
             </div>
         </div>
         <div class="col">
-            <div class="bg-white border rounded shadow-sm p-3 text-center">
+            <div class="bg-light border rounded p-3 text-center">
                 <span class="text-muted fs-11 text-uppercase fw-bold">Completed / Closed</span>
                 <h4 class="text-muted fw-bold mt-1 mb-0">{{ ($statusCounts['completed'] ?? 0) + ($statusCounts['closed'] ?? 0) }}</h4>
             </div>
         </div>
     </div>
-
-    <div class="erp-single-panel bg-white">
         <!-- Success & Error Messages -->
         @if (session('success'))
             <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
@@ -196,8 +195,8 @@
             </table>
         </div>
 
-        <div class="mt-4">
-            {{ $plans->links() }}
-        </div>
+    <div class="mt-4">
+        {{ $plans->links() }}
     </div>
+</div>
 @endsection

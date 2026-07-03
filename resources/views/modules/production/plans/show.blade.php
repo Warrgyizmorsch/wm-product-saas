@@ -1,23 +1,20 @@
 @extends('layouts.duralux')
 
-@section('title', 'Production Plan Details | SaaS ERP')
-@section('page-title', 'Production Plan Details')
-@section('breadcrumb', 'Plan Details')
+@section('title', 'Production Plan ' . $plan->plan_number . ' | SaaS ERP')
 
 @section('page-actions')
     <a href="{{ route('production.plans.index') }}" class="btn btn-secondary me-2">
         <i class="feather-arrow-left me-2"></i>Back to List
     </a>
-    
+
     @if($plan->isDraft())
         <a href="{{ route('production.plans.edit', $plan->id) }}" class="btn btn-primary me-2">
             <i class="feather-edit me-2"></i>Edit Plan
         </a>
-
         <form method="POST" action="{{ route('production.plans.submit', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-info">
-                <i class="feather-send me-2"></i>Submit Approval
+                <i class="feather-send me-2"></i>Submit for Approval
             </button>
         </form>
     @endif
@@ -53,7 +50,6 @@
                 <i class="feather-file-text me-2"></i>Generate Production Order
             </button>
         </form>
-
         <form method="POST" action="{{ route('production.plans.release', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-primary">
@@ -75,13 +71,14 @@
         <form method="POST" action="{{ route('production.plans.close', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-dark">
-                <i class="feather-archive me-2"></i>Close & Archive
+                <i class="feather-archive me-2"></i>Close &amp; Archive
             </button>
         </form>
     @endif
 
     @if(!$plan->isClosed() && !$plan->isCompleted() && !$plan->isCancelled())
-        <form method="POST" action="{{ route('production.plans.cancel', $plan->id) }}" class="d-inline me-2" onsubmit="return confirm('Cancel this Production Plan?');">
+        <form method="POST" action="{{ route('production.plans.cancel', $plan->id) }}" class="d-inline"
+              onsubmit="return confirm('Cancel this Production Plan?');">
             @csrf
             <button type="submit" class="btn btn-outline-danger">
                 <i class="feather-slash me-2"></i>Cancel Plan
@@ -91,331 +88,348 @@
 @endsection
 
 @section('content')
-    <!-- Warnings Diagnostics Panel -->
+<div class="erp-single-panel bg-white">
+
+    {{-- Alerts --}}
+    @if(session('success'))
+        <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
+            <h6 class="alert-heading fw-bold mb-1">Success!</h6>
+            <p class="fs-12 mb-0">{{ session('success') }}</p>
+        </x-ui.alert>
+        <div class="mb-4"></div>
+    @endif
+    @if(session('error'))
+        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+            <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+            <p class="fs-12 mb-0">{{ session('error') }}</p>
+        </x-ui.alert>
+        <div class="mb-4"></div>
+    @endif
+
+    {{-- Warnings Diagnostics Panel --}}
     @if(count($warnings) > 0)
-        <div class="row mb-4">
-            <div class="col-12">
-                <x-ui.card class="border-danger">
-                    <div class="card-header bg-soft-danger text-danger d-flex align-items-center py-2">
-                        <i class="feather-alert-triangle me-2 fs-18"></i>
-                        <span class="fw-bold">Planning & Resource Warnings ({{ count($warnings) }})</span>
-                    </div>
-                    <div class="card-body py-3">
-                        <ul class="mb-0 ps-3">
-                            @foreach($warnings as $warn)
-                                <li class="text-{{ $warn['severity'] === 'danger' ? 'danger fw-semibold' : 'dark' }} mb-1 fs-12">
-                                    {{ $warn['message'] }}
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-                </x-ui.card>
+        <div class="alert alert-danger border-danger bg-soft-danger mb-4 rounded shadow-sm" role="alert">
+            <div class="d-flex align-items-center mb-2">
+                <i class="feather-alert-triangle me-2 fs-18 text-danger"></i>
+                <span class="fw-bold text-danger">Planning &amp; Resource Warnings ({{ count($warnings) }})</span>
             </div>
+            <ul class="mb-0 ps-3">
+                @foreach($warnings as $warn)
+                    <li class="text-{{ $warn['severity'] === 'danger' ? 'danger fw-semibold' : 'dark' }} mb-1 fs-12">
+                        {{ $warn['message'] }}
+                    </li>
+                @endforeach
+            </ul>
         </div>
     @endif
 
-    <div class="row g-4">
-        <!-- Plan Header / Metadata Summary -->
-        <div class="col-md-4">
-            <x-ui.card class="bg-white">
-                <div class="card-header border-bottom py-3">
-                    <h5 class="fw-bold text-dark mb-0">Plan Identification</h5>
+    {{-- Header Identity Row --}}
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+        <h4 class="fw-bold text-dark mb-0">{{ $plan->plan_number }} — {{ $plan->name }}</h4>
+        <div>
+            @if($plan->status === 'draft')
+                <span class="erp-badge-draft">Draft</span>
+            @elseif($plan->status === 'pending_approval')
+                <span class="erp-badge-pending">Pending Approval</span>
+            @elseif($plan->status === 'approved')
+                <span class="erp-badge-active">Approved</span>
+            @elseif($plan->status === 'mrp_generated')
+                <span class="badge bg-soft-info text-info">MRP Generated</span>
+            @elseif($plan->status === 'released')
+                <span class="badge bg-soft-primary text-primary">Released</span>
+            @elseif($plan->status === 'completed')
+                <span class="erp-badge-active">Completed</span>
+            @elseif($plan->status === 'closed')
+                <span class="badge bg-soft-dark text-dark">Closed</span>
+            @else
+                <span class="badge bg-soft-danger text-danger">Cancelled</span>
+            @endif
+        </div>
+    </div>
+
+    {{-- Identity Grid --}}
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 border-end">
+            <div class="row erp-form-row mb-2">
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Item to Produce:</span></div>
+                <div class="col-md-8">
+                    <span class="text-dark fw-bold fs-13">{{ $plan->product->name }}</span>
+                    <small class="text-muted font-monospace d-block fs-10">{{ $plan->product->sku }}</small>
                 </div>
-                <div class="card-body">
-                    <div class="d-flex flex-column gap-3 fs-13">
-                        <div>
-                            <span class="text-muted d-block">Plan Number</span>
-                            <span class="fw-bold text-dark fs-15">{{ $plan->plan_number }}</span>
-                        </div>
-                        <div>
-                            <span class="text-muted d-block">Plan Name</span>
-                            <span class="fw-semibold text-dark">{{ $plan->name }}</span>
-                        </div>
-                        <div>
-                            <span class="text-muted d-block">Item to Produce</span>
-                            <span class="fw-bold text-dark">{{ $plan->product->name }}</span>
-                            <small class="text-muted font-monospace d-block">{{ $plan->product->sku }}</small>
-                        </div>
-                        <div>
-                            <span class="text-muted d-block">Target Quantity</span>
-                            <span class="fw-bold text-dark fs-14">{{ number_format($plan->quantity, 2) }} Units</span>
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <span class="text-muted d-block">Start Date</span>
-                                <span class="fw-semibold text-dark">{{ $plan->start_date->format('d M Y') }}</span>
-                            </div>
-                            <div class="col-6">
-                                <span class="text-muted d-block">End Date</span>
-                                <span class="fw-semibold text-dark">{{ $plan->end_date->format('d M Y') }}</span>
-                            </div>
-                        </div>
-                        <div>
-                            <span class="text-muted d-block">Status</span>
-                            @if($plan->status === 'draft')
-                                <span class="badge bg-soft-secondary text-secondary text-uppercase rounded-pill px-2 py-1 fs-10">Draft</span>
-                            @elseif($plan->status === 'pending_approval')
-                                <span class="badge bg-soft-warning text-warning text-uppercase rounded-pill px-2 py-1 fs-10">Pending Approval</span>
-                            @elseif($plan->status === 'approved')
-                                <span class="badge bg-soft-success text-success text-uppercase rounded-pill px-2 py-1 fs-10">Approved</span>
-                            @elseif($plan->status === 'mrp_generated')
-                                <span class="badge bg-soft-info text-info text-uppercase rounded-pill px-2 py-1 fs-10">MRP Run</span>
-                            @elseif($plan->status === 'released')
-                                <span class="badge bg-soft-primary text-primary text-uppercase rounded-pill px-2 py-1 fs-10">Released to Shop Floor</span>
-                            @elseif($plan->status === 'completed')
-                                <span class="badge bg-soft-success text-success text-uppercase rounded-pill px-2 py-1 fs-10">Completed</span>
-                            @elseif($plan->status === 'closed')
-                                <span class="badge bg-soft-dark text-dark text-uppercase rounded-pill px-2 py-1 fs-10">Closed</span>
-                            @else
-                                <span class="badge bg-soft-danger text-danger text-uppercase rounded-pill px-2 py-1 fs-10">Cancelled</span>
-                            @endif
-                        </div>
-                        <div class="border-top pt-2 mt-2">
-                            <span class="text-muted d-block">BOM Reference (Frozen)</span>
-                            @if($plan->bom)
-                                <a href="{{ route('production.boms.show', $plan->bom_id) }}" class="fw-semibold text-primary">
-                                    {{ $plan->bom->bom_number }} (v{{ $plan->bom->version }})
-                                </a>
-                            @else
-                                <span class="text-muted">None Assigned</span>
-                            @endif
-                        </div>
-                        <div>
-                            <span class="text-muted d-block">Routing Reference (Frozen)</span>
-                            @if($plan->routing)
-                                <a href="{{ route('production.routing.show', $plan->routing_id) }}" class="fw-semibold text-primary">
-                                    {{ $plan->routing->routing_number }} (v{{ $plan->routing->version }})
-                                </a>
-                            @else
-                                <span class="text-muted">None Assigned</span>
-                            @endif
-                        </div>
+            </div>
+            <div class="row erp-form-row mb-2">
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Target Quantity:</span></div>
+                <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ number_format($plan->quantity, 2) }} Units</span></div>
+            </div>
+            <div class="row erp-form-row mb-2">
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Planned Window:</span></div>
+                <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $plan->start_date->format('d M Y') }} → {{ $plan->end_date->format('d M Y') }}</span></div>
+            </div>
+            <div class="row erp-form-row mb-2">
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Created By:</span></div>
+                <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $plan->creator ? $plan->creator->name : 'System' }} on {{ $plan->created_at->format('d/m/Y H:i') }}</span></div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="row erp-form-row mb-2">
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">BOM Reference:</span></div>
+                <div class="col-md-8">
+                    @if($plan->bom)
+                        <a href="{{ route('production.boms.show', $plan->bom_id) }}" class="fw-bold text-primary fs-13">
+                            {{ $plan->bom->bom_number }} (v{{ $plan->bom->version }})
+                        </a>
+                        <small class="text-muted d-block fs-11">Frozen at plan creation</small>
+                    @else
+                        <span class="text-muted fs-13">None Assigned</span>
+                    @endif
+                </div>
+            </div>
+            <div class="row erp-form-row mb-2">
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Routing Reference:</span></div>
+                <div class="col-md-8">
+                    @if($plan->routing)
+                        <a href="{{ route('production.routing.show', $plan->routing_id) }}" class="fw-bold text-primary fs-13">
+                            {{ $plan->routing->routing_number }} (v{{ $plan->routing->version }})
+                        </a>
+                        <small class="text-muted d-block fs-11">Frozen at plan creation</small>
+                    @else
+                        <span class="text-muted fs-13">None Assigned</span>
+                    @endif
+                </div>
+            </div>
+            @if($plan->approved_by)
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Approved By:</span></div>
+                    <div class="col-md-8">
+                        <span class="text-dark fw-bold fs-13">{{ $plan->approver ? $plan->approver->name : 'N/A' }}</span>
+                        <small class="text-muted d-block fs-11">{{ $plan->approved_at ? $plan->approved_at->format('d/m/Y H:i') : '' }}</small>
                     </div>
                 </div>
-            </x-ui.card>
+            @endif
+            @if($plan->description)
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Description:</span></div>
+                    <div class="col-md-8"><span class="text-dark fs-13">{{ $plan->description }}</span></div>
+                </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- Tab Navigation (BOM-style) --}}
+    <div class="erp-tabs-nav">
+        <a class="erp-tabs-link active" id="btn-tab-mrp"        onclick="switchTab('mrp')"><i class="feather-cpu me-2 fs-13"></i>Material Requirements (MRP)</a>
+        <a class="erp-tabs-link"        id="btn-tab-summary"    onclick="switchTab('summary')"><i class="feather-info me-2 fs-13"></i>MRP Summary</a>
+        <a class="erp-tabs-link"        id="btn-tab-operations" onclick="switchTab('operations')"><i class="feather-sliders me-2 fs-13"></i>Capacity Operations</a>
+        <a class="erp-tabs-link"        id="btn-tab-details"    onclick="switchTab('details')"><i class="feather-activity me-2 fs-13"></i>Details &amp; Logs</a>
+    </div>
+
+    {{-- Tab Content --}}
+    <div class="tab-content mt-3">
+
+        {{-- Tab 1: Material Requirements (MRP) --}}
+        <div class="tab-pane-custom" id="tab-mrp">
+            @if($plan->requirements->isEmpty())
+                <div class="text-center py-5 text-muted">
+                    <i class="feather-cpu fs-32 mb-2 d-block text-muted"></i>
+                    <p class="mb-2 fw-semibold">No snapshot material requirements recorded.</p>
+                    <p class="fs-12 mb-3">Run the MRP Engine to explode the BOM and populate required components.</p>
+                    @if(!$plan->isFrozen())
+                        <form method="POST" action="{{ route('production.plans.run-mrp', $plan->id) }}">
+                            @csrf
+                            <button type="submit" class="btn btn-warning text-dark px-4 btn-sm">
+                                <i class="feather-play me-2"></i>Run MRP Engine Now
+                            </button>
+                        </form>
+                    @endif
+                </div>
+            @else
+                <h5 class="fw-bold text-dark mb-3">Material Requirements Snapshot</h5>
+                <div class="table-responsive">
+                    <table class="erp-thin-table fs-12">
+                        <thead>
+                            <tr>
+                                <th style="width:4%">Lv</th>
+                                <th style="width:26%">Component Item</th>
+                                <th style="width:12%" class="text-end">Required Qty</th>
+                                <th style="width:12%" class="text-end">Available Qty</th>
+                                <th style="width:12%" class="text-end">Reserved Qty</th>
+                                <th style="width:12%" class="text-end text-danger">Shortage Qty</th>
+                                <th style="width:8%">UOM</th>
+                                <th>Source Item</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($plan->requirements as $req)
+                                <tr>
+                                    <td class="fw-bold">{{ $req->bom_level }}</td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="fw-bold text-dark">{{ $req->product->name }}</span>
+                                            <small class="text-muted font-monospace fs-10">{{ $req->product->sku }}</small>
+                                        </div>
+                                    </td>
+                                    <td class="text-end fw-semibold text-dark">{{ number_format($req->required_quantity, 2) }}</td>
+                                    <td class="text-end text-muted">{{ number_format($req->available_quantity, 2) }}</td>
+                                    <td class="text-end text-muted">{{ number_format($req->reserved_quantity, 2) }}</td>
+                                    <td class="text-end text-danger fw-bold">{{ number_format($req->shortage_quantity, 2) }}</td>
+                                    <td>{{ $req->uom ? $req->uom->code : 'PCS' }}</td>
+                                    <td class="text-muted">{{ $req->sourceItem ? $req->sourceItem->name : '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
 
-        <!-- Planning Tabs & Snapshot Displays -->
-        <div class="col-md-8">
-            <div class="bg-white border rounded shadow-sm p-4">
-                
-                <ul class="nav nav-tabs border-bottom mb-3" id="planTabs" role="tablist">
-                    <li class="nav-item">
-                        <button class="nav-link active" id="mrp-tab" data-bs-toggle="tab" data-bs-target="#mrpContent" type="button" role="tab">
-                            <i class="feather-cpu me-2"></i>Material Requirements (MRP)
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summaryContent" type="button" role="tab">
-                            <i class="feather-info me-2"></i>MRP Summary Panel
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" id="operations-tab" data-bs-toggle="tab" data-bs-target="#operationsContent" type="button" role="tab">
-                            <i class="feather-sliders me-2"></i>Capacity Operations Load
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" id="audit-tab" data-bs-toggle="tab" data-bs-target="#auditContent" type="button" role="tab">
-                            <i class="feather-activity me-2"></i>Details & Logs
-                        </button>
-                    </li>
-                </ul>
-
-                <div class="tab-content" id="planTabsContent">
-                    
-                    <!-- TAB 1: Material Requirements -->
-                    <div class="tab-pane fade show active" id="mrpContent" role="tabpanel">
-                        @if($plan->requirements->isEmpty())
-                            <div class="text-center py-5 text-muted">
-                                <i class="feather-cpu fs-32 mb-2 d-block text-muted"></i>
-                                <p class="mb-2 fw-semibold">No snapshot material requirements recorded.</p>
-                                <p class="fs-12 mb-3">Run the MRP Engine to explode the BOM and populate required components.</p>
-                                @if(!$plan->isFrozen())
-                                    <form method="POST" action="{{ route('production.plans.run-mrp', $plan->id) }}">
-                                        @csrf
-                                        <button type="submit" class="btn btn-warning text-dark px-4 btn-sm">
-                                            <i class="feather-play me-2"></i>Run MRP Engine Now
-                                        </button>
-                                    </form>
-                                @endif
-                            </div>
-                        @else
-                            <div class="table-responsive">
-                                <table class="erp-thin-table fs-12">
-                                    <thead>
-                                        <tr>
-                                            <th>Lv</th>
-                                            <th>Component Item</th>
-                                            <th class="text-end">Required Qty</th>
-                                            <th class="text-end">Available Qty</th>
-                                            <th class="text-end">Reserved Qty</th>
-                                            <th class="text-end text-danger">Shortage Qty</th>
-                                            <th>UOM</th>
-                                            <th>Source Item</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($plan->requirements as $req)
-                                            <tr>
-                                                <td class="fw-bold">{{ $req->bom_level }}</td>
-                                                <td>
-                                                    <div class="d-flex flex-column">
-                                                        <span class="fw-bold text-dark">{{ $req->product->name }}</span>
-                                                        <small class="text-muted font-monospace fs-10">{{ $req->product->sku }}</small>
-                                                    </div>
-                                                </td>
-                                                <td class="text-end fw-semibold text-dark">{{ number_format($req->required_quantity, 2) }}</td>
-                                                <td class="text-end text-muted">{{ number_format($req->available_quantity, 2) }}</td>
-                                                <td class="text-end text-muted">{{ number_format($req->reserved_quantity, 2) }}</td>
-                                                <td class="text-end text-danger fw-bold">{{ number_format($req->shortage_quantity, 2) }}</td>
-                                                <td>{{ $req->uom ? $req->uom->code : 'PCS' }}</td>
-                                                <td class="text-muted">
-                                                    @if($req->sourceItem)
-                                                        {{ $req->sourceItem->name }}
-                                                    @else
-                                                        —
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- TAB 2: MRP Execution Summary Panel -->
-                    <div class="tab-pane fade" id="summaryContent" role="tabpanel">
-                        @if(!$summary)
-                            <div class="text-center py-5 text-muted">
-                                <i class="feather-info fs-32 mb-2 d-block text-muted"></i>
-                                <p class="mb-0">MRP summary dashboard will be loaded once you successfully Run the MRP Engine.</p>
-                            </div>
-                        @else
-                            <div class="row g-3 mb-4">
-                                <div class="col-md-6 col-lg-3">
-                                    <div class="bg-light p-3 rounded text-center">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Total Components</span>
-                                        <span class="fw-bold text-dark fs-18">{{ $summary['total_components'] }}</span>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-lg-3">
-                                    <div class="bg-light p-3 rounded text-center">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Subassemblies</span>
-                                        <span class="fw-bold text-dark fs-18">{{ $summary['total_subassemblies'] }}</span>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-lg-3">
-                                    <div class="bg-light p-3 rounded text-center">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Operations</span>
-                                        <span class="fw-bold text-dark fs-18">{{ $summary['total_operations'] }}</span>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-lg-3">
-                                    <div class="bg-light p-3 rounded text-center">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Warnings</span>
-                                        <span class="fw-bold text-danger fs-18">{{ $summary['warnings_count'] }}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row g-3">
-                                <div class="col-md-4">
-                                    <div class="bg-light p-3 rounded text-center">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Estimated Material Cost</span>
-                                        <h4 class="fw-bold text-success mt-1 mb-0">${{ number_format($summary['estimated_material_cost'], 2) }}</h4>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="bg-light p-3 rounded text-center">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Manufacturing Overhead</span>
-                                        <h4 class="fw-bold text-primary mt-1 mb-0">${{ number_format($summary['estimated_manufacturing_cost'], 2) }}</h4>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="bg-light p-3 rounded text-center">
-                                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Capacity Utilization</span>
-                                        <h4 class="fw-bold text-dark mt-1 mb-0">{{ $summary['capacity_utilization'] }}%</h4>
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- TAB 3: Capacity Operations Load -->
-                    <div class="tab-pane fade" id="operationsContent" role="tabpanel">
-                        @if($plan->operations->isEmpty())
-                            <div class="text-center py-5 text-muted">
-                                <i class="feather-sliders fs-32 mb-2 d-block text-muted"></i>
-                                <p class="mb-0">No Routing capacity operations snapshotted. Run the MRP Engine to compute capacity requirements.</p>
-                            </div>
-                        @else
-                            <div class="table-responsive">
-                                <table class="erp-thin-table fs-12">
-                                    <thead>
-                                        <tr>
-                                            <th>Seq</th>
-                                            <th>Operation#</th>
-                                            <th>Name</th>
-                                            <th>Work Center Location (Hierarchy)</th>
-                                            <th>Assigned Machine</th>
-                                            <th class="text-end">Setup Min</th>
-                                            <th class="text-end">Run Min / unit</th>
-                                            <th class="text-end">Total Time (Min)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($plan->operations as $op)
-                                            <tr>
-                                                <td class="fw-bold align-middle">{{ $op->sequence }}</td>
-                                                <td class="align-middle text-dark font-monospace fw-semibold">{{ $op->operation_number }}</td>
-                                                <td class="align-middle">{{ $op->name }}</td>
-                                                <td class="align-middle">
-                                                    <span class="fw-medium text-dark d-block">{{ $op->workCenter->name }}</span>
-                                                    <small class="text-muted fs-10">{{ $op->workCenter->getHierarchyPath() }}</small>
-                                                </td>
-                                                <td class="align-middle text-muted">{{ $op->machine ? $op->machine->name : 'Manual / None' }}</td>
-                                                <td class="align-middle text-end">{{ number_format($op->setup_time_minutes, 1) }}</td>
-                                                <td class="align-middle text-end">{{ number_format($op->processing_time_minutes, 1) }}</td>
-                                                <td class="align-middle text-end fw-bold text-dark">{{ number_format($op->total_time_minutes, 1) }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- TAB 4: General Details & Logs -->
-                    <div class="tab-pane fade" id="auditContent" role="tabpanel">
-                        <div class="row g-3 fs-13">
-                            <div class="col-md-6">
-                                <h6 class="fw-bold text-dark mb-2">Description / Notes</h6>
-                                <p class="text-muted">{{ $plan->description ?: 'No detailed planning notes provided.' }}</p>
-                            </div>
-                            <div class="col-md-6 border-start ps-4">
-                                <h6 class="fw-bold text-dark mb-2">Planning Metadata</h6>
-                                <div class="d-flex flex-column gap-2">
-                                    <div>
-                                        <span class="text-muted">Created By:</span>
-                                        <span class="fw-semibold text-dark">{{ $plan->creator ? $plan->creator->name : 'System Generated' }}</span>
-                                        <small class="text-muted d-block">on {{ $plan->created_at->format('d/m/Y H:i') }}</small>
-                                    </div>
-                                    @if($plan->approved_by)
-                                        <div>
-                                            <span class="text-muted">Approved By:</span>
-                                            <span class="fw-semibold text-dark">{{ $plan->approver ? $plan->approver->name : 'N/A' }}</span>
-                                            <small class="text-muted d-block">on {{ $plan->approved_at ? $plan->approved_at->format('d/m/Y H:i') : '' }}</small>
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
+        {{-- Tab 2: MRP Summary --}}
+        <div class="tab-pane-custom d-none" id="tab-summary">
+            @if(!$summary)
+                <div class="text-center py-5 text-muted">
+                    <i class="feather-info fs-32 mb-2 d-block"></i>
+                    <p class="mb-0">MRP summary will appear after you run the MRP Engine.</p>
+                </div>
+            @else
+                <h5 class="fw-bold text-dark mb-3">MRP Execution Summary</h5>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="bg-light rounded p-3 text-center border">
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Total Components</span>
+                            <span class="fw-bold text-dark fs-18">{{ $summary['total_components'] }}</span>
                         </div>
                     </div>
+                    <div class="col-md-3">
+                        <div class="bg-light rounded p-3 text-center border">
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Subassemblies</span>
+                            <span class="fw-bold text-dark fs-18">{{ $summary['total_subassemblies'] }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="bg-light rounded p-3 text-center border">
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Operations</span>
+                            <span class="fw-bold text-dark fs-18">{{ $summary['total_operations'] }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="bg-soft-danger rounded p-3 text-center border border-danger">
+                            <span class="text-danger fs-11 text-uppercase d-block mb-1">Warnings</span>
+                            <span class="fw-bold text-danger fs-18">{{ $summary['warnings_count'] }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="bg-soft-success rounded p-3 text-center border border-success">
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Est. Material Cost</span>
+                            <h4 class="fw-bold text-success mt-1 mb-0">${{ number_format($summary['estimated_material_cost'], 2) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="bg-soft-primary rounded p-3 text-center border border-primary">
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Manufacturing Overhead</span>
+                            <h4 class="fw-bold text-primary mt-1 mb-0">${{ number_format($summary['estimated_manufacturing_cost'], 2) }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="bg-light rounded p-3 text-center border">
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Capacity Utilization</span>
+                            <h4 class="fw-bold text-dark mt-1 mb-0">{{ $summary['capacity_utilization'] }}%</h4>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        </div>
 
+        {{-- Tab 3: Capacity Operations Load --}}
+        <div class="tab-pane-custom d-none" id="tab-operations">
+            @if($plan->operations->isEmpty())
+                <div class="text-center py-5 text-muted">
+                    <i class="feather-sliders fs-32 mb-2 d-block"></i>
+                    <p class="mb-0">No Routing capacity operations snapshotted. Run the MRP Engine to compute capacity requirements.</p>
+                </div>
+            @else
+                <h5 class="fw-bold text-dark mb-3">Capacity Operations Load</h5>
+                <div class="table-responsive">
+                    <table class="erp-thin-table fs-12">
+                        <thead>
+                            <tr>
+                                <th style="width:5%">Seq</th>
+                                <th style="width:12%">Operation#</th>
+                                <th style="width:20%">Name</th>
+                                <th style="width:22%">Work Center (Hierarchy)</th>
+                                <th style="width:15%">Assigned Machine</th>
+                                <th style="width:8%" class="text-end">Setup Min</th>
+                                <th style="width:8%" class="text-end">Run Min/unit</th>
+                                <th style="width:10%" class="text-end">Total Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($plan->operations as $op)
+                                <tr>
+                                    <td class="fw-bold">{{ $op->sequence }}</td>
+                                    <td class="text-dark font-monospace fw-semibold">{{ $op->operation_number }}</td>
+                                    <td>{{ $op->name }}</td>
+                                    <td>
+                                        <span class="fw-medium text-dark d-block">{{ $op->workCenter->name }}</span>
+                                        <small class="text-muted fs-10">{{ $op->workCenter->getHierarchyPath() }}</small>
+                                    </td>
+                                    <td class="text-muted">{{ $op->machine ? $op->machine->name : 'Manual / None' }}</td>
+                                    <td class="text-end">{{ number_format($op->setup_time_minutes, 1) }}</td>
+                                    <td class="text-end">{{ number_format($op->processing_time_minutes, 1) }}</td>
+                                    <td class="text-end fw-bold text-dark">{{ number_format($op->total_time_minutes, 1) }} min</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+
+        {{-- Tab 4: Details & Logs --}}
+        <div class="tab-pane-custom d-none" id="tab-details">
+            <div class="row g-4 fs-13">
+                <div class="col-md-6">
+                    <h5 class="fw-bold text-dark mb-3">Description / Planning Notes</h5>
+                    <p class="text-muted">{{ $plan->description ?: 'No detailed planning notes provided.' }}</p>
+                </div>
+                <div class="col-md-6 border-start ps-4">
+                    <h5 class="fw-bold text-dark mb-3">Audit Metadata</h5>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-3 d-flex align-items-start">
+                            <div class="avatar-text avatar-sm bg-soft-primary text-primary me-3 mt-1 rounded-circle">
+                                <i class="feather-user fs-14"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-dark">Plan Created</div>
+                                <div class="text-muted fs-11">By: {{ $plan->creator ? $plan->creator->name : 'System' }} on {{ $plan->created_at->format('d/m/Y H:i') }}</div>
+                            </div>
+                        </li>
+                        @if($plan->approved_by)
+                            <li class="mb-3 d-flex align-items-start">
+                                <div class="avatar-text avatar-sm bg-soft-success text-success me-3 mt-1 rounded-circle">
+                                    <i class="feather-check-circle fs-14"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark">Plan Approved</div>
+                                    <div class="text-muted fs-11">By: {{ $plan->approver ? $plan->approver->name : 'N/A' }} on {{ $plan->approved_at ? $plan->approved_at->format('d/m/Y H:i') : '' }}</div>
+                                </div>
+                            </li>
+                        @endif
+                    </ul>
                 </div>
             </div>
         </div>
-    </div>
+
+    </div>{{-- end .tab-content --}}
+
+</div>{{-- end .erp-single-panel --}}
+
+<script>
+    function switchTab(tabId) {
+        document.querySelectorAll('.erp-tabs-link').forEach(l => l.classList.remove('active'));
+        document.getElementById('btn-tab-' + tabId).classList.add('active');
+        document.querySelectorAll('.tab-pane-custom').forEach(p => p.classList.add('d-none'));
+        document.getElementById('tab-' + tabId).classList.remove('d-none');
+    }
+</script>
 @endsection

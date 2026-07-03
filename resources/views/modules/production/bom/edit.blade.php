@@ -75,70 +75,92 @@
                 <input type="hidden" name="parent_product_id" value="{{ request('parent_product_id') }}">
             @endif
 
-            <!-- BOM Header Fields using Redesigned Common Components -->
-            <div class="row g-4 mb-4">
-                <!-- Left Column -->
-                <div class="col-md-6">
-                    <x-ui.input label="Bill of Material#*" name="bom_number" placeholder="e.g. BOM-XYZ-001" value="{{ old('bom_number', $bom->bom_number) }}" required />
-                    
-                    <x-ui.select label="Item to Produce*" name="product_id" id="product_id" :options="['' => 'Select Product'] + $products->pluck('name', 'id')->toArray()" selected="{{ old('product_id', $bom->product_id) }}" data-select2-selector="default" master="product" required />
-
-                    <x-ui.input label="BOM Description Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" value="{{ old('bom_name', $bom->bom_name) }}" required />
-
-                    <x-ui.select label="BOM Type*" name="bom_type" :options="[
-                        'manufacturing' => 'Manufacturing BOM (Standard)',
-                        'engineering' => 'Engineering BOM (R&D)',
-                        'sales' => 'Sales BOM (Kit)',
-                        'phantom' => 'Phantom (Blow-Through)',
-                        'subcontracting' => 'Subcontracting (Outsourced)'
-                    ]" selected="{{ old('bom_type', $bom->bom_type) }}" data-select2-selector="default" required />
-
-                    <x-ui.select label="Usage Context*" name="usage_context" :options="[
-                        'manufacturing' => 'Manufacturing (Production execution ready)',
-                        'engineering' => 'Engineering (R&D staging)',
-                        'prototype' => 'Prototype (Sample testing)',
-                        'costing' => 'Costing (Simulation only)'
-                    ]" selected="{{ old('usage_context', $bom->usage_context) }}" data-select2-selector="default" required />
+            <x-ui.odoo-form-ui type="sheet">
+                <!-- Header with Close Button -->
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+                    <h4 class="fw-bold text-dark mb-0">Edit Bill of Materials - {{ $bom->bom_number }}</h4>
+                    <a href="{{ route('production.boms.show', $bom->id) }}" class="btn btn-sm btn-light border">Cancel</a>
                 </div>
 
-                <!-- Right Column -->
-                <div class="col-md-6">
-                    <x-ui.input label="Quantity*" name="base_quantity" type="number" step="any" placeholder="1.0" value="{{ old('base_quantity', $bom->base_quantity) }}" required />
-                    
-                    <x-ui.select label="Base Unit*" name="base_uom_id" :options="['' => 'Select UOM'] + $uoms->pluck('name', 'id')->toArray()" selected="{{ old('base_uom_id', $bom->base_uom_id) }}" data-select2-selector="default" master="uom" required />
-                    
-                    <x-ui.textarea label="Description" name="notes" placeholder="Max. 500 characters" value="{{ old('notes', $bom->notes) }}" rows="3" />
-                </div>
-            </div>
+                <!-- BOM Header Fields -->
+                <div class="row g-4 mb-4 fs-13 text-dark">
+                    <!-- Left Column -->
+                    <div class="col-md-6 border-end">
+                        <x-ui.odoo-form-ui type="input" label="BOM Number" name="bom_number" placeholder="e.g. BOM-XYZ-001" :value="old('bom_number', $bom->bom_number)" :required="true" />
+                                               <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" id="product_id" :required="true" data-master="product">
+                            <option value="">Select Product...</option>
+                            <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
+                            @foreach ($products as $p)
+                                <option value="{{ $p->id }}" @selected(old('product_id', $bom->product_id) == $p->id)>{{ $p->name }} ({{ $p->sku }})</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
 
-            <!-- Advanced Configuration Collapsible settings using Alpine.js -->
-            <div class="border rounded mb-4">
-                <div class="bg-light py-2 px-3 fs-13 fw-semibold text-dark d-flex justify-content-between align-items-center c-pointer" @click="showAdvanced = !showAdvanced">
-                    <span><i class="feather-settings me-2"></i>Advanced Configuration & Lifecycle Dates</span>
-                    <i class="feather-chevron-down transition-all" style="transition: transform 0.2s;" :style="showAdvanced ? 'transform: rotate(180deg);' : ''"></i>
+                        <x-ui.odoo-form-ui type="input" label="BOM Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" :value="old('bom_name', $bom->bom_name)" :required="true" />
+
+                        <x-ui.odoo-form-ui type="select" label="BOM Type" name="bom_type" :required="true">
+                            <option value="manufacturing" @selected(old('bom_type', $bom->bom_type) === 'manufacturing')>Manufacturing BOM (Standard)</option>
+                            <option value="engineering" @selected(old('bom_type', $bom->bom_type) === 'engineering')>Engineering BOM (R&D)</option>
+                            <option value="sales" @selected(old('bom_type', $bom->bom_type) === 'sales')>Sales BOM (Kit)</option>
+                            <option value="phantom" @selected(old('bom_type', $bom->bom_type) === 'phantom')>Phantom (Blow-Through)</option>
+                            <option value="subcontracting" @selected(old('bom_type', $bom->bom_type) === 'subcontracting')>Subcontracting (Outsourced)</option>
+                        </x-ui.odoo-form-ui>
+
+                        <x-ui.odoo-form-ui type="select" label="Usage Context" name="usage_context" :required="true">
+                            <option value="manufacturing" @selected(old('usage_context', $bom->usage_context) === 'manufacturing')>Manufacturing (Production execution ready)</option>
+                            <option value="engineering" @selected(old('usage_context', $bom->usage_context) === 'engineering')>Engineering (R&D staging)</option>
+                            <option value="prototype" @selected(old('usage_context', $bom->usage_context) === 'prototype')>Prototype (Sample testing)</option>
+                            <option value="costing" @selected(old('usage_context', $bom->usage_context) === 'costing')>Costing (Simulation only)</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <!-- Right Column -->
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="Base Quantity" name="base_quantity" inputType="number" step="any" placeholder="1.0" :value="old('base_quantity', $bom->base_quantity)" :required="true" />
+                        
+                        <x-ui.odoo-form-ui type="select" label="Base Unit" name="base_uom_id" :required="true" data-master="uom">
+                            <option value="">Select UOM...</option>
+                            <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
+                            @foreach ($uoms as $uom)
+                                <option value="{{ $uom->id }}" @selected(old('base_uom_id', $bom->base_uom_id) == $uom->id)>{{ $uom->name }} ({{ $uom->code }})</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>                        
+                        <x-ui.odoo-form-ui type="textarea" label="Description" name="notes" placeholder="Max. 500 characters" rows="3">{{ old('notes', $bom->notes) }}</x-ui.odoo-form-ui>
+                    </div>
                 </div>
-                <div class="bg-white" 
-                     style="transition: max-height 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out; overflow: hidden;"
-                     :style="showAdvanced ? 'max-height: 1000px; padding: 1rem; opacity: 1; border-top: 1px solid #dee2e6;' : 'max-height: 0px; padding: 0 1rem; opacity: 0; border-top: none;'">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <x-ui.input label="Version ID*" name="version" placeholder="e.g. 1.0.0" value="{{ old('version', $bom->version) }}" required />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.select label="Routing Reference" name="routing_id" id="routing_id" :options="['' => 'No Routing Reference'] + $routings->pluck('name', 'id')->toArray()" selected="{{ old('routing_id', $bom->routing_id) }}" data-select2-selector="default" x-model="selectedRoutingId" @change="loadOperations()" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Effective Start Date*" name="effective_date" type="date" value="{{ old('effective_date', $bom->effective_date ? $bom->effective_date->format('Y-m-d') : date('Y-m-d')) }}" required />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Effective Expiry Date" name="expiry_date" type="date" value="{{ old('expiry_date', $bom->expiry_date ? $bom->expiry_date->format('Y-m-d') : '') }}" />
-                        </div>
-                        <div class="col-md-12">
-                            <x-ui.input label="Revision Reason" name="revision_reason" placeholder="e.g. Change in raw steel specifications" value="{{ old('revision_reason', $bom->revision_reason) }}" />
+
+                <!-- Advanced Configuration Collapsible settings using Alpine.js -->
+                <div class="border rounded mb-4">
+                    <div class="bg-light py-2 px-3 fs-13 fw-semibold text-dark d-flex justify-content-between align-items-center c-pointer" @click="showAdvanced = !showAdvanced">
+                        <span><i class="feather-settings me-2"></i>Advanced Configuration &amp; Lifecycle Dates</span>
+                        <i class="feather-chevron-down transition-all" style="transition: transform 0.2s;" :style="showAdvanced ? 'transform: rotate(180deg);' : ''"></i>
+                    </div>
+                    <div class="bg-white" 
+                         style="transition: max-height 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out; overflow: hidden;"
+                         :style="showAdvanced ? 'max-height: 1000px; padding: 1rem; opacity: 1; border-top: 1px solid #dee2e6;' : 'max-height: 0px; padding: 0 1rem; opacity: 0; border-top: none;'">
+                        <div class="row g-3 fs-13 text-dark">
+                            <div class="col-md-6">
+                                <x-ui.odoo-form-ui type="input" label="Version ID" name="version" placeholder="e.g. 1.0.0" :value="old('version', $bom->version)" :required="true" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.odoo-form-ui type="select" label="Routing Reference" name="routing_id" id="routing_id" x-model="selectedRoutingId" @change="loadOperations()">
+                                    <option value="">No Routing Reference</option>
+                                    @foreach($routings as $rt)
+                                        <option value="{{ $rt->id }}">{{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.odoo-form-ui type="input" label="Start Date" name="effective_date" inputType="date" :value="old('effective_date', $bom->effective_date ? $bom->effective_date->format('Y-m-d') : date('Y-m-d'))" :required="true" />
+                            </div>
+                            <div class="col-md-6">
+                                <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" inputType="date" :value="old('expiry_date', $bom->expiry_date ? $bom->expiry_date->format('Y-m-d') : '')" />
+                            </div>
+                            <div class="col-md-12">
+                                <x-ui.odoo-form-ui type="input" label="Revision Reason" name="revision_reason" placeholder="e.g. Engineering specification update" :value="old('revision_reason', $bom->revision_reason)" />
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
             <!-- Tab Headers -->
             <div class="erp-tabs-nav">
@@ -150,7 +172,7 @@
             <div x-show="activeTab === 'components'" x-transition>
                 <h5 class="fw-bold text-dark mb-3">Add Component*</h5>
                 <div class="table-responsive mb-4">
-                    <table class="erp-thin-table">
+                    <x-ui.odoo-form-ui type="table">
                         <thead>
                             <tr>
                                 <th style="width: 5%" class="text-center">Seq</th>
@@ -169,15 +191,15 @@
                                 <tr x-init="$nextTick(() => initRowSelects($el, item))">
                                     <!-- Sequence -->
                                     <td class="fw-bold text-center align-middle" x-text="index + 1"></td>
-                                    
-                                    <!-- Material Selection -->
+                                                                       <!-- Material Selection -->
                                     <td class="align-middle">
-                                        <x-ui.select x-bind:name="'items['+index+'][material_id]'" class="fs-13" x-model="item.material_id" required data-select2-selector="default" master="product">
+                                        <select x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required data-select2-selector="default" data-master="product">
                                             <option value="">Select Material...</option>
+                                            <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
                                             @foreach($materials as $material)
                                                 <option value="{{ $material->id }}" data-type="{{ $material->type }}" data-sku="{{ $material->sku }}">{{ $material->name }} ({{ $material->sku }})</option>
                                             @endforeach
-                                        </x-ui.select>
+                                        </select>
                                         <template x-if="errors && errors['items.' + index + '.material_id']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
                                         </template>
@@ -213,7 +235,7 @@
                                                                 @csrf
                                                                 <button type="submit" class="btn btn-xs btn-soft-warning py-0.5 px-1 fs-9 text-nowrap">
                                                                     <i class="feather-copy"></i> Revise
-                                                                </button>
+                                                                 </button>
                                                             </form>
                                                         </template>
                                                     </div>
@@ -231,7 +253,7 @@
                                     
                                     <!-- Quantity -->
                                     <td class="align-middle">
-                                        <x-ui.input type="number" step="any" x-bind:name="'items['+index+'][quantity]'" class="text-end fs-13" x-model="item.quantity" placeholder="0.00" required min="0.0001" />
+                                        <input type="number" step="any" x-bind:name="'items['+index+'][quantity]'" class="odoo-table-input text-end" x-model="item.quantity" placeholder="0.00" required min="0.0001" />
                                         <template x-if="errors && errors['items.' + index + '.quantity']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.quantity'][0]"></span>
                                         </template>
@@ -239,12 +261,13 @@
                                     
                                     <!-- UOM -->
                                     <td class="align-middle">
-                                        <x-ui.select x-bind:name="'items['+index+'][uom_id]'" class="fs-13" x-model="item.uom_id" required data-select2-selector="default" master="uom">
+                                        <select x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required data-select2-selector="default" data-master="uom">
                                             <option value="">Select UOM...</option>
+                                            <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
                                             @foreach($uoms as $uom)
                                                 <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
                                             @endforeach
-                                        </x-ui.select>
+                                        </select>
                                         <template x-if="errors && errors['items.' + index + '.uom_id']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.uom_id'][0]"></span>
                                         </template>
@@ -252,15 +275,15 @@
                                     
                                     <!-- Material Scrap Percentage -->
                                     <td class="align-middle">
-                                        <x-ui.input type="number" step="any" x-bind:name="'items['+index+'][material_scrap_percentage]'" class="text-end fs-13 text-danger" x-model="item.material_scrap_percentage" placeholder="0.00" min="0" max="100" />
+                                        <input type="number" step="any" x-bind:name="'items['+index+'][material_scrap_percentage]'" class="odoo-table-input text-end text-danger" x-model="item.material_scrap_percentage" placeholder="0.00" min="0" max="100" />
                                         <template x-if="errors && errors['items.' + index + '.material_scrap_percentage']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_scrap_percentage'][0]"></span>
                                         </template>
                                     </td>
-
+                                    
                                     <!-- Priority -->
                                     <td class="align-middle">
-                                        <x-ui.input type="number" x-bind:name="'items['+index+'][priority]'" class="text-end fs-13" x-model="item.priority" placeholder="1" min="1" />
+                                        <input type="number" x-bind:name="'items['+index+'][priority]'" class="odoo-table-input text-end" x-model="item.priority" placeholder="1" min="1" />
                                         <template x-if="errors && errors['items.' + index + '.priority']">
                                             <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.priority'][0]"></span>
                                         </template>
@@ -269,11 +292,11 @@
                                     <!-- Validity limits -->
                                     <td class="align-middle">
                                         <div class="d-flex flex-column gap-1">
-                                            <x-ui.input type="date" x-bind:name="'items['+index+'][effective_from]'" class="form-control-sm fs-11" x-model="item.effective_from" />
+                                            <input type="date" x-bind:name="'items['+index+'][effective_from]'" class="odoo-table-input fs-11" x-model="item.effective_from" />
                                             <template x-if="errors && errors['items.' + index + '.effective_from']">
                                                 <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_from'][0]"></span>
                                             </template>
-                                            <x-ui.input type="date" x-bind:name="'items['+index+'][effective_to]'" class="form-control-sm fs-11" x-model="item.effective_to" />
+                                            <input type="date" x-bind:name="'items['+index+'][effective_to]'" class="odoo-table-input fs-11" x-model="item.effective_to" />
                                             <template x-if="errors && errors['items.' + index + '.effective_to']">
                                                 <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_to'][0]"></span>
                                             </template>
@@ -285,18 +308,13 @@
                                         <div class="d-flex flex-column gap-2">
                                             <div>
                                                 <input type="hidden" x-bind:name="'items['+index+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
-                                                
-                                                <x-ui.checkbox 
-                                                    x-model="item.is_alternative" 
-                                                    class="fs-11" 
-                                                    x-bind:id="'is_alternative_edit_' + index"
-                                                />
+                                                <input type="checkbox" class="form-check-input" x-model="item.is_alternative" x-bind:id="'is_alternative_edit_' + index" />
                                                 <label class="form-check-label c-pointer fw-medium text-dark fs-11 ms-1" x-bind:for="'is_alternative_edit_' + index">
                                                     Is Alternative
                                                 </label>
                                             </div>
                                             <div x-show="item.is_alternative">
-                                                <x-ui.input type="text" x-bind:name="'items['+index+'][alternative_group]'" class="form-control-sm fs-11" placeholder="Alt Group Code..." x-model="item.alternative_group" />
+                                                <input type="text" x-bind:name="'items['+index+'][alternative_group]'" class="odoo-table-input fs-11" placeholder="Alt Group Code..." x-model="item.alternative_group" />
                                                 <template x-if="errors && errors['items.' + index + '.alternative_group']">
                                                     <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.alternative_group'][0]"></span>
                                                 </template>
@@ -313,7 +331,7 @@
                                 </tr>
                             </template>
                         </tbody>
-                    </table>
+                    </x-ui.odoo-form-ui>
                 </div>
 
                 <!-- Add Row Action -->
@@ -379,19 +397,14 @@
                                     </tbody>
                                 </table>
                             </div>
-                        </template>
-                    </div>
-                </template>
-            </div>
 
-            <!-- Footer Save and Cancel buttons -->
             <div class="d-flex gap-2 pt-3 border-top mt-4">
                 <button type="submit" class="btn btn-primary px-4">Update BOM</button>
                 <a href="{{ route('production.boms.show', $bom->id) }}" class="btn btn-secondary px-4">Cancel</a>
             </div>
+            </x-ui.odoo-form-ui>
         </form>
     </div>
-
     @php
         $oldItems = old('items', $bom->items->toArray());
     @endphp

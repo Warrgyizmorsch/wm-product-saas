@@ -38,7 +38,9 @@
                 ['label' => 'Work Centers', 'route' => 'production.work-centers.index'],
                 ['label' => 'Machines', 'route' => 'production.machines.index'],
                 ['label' => 'Routing', 'route' => 'production.routing.index'],
-                'Work Orders', 'Planning', 'Quality'
+                ['label' => 'Planning', 'route' => 'production.plans.index'],
+                ['label' => 'Production Orders', 'route' => 'production.orders.index'],
+                'Quality'
             ]],
         ],
         'Finance & People' => [
