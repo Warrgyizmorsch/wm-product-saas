@@ -11,7 +11,11 @@ return new class extends Migration
         Schema::create('production_routing_operation_materials', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('routing_operation_id')->constrained('production_routing_operations')->cascadeOnDelete();
+            $table->unsignedBigInteger('routing_operation_id');
+            $table->foreign('routing_operation_id', 'rom_routing_op_fk')
+                ->references('id')
+                ->on('production_routing_operations')
+                ->cascadeOnDelete();
             $table->foreignId('material_id')->constrained('products')->cascadeOnDelete();
             $table->decimal('quantity', 12, 4);
             $table->foreignId('uom_id')->constrained('uoms')->cascadeOnDelete();

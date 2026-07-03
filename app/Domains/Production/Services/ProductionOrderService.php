@@ -1,0 +1,339 @@
+<?php
+
+namespace App\Domains\Production\Services;
+
+use App\Domains\Production\Models\ProductionOrder;
+use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionOrderReservation;
+use App\Domains\Production\Models\ProductionPlan;
+use App\Domains\Production\Models\ProductionBom;
+use App\Domains\Production\Models\Routing;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+
+class ProductionOrderService
+{
+    public function __construct(
+        private readonly ProductionOrderNumberService $numberService
+    ) {}
+
+    /**
+     * Convert an approved Production Plan into a Production Order with frozen snapshots.
+     */
+    public function createFromPlan(int $planId, ?int $userId = null): ProductionOrder
+    {
+        return DB::transaction(function () use ($planId, $userId) {
+            $plan = ProductionPlan::with(['requirements', 'operations'])->findOrFail($planId);
+
+            if ($plan->status !== ProductionPlan::STATUS_APPROVED && $plan->status !== ProductionPlan::STATUS_MRP_GENERATED) {
+                throw new InvalidArgumentException("Only approved or MRP-generated production plans can be converted to production orders.");
+            }
+
+            // 1. Create order header
+            $order = ProductionOrder::create([
+                'tenant_id'          => $plan->tenant_id,
+                'order_number'       => $this->numberService->generateNextNumber($plan->tenant_id),
+                'production_plan_id' => $plan->id,
+                'product_id'         => $plan->product_id,
+                'bom_id'             => $plan->bom_id,
+                'routing_id'         => $plan->routing_id,
+                'quantity_ordered'   => $plan->quantity,
+                'start_date'         => $plan->start_date,
+                'end_date'           => $plan->end_date,
+                'status'             => ProductionOrder::STATUS_DRAFT,
+                'created_by'         => $userId,
+            ]);
+
+            // 2. Clone Planning Requirements -> Order Reservations
+            foreach ($plan->requirements as $req) {
+                ProductionOrderReservation::create([
+                    'tenant_id'           => $order->tenant_id,
+                    'production_order_id' => $order->id,
+                    'bom_item_id'         => $req->bom_item_id,
+                    'product_id'          => $req->product_id,
+                    'quantity_planned'    => $req->required_quantity,
+                    'quantity_reserved'   => $req->required_quantity, // Initial auto-reservation
+                    'quantity_issued'     => 0.0000,
+                    'uom_id'              => $req->uom_id,
+                ]);
+            }
+
+            // 3. Clone Planning Operations -> Order Operations (snapshot)
+            $createdOps = [];
+            foreach ($plan->operations as $idx => $planOp) {
+                $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
+
+                $op = ProductionOrderOperation::create([
+                    'tenant_id'               => $order->tenant_id,
+                    'production_order_id'     => $order->id,
+                    'routing_operation_id'    => $planOp->routing_operation_id,
+                    'sequence'                => $planOp->sequence,
+                    'operation_number'        => $planOp->operation_number,
+                    'name'                    => $planOp->name,
+                    'work_center_id'          => $planOp->work_center_id,
+                    'machine_id'              => $planOp->machine_id,
+                    'status'                  => $status,
+                    'setup_time_planned'      => $planOp->setup_time_minutes,
+                    'processing_time_planned' => $planOp->processing_time_minutes,
+                    'total_time_planned'      => $planOp->total_time_minutes,
+                    'setup_time_actual'       => 0.00,
+                    'processing_time_actual'  => 0.00,
+                    'quantity_produced'       => 0.0000,
+                    'quantity_rejected'       => 0.0000,
+                    'quantity_scrapped'       => 0.0000,
+                ]);
+                $createdOps[] = $op;
+            }
+
+            // Bind sequential self-referencing operations dependency chain (previous_operation_id)
+            for ($i = 1; $i < count($createdOps); $i++) {
+                $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
+                $createdOps[$i]->save();
+            }
+
+            // 4. Progress Production Plan status
+            $plan->status = ProductionPlan::STATUS_RELEASED;
+            $plan->save();
+
+            return $order;
+        });
+    }
+
+    /**
+     * Create a Production Order directly (without a prior Production Plan).
+     */
+    public function createDirect(array $data, int $tenantId, ?int $userId = null): ProductionOrder
+    {
+        return DB::transaction(function () use ($data, $tenantId, $userId) {
+            $productId = $data['product_id'];
+            $quantity = (float) $data['quantity_ordered'];
+
+            // Fetch latest active BOM & Routing
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('status', 'approved')
+                ->first();
+
+            $routing = Routing::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('status', 'active')
+                ->first();
+
+            if (!$bom || !$routing) {
+                throw new InvalidArgumentException("Cannot create order: No approved BOM and/or active Routing exists for this product.");
+            }
+
+            $order = ProductionOrder::create([
+                'tenant_id'          => $tenantId,
+                'order_number'       => $this->numberService->generateNextNumber($tenantId),
+                'production_plan_id' => null,
+                'product_id'         => $productId,
+                'bom_id'             => $bom->id,
+                'routing_id'         => $routing->id,
+                'quantity_ordered'   => $quantity,
+                'start_date'         => $data['start_date'],
+                'end_date'           => $data['end_date'],
+                'status'             => ProductionOrder::STATUS_DRAFT,
+                'description'        => $data['description'] ?? null,
+                'created_by'         => $userId,
+            ]);
+
+            // 1. Resolve & Snapshot reservations directly from BOM items
+            foreach ($bom->items as $item) {
+                $plannedQty = $item->quantity * ($quantity / ($bom->base_quantity ?: 1.0));
+                
+                // Add scrap factor if defined
+                if ($item->material_scrap_percentage > 0) {
+                    $plannedQty *= (1 + ($item->material_scrap_percentage / 100));
+                }
+
+                ProductionOrderReservation::create([
+                    'tenant_id'           => $tenantId,
+                    'production_order_id' => $order->id,
+                    'bom_item_id'         => $item->id,
+                    'product_id'          => $item->material_id,
+                    'quantity_planned'    => $plannedQty,
+                    'quantity_reserved'   => $plannedQty,
+                    'quantity_issued'     => 0.0000,
+                    'uom_id'              => $item->uom_id,
+                ]);
+            }
+
+            // 2. Resolve & Snapshot operations directly from Routing operations
+            $createdOps = [];
+            foreach ($routing->operations as $idx => $routingOp) {
+                $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
+                
+                $processingTime = ($routingOp->processing_time_minutes * $quantity);
+                $totalTime = $routingOp->setup_time_minutes + $processingTime;
+
+                $op = ProductionOrderOperation::create([
+                    'tenant_id'               => $tenantId,
+                    'production_order_id'     => $order->id,
+                    'routing_operation_id'    => $routingOp->id,
+                    'sequence'                => $routingOp->sequence,
+                    'operation_number'        => $routingOp->operation_number,
+                    'name'                    => $routingOp->name,
+                    'work_center_id'          => $routingOp->work_center_id,
+                    'machine_id'              => $routingOp->machine_id,
+                    'status'                  => $status,
+                    'setup_time_planned'      => $routingOp->setup_time_minutes,
+                    'processing_time_planned' => $processingTime,
+                    'total_time_planned'      => $totalTime,
+                    'setup_time_actual'       => 0.00,
+                    'processing_time_actual'  => 0.00,
+                    'quantity_produced'       => 0.0000,
+                    'quantity_rejected'       => 0.0000,
+                    'quantity_scrapped'       => 0.0000,
+                ]);
+                $createdOps[] = $op;
+            }
+
+            // Bind sequence dependencies
+            for ($i = 1; $i < count($createdOps); $i++) {
+                $createdOps[$i]->previous_operation_id = $createdOps[$i - 1]->id;
+                $createdOps[$i]->save();
+            }
+
+            return $order;
+        });
+    }
+
+    /**
+     * Release order to shop floor execution.
+     */
+    public function release(int $id, ?int $userId = null): void
+    {
+        $order = ProductionOrder::findOrFail($id);
+
+        if (!$order->isDraft()) {
+            throw new InvalidArgumentException("Only draft orders can be released.");
+        }
+
+        $order->status = ProductionOrder::STATUS_RELEASED;
+        $order->released_by = $userId;
+        $order->released_at = now();
+        $order->save();
+    }
+
+    /**
+     * Complete order execution.
+     */
+    public function complete(int $id, ?int $userId = null): void
+    {
+        $order = ProductionOrder::findOrFail($id);
+
+        if ($order->status !== ProductionOrder::STATUS_IN_PROGRESS && $order->status !== ProductionOrder::STATUS_RELEASED) {
+            throw new InvalidArgumentException("Only orders in progress or released can be completed.");
+        }
+
+        // Validate that all operations are completed/skipped/cancelled
+        $uncompletedOps = $order->operations()->whereNotIn('status', [
+            ProductionOrderOperation::STATUS_COMPLETED,
+            ProductionOrderOperation::STATUS_SKIPPED,
+            ProductionOrderOperation::STATUS_CANCELLED,
+        ])->exists();
+
+        if ($uncompletedOps) {
+            throw new InvalidArgumentException("Cannot complete order: There are operations that have not been completed, skipped, or cancelled.");
+        }
+
+        $order->status = ProductionOrder::STATUS_COMPLETED;
+        $order->completed_by = $userId;
+        $order->completed_at = now();
+        $order->actual_end_date = now();
+        $order->save();
+    }
+
+    /**
+     * Close order execution.
+     */
+    public function close(int $id, ?int $userId = null): void
+    {
+        $order = ProductionOrder::findOrFail($id);
+
+        if (!$order->isCompleted()) {
+            throw new InvalidArgumentException("Only completed orders can be closed.");
+        }
+
+        $order->status = ProductionOrder::STATUS_CLOSED;
+        $order->closed_by = $userId;
+        $order->closed_at = now();
+        $order->save();
+    }
+
+    /**
+     * Cancel order execution.
+     */
+    public function cancel(int $id, ?int $userId = null): void
+    {
+        $order = ProductionOrder::findOrFail($id);
+
+        if ($order->isClosed() || $order->isCompleted()) {
+            throw new InvalidArgumentException("Closed or completed orders cannot be cancelled.");
+        }
+
+        DB::transaction(function () use ($order, $userId) {
+            $order->status = ProductionOrder::STATUS_CANCELLED;
+            $order->save();
+
+            // Cancel all operations
+            $order->operations()->update(['status' => ProductionOrderOperation::STATUS_CANCELLED]);
+
+            // Release plan back if applicable
+            if ($order->production_plan_id) {
+                $plan = ProductionPlan::find($order->production_plan_id);
+                if ($plan) {
+                    $plan->status = ProductionPlan::STATUS_APPROVED;
+                    $plan->save();
+                }
+            }
+        });
+    }
+
+    /**
+     * Update order details (only allowed in draft state).
+     */
+    public function update(int $id, array $data): ProductionOrder
+    {
+        $order = ProductionOrder::findOrFail($id);
+
+        if ($order->isFrozen()) {
+            throw new InvalidArgumentException("Frozen orders cannot be modified.");
+        }
+
+        $order->update($data);
+        return $order;
+    }
+
+    /**
+     * Delete draft order.
+     */
+    public function delete(int $id): void
+    {
+        $order = ProductionOrder::findOrFail($id);
+
+        if ($order->isFrozen()) {
+            throw new InvalidArgumentException("Frozen orders cannot be deleted.");
+        }
+
+        DB::transaction(function () use ($order) {
+            // Delete child snapshots
+            $order->reservations()->delete();
+            $order->operations()->delete();
+            
+            // Revert production plan if linked
+            if ($order->production_plan_id) {
+                $plan = ProductionPlan::find($order->production_plan_id);
+                if ($plan) {
+                    $plan->status = ProductionPlan::STATUS_APPROVED;
+                    $plan->save();
+                }
+            }
+
+            $order->delete();
+        });
+    }
+}

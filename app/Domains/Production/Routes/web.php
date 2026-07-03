@@ -5,6 +5,8 @@ use App\Domains\Production\Controllers\ProductionBomController;
 use App\Domains\Production\Controllers\WorkCenterController;
 use App\Domains\Production\Controllers\MachineController;
 use App\Domains\Production\Controllers\RoutingController;
+use App\Domains\Production\Controllers\ProductionPlanController;
+use App\Domains\Production\Controllers\ProductionOrderController;
 
 Route::prefix('production')
     ->as('production.')
@@ -36,4 +38,30 @@ Route::prefix('production')
         Route::post('routing/{routing}/duplicate', [RoutingController::class, 'duplicateVersion'])->name('routing.duplicate');
         Route::get('routing/{routing}/operations', [RoutingController::class, 'getOperationsForAjax'])->name('routing.operations');
         Route::resource('routing', RoutingController::class);
+
+        // ── Production Planning ───────────────────────────────────────────────
+        Route::post('plans/{plan}/submit',    [ProductionPlanController::class, 'submitApproval'])->name('plans.submit');
+        Route::post('plans/{plan}/approve',   [ProductionPlanController::class, 'approve'])->name('plans.approve');
+        Route::post('plans/{plan}/reject',    [ProductionPlanController::class, 'reject'])->name('plans.reject');
+        Route::post('plans/{plan}/release',   [ProductionPlanController::class, 'release'])->name('plans.release');
+        Route::post('plans/{plan}/complete',  [ProductionPlanController::class, 'complete'])->name('plans.complete');
+        Route::post('plans/{plan}/close',     [ProductionPlanController::class, 'close'])->name('plans.close');
+        Route::post('plans/{plan}/cancel',    [ProductionPlanController::class, 'cancel'])->name('plans.cancel');
+        Route::post('plans/{plan}/run-mrp',   [ProductionPlanController::class, 'runMrp'])->name('plans.run-mrp');
+        Route::get('plans/ajax-engineering-options', [ProductionPlanController::class, 'getEngineeringOptions'])->name('plans.engineering-options');
+        Route::resource('plans', ProductionPlanController::class);
+
+        // ── Production Orders ─────────────────────────────────────────────────
+        Route::post('plans/{plan}/create-order', [ProductionOrderController::class, 'createFromPlan'])->name('plans.create-order');
+        Route::post('orders/{order}/release',  [ProductionOrderController::class, 'release'])->name('orders.release');
+        Route::post('orders/{order}/issue',    [ProductionOrderController::class, 'issueMaterial'])->name('orders.issue');
+        Route::post('orders/{order}/return',   [ProductionOrderController::class, 'returnMaterial'])->name('orders.return');
+        Route::post('orders/{order}/log-progress', [ProductionOrderController::class, 'logProgress'])->name('orders.log-progress');
+        Route::post('orders/{order}/log-scrap', [ProductionOrderController::class, 'logScrap'])->name('orders.log-scrap');
+        Route::post('orders/{order}/log-rework', [ProductionOrderController::class, 'logRework'])->name('orders.log-rework');
+        Route::post('orders/{order}/receive-fg', [ProductionOrderController::class, 'receiveFg'])->name('orders.receive-fg');
+        Route::post('orders/{order}/complete', [ProductionOrderController::class, 'complete'])->name('orders.complete');
+        Route::post('orders/{order}/close',    [ProductionOrderController::class, 'close'])->name('orders.close');
+        Route::post('orders/{order}/cancel',   [ProductionOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::resource('orders', ProductionOrderController::class);
     });
