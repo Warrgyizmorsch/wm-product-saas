@@ -1,5 +1,8 @@
 @php
-    $showSalaryActive = request()->routeIs('hrms.salary-structure.index') || request()->query('tab') === 'salary-structure';
+    $isSalary = request()->routeIs('hrms.salary-structure.index') || request()->query('tab') === 'salary-structure';
+    $isLeave = request()->routeIs('hrms.leave-structure.index');
+    $isPenalty = request()->routeIs('hrms.penalization-policy.index');
+    $isOrg = !$isSalary && !$isLeave && !$isPenalty;
 @endphp
 
 <div class="settings-sidebar-panel h-100">
@@ -8,18 +11,22 @@
     </div>
     <div class="settings-sidebar-body py-3 px-3">
         <div class="nav flex-column nav-pills gap-1" id="settingsSubSidebar" role="tablist" aria-orientation="vertical">
-            <button class="nav-link {{ !$showSalaryActive ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="org-structure-menu" data-bs-toggle="pill" data-bs-target="#org-structure-pane" type="button" role="tab" aria-controls="org-structure-pane" aria-selected="{{ !$showSalaryActive ? 'true' : 'false' }}">
+            <a class="nav-link {{ $isOrg ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="org-structure-menu" href="{{ route('hrms.org.index') }}" role="tab" aria-controls="org-structure-pane" aria-selected="{{ $isOrg ? 'true' : 'false' }}">
                 <i class="feather-settings me-3 fs-16"></i>
                 <span>Organization Structure</span>
-            </button>
-            <a class="nav-link {{ $showSalaryActive ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="salary-structure-menu" href="{{ route('hrms.salary-structure.index') }}" role="tab" aria-controls="salary-structure-pane" aria-selected="{{ $showSalaryActive ? 'true' : 'false' }}">
+            </a>
+            <a class="nav-link {{ $isSalary ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="salary-structure-menu" href="{{ route('hrms.salary-structure.index') }}" role="tab" aria-controls="salary-structure-pane" aria-selected="{{ $isSalary ? 'true' : 'false' }}">
                 <i class="feather-dollar-sign me-3 fs-16"></i>
                 <span>Salary Structure</span>
             </a>
-            <button class="nav-link d-flex align-items-center text-start transition-all" id="leave-structure-menu" data-bs-toggle="pill" data-bs-target="#leave-structure-pane" type="button" role="tab" aria-controls="leave-structure-pane" aria-selected="false">
+            <a class="nav-link {{ $isLeave ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="leave-structure-menu" href="{{ route('hrms.leave-structure.index') }}" role="tab" aria-selected="{{ $isLeave ? 'true' : 'false' }}">
                 <i class="feather-calendar me-3 fs-16"></i>
                 <span>Leave Structure</span>
-            </button>
+            </a>
+            <a class="nav-link {{ $isPenalty ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="penalization-policy-menu" href="{{ route('hrms.penalization-policy.index') }}" role="tab" aria-selected="{{ $isPenalty ? 'true' : 'false' }}">
+                <i class="feather-alert-octagon me-3 fs-16"></i>
+                <span>Penalization Policy</span>
+            </a>
         </div>
     </div>
 </div>

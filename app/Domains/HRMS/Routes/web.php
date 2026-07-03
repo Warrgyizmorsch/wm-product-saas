@@ -2,6 +2,8 @@
 
 use App\Domains\HRMS\Controllers\OrgController;
 use App\Domains\HRMS\Controllers\SalaryStructureController;
+use App\Domains\HRMS\Controllers\LeaveStructureController;
+use App\Domains\HRMS\Controllers\PenalizationPolicyController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('hrms')
@@ -28,6 +30,21 @@ Route::prefix('hrms')
         Route::post('/salary-structure/component/store', [SalaryStructureController::class, 'storeComponent'])->name('salary-structure.store');
         Route::post('/salary-structure/component/update/{salaryComponent}', [SalaryStructureController::class, 'updateComponent'])->name('salary-structure.update');
         Route::delete('/salary-structure/component/delete/{salaryComponent}', [SalaryStructureController::class, 'destroyComponent'])->name('salary-structure.destroy');
+
+        Route::post('/salary-structure/structure/store', [SalaryStructureController::class, 'storeStructure'])->name('salary-structure.structure.store');
+        Route::post('/salary-structure/structure/update/{salaryStructure}', [SalaryStructureController::class, 'updateStructure'])->name('salary-structure.structure.update');
+        Route::delete('/salary-structure/structure/delete/{salaryStructure}', [SalaryStructureController::class, 'destroyStructure'])->name('salary-structure.structure.destroy');
+
+        Route::get('/leave-structure', [LeaveStructureController::class, 'index'])->name('leave-structure.index');
+        Route::post('/leave-structure/plan/store', [LeaveStructureController::class, 'storePlan'])->name('leave-structure.plan.store');
+        Route::post('/leave-structure/plan/update/{leavePlan}', [LeaveStructureController::class, 'updatePlan'])->name('leave-structure.plan.update');
+        Route::delete('/leave-structure/plan/delete/{leavePlan}', [LeaveStructureController::class, 'destroyPlan'])->name('leave-structure.plan.destroy');
+        Route::post('/leave-structure/type/store', [LeaveStructureController::class, 'storeType'])->name('leave-structure.type.store');
+        Route::post('/leave-structure/type/update/{leaveType}', [LeaveStructureController::class, 'updateType'])->name('leave-structure.type.update');
+        Route::delete('/leave-structure/type/delete/{leaveType}', [LeaveStructureController::class, 'destroyType'])->name('leave-structure.type.destroy');
+
+        Route::get('/penalization-policy', [PenalizationPolicyController::class, 'index'])->name('penalization-policy.index');
+        Route::post('/penalization-policy/store', [PenalizationPolicyController::class, 'store'])->name('penalization-policy.store');
 
         Route::post('/org/salary-component/store', [OrgController::class, 'storeSalaryComponent'])->name('salary-component.store');
         Route::post('/org/salary-component/update/{salaryComponent}', [OrgController::class, 'updateSalaryComponent'])->name('salary-component.update');
