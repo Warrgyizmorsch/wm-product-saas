@@ -63,5 +63,15 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Models\Routing::class,
             \App\Domains\Production\Policies\RoutingPolicy::class
         );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionPlan::class,
+            \App\Domains\Production\Policies\ProductionPlanPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionOrder::class,
+            \App\Domains\Production\Policies\ProductionOrderPolicy::class
+        );
     }
 }
