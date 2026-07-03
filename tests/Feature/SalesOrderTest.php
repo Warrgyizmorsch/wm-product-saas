@@ -1,0 +1,254 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Tenant;
+use App\Models\User;
+use App\Domains\CRM\Models\Customer;
+use App\Domains\CRM\Models\Quotation;
+use App\Domains\Inventory\Models\Product;
+use App\Domains\Sales\Models\SalesOrder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class SalesOrderTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Tenant $tenant;
+    private User $user;
+    private Customer $customer;
+    private Product $product;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Create tenant
+        $this->tenant = Tenant::create([
+            'name' => 'Test Tenant',
+            'slug' => 'test-tenant',
+            'status' => 'active',
+            'plan' => 'enterprise',
+        ]);
+
+        // Create user
+        $this->user = User::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => bcrypt('password'),
+        ]);
+
+        // Create customer
+        $this->customer = Customer::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'John Doe Corp',
+            'email' => 'john@doe.com',
+            'phone' => '1234567890',
+            'status' => 'active',
+        ]);
+
+        // Create product
+        $this->product = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Standard Widget',
+            'sku' => 'WIDG-001',
+            'type' => 'finished_good',
+            'status' => 'active',
+            'unit_cost' => 100.00,
+        ]);
+    }
+
+    /** @test */
+    public function sales_order_index_is_accessible()
+    {
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('sales.orders.index'));
+
+        $response->assertStatus(200);
+        $response->assertViewIs('modules.sales.orders.index');
+    }
+
+    /** @test */
+    public function sales_order_create_is_accessible()
+    {
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('sales.orders.create'));
+
+        $response->assertStatus(200);
+        $response->assertViewIs('modules.sales.orders.create');
+    }
+
+    /** @test */
+    public function sales_order_can_be_stored()
+    {
+        $orderData = [
+            'customer_id' => $this->customer->id,
+            'sales_person_id' => $this->user->id,
+            'sales_order_number' => 'SO-0001',
+            'order_date' => now()->format('Y-m-d'),
+            'shipment_date' => now()->addDays(7)->format('Y-m-d'),
+            'payment_terms' => 'Net 30',
+            'billing_address' => '123 Main St, Anytown',
+            'shipping_address' => '456 Delivery Rd, City',
+            'discount' => 10.00,
+            'shipping_charges' => 50.00,
+            'adjustment' => 5.00,
+            'terms_conditions' => 'Standard terms apply',
+            'notes' => 'Please package carefully',
+            'items' => [
+                [
+                    'product_id' => $this->product->id,
+                    'item_name' => 'Standard Widget',
+                    'description' => 'A great widget',
+                    'quantity' => 5,
+                    'unit_price' => 120.00,
+                    'tax_rate' => 18.00,
+                    'discount' => 5.00,
+                ]
+            ]
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('sales.orders.store'), $orderData);
+
+        // Assert redirect to show page
+        $order = SalesOrder::where('sales_order_number', '0001')->first();
+        $this->assertNotNull($order);
+        $response->assertRedirect(route('sales.orders.show', $order->id));
+
+        // Check values
+        $this->assertEquals(600.00, $order->subtotal); // 5 * 120
+        $this->assertEquals(107.10, $order->tax); // (600 - 5) * 18% = 595 * 0.18 = 107.1
+        $this->assertEquals(752.10, $order->total_amount); // 600 + 107.10 - 10 + 50 + 5 = 752.1
+        $this->assertEquals('Draft', $order->status);
+
+        // Check items table
+        $this->assertCount(1, $order->items);
+        $item = $order->items->first();
+        $this->assertEquals($this->product->id, $item->product_id);
+        $this->assertEquals(5, $item->quantity);
+        $this->assertEquals(120.00, $item->unit_price);
+        $this->assertEquals(5.00, $item->discount);
+        $this->assertEquals(595.00, $item->amount); // (5 * 120) - 5
+    }
+
+    /** @test */
+    public function sales_order_can_be_created_from_quotation_context()
+    {
+        // 1. Create a Quotation
+        $quotation = Quotation::create([
+            'tenant_id' => $this->tenant->id,
+            'customer_id' => $this->customer->id,
+            'quotation_number' => 'QT-1111',
+            'quotation_date' => now(),
+            'status' => 'Accepted',
+            'subtotal' => 200.00,
+            'tax' => 36.00,
+            'total_amount' => 236.00,
+            'terms_conditions' => 'Quotation terms text',
+            'notes' => 'Quotation notes text',
+        ]);
+
+        $quotation->items()->create([
+            'product_id' => $this->product->id,
+            'item_name' => 'Standard Widget',
+            'quantity' => 2,
+            'unit_price' => 100.00,
+            'tax_rate' => 18.00,
+            'amount' => 200.00,
+        ]);
+
+        // 2. Load Sales Order Create page with quotation_id parameter
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('sales.orders.create', ['quotation_id' => $quotation->id]));
+
+        $response->assertStatus(200);
+        $response->assertViewHas('prefillQuotation');
+    }
+
+    /** @test */
+    public function sales_order_status_transitions_operate_correctly()
+    {
+        $order = SalesOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'customer_id' => $this->customer->id,
+            'sales_order_number' => 'SO-0002',
+            'order_date' => now(),
+            'status' => 'Draft',
+            'subtotal' => 100,
+            'total_amount' => 118,
+        ]);
+
+        // 1. Confirm
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('sales.orders.confirm', $order->id));
+        
+        $order->refresh();
+        $this->assertEquals('Confirmed', $order->status);
+
+        // 2. Ship
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('sales.orders.ship', $order->id));
+
+        $order->refresh();
+        $this->assertEquals('Shipped', $order->status);
+
+        // 3. Try to cancel Shipped order (should fail validation)
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('sales.orders.cancel', $order->id));
+
+        $order->refresh();
+        $this->assertEquals('Shipped', $order->status); // unchanged
+    }
+
+    /** @test */
+    public function sales_order_isolation_by_tenant()
+    {
+        // Create second tenant
+        $otherTenant = Tenant::create([
+            'name' => 'Other Tenant',
+            'slug' => 'other-tenant',
+            'status' => 'active',
+            'plan' => 'starter',
+        ]);
+
+        $otherUser = User::create([
+            'tenant_id' => $otherTenant->id,
+            'name' => 'Other User',
+            'email' => 'other@example.com',
+            'password' => bcrypt('password'),
+        ]);
+
+        $otherCustomer = Customer::create([
+            'tenant_id' => $otherTenant->id,
+            'name' => 'Other Customer',
+            'email' => 'other-customer@example.com',
+            'status' => 'active',
+        ]);
+
+        // Create sales order in other tenant
+        $otherOrder = SalesOrder::create([
+            'tenant_id' => $otherTenant->id,
+            'customer_id' => $otherCustomer->id,
+            'sales_order_number' => 'SO-9999',
+            'order_date' => now(),
+            'status' => 'Draft',
+        ]);
+
+        // Try to access other tenant's order as first user
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('sales.orders.show', $otherOrder->id));
+
+        $response->assertStatus(404); // Scoped out
+    }
+}
