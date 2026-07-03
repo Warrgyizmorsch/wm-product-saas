@@ -1053,6 +1053,10 @@
                                                          <input type="hidden" name="status" value="Rejected">
                                                          <button type="submit" class="btn btn-sm btn-danger">Reject</button>
                                                      </form>
+                                                 @elseif ($activeQuotation->status === 'Accepted')
+                                                     <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success">
+                                                         <i class="feather-shopping-cart me-1"></i>Convert to Sales Order
+                                                     </a>
                                                  @endif
                                             </div>
                                         </div>

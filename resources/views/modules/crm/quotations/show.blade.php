@@ -9,6 +9,11 @@
         <a href="{{ route('crm.quotations.index') }}" class="btn btn-light d-print-none">
             <i class="feather-arrow-left me-2"></i>Back to List
         </a>
+        @if ($quotation->status === 'Accepted')
+            <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="btn btn-success d-print-none">
+                <i class="feather-shopping-cart me-2"></i>Convert to Sales Order
+            </a>
+        @endif
         <button onclick="window.print()" class="btn btn-primary d-print-none">
             <i class="feather-printer me-2"></i>Print / Download PDF
         </button>
