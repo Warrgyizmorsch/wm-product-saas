@@ -7,6 +7,19 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <style>
+        .erp-single-panel {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: calc(100vh - 180px) !important;
+        }
+        .table-responsive {
+            position: relative;
+        }
+        .table-responsive:has(.dropdown.show) {
+            overflow: visible !important;
+        }
+    </style>
 @endpush
 
 @push('scripts')
@@ -21,77 +34,116 @@
 @endsection
 
 @section('content')
+    @php
+        $sortBy = request('sort_by', 'bom_number');
+        $sortOrder = request('sort_order', 'asc');
+        
+        // Sort the collection based on request parameters
+        if ($sortBy === 'bom_name') {
+            $sortedBoms = $sortOrder === 'desc' 
+                ? $boms->sortByDesc('bom_name') 
+                : $boms->sortBy('bom_name');
+        } elseif ($sortBy === 'base_quantity') {
+            $sortedBoms = $sortOrder === 'desc' 
+                ? $boms->sortByDesc('base_quantity') 
+                : $boms->sortBy('base_quantity');
+        } else { // default: bom_number
+            $sortedBoms = $sortOrder === 'desc' 
+                ? $boms->sortByDesc('bom_number') 
+                : $boms->sortBy('bom_number');
+        }
+
+        $currentPage = (int) request('page', 1);
+        $perPage = 10;
+        $totalResults = $sortedBoms->count();
+        $totalPages = (int) ceil($totalResults / $perPage);
+        $paginatedBoms = $sortedBoms->slice(($currentPage - 1) * $perPage, $perPage);
+    @endphp
+
     <div class="erp-single-panel">
-        <!-- Success & Error Messages -->
+        <!-- Success & Error Messages (Rendered via Toast Component) -->
         @if (session('success'))
-            <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-success text-white me-3">
-                        <i class="feather-check-circle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                        <p class="fs-12 mb-0">{{ session('success') }}</p>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
+            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
         @endif
 
         @if (session('error'))
-            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-danger text-white me-3">
-                        <i class="feather-alert-triangle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                        <p class="fs-12 mb-0">{{ session('error') }}</p>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
+            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
         @endif
 
-        <!-- Filters Section - Inlined on Single panel -->
-        <form method="GET" action="{{ route('production.boms.index') }}" class="mb-4">
-            <div class="row g-3">
-                <div class="col-md-4 erp-form-input-col">
-                    <input type="text" name="search" class="form-control" placeholder="Search BOM number, name or sku..." value="{{ request('search') }}" />
-                </div>
-                <div class="col-md-3 erp-form-input-col">
-                    <select name="product_id" class="form-select" data-select2-selector="default">
-                        <option value="">All Products</option>
-                        @foreach($products as $product)
-                            <option value="{{ $product->id }}" {{ request('product_id') == $product->id ? 'selected' : '' }}>
-                                {{ $product->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-3 erp-form-input-col">
-                    <select name="status" class="form-select" data-select2-selector="default">
-                        <option value="">All Statuses</option>
-                        <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>Draft</option>
-                        <option value="pending_approval" {{ request('status') === 'pending_approval' ? 'selected' : '' }}>Pending Approval</option>
-                        <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved / Active</option>
-                        <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
-                        <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                    </select>
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <div class="d-grid w-100">
-                        <button type="submit" class="btn btn-secondary h-40">
-                            <i class="feather-filter me-2"></i>Filter
-                        </button>
-                    </div>
-                </div>
+        <!-- Toolbar: Sort, Filters -->
+        <div class="d-flex align-items-center mb-3">
+            <h5 class="fw-bold text-dark mb-0">BOM List</h5>
+            <div class="d-flex gap-2 ms-auto">
+                <!-- Custom Sort Component -->
+                <x-ui.sort-dropdown label="Sort">
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'bom_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'bom_number' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>BOM Number (Asc)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'bom_number', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'bom_number' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>BOM Number (Desc)</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'bom_name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'bom_name' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>BOM Name (A-Z)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'bom_name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'bom_name' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>BOM Name (Z-A)</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'base_quantity', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'base_quantity' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>Quantity (Low to High)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'base_quantity', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'base_quantity' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Quantity (High to Low)</span>
+                    </a>
+                </x-ui.sort-dropdown>
+
+                <!-- Custom Filter Component -->
+                <form method="GET" action="{{ route('production.boms.index') }}" class="d-inline">
+                    <x-ui.filter label="Filter" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search BOM number, name..." value="{{ request('search') }}" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Item to Produce</label>
+                            <x-ui.odoo-form-ui type="select" name="product_id">
+                                <option value="">All Products</option>
+                                @foreach($products as $product)
+                                    <option value="{{ $product->id }}" {{ request('product_id') == $product->id ? 'selected' : '' }}>
+                                        {{ $product->name }}
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <x-ui.odoo-form-ui type="select" name="status">
+                                <option value="">All Statuses</option>
+                                <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>Draft</option>
+                                <option value="pending_approval" {{ request('status') === 'pending_approval' ? 'selected' : '' }}>Pending Approval</option>
+                                <option value="approved" {{ request('status') === 'approved' ? 'selected' : '' }}>Approved / Active</option>
+                                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                                <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <a href="{{ route('production.boms.index') }}" class="btn btn-sm btn-light border">Reset</a>
+                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        </div>
+                    </x-ui.filter>
+                </form>
             </div>
-        </form>
+        </div>
 
         <!-- BOM List Table -->
         <div class="table-responsive">
-            <table class="erp-thin-table">
+            <x-ui.odoo-form-ui type="table">
                 <thead>
                     <tr>
                         <th style="width: 3%" class="text-center">
@@ -104,11 +156,11 @@
                         <th style="width: 18%">Item to Produce</th>
                         <th style="width: 10%" class="text-end">Quantity to Produce</th>
                         <th style="width: 7%">Unit</th>
-                        <th class="text-end" style="width: 15%">Actions</th>
+                        <th class="text-end" style="width: 10%">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($boms as $bom)
+                    @forelse($paginatedBoms as $bom)
                         <tr>
                             <td class="text-center">
                                 <input type="checkbox" class="form-check-input">
@@ -150,45 +202,77 @@
                                 <span class="text-muted">{{ $bom->baseUom ? $bom->baseUom->code : 'PCS' }}</span>
                             </td>
                             <td class="text-end">
-                                <div class="d-inline-flex gap-1 justify-content-end align-items-center">
-                                    {{-- View --}}
-                                    <x-ui.icon-btn href="{{ route('production.boms.show', $bom->id) }}" variant="soft-info" title="View Recipe" icon="feather-eye" />
-
+                                <x-ui.action-dropdown :viewUrl="route('production.boms.show', $bom->id)">
                                     {{-- Edit / Submit (draft only) --}}
                                     @if($bom->isDraft() || $bom->isUnderRevision())
-                                        <x-ui.icon-btn href="{{ route('production.boms.edit', $bom->id) }}" variant="soft-primary" title="Edit Draft" icon="feather-edit" />
-                                        <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline">
-                                            @csrf
-                                            <x-ui.icon-btn type="submit" variant="soft-info" title="Submit for Approval" icon="feather-send" />
-                                        </form>
+                                        <li>
+                                            <a href="{{ route('production.boms.edit', $bom->id) }}" class="dropdown-item">
+                                                <i class="feather-edit me-2 text-muted fs-12"></i>Edit Draft
+                                            </a>
+                                        </li>
+                                        <li>
+                                            @if($bom->routing_id)
+                                                <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="feather-send me-2 text-muted fs-12"></i>Submit Approval
+                                                    </button>
+                                                </form>
+                                            @else
+                                                <button type="button" class="dropdown-item text-muted" disabled title="Routing reference is required before submitting for approval" data-bs-toggle="tooltip" style="cursor: not-allowed;">
+                                                    <i class="feather-send me-2 text-muted fs-12"></i>Submit Approval (Routing Required)
+                                                </button>
+                                            @endif
+                                        </li>
                                     @endif
 
                                     {{-- Approve / Reject --}}
                                     @if($bom->isPendingApproval())
-                                        <form method="POST" action="{{ route('production.boms.approve', $bom->id) }}" class="d-inline">
-                                            @csrf
-                                            <x-ui.icon-btn type="submit" variant="soft-success" title="Approve BOM" icon="feather-check-circle" />
-                                        </form>
-                                        <x-ui.icon-btn type="button" variant="soft-danger" title="Reject BOM" icon="feather-x-circle" data-bs-toggle="modal" data-bs-target="#rejectModal{{ $bom->id }}" />
+                                        <li>
+                                            <form method="POST" action="{{ route('production.boms.approve', $bom->id) }}">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item text-success">
+                                                    <i class="feather-check-circle me-2 text-success fs-12"></i>Approve BOM
+                                                </button>
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ $bom->id }}">
+                                                <i class="feather-x-circle me-2 text-danger fs-12"></i>Reject BOM
+                                            </button>
+                                        </li>
                                     @endif
 
                                     {{-- Cancel --}}
                                     @if($bom->isApproved())
-                                        <x-ui.icon-btn type="button" variant="soft-danger" title="Cancel BOM" icon="feather-slash" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $bom->id }}" />
+                                        <li>
+                                            <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $bom->id }}">
+                                                <i class="feather-slash me-2 text-danger fs-12"></i>Cancel BOM
+                                            </button>
+                                        </li>
                                     @endif
 
                                     {{-- Duplicate --}}
-                                    <x-ui.icon-btn type="button" variant="soft-warning" title="Duplicate Version" icon="feather-copy" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ $bom->id }}" />
+                                    <li>
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ $bom->id }}">
+                                            <i class="feather-copy me-2 text-muted fs-12"></i>Duplicate Version
+                                        </button>
+                                    </li>
 
                                     {{-- Delete (draft only) --}}
                                     @if($bom->isDraft() || $bom->isUnderRevision())
-                                        <form method="POST" action="{{ route('production.boms.destroy', $bom->id) }}" class="d-inline" onsubmit="return confirm('Delete this BOM permanently?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <x-ui.icon-btn type="submit" variant="soft-danger" title="Delete Permanent" icon="feather-trash-2" />
-                                        </form>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form method="POST" action="{{ route('production.boms.destroy', $bom->id) }}" onsubmit="return confirm('Delete this BOM permanently?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Permanent
+                                                </button>
+                                            </form>
+                                        </li>
                                     @endif
-                                </div>
+                                </x-ui.action-dropdown>
 
                                 <!-- Duplicate Modal -->
                                 <x-ui.modal id="duplicateModal{{ $bom->id }}" title="Duplicate BOM Version" submit-text="Create Version" class="text-start">
@@ -238,7 +322,10 @@
                         </tr>
                     @endforelse
                 </tbody>
-            </table>
+            </x-ui.odoo-form-ui>
         </div>
+
+        <!-- Pagination Component -->
+        <x-ui.pagination :currentPage="$currentPage" :totalPages="$totalPages" :totalResults="$totalResults" :perPage="$perPage" />
     </div>
 @endsection

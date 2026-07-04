@@ -14,7 +14,7 @@
                 align-items: center;
                 justify-content: center;
                 gap: 12px;
-                margin-top: 20px;
+                margin-top: auto !important;
                 padding-top: 15px;
                 border-top: 1px solid #f1f5f9;
             }
@@ -70,11 +70,12 @@
     @endpush
 @endonce
 
+@if($totalPages > 1)
 <div class="erp-pagination-container" {{ $attributes }}>
     <ul class="erp-pagination">
         <!-- Previous Page Link -->
         <li class="page-item {{ $currentPage <= 1 ? 'disabled' : '' }}">
-            <a class="page-link" href="javascript:void(0);" aria-label="Previous">
+            <a class="page-link" href="{{ $currentPage <= 1 ? 'javascript:void(0);' : request()->fullUrlWithQuery(['page' => $currentPage - 1]) }}" aria-label="Previous">
                 <i class="feather-chevron-left"></i>
             </a>
         </li>
@@ -82,13 +83,13 @@
         <!-- Page Numbers -->
         @for ($i = 1; $i <= $totalPages; $i++)
             <li class="page-item {{ $currentPage == $i ? 'active' : '' }}">
-                <a class="page-link" href="javascript:void(0);">{{ $i }}</a>
+                <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $i]) }}">{{ $i }}</a>
             </li>
         @endfor
 
         <!-- Next Page Link -->
         <li class="page-item {{ $currentPage >= $totalPages ? 'disabled' : '' }}">
-            <a class="page-link" href="javascript:void(0);" aria-label="Next">
+            <a class="page-link" href="{{ $currentPage >= $totalPages ? 'javascript:void(0);' : request()->fullUrlWithQuery(['page' => $currentPage + 1]) }}" aria-label="Next">
                 <i class="feather-chevron-right"></i>
             </a>
         </li>
@@ -98,3 +99,4 @@
         Showing {{ min(($currentPage - 1) * $perPage + 1, $totalResults) }} to {{ min($currentPage * $perPage, $totalResults) }} of {{ $totalResults }} entries
     </div>
 </div>
+@endif

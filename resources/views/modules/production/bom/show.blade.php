@@ -2,6 +2,22 @@
 
 @section('title', 'BOM Details | SaaS ERP')
 
+@push('styles')
+    <style>
+        .erp-child-bom-row td {
+            color: #828a96 !important;
+            font-weight: 300 !important;
+        }
+        .erp-child-bom-row td .text-dark {
+            color: #828a96 !important;
+            font-weight: 400 !important;
+        }
+        .erp-child-bom-row td .fw-bold {
+            font-weight: 400 !important;
+        }
+    </style>
+@endpush
+
 @section('page-actions')
     <a href="{{ route('production.boms.index') }}" class="btn btn-secondary me-2">
         <i class="feather-arrow-left me-2"></i>Back to List
@@ -12,12 +28,18 @@
             <i class="feather-edit me-2"></i>Edit Draft
         </a>
 
-        <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline me-2">
-            @csrf
-            <button type="submit" class="btn btn-info">
-                <i class="feather-send me-2"></i>Submit Approval
+        @if($bom->routing_id)
+            <form method="POST" action="{{ route('production.boms.submit', $bom->id) }}" class="d-inline me-2">
+                @csrf
+                <button type="submit" class="btn btn-info">
+                    <i class="feather-send me-2"></i>Submit Approval
+                </button>
+            </form>
+        @else
+            <button type="button" class="btn btn-info me-2" disabled title="Routing reference must be selected in Edit Draft before submitting for approval" data-bs-toggle="tooltip">
+                <i class="feather-send me-2"></i>Submit Approval (Routing Required)
             </button>
-        </form>
+        @endif
     @endif
 
     @if($bom->isPendingApproval())
@@ -45,7 +67,7 @@
 
 @section('content')
     <div class="erp-single-panel bg-white">
-        <!-- Success & Error Banners -->
+        <!-- Success & Error Banners (Rendered via Toast Component) -->
         @if(isset($parentProduct))
             <div class="alert alert-success border-success bg-soft-success d-flex align-items-center justify-content-between p-3 mb-4 rounded shadow-sm" role="alert">
                 <div class="d-flex align-items-center">
@@ -76,33 +98,11 @@
                 </div>
             </div>
         @elseif (session('success'))
-            <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-success text-white me-3">
-                        <i class="feather-check-circle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                        <p class="fs-12 mb-0">{{ session('success') }}</p>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
         @endif
 
         @if (session('error'))
-            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-danger text-white me-3">
-                        <i class="feather-alert-triangle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                        <p class="fs-12 mb-0">{{ session('error') }}</p>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
         @endif
 
         <!-- BOM Details Header Grid -->
@@ -210,22 +210,22 @@
         @endif
 
         <!-- TAB NAVIGATION -->
-        <div class="erp-tabs-nav">
-            <a class="erp-tabs-link active" id="btn-tab-components" onclick="switchTab('components')">All Components</a>
-            <a class="erp-tabs-link" id="btn-tab-explosion" onclick="switchTab('explosion')">Expanded Material Explosion</a>
-            <a class="erp-tabs-link" id="btn-tab-routing" onclick="switchTab('routing')">Routing Process</a>
-            <a class="erp-tabs-link" id="btn-tab-costing" onclick="switchTab('costing')">Cost Summary</a>
-            <a class="erp-tabs-link" id="btn-tab-history" onclick="switchTab('history')">Approval History</a>
-            <a class="erp-tabs-link" id="btn-tab-whereused" onclick="switchTab('whereused')">Where Used</a>
-        </div>
+        <x-ui.horizontal-tabs id="bomDetailsTabs" :tabs="[
+            ['id' => 'tab-components', 'label' => 'All Components', 'active' => true, 'icon' => 'feather-list'],
+            ['id' => 'tab-explosion', 'label' => 'Expanded Material Explosion', 'icon' => 'feather-activity'],
+            ['id' => 'tab-routing', 'label' => 'Routing Process', 'icon' => 'feather-sliders'],
+            ['id' => 'tab-costing', 'label' => 'Cost Summary', 'icon' => 'feather-dollar-sign'],
+            ['id' => 'tab-history', 'label' => 'Approval History', 'icon' => 'feather-clock'],
+            ['id' => 'tab-whereused', 'label' => 'Where Used', 'icon' => 'feather-git-merge']
+        ]" />
 
-        <!-- TAB CONTENT CONTAINER (No cards, sits flat) -->
+        <!-- TAB CONTENT CONTAINER -->
         <div class="tab-content mt-3">
             <!-- Tab 1: Components -->
-            <div class="tab-pane-custom" id="tab-components">
+            <div class="tab-pane fade show active" id="tab-components" role="tabpanel" aria-labelledby="tab-components-tab">
                 <h5 class="fw-bold text-dark mb-3">Required Components (Recipe Items)</h5>
                 <div class="table-responsive">
-                    <table class="erp-thin-table">
+                    <x-ui.odoo-form-ui type="table">
                         <thead>
                             <tr>
                                 <th style="width: 5%" class="text-center">Seq</th>
@@ -236,55 +236,79 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($bom->items as $item)
-                                <tr>
-                                    <td class="text-center fw-semibold text-muted">{{ $item->sequence }}</td>
-                                    <td>
-                                        <div class="d-flex flex-column">
-                                            <span class="fw-bold text-dark">{{ $item->material->name }}</span>
-                                            <small class="text-muted font-monospace fs-10">{{ $item->material->sku }}</small>
-                                            @if($item->childBom)
-                                                <small class="mt-1">
-                                                    <a href="{{ route('production.boms.show', $item->childBom->id) }}" class="badge bg-soft-success text-success">
-                                                        <i class="feather-link me-1"></i>Linked BOM: {{ $item->childBom->bom_name ?: $item->childBom->bom_number }} v{{ $item->childBom->version }} ({{ $item->childBom->status }})
-                                                    </a>
-                                                </small>
-                                            @else
-                                                @if($item->material->type === 'semi_finished' || $item->material->type === 'finished_good')
-                                                    @if(isset($componentBoms[$item->material_id]))
-                                                        <small class="mt-1">
-                                                            <a href="{{ route('production.boms.show', $componentBoms[$item->material_id]->first()->id) }}" class="badge bg-soft-info text-info">
-                                                                <i class="feather-link me-1"></i>Subassembly BOM: v{{ $componentBoms[$item->material_id]->first()->version }}
-                                                            </a>
-                                                        </small>
-                                                    @endif
-                                                @endif
-                                            @endif
-                                            @if($item->notes)
-                                                <small class="text-muted mt-1"><i class="feather-info me-1"></i>{{ $item->notes }}</small>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="text-end fw-bold">{{ number_format($item->quantity, 4) }}</td>
-                                    <td>
-                                        <span class="text-muted">{{ $item->uom ? $item->uom->code : 'PCS' }}</span>
-                                    </td>
-                                    <td class="text-end text-danger fw-semibold">
-                                        {{ number_format($item->material_scrap_percentage, 2) }}%
-                                    </td>
-                                </tr>
-                            @empty
+                            @php
+                                if (!function_exists('renderComponentTreeRows')) {
+                                    function renderComponentTreeRows($items, $level = 1) {
+                                        foreach ($items as $item) {
+                                            $padding = ($level - 1) * 24;
+                                            $hasChildBom = $item->childBom ? true : false;
+                                            
+                                            echo '<tr class="' . ($level > 1 ? 'table-light bg-light-soft erp-child-bom-row' : '') . '">';
+                                            
+                                            // Sequence
+                                            echo '<td class="text-center fw-semibold text-muted align-middle">';
+                                            if ($level > 1) {
+                                                echo '—';
+                                            } else {
+                                                echo $item->sequence;
+                                            }
+                                            echo '</td>';
+                                            
+                                            // Material Component details with Indentation
+                                            echo '<td class="align-middle">';
+                                            echo '<div style="padding-left: ' . $padding . 'px;" class="d-flex align-items-center">';
+                                            if ($level > 1) {
+                                                echo '<i class="feather-corner-down-right text-muted me-2 fs-12"></i>';
+                                            }
+                                            echo '<div class="d-flex flex-column">';
+                                            echo '<span class="fw-bold text-dark">' . e($item->material->name) . '</span>';
+                                            echo '<small class="text-muted font-monospace fs-10">' . e($item->material->sku) . '</small>';
+                                            
+                                            if ($item->childBom) {
+                                                echo '<small class="mt-1">';
+                                                echo '<a href="' . route('production.boms.show', $item->childBom->id) . '" class="badge bg-soft-success text-success">';
+                                                echo '<i class="feather-link me-1"></i>Linked BOM: ' . e($item->childBom->bom_name ?: $item->childBom->bom_number) . ' v' . e($item->childBom->version);
+                                                echo '</a>';
+                                                echo '</small>';
+                                            }
+                                            echo '</div>';
+                                            echo '</div>';
+                                            echo '</td>';
+                                            
+                                            // Quantity
+                                            echo '<td class="text-end fw-bold align-middle">' . number_format($item->quantity, 4) . '</td>';
+                                            
+                                            // Unit
+                                            echo '<td class="align-middle text-muted">' . e($item->uom ? $item->uom->code : 'PCS') . '</td>';
+                                            
+                                            // Scrap %
+                                            echo '<td class="text-end text-danger fw-semibold align-middle">' . number_format($item->material_scrap_percentage, 2) . '%</td>';
+                                            
+                                            echo '</tr>';
+                                            
+                                            // Recursively render child components if linked BOM exists
+                                            if ($item->childBom && $item->childBom->items->count() > 0) {
+                                                renderComponentTreeRows($item->childBom->items, $level + 1);
+                                            }
+                                        }
+                                    }
+                                }
+                            @endphp
+
+                            @if($bom->items->count() > 0)
+                                @php renderComponentTreeRows($bom->items) @endphp
+                            @else
                                 <tr>
                                     <td colspan="5" class="text-center py-4 text-muted">No components found for this recipe.</td>
                                 </tr>
-                            @endforelse
+                            @endif
                         </tbody>
-                    </table>
+                    </x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Tab 2: Expanded Material Explosion -->
-            <div class="tab-pane-custom d-none" id="tab-explosion">
+            <div class="tab-pane fade" id="tab-explosion" role="tabpanel" aria-labelledby="tab-explosion-tab">
                 <h5 class="fw-bold text-dark mb-3">MRP-Ready Expanded Material Explosion</h5>
                 <p class="text-muted fs-12 mb-3">Below is the recursive, multi-level material explosion detailing all required sub-assemblies and direct raw materials scaled to the target production quantity.</p>
                 
@@ -339,7 +363,7 @@
                 @endphp
 
                 <div class="table-responsive">
-                    <table class="erp-thin-table">
+                    <x-ui.odoo-form-ui type="table">
                         <thead>
                             <tr>
                                 <th style="width: 8%" class="text-center">Level</th>
@@ -355,12 +379,12 @@
                         <tbody>
                             @php renderExplosionTableRows($explosion['tree']) @endphp
                         </tbody>
-                    </table>
+                    </x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Tab 3: Routing Process -->
-            <div class="tab-pane-custom d-none" id="tab-routing">
+            <div class="tab-pane fade" id="tab-routing" role="tabpanel" aria-labelledby="tab-routing-tab">
                 @if($bom->routing)
                     <div class="mb-4 p-3 bg-light rounded border border-light">
                         <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-1">Routing Header Reference</span>
@@ -372,7 +396,7 @@
 
                     <h5 class="fw-bold text-dark mb-3">Operations Stage Sequence</h5>
                     <div class="table-responsive">
-                        <table class="erp-thin-table">
+                        <x-ui.odoo-form-ui type="table">
                             <thead>
                                 <tr>
                                     <th style="width: 5%" class="text-center">Seq</th>
@@ -405,7 +429,7 @@
                                                     <ul class="mb-0 ps-3 fs-10 text-muted">
                                                         @foreach($op->materials as $opMat)
                                                             <li>
-                                                                <span class="text-secondary fw-semibold">Seq {{ $opMat->sequence }}:</span>
+                                                                 <span class="text-secondary fw-semibold">Seq {{ $opMat->sequence }}:</span>
                                                                 <strong>{{ $opMat->material->name }}</strong>: {{ number_format($opMat->quantity, 4) }} {{ $opMat->uom->code }}
                                                                 <span class="badge bg-light text-dark fs-8">{{ $opMat->consumption_type ?? 'manual' }}</span>
                                                             </li>
@@ -455,7 +479,7 @@
                                     </tr>
                                 @endforelse
                             </tbody>
-                        </table>
+                        </x-ui.odoo-form-ui>
                     </div>
                 @else
                     <div class="p-4 text-center border rounded bg-light text-muted">
@@ -465,7 +489,7 @@
             </div>
 
             <!-- Tab 4: Cost Summary -->
-            <div class="tab-pane-custom d-none" id="tab-costing">
+            <div class="tab-pane fade" id="tab-costing" role="tabpanel" aria-labelledby="tab-costing-tab">
                 <h5 class="fw-bold text-dark mb-3">Total Manufacturing Cost Summary Breakdown</h5>
                 <div class="row g-3 mb-4">
                     <!-- Net Material Cost -->
@@ -521,7 +545,7 @@
                 <!-- Cost Details Item Table -->
                 <h6 class="fw-bold text-dark mb-3">Direct Component Cost Contributions</h6>
                 <div class="table-responsive">
-                    <table class="erp-thin-table">
+                    <x-ui.odoo-form-ui type="table">
                         <thead>
                             <tr>
                                 <th style="width: 40%">Material Component</th>
@@ -557,15 +581,15 @@
                                 <td class="text-end text-primary fs-14">${{ number_format($materialCost, 4) }}</td>
                             </tr>
                         </tbody>
-                    </table>
+                    </x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Tab 5: Approval History -->
-            <div class="tab-pane-custom d-none" id="tab-history">
+            <div class="tab-pane fade" id="tab-history" role="tabpanel" aria-labelledby="tab-history-tab">
                 <h5 class="fw-bold text-dark mb-3">Workflow approvals & system audit timeline logs</h5>
                 <div class="table-responsive">
-                    <table class="erp-thin-table">
+                    <x-ui.odoo-form-ui type="table">
                         <thead>
                             <tr>
                                 <th style="width: 20%">Timestamp</th>
@@ -592,16 +616,16 @@
                                 </tr>
                             @endforelse
                         </tbody>
-                    </table>
+                    </x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Tab 6: Where Used -->
-            <div class="tab-pane-custom d-none" id="tab-whereused">
+            <div class="tab-pane fade" id="tab-whereused" role="tabpanel" aria-labelledby="tab-whereused-tab">
                 <h5 class="fw-bold text-dark mb-3"><i class="feather-git-merge me-2 text-primary"></i>Where Used (Consumed In Parent BOMs)</h5>
                 @if($whereUsedBoms->count() > 0)
                     <div class="table-responsive">
-                        <table class="erp-thin-table">
+                        <x-ui.odoo-form-ui type="table">
                             <thead>
                                 <tr>
                                     <th style="width: 30%">Parent Product Name</th>
@@ -643,7 +667,7 @@
                                     </tr>
                                 @endforeach
                             </tbody>
-                        </table>
+                        </x-ui.odoo-form-ui>
                     </div>
                 @else
                     <div class="p-3 text-center border rounded bg-light text-muted fs-12">
@@ -704,21 +728,5 @@
                 }, '*');
             }
         @endif
-
-        function switchTab(tabId) {
-            // Remove active class from all links
-            document.querySelectorAll('.erp-tabs-link').forEach(link => {
-                link.classList.remove('active');
-            });
-            // Add active class to clicked link
-            document.getElementById('btn-tab-' + tabId).classList.add('active');
-
-            // Hide all tabs
-            document.querySelectorAll('.tab-pane-custom').forEach(pane => {
-                pane.classList.add('d-none');
-            });
-            // Show target tab
-            document.getElementById('tab-' + tabId).classList.remove('d-none');
-        }
     </script>
 @endsection

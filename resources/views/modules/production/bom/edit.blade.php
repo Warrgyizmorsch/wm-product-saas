@@ -39,33 +39,14 @@
 
 @section('content')
     <div class="erp-single-panel bg-white" x-data="bomForm">
-        <!-- Header with Close Button -->
-        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-            <h4 class="fw-bold text-dark mb-0">Edit Bill of Materials (BOM #{{ $bom->bom_number }})</h4>
-            <a href="{{ route('production.boms.show', $bom->id) }}" class="text-muted hover-danger fs-18">
-                <i class="feather-x"></i>
-            </a>
-        </div>
 
-        <!-- Validation Errors & Warning Banners -->
+        <!-- Validation Errors & Warning Banners (Rendered via Toast Component) -->
         @if ($errors->any())
-            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
-                <ul class="mb-0 fs-12 ps-3">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </x-ui.alert>
-            <div class="mb-4"></div>
+            <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
         @endif
 
         @if (session('error'))
-            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                <p class="fs-12 mb-0">{{ session('error') }}</p>
-            </x-ui.alert>
-            <div class="mb-4"></div>
+            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
         @endif
 
         <form method="POST" action="{{ route('production.boms.update', $bom->id) }}">
@@ -87,7 +68,7 @@
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
                         <x-ui.odoo-form-ui type="input" label="BOM Number" name="bom_number" placeholder="e.g. BOM-XYZ-001" :value="old('bom_number', $bom->bom_number)" :required="true" />
-                                               <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" id="product_id" :required="true" data-master="product">
+                        <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" id="product_id" :required="true" data-master="product">
                             <option value="">Select Product...</option>
                             <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
                             @foreach ($products as $p)
@@ -142,7 +123,7 @@
                                 <x-ui.odoo-form-ui type="input" label="Version ID" name="version" placeholder="e.g. 1.0.0" :value="old('version', $bom->version)" :required="true" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" label="Routing Reference" name="routing_id" id="routing_id" x-model="selectedRoutingId" @change="loadOperations()">
+                                <x-ui.odoo-form-ui type="select" label="Routing Reference" name="routing_id" id="routing_id" x-model="selectedRoutingId">
                                     <option value="">No Routing Reference</option>
                                     @foreach($routings as $rt)
                                         <option value="{{ $rt->id }}">{{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})</option>
@@ -162,246 +143,253 @@
                     </div>
                 </div>
 
-            <!-- Tab Headers -->
-            <div class="erp-tabs-nav">
-                <a href="javascript:void(0)" class="erp-tabs-link" :class="activeTab === 'components' ? 'active' : ''" @click="activeTab = 'components'">Components</a>
-                <a href="javascript:void(0)" class="erp-tabs-link" :class="activeTab === 'operations' ? 'active' : ''" @click="activeTab = 'operations'; loadOperations()">Operations*</a>
-            </div>
+                <!-- Tab Headers -->
+                <x-ui.horizontal-tabs id="bomFormTabs" :tabs="[
+                    ['id' => 'tab-components', 'label' => 'Components', 'active' => true, 'icon' => 'feather-list'],
+                    ['id' => 'tab-operations', 'label' => 'Operations', 'icon' => 'feather-sliders']
+                ]" />
 
-            <!-- Tab 1: Components Panel -->
-            <div x-show="activeTab === 'components'" x-transition>
-                <h5 class="fw-bold text-dark mb-3">Add Component*</h5>
-                <div class="table-responsive mb-4">
-                    <x-ui.odoo-form-ui type="table">
-                        <thead>
-                            <tr>
-                                <th style="width: 5%" class="text-center">Seq</th>
-                                <th style="width: 25%">Material Component</th>
-                                <th style="width: 10%">Quantity</th>
-                                <th style="width: 12%">UOM</th>
-                                <th style="width: 10%">Scrap %</th>
-                                <th style="width: 8%">Priority</th>
-                                <th style="width: 15%">Validity (From - To)</th>
-                                <th style="width: 12%">Alternative</th>
-                                <th style="width: 5%" class="text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="(item, index) in items" :key="item.uid">
-                                <tr x-init="$nextTick(() => initRowSelects($el, item))">
-                                    <!-- Sequence -->
-                                    <td class="fw-bold text-center align-middle" x-text="index + 1"></td>
-                                                                       <!-- Material Selection -->
-                                    <td class="align-middle">
-                                        <select x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required data-select2-selector="default" data-master="product">
-                                            <option value="">Select Material...</option>
-                                            <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
-                                            @foreach($materials as $material)
-                                                <option value="{{ $material->id }}" data-type="{{ $material->type }}" data-sku="{{ $material->sku }}">{{ $material->name }} ({{ $material->sku }})</option>
-                                            @endforeach
-                                        </select>
-                                        <template x-if="errors && errors['items.' + index + '.material_id']">
-                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
-                                        </template>
-                                        <input type="hidden" x-bind:name="'items['+index+'][child_bom_id]'" x-model="item.child_bom_id">
-                                        <template x-if="item.child_bom_loading">
-                                            <div class="mt-2 text-muted fs-11">
-                                                <span class="spinner-border spinner-border-sm text-secondary me-1" role="status" style="width: 12px; height: 12px;"></span>Checking child BOM...
-                                            </div>
-                                        </template>
-                                        <template x-if="!item.child_bom_loading && item.child_bom_versions && item.child_bom_versions.length > 0">
-                                            <div class="mt-2 p-2 border rounded bg-light" style="max-width: 250px;">
-                                                <label class="fs-10 fw-bold text-muted mb-1 d-block">Link specific BOM version:</label>
-                                                <select class="form-select form-select-xs py-0.5 fs-11" x-model="item.child_bom_id">
-                                                    <option value="">-- Explicit Selection --</option>
-                                                    <template x-for="v in item.child_bom_versions" :key="v.id">
-                                                        <option :value="v.id" x-text="'v' + v.version + ' (' + v.status + ')'"></option>
-                                                    </template>
+                <div class="tab-content mt-3">
+                    <!-- Tab 1: Components Panel -->
+                    <div class="tab-pane fade show active" id="tab-components" role="tabpanel" aria-labelledby="tab-components-tab">
+                        <h5 class="fw-bold text-dark mb-3">Add Component*</h5>
+                        <div class="table-responsive mb-4">
+                            <x-ui.odoo-form-ui type="table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 5%" class="text-center">Seq</th>
+                                        <th style="width: 25%">Material Component</th>
+                                        <th style="width: 10%">Quantity</th>
+                                        <th style="width: 12%">UOM</th>
+                                        <th style="width: 10%">Scrap %</th>
+                                        <th style="width: 8%">Priority</th>
+                                        <th style="width: 15%">Validity (From - To)</th>
+                                        <th style="width: 12%">Alternative</th>
+                                        <th style="width: 5%" class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(item, index) in items" :key="item.uid">
+                                        <tr x-init="$nextTick(() => initRowSelects($el, item))">
+                                            <!-- Sequence -->
+                                            <td class="fw-bold text-center align-middle" x-text="index + 1"></td>
+                                            
+                                            <!-- Material Selection -->
+                                            <td class="align-middle">
+                                                <select x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required data-select2-selector="default" data-master="product">
+                                                    <option value="">Select Material...</option>
+                                                    <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
+                                                    @foreach($materials as $material)
+                                                        <option value="{{ $material->id }}" data-type="{{ $material->type }}" data-sku="{{ $material->sku }}">{{ $material->name }} ({{ $material->sku }})</option>
+                                                    @endforeach
                                                 </select>
-                                                <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
-                                                    <div class="d-flex gap-1 align-items-center">
-                                                        <template x-if="item.child_bom_id">
-                                                            <a :href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1 fs-9 text-nowrap">
-                                                                <i class="feather-eye"></i> View
-                                                            </a>
-                                                        </template>
-                                                        <template x-if="item.child_bom_id && item.child_bom_versions.find(x => x.id == item.child_bom_id)?.status !== 'approved'">
-                                                            <span class="badge bg-soft-danger text-danger fs-9" title="Draft / non-approved versions warn user"><i class="feather-alert-triangle"></i> Non-Approved</span>
-                                                        </template>
+                                                <template x-if="errors && errors['items.' + index + '.material_id']">
+                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
+                                                </template>
+                                                <input type="hidden" x-bind:name="'items['+index+'][child_bom_id]'" x-model="item.child_bom_id">
+                                                <template x-if="item.child_bom_loading">
+                                                    <div class="mt-2 text-muted fs-11">
+                                                        <span class="spinner-border spinner-border-sm text-secondary me-1" role="status" style="width: 12px; height: 12px;"></span>Checking child BOM...
                                                     </div>
-                                                    <div class="d-flex gap-1">
-                                                        <template x-if="item.child_bom_id">
-                                                            <form :action="'/production/boms/' + item.child_bom_id + '/create-revision'" method="POST" target="_blank" class="d-inline">
-                                                                @csrf
-                                                                <button type="submit" class="btn btn-xs btn-soft-warning py-0.5 px-1 fs-9 text-nowrap">
-                                                                    <i class="feather-copy"></i> Revise
-                                                                 </button>
-                                                            </form>
+                                                </template>
+                                                <template x-if="!item.child_bom_loading && item.child_bom_versions && item.child_bom_versions.length > 0">
+                                                    <div class="mt-2 p-2 border rounded bg-light" style="max-width: 250px;">
+                                                        <label class="fs-10 fw-bold text-muted mb-1 d-block">Link specific BOM version:</label>
+                                                        <select class="form-select form-select-xs py-0.5 fs-11" x-model="item.child_bom_id">
+                                                            <option value="">-- Explicit Selection --</option>
+                                                            <template x-for="v in item.child_bom_versions" :key="v.id">
+                                                                <option :value="v.id" x-text="'v' + v.version + ' (' + v.status + ')'"></option>
+                                                            </template>
+                                                        </select>
+                                                        <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-1">
+                                                            <div class="d-flex gap-1 align-items-center">
+                                                                <template x-if="item.child_bom_id">
+                                                                    <a :href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1 fs-9 text-nowrap">
+                                                                        <i class="feather-eye"></i> View
+                                                                    </a>
+                                                                </template>
+                                                                <template x-if="item.child_bom_id && item.child_bom_versions.find(x => x.id == item.child_bom_id)?.status !== 'approved'">
+                                                                    <span class="badge bg-soft-danger text-danger fs-9" title="Draft / non-approved versions warn user"><i class="feather-alert-triangle"></i> Non-Approved</span>
+                                                                </template>
+                                                            </div>
+                                                            <div class="d-flex gap-1">
+                                                                <template x-if="item.child_bom_id">
+                                                                    <form :action="'/production/boms/' + item.child_bom_id + '/create-revision'" method="POST" target="_blank" class="d-inline">
+                                                                        @csrf
+                                                                        <button type="submit" class="btn btn-xs btn-soft-warning py-0.5 px-1 fs-9 text-nowrap">
+                                                                            <i class="feather-copy"></i> Revise
+                                                                         </button>
+                                                                    </form>
+                                                                </template>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                                <template x-if="!item.child_bom_loading && (!item.child_bom_versions || item.child_bom_versions.length === 0) && (getMaterialType(item.material_id) === 'semi_finished' || getMaterialType(item.material_id) === 'finished_good')">
+                                                    <div class="erp-child-bom-cta mt-2">
+                                                        <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-xs btn-soft-primary py-0.5 px-1.5 fs-9 text-nowrap">
+                                                            <i class="feather-plus me-0.5"></i>Create Child BOM
+                                                        </a>
+                                                    </div>
+                                                </template>
+                                            </td>
+                                            
+                                            <!-- Quantity -->
+                                            <td class="align-middle">
+                                                <input type="number" step="any" x-bind:name="'items['+index+'][quantity]'" class="odoo-table-input text-end" x-model="item.quantity" placeholder="0.00" required min="0.0001" />
+                                                <template x-if="errors && errors['items.' + index + '.quantity']">
+                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.quantity'][0]"></span>
+                                                </template>
+                                            </td>
+                                            
+                                            <!-- UOM -->
+                                            <td class="align-middle">
+                                                <select x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required data-select2-selector="default" data-master="uom">
+                                                    <option value="">Select UOM...</option>
+                                                    <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
+                                                    @foreach($uoms as $uom)
+                                                        <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
+                                                    @endforeach
+                                                </select>
+                                                <template x-if="errors && errors['items.' + index + '.uom_id']">
+                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.uom_id'][0]"></span>
+                                                </template>
+                                            </td>
+                                            
+                                            <!-- Material Scrap Percentage -->
+                                            <td class="align-middle">
+                                                <input type="number" step="any" x-bind:name="'items['+index+'][material_scrap_percentage]'" class="odoo-table-input text-end text-danger" x-model="item.material_scrap_percentage" placeholder="0.00" min="0" max="100" />
+                                                <template x-if="errors && errors['items.' + index + '.material_scrap_percentage']">
+                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_scrap_percentage'][0]"></span>
+                                                </template>
+                                            </td>
+                                            
+                                            <!-- Priority -->
+                                            <td class="align-middle">
+                                                <input type="number" x-bind:name="'items['+index+'][priority]'" class="odoo-table-input text-end" x-model="item.priority" placeholder="1" min="1" />
+                                                <template x-if="errors && errors['items.' + index + '.priority']">
+                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.priority'][0]"></span>
+                                                </template>
+                                            </td>
+
+                                            <!-- Validity limits -->
+                                            <td class="align-middle">
+                                                <div class="d-flex flex-column gap-1">
+                                                    <input type="date" x-bind:name="'items['+index+'][effective_from]'" class="odoo-table-input fs-11" x-model="item.effective_from" />
+                                                    <template x-if="errors && errors['items.' + index + '.effective_from']">
+                                                        <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_from'][0]"></span>
+                                                    </template>
+                                                    <input type="date" x-bind:name="'items['+index+'][effective_to]'" class="odoo-table-input fs-11" x-model="item.effective_to" />
+                                                    <template x-if="errors && errors['items.' + index + '.effective_to']">
+                                                        <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_to'][0]"></span>
+                                                    </template>
+                                                </div>
+                                            </td>
+                                            
+                                            <!-- Alternative material options -->
+                                            <td class="align-middle">
+                                                <div class="d-flex flex-column gap-2">
+                                                    <div>
+                                                        <input type="hidden" x-bind:name="'items['+index+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
+                                                        <input type="checkbox" class="form-check-input" x-model="item.is_alternative" x-bind:id="'is_alternative_edit_' + index" />
+                                                        <label class="form-check-label c-pointer fw-medium text-dark fs-11 ms-1" x-bind:for="'is_alternative_edit_' + index">
+                                                            Is Alternative
+                                                        </label>
+                                                    </div>
+                                                    <div x-show="item.is_alternative">
+                                                        <input type="text" x-bind:name="'items['+index+'][alternative_group]'" class="odoo-table-input fs-11" placeholder="Alt Group Code..." x-model="item.alternative_group" />
+                                                        <template x-if="errors && errors['items.' + index + '.alternative_group']">
+                                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.alternative_group'][0]"></span>
                                                         </template>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </template>
-                                        <template x-if="!item.child_bom_loading && (!item.child_bom_versions || item.child_bom_versions.length === 0) && (getMaterialType(item.material_id) === 'semi_finished' || getMaterialType(item.material_id) === 'finished_good')">
-                                            <div class="erp-child-bom-cta mt-2">
-                                                <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-xs btn-soft-primary py-0.5 px-1.5 fs-9 text-nowrap">
-                                                    <i class="feather-plus me-0.5"></i>Create Child BOM
-                                                </a>
-                                            </div>
-                                        </template>
-                                    </td>
-                                    
-                                    <!-- Quantity -->
-                                    <td class="align-middle">
-                                        <input type="number" step="any" x-bind:name="'items['+index+'][quantity]'" class="odoo-table-input text-end" x-model="item.quantity" placeholder="0.00" required min="0.0001" />
-                                        <template x-if="errors && errors['items.' + index + '.quantity']">
-                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.quantity'][0]"></span>
-                                        </template>
-                                    </td>
-                                    
-                                    <!-- UOM -->
-                                    <td class="align-middle">
-                                        <select x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required data-select2-selector="default" data-master="uom">
-                                            <option value="">Select UOM...</option>
-                                            <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
-                                            @foreach($uoms as $uom)
-                                                <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
-                                            @endforeach
-                                        </select>
-                                        <template x-if="errors && errors['items.' + index + '.uom_id']">
-                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.uom_id'][0]"></span>
-                                        </template>
-                                    </td>
-                                    
-                                    <!-- Material Scrap Percentage -->
-                                    <td class="align-middle">
-                                        <input type="number" step="any" x-bind:name="'items['+index+'][material_scrap_percentage]'" class="odoo-table-input text-end text-danger" x-model="item.material_scrap_percentage" placeholder="0.00" min="0" max="100" />
-                                        <template x-if="errors && errors['items.' + index + '.material_scrap_percentage']">
-                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_scrap_percentage'][0]"></span>
-                                        </template>
-                                    </td>
-                                    
-                                    <!-- Priority -->
-                                    <td class="align-middle">
-                                        <input type="number" x-bind:name="'items['+index+'][priority]'" class="odoo-table-input text-end" x-model="item.priority" placeholder="1" min="1" />
-                                        <template x-if="errors && errors['items.' + index + '.priority']">
-                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.priority'][0]"></span>
-                                        </template>
-                                    </td>
-
-                                    <!-- Validity limits -->
-                                    <td class="align-middle">
-                                        <div class="d-flex flex-column gap-1">
-                                            <input type="date" x-bind:name="'items['+index+'][effective_from]'" class="odoo-table-input fs-11" x-model="item.effective_from" />
-                                            <template x-if="errors && errors['items.' + index + '.effective_from']">
-                                                <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_from'][0]"></span>
-                                            </template>
-                                            <input type="date" x-bind:name="'items['+index+'][effective_to]'" class="odoo-table-input fs-11" x-model="item.effective_to" />
-                                            <template x-if="errors && errors['items.' + index + '.effective_to']">
-                                                <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_to'][0]"></span>
-                                            </template>
-                                        </div>
-                                    </td>
-                                    
-                                    <!-- Alternative material options -->
-                                    <td class="align-middle">
-                                        <div class="d-flex flex-column gap-2">
-                                            <div>
-                                                <input type="hidden" x-bind:name="'items['+index+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
-                                                <input type="checkbox" class="form-check-input" x-model="item.is_alternative" x-bind:id="'is_alternative_edit_' + index" />
-                                                <label class="form-check-label c-pointer fw-medium text-dark fs-11 ms-1" x-bind:for="'is_alternative_edit_' + index">
-                                                    Is Alternative
-                                                </label>
-                                            </div>
-                                            <div x-show="item.is_alternative">
-                                                <input type="text" x-bind:name="'items['+index+'][alternative_group]'" class="odoo-table-input fs-11" placeholder="Alt Group Code..." x-model="item.alternative_group" />
-                                                <template x-if="errors && errors['items.' + index + '.alternative_group']">
-                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.alternative_group'][0]"></span>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    
-                                    <!-- Remove Row Action -->
-                                    <td class="text-center align-middle">
-                                        <button type="button" class="erp-btn-delete" @click="removeItem(index)">
-                                            <i class="feather-x"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </x-ui.odoo-form-ui>
-                </div>
-
-                <!-- Add Row Action -->
-                <div class="mb-4">
-                    <button type="button" class="btn btn-light-brand" @click="addItem()">
-                        <i class="feather-plus me-2"></i>Add Component Row
-                    </button>
-                </div>
-            </div>
-
-            <!-- Tab 2: Operations Panel (Read-only viewed, linked to Routing reference dropdown) -->
-            <div x-show="activeTab === 'operations'" x-transition style="display: none;">
-                <h5 class="fw-bold text-dark mb-3">Routing Operations List</h5>
-                
-                <template x-if="!selectedRoutingId">
-                    <div class="p-4 text-center border rounded bg-light text-muted">
-                        <i class="feather-info me-2"></i>Select routing to see operations
-                    </div>
-                </template>
-                
-                <template x-if="selectedRoutingId">
-                    <div>
-                        <template x-if="loadingOperations">
-                            <div class="p-4 text-center">
-                                <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading operations...
-                            </div>
-                        </template>
-                        
-                        <template x-if="!loadingOperations && operations.length === 0">
-                            <div class="p-4 text-center border rounded bg-light text-muted">
-                                No operations defined for this routing.
-                            </div>
-                        </template>
-                        
-                        <template x-if="!loadingOperations && operations.length > 0">
-                            <div class="table-responsive">
-                                <table class="erp-thin-table">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 10%" class="text-center">Seq</th>
-                                            <th style="width: 25%">Operation Stage</th>
-                                            <th style="width: 15%">Type</th>
-                                            <th style="width: 20%">Work Center</th>
-                                            <th style="width: 15%">Machine</th>
-                                            <th style="width: 15%" class="text-end">Times & Yield</th>
+                                            </td>
+                                            
+                                            <!-- Remove Row Action -->
+                                            <td class="text-center align-middle">
+                                                <button type="button" class="erp-btn-delete" @click="removeItem(index)">
+                                                    <i class="feather-x"></i>
+                                                </button>
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        <template x-for="op in operations" :key="op.sequence">
-                                            <tr>
-                                                <td class="fw-semibold text-muted text-center align-middle" x-text="op.sequence"></td>
-                                                <td class="fw-bold text-dark align-middle" x-text="op.name"></td>
-                                                <td class="text-capitalize align-middle" x-text="op.operation_type"></td>
-                                                <td class="align-middle" x-text="op.work_center_name"></td>
-                                                <td class="align-middle" x-text="op.machine_name"></td>
-                                                <td class="text-end align-middle">
-                                                    <div class="fs-11 text-muted">Setup: <span class="fw-semibold text-dark" x-text="op.setup_time_minutes + 'm'"></span></div>
-                                                    <div class="fs-11 text-muted">Run: <span class="fw-semibold text-dark" x-text="op.processing_time_minutes + 'm'"></span></div>
-                                                    <div class="fs-11 text-muted">Yield: <span class="fw-semibold text-dark" x-text="op.expected_yield_percentage + '%'"></span></div>
-                                                </td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
+                                    </template>
+                                </tbody>
+                            </x-ui.odoo-form-ui>
+                        </div>
 
-            <div class="d-flex gap-2 pt-3 border-top mt-4">
-                <button type="submit" class="btn btn-primary px-4">Update BOM</button>
-                <a href="{{ route('production.boms.show', $bom->id) }}" class="btn btn-secondary px-4">Cancel</a>
-            </div>
+                        <!-- Add Row Action -->
+                        <div class="mb-4">
+                            <button type="button" class="btn btn-light-brand" @click="addItem()">
+                                <i class="feather-plus me-2"></i>Add Component Row
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Operations Panel (Linked to Routing reference dropdown) -->
+                    <div class="tab-pane fade" id="tab-operations" role="tabpanel" aria-labelledby="tab-operations-tab">
+                        <h5 class="fw-bold text-dark mb-3">Routing Operations List</h5>
+                        
+                        <template x-if="!selectedRoutingId">
+                            <div class="p-4 text-center border rounded bg-light text-muted">
+                                <i class="feather-info me-2"></i>Select routing to see operations
+                            </div>
+                        </template>
+                        
+                        <template x-if="selectedRoutingId">
+                            <div>
+                                <template x-if="loadingOperations">
+                                    <div class="p-4 text-center">
+                                        <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading operations...
+                                    </div>
+                                </template>
+                                
+                                <template x-if="!loadingOperations && operations.length === 0">
+                                    <div class="p-4 text-center border rounded bg-light text-muted">
+                                        No operations defined for this routing.
+                                    </div>
+                                </template>
+                                
+                                <template x-if="!loadingOperations && operations.length > 0">
+                                    <div class="table-responsive">
+                                        <x-ui.odoo-form-ui type="table">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 10%" class="text-center">Seq</th>
+                                                    <th style="width: 25%">Operation Stage</th>
+                                                    <th style="width: 15%">Type</th>
+                                                    <th style="width: 20%">Work Center</th>
+                                                    <th style="width: 15%">Machine</th>
+                                                    <th style="width: 15%" class="text-end">Times & Yield</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <template x-for="op in operations" :key="op.sequence">
+                                                    <tr>
+                                                        <td class="fw-semibold text-muted text-center align-middle" x-text="op.sequence"></td>
+                                                        <td class="fw-bold text-dark align-middle" x-text="op.name"></td>
+                                                        <td class="text-capitalize align-middle" x-text="op.operation_type"></td>
+                                                        <td class="align-middle" x-text="op.work_center_name"></td>
+                                                        <td class="align-middle" x-text="op.machine_name"></td>
+                                                        <td class="text-end align-middle">
+                                                            <div class="fs-11 text-muted">Setup: <span class="fw-semibold text-dark" x-text="op.setup_time_minutes + 'm'"></span></div>
+                                                            <div class="fs-11 text-muted">Run: <span class="fw-semibold text-dark" x-text="op.processing_time_minutes + 'm'"></span></div>
+                                                            <div class="fs-11 text-muted">Yield: <span class="fw-semibold text-dark" x-text="op.expected_yield_percentage + '%'"></span></div>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </x-ui.odoo-form-ui>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 pt-3 border-top mt-4">
+                    <button type="submit" class="btn btn-primary px-4">Update BOM</button>
+                    <a href="{{ route('production.boms.show', $bom->id) }}" class="btn btn-secondary px-4">Cancel</a>
+                </div>
             </x-ui.odoo-form-ui>
         </form>
     </div>
@@ -495,6 +483,27 @@
                         this.loadOperations();
                     });
 
+                    // Hook select2 change event for parent product_id to disable it in row selections
+                    $('#product_id').on('change.select2 change', (e) => {
+                        var parentProductId = e.target.value;
+                        $('.odoo-table-select[name*="[material_id]"]').each(function() {
+                            var $select = $(this);
+                            $select.find('option').each(function() {
+                                if ($(this).val() === parentProductId && parentProductId !== "") {
+                                    $(this).prop('disabled', true);
+                                } else {
+                                    $(this).prop('disabled', false);
+                                }
+                            });
+                            if ($select.data('select2')) {
+                                $select.select2({
+                                    theme: "bootstrap-5",
+                                    dropdownParent: $select.closest('.table-responsive')
+                                });
+                            }
+                        });
+                    });
+
                     // Trigger initial load
                     this.loadOperations();
                 },
@@ -561,6 +570,18 @@
                         }
                         $select.data('select2-initialized', true);
                         
+                        // Disable parent product if selected
+                        var parentProductId = $('#product_id').val();
+                        if ($select.attr('name') && $select.attr('name').indexOf('material_id') !== -1) {
+                            $select.find('option').each(function() {
+                                if ($(this).val() === parentProductId && parentProductId !== "") {
+                                    $(this).prop('disabled', true);
+                                } else {
+                                    $(this).prop('disabled', false);
+                                }
+                            });
+                        }
+
                         // Initialize select2 with bootstrap-5 theme
                         $select.select2({
                             theme: "bootstrap-5",
@@ -598,6 +619,16 @@
                     });
                 }
             }));
+
+            // Hook bootstrap horizontal tabs change to load operations on Alpine
+            $(document).on('shown.bs.tab', '#bomFormTabs button', function (e) {
+                var targetId = $(e.target).attr('aria-controls');
+                if (targetId === 'tab-operations') {
+                    if (window.bomAlpineInstance) {
+                        window.bomAlpineInstance.loadOperations();
+                    }
+                }
+            });
 
             window.addEventListener('message', (event) => {
                 if (event.data && event.data.type === 'CHILD_BOM_CREATED') {
