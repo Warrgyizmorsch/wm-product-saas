@@ -6,17 +6,17 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <a href="{{ route('crm.quotations.index') }}" class="btn btn-light d-print-none">
-            <i class="feather-arrow-left me-2"></i>Back to List
-        </a>
+        <x-ui.button href="{{ route('crm.quotations.index') }}" variant="light" class="d-print-none" icon="feather-arrow-left">
+            Back to List
+        </x-ui.button>
         @if ($quotation->status === 'Accepted')
-            <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="btn btn-success d-print-none">
-                <i class="feather-shopping-cart me-2"></i>Convert to Sales Order
-            </a>
+            <x-ui.button href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" variant="success" class="d-print-none" icon="feather-shopping-cart">
+                Convert to Sales Order
+            </x-ui.button>
         @endif
-        <button onclick="window.print()" class="btn btn-primary d-print-none">
-            <i class="feather-printer me-2"></i>Print / Download PDF
-        </button>
+        <x-ui.button onclick="window.print()" variant="primary" class="d-print-none" icon="feather-printer">
+            Print / Download PDF
+        </x-ui.button>
     </div>
 @endsection
 
@@ -36,143 +36,141 @@
         </div>
     @endif
 
-    <div class="card border-0 shadow-sm print-area" id="printableInvoice">
-        <div class="card-body p-5">
-            <!-- Invoice Header -->
-            <div class="row align-items-center mb-5">
-                <div class="col-sm-6 text-start">
-                    <div class="d-flex align-items-center">
-                        <div class="avatar-text avatar-lg bg-primary text-white fs-3 fw-bold me-3 shadow">
-                            {{ strtoupper(substr(tenant() ? tenant()->name : 'ERP', 0, 1)) }}
-                        </div>
-                        <div>
-                            <h3 class="fw-bold text-dark mb-0">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h3>
-                            <p class="text-muted mb-0 fs-12">Official Sales Quotation</p>
-                        </div>
+    <x-ui.card class="print-area" id="printableInvoice" bodyClass="p-5">
+        <!-- Invoice Header -->
+        <div class="row align-items-center mb-5">
+            <div class="col-sm-6 text-start">
+                <div class="d-flex align-items-center">
+                    <div class="avatar-text avatar-lg bg-primary text-white fs-3 fw-bold me-3 shadow">
+                        {{ strtoupper(substr(tenant() ? tenant()->name : 'ERP', 0, 1)) }}
+                    </div>
+                    <div>
+                        <h3 class="fw-bold text-dark mb-0">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h3>
+                        <p class="text-muted mb-0 fs-12">Official Sales Quotation</p>
                     </div>
                 </div>
-                <div class="col-sm-6 text-sm-end mt-4 mt-sm-0">
-                    <h4 class="fw-bold text-primary mb-1">ESTIMATE</h4>
-                    <span class="fs-14 fw-bold text-dark d-block">No: {{ $quotation->quotation_number }}</span>
-                    @php
-                        $badgeClass = 'bg-soft-secondary text-secondary';
-                        if ($quotation->status === 'Sent' || $quotation->status === 'Quotation Sent') $badgeClass = 'bg-soft-info text-info';
-                        elseif ($quotation->status === 'Accepted' || $quotation->status === 'Approved') $badgeClass = 'bg-soft-success text-success';
-                        elseif ($quotation->status === 'Declined' || $quotation->status === 'Rejected') $badgeClass = 'bg-soft-danger text-danger';
-                        elseif ($quotation->status === 'Pending Approval') $badgeClass = 'bg-soft-warning text-warning';
-                        elseif ($quotation->status === 'Quotation Rework' || $quotation->status === 'Rework') $badgeClass = 'bg-soft-warning text-warning';
-                    @endphp
-                    <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 mt-1">{{ $quotation->status }}</span>
-                </div>
             </div>
-
-            <hr class="my-4">
-
-            <!-- Meta details (Bill to / Dates) -->
-            <div class="row mb-5">
-                <div class="col-6 text-start">
-                    <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Prepared For</span>
-                    <h5 class="fw-bold text-dark mb-1">{{ $quotation->customer?->name ?? '—' }}</h5>
-                    <p class="text-muted mb-1 fs-13"><i class="feather-mail me-2"></i>{{ $quotation->customer?->email ?: '—' }}</p>
-                    <p class="text-muted mb-0 fs-13"><i class="feather-phone me-2"></i>{{ $quotation->customer?->phone ?: '—' }}</p>
-                </div>
-                <div class="col-6 text-end">
-                    <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Quotation Schedule</span>
-                    <p class="text-dark mb-1 fs-13"><strong>Quotation Date:</strong> {{ $quotation->quotation_date ? $quotation->quotation_date->format('d/m/Y') : '—' }}</p>
-                    <p class="text-dark mb-1 fs-13"><strong>Valid Until:</strong> {{ $quotation->expiry_date ? $quotation->expiry_date->format('d/m/Y') : '—' }}</p>
-                    @if($quotation->salesPerson)
-                        <p class="text-dark mb-0 fs-13"><strong>Sales Rep:</strong> {{ $quotation->salesPerson->name }}</p>
-                    @endif
-                </div>
+            <div class="col-sm-6 text-sm-end mt-4 mt-sm-0">
+                <h4 class="fw-bold text-primary mb-1">ESTIMATE</h4>
+                <span class="fs-14 fw-bold text-dark d-block">No: {{ $quotation->quotation_number }}</span>
+                @php
+                    $badgeClass = 'bg-soft-secondary text-secondary';
+                    if ($quotation->status === 'Sent' || $quotation->status === 'Quotation Sent') $badgeClass = 'bg-soft-info text-info';
+                    elseif ($quotation->status === 'Accepted' || $quotation->status === 'Approved') $badgeClass = 'bg-soft-success text-success';
+                    elseif ($quotation->status === 'Declined' || $quotation->status === 'Rejected') $badgeClass = 'bg-soft-danger text-danger';
+                    elseif ($quotation->status === 'Pending Approval') $badgeClass = 'bg-soft-warning text-warning';
+                    elseif ($quotation->status === 'Quotation Rework' || $quotation->status === 'Rework') $badgeClass = 'bg-soft-warning text-warning';
+                @endphp
+                <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 mt-1">{{ $quotation->status }}</span>
             </div>
+        </div>
 
-            <!-- Items Table -->
-            <div class="table-responsive mb-5">
-                <table class="table table-bordered align-middle">
-                    <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+        <hr class="my-4">
+
+        <!-- Meta details (Bill to / Dates) -->
+        <div class="row mb-5">
+            <div class="col-6 text-start">
+                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Prepared For</span>
+                <h5 class="fw-bold text-dark mb-1">{{ $quotation->customer?->name ?? '—' }}</h5>
+                <p class="text-muted mb-1 fs-13"><i class="feather-mail me-2"></i>{{ $quotation->customer?->email ?: '—' }}</p>
+                <p class="text-muted mb-0 fs-13"><i class="feather-phone me-2"></i>{{ $quotation->customer?->phone ?: '—' }}</p>
+            </div>
+            <div class="col-6 text-end">
+                <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Quotation Schedule</span>
+                <p class="text-dark mb-1 fs-13"><strong>Quotation Date:</strong> {{ $quotation->quotation_date ? $quotation->quotation_date->format('d/m/Y') : '—' }}</p>
+                <p class="text-dark mb-1 fs-13"><strong>Valid Until:</strong> {{ $quotation->expiry_date ? $quotation->expiry_date->format('d/m/Y') : '—' }}</p>
+                @if($quotation->salesPerson)
+                    <p class="text-dark mb-0 fs-13"><strong>Sales Rep:</strong> {{ $quotation->salesPerson->name }}</p>
+                @endif
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="table-responsive mb-5">
+            <table class="table table-bordered align-middle">
+                <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                    <tr>
+                        <th class="ps-3" style="width: 5%;">#</th>
+                        <th style="width: 40%;">Description of Service / Product</th>
+                        <th class="text-center" style="width: 10%;">Qty</th>
+                        <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
+                        <th class="text-end" style="width: 12%;">Tax Rate</th>
+                        <th class="text-end pe-3" style="width: 18%;">Amount (₹)</th>
+                    </tr>
+                </thead>
+                <tbody class="fs-13 text-dark">
+                    @foreach ($quotation->items as $index => $item)
                         <tr>
-                            <th class="ps-3" style="width: 5%;">#</th>
-                            <th style="width: 40%;">Description of Service / Product</th>
-                            <th class="text-center" style="width: 10%;">Qty</th>
-                            <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
-                            <th class="text-end" style="width: 12%;">Tax Rate</th>
-                            <th class="text-end pe-3" style="width: 18%;">Amount (₹)</th>
+                            <td class="ps-3 text-muted text-center">{{ $index + 1 }}</td>
+                            <td>
+                                <strong class="text-dark">{{ $item->item_name }}</strong>
+                                @if($item->description)
+                                    <small class="text-muted d-block mt-0.5">{{ $item->description }}</small>
+                                @endif
+                            </td>
+                            <td class="text-center">{{ $item->quantity }}</td>
+                            <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
+                            <td class="text-end">{{ number_format($item->tax_rate, 2) }}%</td>
+                            <td class="text-end pe-3 fw-semibold">₹{{ number_format($item->amount, 2) }}</td>
                         </tr>
-                    </thead>
-                    <tbody class="fs-13 text-dark">
-                        @foreach ($quotation->items as $index => $item)
-                            <tr>
-                                <td class="ps-3 text-muted text-center">{{ $index + 1 }}</td>
-                                <td>
-                                    <strong class="text-dark">{{ $item->item_name }}</strong>
-                                    @if($item->description)
-                                        <small class="text-muted d-block mt-0.5">{{ $item->description }}</small>
-                                    @endif
-                                </td>
-                                <td class="text-center">{{ $item->quantity }}</td>
-                                <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
-                                <td class="text-end">{{ number_format($item->tax_rate, 2) }}%</td>
-                                <td class="text-end pe-3 fw-semibold">₹{{ number_format($item->amount, 2) }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Bottom Notes and Calculations -->
+        <div class="row g-4">
+            <div class="col-7 text-start">
+                @if($quotation->terms_conditions)
+                    <h6 class="fw-bold text-dark mb-2 fs-12 text-uppercase">Terms & Conditions</h6>
+                    <p class="text-muted fs-12 mb-4" style="white-space: pre-line;">{{ $quotation->terms_conditions }}</p>
+                @endif
+
+                @if($quotation->notes)
+                    <h6 class="fw-bold text-dark mb-2 fs-12 text-uppercase">Client Notes</h6>
+                    <p class="text-muted fs-12 mb-0" style="white-space: pre-line;">{{ $quotation->notes }}</p>
+                @endif
             </div>
-
-            <!-- Bottom Notes and Calculations -->
-            <div class="row g-4">
-                <div class="col-7 text-start">
-                    @if($quotation->terms_conditions)
-                        <h6 class="fw-bold text-dark mb-2 fs-12 text-uppercase">Terms & Conditions</h6>
-                        <p class="text-muted fs-12 mb-4" style="white-space: pre-line;">{{ $quotation->terms_conditions }}</p>
-                    @endif
-
-                    @if($quotation->notes)
-                        <h6 class="fw-bold text-dark mb-2 fs-12 text-uppercase">Client Notes</h6>
-                        <p class="text-muted fs-12 mb-0" style="white-space: pre-line;">{{ $quotation->notes }}</p>
-                    @endif
-                </div>
-                <div class="col-5">
-                    <div class="border p-3 rounded bg-light">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted">Subtotal:</span>
-                            <span class="fw-bold text-dark">₹{{ number_format($quotation->subtotal, 2) }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-muted">Tax total (GST):</span>
-                            <span class="fw-bold text-dark">₹{{ number_format($quotation->tax, 2) }}</span>
-                        </div>
-                        @if($quotation->discount > 0)
-                            <div class="d-flex justify-content-between mb-2 text-danger">
-                                <span>Discount:</span>
-                                <span>-₹{{ number_format($quotation->discount, 2) }}</span>
-                            </div>
-                        @endif
-                        <hr class="my-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="fs-15 fw-bold text-dark">Total Payable:</span>
-                            <span class="fs-15 fw-bold text-primary">₹{{ number_format($quotation->total_amount, 2) }}</span>
-                        </div>
+            <div class="col-5">
+                <div class="border p-3 rounded bg-light">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Subtotal:</span>
+                        <span class="fw-bold text-dark">₹{{ number_format($quotation->subtotal, 2) }}</span>
                     </div>
-                </div>
-            </div>
-
-            <hr class="my-5">
-
-            <!-- Signature block -->
-            <div class="row mt-5">
-                <div class="col-sm-6 text-start">
-                    <p class="fs-11 text-muted mb-0">For any questions concerning this quotation, contact sales office.</p>
-                </div>
-                <div class="col-sm-6 text-sm-end mt-4 mt-sm-0">
-                    <div class="d-inline-block text-center" style="width: 200px;">
-                        <hr class="mb-1 mt-5">
-                        <span class="fs-11 text-muted text-uppercase fw-semibold">Authorized Signature</span>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Tax total (GST):</span>
+                        <span class="fw-bold text-dark">₹{{ number_format($quotation->tax, 2) }}</span>
+                    </div>
+                    @if($quotation->discount > 0)
+                        <div class="d-flex justify-content-between mb-2 text-danger">
+                            <span>Discount:</span>
+                            <span>-₹{{ number_format($quotation->discount, 2) }}</span>
+                        </div>
+                    @endif
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fs-15 fw-bold text-dark">Total Payable:</span>
+                        <span class="fs-15 fw-bold text-primary">₹{{ number_format($quotation->total_amount, 2) }}</span>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+
+        <hr class="my-5">
+
+        <!-- Signature block -->
+        <div class="row mt-5">
+            <div class="col-sm-6 text-start">
+                <p class="fs-11 text-muted mb-0">For any questions concerning this quotation, contact sales office.</p>
+            </div>
+            <div class="col-sm-6 text-sm-end mt-4 mt-sm-0">
+                <div class="d-inline-block text-center" style="width: 200px;">
+                    <hr class="mb-1 mt-5">
+                    <span class="fs-11 text-muted text-uppercase fw-semibold">Authorized Signature</span>
+                </div>
+            </div>
+        </div>
+    </x-ui.card>
 @endsection
 
 @push('styles')

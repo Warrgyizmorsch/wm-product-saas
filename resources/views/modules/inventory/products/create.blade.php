@@ -81,7 +81,7 @@
 @endpush
 
 @section('page-actions')
-    <a href="#" class="btn btn-light" onclick="history.back(); return false;">
+    <a href="{{ route('inventory.products.index') }}" class="btn btn-light">
         <i class="feather-arrow-left me-2"></i>Back
     </a>
 @endsection
@@ -91,13 +91,13 @@
         <div class="col-12">
             <!-- Zoho / Odoo Style Flat Form Sheet -->
             <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">
-                <form action="#" method="POST" id="productForm" class="odoo-sheet" onsubmit="event.preventDefault(); alert('Product and variants structure logged to console! (UI Only Mode)'); console.log(getFormData());">
+                <form action="{{ route('inventory.products.store') }}" method="POST" id="productForm" class="odoo-sheet">
                     @csrf
 
                     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                         <h3 class="fw-bold text-dark mb-0">New Item / Product</h3>
                         <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-light border" onclick="history.back();">Cancel</button>
+                            <a href="{{ route('inventory.products.index') }}" class="btn btn-sm btn-light border">Cancel</a>
                             <button type="submit" class="btn btn-sm btn-primary">Save Product</button>
                         </div>
                     </div>
@@ -139,32 +139,25 @@
                                 <x-ui.odoo-form-ui type="input" label="SKU" name="sku" required="true" placeholder="Enter Unique SKU Code" />
                             </div>
 
-                            <x-ui.odoo-form-ui type="select" label="Unit" name="unit" required="true">
-                                <option value="pcs">Pcs (Pieces)</option>
-                                <option value="box">Box</option>
-                                <option value="kg">Kg (Kilograms)</option>
-                                <option value="ltr">Ltr (Liters)</option>
-                                <option value="bndl">Bndl (Bundle)</option>
-                                <option value="m">M (Meters)</option>
-                                <option value="hr">Hr (Hours)</option>
+                            <x-ui.odoo-form-ui type="select" label="Unit" name="uom_id" required="true">
+                                @foreach($uoms as $uom)
+                                    <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
+                                @endforeach
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" label="HSN/SAC Code" name="hsn_sac" placeholder="e.g. 8471 (HSN) or 9983 (SAC)" />
+                            <x-ui.odoo-form-ui type="input" label="Brand" name="brand" placeholder="e.g. Apple, Nike" />
+                            
+                            <x-ui.odoo-form-ui type="input" label="Manufacturer" name="manufacturer" placeholder="Manufacturer Name" />
+                            
+                            <x-ui.odoo-form-ui type="input" label="MPN" name="mpn" placeholder="Manufacturer Part Number" />
 
-                            <x-ui.odoo-form-ui type="select" label="GST Rate" name="gst_rate">
-                                <option value="0">GST @ 0% (Exempt)</option>
-                                <option value="5">GST @ 5%</option>
-                                <option value="12">GST @ 12%</option>
-                                <option value="18" selected>GST @ 18%</option>
-                                <option value="28">GST @ 28%</option>
-                            </x-ui.odoo-form-ui>
-
-                            <x-ui.odoo-form-ui type="select" label="Preferred Vendor" name="preferred_vendor_id" searchable="true">
-                                <option value="">Select Preferred Supplier...</option>
-                                <option value="1">Acme Supplies Ltd</option>
-                                <option value="2">Apex Trade Corp</option>
-                                <option value="3">Matrix Logistics</option>
-                            </x-ui.odoo-form-ui>
+                            <div class="border-top pt-3 mt-3">
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>Identifiers</h6>
+                                <x-ui.odoo-form-ui type="input" label="Barcode" name="barcode" placeholder="Barcode (EAN/UPC)" />
+                                <x-ui.odoo-form-ui type="input" label="UPC" name="upc" placeholder="Universal Product Code" />
+                                <x-ui.odoo-form-ui type="input" label="EAN" name="ean" placeholder="European Article Number" />
+                                <x-ui.odoo-form-ui type="input" label="ISBN" name="isbn" placeholder="International Standard Book Number" />
+                            </div>
                         </div>
 
                         <!-- Right Column: Sales & Purchase Accounts -->
@@ -174,7 +167,7 @@
                             <x-ui.odoo-form-ui type="input" label="Selling Price" name="selling_price" inputType="number" step="0.01" placeholder="Selling Price (₹)" required="true" />
 
                             <x-ui.odoo-form-ui type="select" label="Sales Account" name="sales_account" required="true">
-                                <option value="Sales">Sales Income Account</option>
+                                <option value="Sales Income">Sales Income Account</option>
                                 <option value="General Income">General Income Account</option>
                                 <option value="Interest Income">Interest Income Account</option>
                             </x-ui.odoo-form-ui>
@@ -186,12 +179,62 @@
                                 <option value="Purchases">Purchases Expense Account</option>
                                 <option value="Job Costs">Job Costs Expense Account</option>
                             </x-ui.odoo-form-ui>
+
+                            <div class="border-top pt-3 mt-3">
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-percent me-2"></i>Taxation & Preferred Vendor</h6>
+                                <x-ui.odoo-form-ui type="input" label="HSN/SAC Code" name="hsn_sac" placeholder="e.g. 8471 (HSN) or 9983 (SAC)" />
+
+                                <x-ui.odoo-form-ui type="select" label="GST Rate" name="gst_rate">
+                                    <option value="0">GST @ 0% (Exempt)</option>
+                                    <option value="5">GST @ 5%</option>
+                                    <option value="12">GST @ 12%</option>
+                                    <option value="18" selected>GST @ 18%</option>
+                                    <option value="28">GST @ 28%</option>
+                                </x-ui.odoo-form-ui>
+
+                                <x-ui.odoo-form-ui type="select" label="Preferred Vendor" name="preferred_vendor_id" searchable="true">
+                                    <option value="">Select Preferred Supplier...</option>
+                                    @foreach($vendors as $vendor)
+                                        <option value="{{ $vendor->id }}">{{ $vendor->name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+
+                            <div class="border-top pt-3 mt-3">
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-maximize me-2"></i>Dimensions & Weight</h6>
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label">Dimensions</label>
+                                    <div class="d-flex gap-2 flex-grow-1">
+                                        <input type="number" step="0.01" name="length" placeholder="Length" class="odoo-form-control text-center" style="width: 25%;">
+                                        <input type="number" step="0.01" name="width" placeholder="Width" class="odoo-form-control text-center" style="width: 25%;">
+                                        <input type="number" step="0.01" name="height" placeholder="Height" class="odoo-form-control text-center" style="width: 25%;">
+                                        <select name="dimension_unit" class="form-select form-select-sm" style="border-radius: 0; border: none; border-bottom: 1px solid #ced4da; width: 25%;">
+                                            <option value="cm">cm</option>
+                                            <option value="in">in</option>
+                                            <option value="mm">mm</option>
+                                            <option value="m">m</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="odoo-form-group mt-2">
+                                    <label class="odoo-form-label">Weight</label>
+                                    <div class="d-flex gap-2 flex-grow-1">
+                                        <input type="number" step="0.01" name="weight" placeholder="Weight" class="odoo-form-control" style="width: 70%;">
+                                        <select name="weight_unit" class="form-select form-select-sm" style="border-radius: 0; border: none; border-bottom: 1px solid #ced4da; width: 30%;">
+                                            <option value="kg">kg</option>
+                                            <option value="g">g</option>
+                                            <option value="lb">lb</option>
+                                            <option value="oz">oz</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Inventory tracking section (Only relevant for Goods & Single variation) -->
                     <div id="inventorySection" class="border-top pt-4 mt-4 single-item-only">
-                        <h6 class="fw-bold text-primary mb-3"><i class="feather-box me-2"></i>Inventory Tracking & Opening Stock</h6>
+                        <h6 class="fw-bold text-primary mb-3"><i class="feather-box me-2"></i>Inventory Tracking & Settings</h6>
                         
                         <div class="row g-4 fs-13 text-dark">
                             <div class="col-lg-6 border-end">
@@ -205,10 +248,51 @@
                             </div>
 
                             <div class="col-lg-6">
-                                <x-ui.odoo-form-ui type="input" label="Opening Stock" name="opening_stock" inputType="number" placeholder="Initial quantity on hand" />
-
-                                <x-ui.odoo-form-ui type="input" label="Opening Stock Rate" name="opening_stock_rate" inputType="number" step="0.01" placeholder="Cost per unit for opening stock (₹)" />
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label">Advanced tracking</label>
+                                    <div class="flex-grow-1">
+                                        <div class="form-check form-check-inline mt-1">
+                                            <input class="form-check-input" type="checkbox" name="track_serial_number" id="trackSerial" value="1">
+                                            <label class="form-check-label" for="trackSerial">Track Serial Numbers</label>
+                                        </div>
+                                        <div class="form-check form-check-inline mt-1 ms-3">
+                                            <input class="form-check-input" type="checkbox" name="track_batch" id="trackBatch" value="1">
+                                            <label class="form-check-label" for="trackBatch">Track Batches</label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Opening Stock by Warehouse (Single variation Goods only) -->
+                    <div id="warehouseStocksSection" class="border-top pt-4 mt-4 single-item-only">
+                        <h6 class="fw-bold text-primary mb-3"><i class="feather-home me-2"></i>Opening Stock by Warehouse</h6>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-sm odoo-table">
+                                <thead class="table-light text-muted">
+                                    <tr>
+                                        <th>Warehouse Code</th>
+                                        <th>Warehouse Name</th>
+                                        <th>Quantity on Hand</th>
+                                        <th>Unit Cost (₹)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($warehouses as $wh)
+                                        <tr>
+                                            <td class="fw-semibold text-dark">{{ $wh->code }}</td>
+                                            <td class="text-muted">{{ $wh->name }}</td>
+                                            <td>
+                                                <input type="number" name="warehouse_stocks[{{ $wh->id }}][quantity]" class="form-control form-control-sm py-1 odoo-table-input" placeholder="0">
+                                            </td>
+                                            <td>
+                                                <input type="number" name="warehouse_stocks[{{ $wh->id }}][unit_cost]" class="form-control form-control-sm py-1 odoo-table-input" placeholder="0.00" step="0.01">
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
@@ -228,7 +312,7 @@
                                 <div class="row align-items-center">
                                     <div class="col-md-3">
                                         <label class="fs-12 fw-bold text-dark mb-1">Attribute Name</label>
-                                        <select class="form-select form-select-sm attribute-name-select" style="border-radius: 0;">
+                                        <select name="attributes[0][name]" class="form-select form-select-sm attribute-name-select" style="border-radius: 0;">
                                             <option value="Color">Color</option>
                                             <option value="Size">Size</option>
                                             <option value="Material">Material</option>
@@ -241,8 +325,14 @@
                                         <label class="fs-12 fw-bold text-dark mb-1">Options (Type option value and press Enter or Comma)</label>
                                         <div class="tag-input-container">
                                             <span class="tags-wrapper">
-                                                <span class="tag-badge" data-val="Red">Red <span class="remove-tag">&times;</span></span>
-                                                <span class="tag-badge" data-val="Blue">Blue <span class="remove-tag">&times;</span></span>
+                                                <span class="tag-badge" data-val="Red">
+                                                    Red <span class="remove-tag">&times;</span>
+                                                    <input type="hidden" name="attributes[0][options][]" value="Red">
+                                                </span>
+                                                <span class="tag-badge" data-val="Blue">
+                                                    Blue <span class="remove-tag">&times;</span>
+                                                    <input type="hidden" name="attributes[0][options][]" value="Blue">
+                                                </span>
                                             </span>
                                             <input type="text" class="tag-input" placeholder="e.g. Red, Blue, Green">
                                         </div>
@@ -282,7 +372,7 @@
 
                     <!-- Action buttons footer -->
                     <div class="d-flex justify-content-end gap-2 mt-4 border-top pt-3">
-                        <button type="button" class="btn btn-light border" onclick="history.back();">Cancel</button>
+                        <a href="{{ route('inventory.products.index') }}" class="btn btn-light border">Cancel</a>
                         <button type="submit" class="btn btn-primary">Save Product</button>
                     </div>
                 </form>
@@ -317,27 +407,32 @@
                 if (itemType === 'Service') {
                     hsnLabel.html('SAC Code');
                     $('input[name="hsn_sac"]').attr('placeholder', 'e.g. 9983 (SAC)');
-                    // Hide preferred vendor for services
+                    // Hide preferred vendor and dimensions for services
                     $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').slideUp();
+                    $('input[name="length"]').closest('.border-top').slideUp();
                 } else {
                     hsnLabel.html('HSN Code');
                     $('input[name="hsn_sac"]').attr('placeholder', 'e.g. 8471 (HSN)');
-                    // Show preferred vendor for goods
+                    // Show preferred vendor and dimensions for goods
                     $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').slideDown();
+                    $('input[name="length"]').closest('.border-top').slideDown();
                 }
 
                 if (itemType === 'Service') {
                     // Hide inventory sections for Services
                     $('#inventorySection').slideUp();
+                    $('#warehouseStocksSection').slideUp();
                     $('select[name="inventory_account"]').prop('required', false);
                     $('.variant-stock-col').hide();
                 } else {
                     $('.variant-stock-col').show();
                     if (variationType === 'Single') {
                         $('#inventorySection').slideDown();
+                        $('#warehouseStocksSection').slideDown();
                         $('select[name="inventory_account"]').prop('required', true);
                     } else {
                         $('#inventorySection').slideUp();
+                        $('#warehouseStocksSection').slideUp();
                         $('select[name="inventory_account"]').prop('required', false);
                     }
                 }
@@ -357,7 +452,21 @@
             // Setup custom attribute type display
             $(document).on('change', '.attribute-name-select', function() {
                 const isCustom = $(this).val() === 'Custom';
-                $(this).siblings('.attribute-custom-name').toggle(isCustom).prop('required', isCustom);
+                const inputCustom = $(this).siblings('.attribute-custom-name');
+                inputCustom.toggle(isCustom).prop('required', isCustom);
+                
+                const cardIndex = $(this).closest('.attribute-card').attr('data-index');
+                if (isCustom) {
+                    $(this).removeAttr('name');
+                    inputCustom.attr('name', `attributes[${cardIndex}][name]`);
+                } else {
+                    $(this).attr('name', `attributes[${cardIndex}][name]`);
+                    inputCustom.removeAttr('name');
+                }
+                generateMatrix();
+            });
+
+            $(document).on('input', '.attribute-custom-name', function() {
                 generateMatrix();
             });
 
@@ -368,6 +477,8 @@
                     const val = $(this).val().trim().replace(/,/g, '');
                     if (val) {
                         const wrapper = $(this).siblings('.tags-wrapper');
+                        const cardIndex = $(this).closest('.attribute-card').attr('data-index');
+                        
                         // Prevent duplicates
                         let exists = false;
                         wrapper.find('.tag-badge').each(function() {
@@ -377,7 +488,12 @@
                         });
 
                         if (!exists) {
-                            wrapper.append(`<span class="tag-badge" data-val="${val}">${val} <span class="remove-tag">&times;</span></span>`);
+                            wrapper.append(`
+                                <span class="tag-badge" data-val="${val}">
+                                    ${val} <span class="remove-tag">&times;</span>
+                                    <input type="hidden" name="attributes[${cardIndex}][options][]" value="${val}">
+                                </span>
+                            `);
                             generateMatrix();
                         }
                         $(this).val('');
@@ -398,7 +514,7 @@
                         <div class="row align-items-center">
                             <div class="col-md-3">
                                 <label class="fs-12 fw-bold text-dark mb-1">Attribute Name</label>
-                                <select class="form-select form-select-sm attribute-name-select" style="border-radius: 0;">
+                                <select name="attributes[${attributeIndex}][name]" class="form-select form-select-sm attribute-name-select" style="border-radius: 0;">
                                     <option value="Size">Size</option>
                                     <option value="Color">Color</option>
                                     <option value="Material">Material</option>
@@ -428,11 +544,6 @@
             // Remove Attribute row
             $(document).on('click', '.remove-attribute-btn', function() {
                 $(this).closest('.attribute-card').remove();
-                generateMatrix();
-            });
-
-            // Input monitors on attributes name inputs to regenerate table
-            $(document).on('input', '.attribute-custom-name', function() {
                 generateMatrix();
             });
 
@@ -528,55 +639,12 @@
             // Sync matrix helper fields when parent details are typed
             $('input[name="name"], input[name="sku"], input[name="selling_price"], input[name="cost_price"]').on('input', function() {
                 if ($('input[name="variation_type"]:checked').val() === 'Variant') {
-                    // Update matrix helper titles & values without overwriting dirty variant fields
-                    $('#variantsMatrixBody tr').each(function() {
-                        const skuInput = $(this).find('input[name*="[sku]"]');
-                        const sellInput = $(this).find('input[name*="[selling_price]"]');
-                        const costInput = $(this).find('input[name*="[cost_price]"]');
-                        
-                        // Only change values if they were unmodified or empty
-                        const parentSku = $('input[name="sku"]').val().trim() || 'SKU';
-                        const parentSell = $('input[name="selling_price"]').val().trim();
-                        const parentCost = $('input[name="cost_price"]').val().trim();
-                    });
+                    generateMatrix();
                 }
             });
 
-            // Helper function to extract current form data values for debug log
-            window.getFormData = function() {
-                const data = {
-                    item_type: $('input[name="item_type"]:checked').val(),
-                    variation_type: $('input[name="variation_type"]:checked').val(),
-                    name: $('input[name="name"]').val(),
-                    unit: $('select[name="unit"]').val(),
-                    hsn_sac: $('input[name="hsn_sac"]').val(),
-                    gst_rate: $('select[name="gst_rate"]').val(),
-                    selling_price: $('input[name="selling_price"]').val(),
-                    cost_price: $('input[name="cost_price"]').val(),
-                    sales_account: $('select[name="sales_account"]').val(),
-                    purchase_account: $('select[name="purchase_account"]').val(),
-                };
-
-                if (data.variation_type === 'Single') {
-                    data.sku = $('input[name="sku"]').val();
-                    data.opening_stock = $('input[name="opening_stock"]').val();
-                    data.opening_stock_rate = $('input[name="opening_stock_rate"]').val();
-                    data.reorder_point = $('input[name="reorder_point"]').val();
-                } else {
-                    data.variants = [];
-                    $('#variantsMatrixBody tr').each(function() {
-                        data.variants.push({
-                            label: $(this).find('td:first-child').text().trim().replace(/Variant #\d+\s+/, ''),
-                            sku: $(this).find('input[name*="[sku]"]').val(),
-                            selling_price: $(this).find('input[name*="[selling_price]"]').val(),
-                            cost_price: $(this).find('input[name*="[cost_price]"]').val(),
-                            opening_stock: $(this).find('input[name*="[opening_stock]"]').val(),
-                            reorder_point: $(this).find('input[name*="[reorder_point]"]').val()
-                        });
-                    });
-                }
-                return data;
-            };
+            // Initial toggle check
+            toggleSections();
         });
     </script>
 @endpush
