@@ -4,6 +4,16 @@
 @section('page-title', 'Penalization Policies')
 @section('breadcrumb', 'HRMS / Penalization Policy Settings')
 
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+@endpush
+
+@push('scripts')
+    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
+    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
+@endpush
+
 @section('content')
     <style>
         /* Sidebar and Workspace layout alignment */
@@ -80,13 +90,113 @@
             border-left: 4px solid transparent !important;
             transition: all 0.15s ease-in-out;
             border-bottom: 1px solid #f1f5f9 !important;
+            padding: 16px 20px !important;
         }
         .policy-item.active {
-            background-color: #f1f5f9 !important;
+            background-color: rgba(74, 108, 247, 0.05) !important;
             border-left-color: var(--bs-primary) !important;
+        }
+        .policy-item.active span {
+            color: var(--bs-primary) !important;
+            font-weight: 600 !important;
+        }
+        .policy-item.active i {
+            color: var(--bs-primary) !important;
         }
         .policy-item:hover:not(.active) {
             background-color: #f8fafc !important;
+            transform: translateX(2px);
+        }
+
+        /* Form inputs design enhancements */
+        .form-label {
+            font-size: 12.5px !important;
+            color: #334155 !important;
+            margin-bottom: 6px !important;
+        }
+        .form-control, .form-select {
+            border-color: #cbd5e1 !important;
+            font-size: 13px !important;
+            border-radius: 6px !important;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: var(--bs-primary) !important;
+            box-shadow: 0 0 0 2.5px rgba(74, 108, 247, 0.12) !important;
+        }
+        .form-control-sm, .form-select-sm {
+            height: 34px !important;
+            font-size: 12px !important;
+            padding: 0.25rem 0.5rem !important;
+        }
+        .input-group-text {
+            border-color: #cbd5e1 !important;
+            font-size: 12.5px !important;
+            color: #475569 !important;
+        }
+
+        /* Table enhancements */
+        .table-responsive {
+            border-color: #e2e8f0 !important;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03) !important;
+        }
+        .table thead th {
+            font-size: 10.5px !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            color: #475569 !important;
+            background-color: #f8fafc !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            padding: 10px 14px !important;
+        }
+        .table tbody td {
+            padding: 8px 12px !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+        .table tbody td input, .table tbody td select {
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+            padding: 4px 8px !important;
+            font-size: 12.5px !important;
+            background-color: #ffffff !important;
+            transition: all 0.2s ease !important;
+            height: 32px !important;
+        }
+        .table tbody td input:focus, .table tbody td select:focus {
+            border-color: var(--bs-primary) !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 0 0 2.5px rgba(74, 108, 247, 0.12) !important;
+        }
+        .table tbody td input[readonly] {
+            background-color: #f1f5f9 !important;
+            border-color: #e2e8f0 !important;
+            color: #64748b !important;
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(248, 250, 252, 0.75) !important;
+        }
+        .btn-soft-danger {
+            background-color: #fef2f2 !important;
+            color: #ef4444 !important;
+            border: 1px solid #fee2e2 !important;
+            transition: all 0.15s ease;
+        }
+        .btn-soft-danger:hover {
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+        }
+        .btn-soft-primary {
+            background-color: rgba(74, 108, 247, 0.08) !important;
+            color: var(--bs-primary) !important;
+            border: 1px dashed rgba(74, 108, 247, 0.25) !important;
+            transition: all 0.15s ease;
+            font-weight: 500 !important;
+        }
+        .btn-soft-primary:hover {
+            background-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            border-style: solid !important;
         }
     </style>
 
@@ -114,15 +224,20 @@
                 <x-ui.card title="Penalization Policies" subtitle="Configure thresholds, grace periods, and deductions for attendance infractions" bodyClass="p-0" stretch>
                     <div class="row g-0">
                         <!-- LEFT COLUMN: RULES CATEGORIES ONLY -->
-                        <div class="col-md-4 col-12 border-end">
+                        <div class="col-md-3 col-12 border-end">
                             <div class="list-group list-group-flush rounded-0" style="min-height: 400px;">
                                 @php
                                     $policyTypes = [
-                                        'no_attendance' => ['Absence (No Attendance)', 'feather-user-x'],
                                         'late_arrival' => ['Late Arrival', 'feather-clock'],
                                         'under_hours' => ['Work Hours Deficit', 'feather-trending-down'],
-                                        'missing_logs' => ['Missing Check-in/out Logs', 'feather-alert-triangle']
+                                        'missing_logs' => ['Missing Logs', 'feather-alert-triangle']
                                     ];
+                                    $lateArrivalRule = $rules->get('late_arrival');
+                                    $savedLateTiers = ($lateArrivalRule && $lateArrivalRule->penalty_tiers) ? $lateArrivalRule->penalty_tiers : null;
+                                    $underHoursRule = $rules->get('under_hours');
+                                    $savedDeficitTiers = ($underHoursRule && $underHoursRule->penalty_tiers) ? $underHoursRule->penalty_tiers : null;
+                                    $missingLogsRule = $rules->get('missing_logs');
+                                    $savedMissingTiers = ($missingLogsRule && $missingLogsRule->penalty_tiers) ? $missingLogsRule->penalty_tiers : null;
                                 @endphp
                                 @foreach($policyTypes as $typeKey => $typeData)
                                     @php
@@ -134,7 +249,7 @@
                                        data-policy-type="{{ $typeKey }}">
                                         <div class="d-flex align-items-center">
                                             <i class="{{ $typeData[1] }} me-3 fs-16 {{ $isActive ? 'text-primary' : 'text-secondary' }}"></i>
-                                            <span class="fw-bold {{ $isActive ? 'text-primary' : 'text-dark' }}" style="font-size: 14px;">
+                                            <span class="fw-bold {{ $isActive ? 'text-primary' : 'text-dark' }}" style="font-size: 13px;">
                                                 {{ $typeData[0] }}
                                             </span>
                                         </div>
@@ -144,7 +259,7 @@
                         </div>
 
                         <!-- RIGHT COLUMN: SELECTED POLICY FORM DETAILED WORKSPACE -->
-                        <div class="col-md-8 col-12">
+                        <div class="col-md-9 col-12">
                             @foreach($policyTypes as $typeKey => $typeData)
                                 @php
                                     $isPaneActive = ($selectedType === $typeKey);
@@ -167,133 +282,177 @@
                                                 <span class="text-muted fs-12">Set thresholds, deductions, and active policy scope</span>
                                             </div>
                                             <div>
-                                                <span class="badge {{ $statusVal === '1' ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-danger-subtle text-danger border border-danger-subtle' }} px-2 py-1">
+                                                <x-ui.badge variant="{{ $statusVal === '1' ? 'success' : 'danger' }}" soft class="px-2 py-1">
                                                     {{ $statusVal === '1' ? 'Active' : 'Inactive' }}
-                                                </span>
+                                                </x-ui.badge>
                                             </div>
                                         </div>
 
                                         <div class="row g-3 mb-4">
                                             <!-- Entity Scope -->
                                             <div class="col-md-6 col-12">
-                                                <label class="form-label fw-bold">Company Scope</label>
-                                                <select name="company_id" class="form-select">
+                                                <x-ui.select label="Company Scope" name="company_id" data-select2-selector="default">
                                                     <option value="">Apply Globally (All Entities)</option>
                                                     @foreach($companies as $company)
                                                         <option value="{{ $company->id }}" {{ ($rule && $rule->company_id === $company->id) ? 'selected' : '' }}>
                                                             {{ $company->company_name }}
                                                         </option>
                                                     @endforeach
-                                                </select>
+                                                </x-ui.select>
                                             </div>
 
                                             <!-- Status -->
                                             <div class="col-md-6 col-12">
-                                                <label class="form-label fw-bold">Policy Status <span class="text-danger">*</span></label>
-                                                <select name="status" class="form-select" required>
+                                                <x-ui.select label="Policy Status" name="status" data-select2-selector="default" required>
                                                     <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>Active (Enforce Policy)</option>
                                                     <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>Inactive (Ignore Violations)</option>
-                                                </select>
+                                                </x-ui.select>
                                             </div>
 
-                                            <!-- Type-Specific Parameters -->
-                                            @if($typeKey === 'late_arrival')
-                                                <!-- Grace Period -->
-                                                <div class="col-md-6 col-12">
-                                                    <label class="form-label fw-bold">Grace Period (Minutes) <span class="text-danger">*</span></label>
-                                                    <div class="input-group">
-                                                        <input type="number" name="grace_period_minutes" class="form-control" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" required>
-                                                        <span class="input-group-text bg-light">Minutes</span>
-                                                    </div>
-                                                    <small class="text-muted fs-11">Late arrival registered only after this duration.</small>
-                                                </div>
+                                             <!-- Type-Specific Parameters -->
+                                             @if($typeKey === 'late_arrival')
+                                                 <!-- Grace Period -->
+                                                 <div class="col-12">
+                                                     <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-3 m-0 rounded-3 text-dark fs-13 flex-nowrap">
+                                                         <i class="feather-info text-primary fs-16"></i>
+                                                         <span>Late arrival grace period is</span>
+                                                         <input type="number" name="grace_period_minutes" class="form-control d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
+                                                         <span>minutes relative to shift start time.</span>
+                                                     </div>
+                                                 </div>
 
-                                                <!-- Occurrence Threshold -->
-                                                <div class="col-md-6 col-12">
-                                                    <label class="form-label fw-bold">Allowed Grace Counts (Per Month) <span class="text-danger">*</span></label>
-                                                    <div class="input-group">
-                                                        <input type="number" name="threshold_count" class="form-control" value="{{ $rule ? $rule->threshold_count : 3 }}" min="0" required>
-                                                        <span class="input-group-text bg-light">Times</span>
-                                                    </div>
-                                                    <small class="text-muted fs-11">Count of allowed late arrivals before penalty starts.</small>
-                                                </div>
-                                            @endif
+                                                 <div class="col-12 border-top my-4 pt-4">
+                                                     <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                         <i class="feather-grid text-primary fs-16"></i> Configure Penalty Tiers
+                                                     </h6>
+                                                     <span class="text-muted fs-11 d-block mb-3">Define occurrence boundaries and corresponding penalty actions</span>
+                                                 </div>
 
-                                            @if($typeKey === 'under_hours')
-                                                <!-- Shift Target Hours -->
-                                                <div class="col-md-6 col-12">
-                                                    <label class="form-label fw-bold">Required Shift Working Hours <span class="text-danger">*</span></label>
-                                                    <div class="input-group">
-                                                        <input type="number" name="grace_period_minutes" class="form-control" value="{{ $rule ? $rule->grace_period_minutes : 480 }}" min="0" required>
-                                                        <span class="input-group-text bg-light">Minutes</span>
-                                                    </div>
-                                                    <small class="text-muted fs-11">Work hours target. e.g. 480 Minutes = 8 Hours.</small>
-                                                </div>
+                                                 <div class="col-12">
+                                                     <div class="table-responsive border rounded bg-white">
+                                                         <table class="table table-sm table-hover align-middle mb-0" id="late-arrival-tiers-table" style="font-size: 13px;">
+                                                             <thead class="table-light">
+                                                                 <tr>
+                                                                     <th style="width: 11%; min-width: 95px;">Min Occurrences</th>
+                                                                     <th style="width: 12%; min-width: 105px;">Max Occurrences</th>
+                                                                     <th style="width: 25%; min-width: 195px;">Penalty Settlement Method</th>
+                                                                     <th style="width: 15%; min-width: 115px;">Deduction Value (Days)</th>
+                                                                     <th style="width: 27%; min-width: 175px;">Deduct From Leave Type</th>
+                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">Action</th>
+                                                                 </tr>
+                                                             </thead>
+                                                             <tbody id="late-arrival-tiers-tbody">
+                                                                 <!-- Tiers will be dynamically rendered here -->
+                                                             </tbody>
+                                                         </table>
+                                                     </div>
+                                                     <div class="mt-3">
+                                                         <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-tier" icon="feather-plus">
+                                                             Add Penalty Tier
+                                                         </x-ui.button>
+                                                     </div>
+                                                 </div>
+                                             @endif
 
-                                                <!-- Occurrence Threshold -->
-                                                <div class="col-md-6 col-12">
-                                                    <label class="form-label fw-bold">Allowed Free Deficit Counts (Per Month) <span class="text-danger">*</span></label>
-                                                    <div class="input-group">
-                                                        <input type="number" name="threshold_count" class="form-control" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" required>
-                                                        <span class="input-group-text bg-light">Times</span>
-                                                    </div>
-                                                    <small class="text-muted fs-11">Allowed times worker can log deficit hours before penalty.</small>
-                                                </div>
-                                            @endif
+                                             @if($typeKey === 'under_hours')
+                                                 <!-- Shift Deficit Parameters -->
+                                                 <div class="col-12 d-flex flex-column gap-2">
+                                                     <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-2.5 m-0 rounded-3 text-dark fs-13 flex-nowrap">
+                                                         <i class="feather-info text-primary fs-16"></i>
+                                                         <span>Shift working hours target is</span>
+                                                         <input type="number" name="grace_period_hours" step="0.5" class="form-control d-inline-block text-center px-1 mx-1" value="{{ $rule ? ($rule->grace_period_minutes / 60) : 8 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
+                                                         <span>hours.</span>
+                                                     </div>
+                                                     <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-2.5 m-0 rounded-3 text-dark fs-13 flex-nowrap">
+                                                         <i class="feather-calendar text-primary fs-16"></i>
+                                                         <span>Allowed monthly grace of</span>
+                                                         <input type="number" name="threshold_count" class="form-control d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
+                                                         <span>deficit occurrences before penalties trigger.</span>
+                                                     </div>
+                                                 </div>
 
-                                            <div class="col-12 border-top my-3 pt-3">
-                                                <h6 class="fw-bold text-dark mb-3" style="font-size: 13.5px;"><i class="feather-dollar-sign text-primary me-2"></i>Deduction Details</h6>
-                                            </div>
+                                                 <div class="col-12 border-top my-4 pt-4">
+                                                     <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                         <i class="feather-grid text-primary fs-16"></i> Configure Penalty Tiers
+                                                     </h6>
+                                                     <span class="text-muted fs-11 d-block mb-3">Define occurrence boundaries and corresponding penalty actions</span>
+                                                 </div>
 
-                                            <!-- Penalty Action Choice -->
-                                            <div class="col-md-6 col-12">
-                                                <label class="form-label fw-bold d-block">Penalty Settlement Method <span class="text-danger">*</span></label>
-                                                <div class="d-flex gap-4 mt-2">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input action-toggle" type="radio" name="penalty_action" id="action_salary_{{ $typeKey }}" value="salary_deduction" {{ $action === 'salary_deduction' ? 'checked' : '' }} required>
-                                                        <label class="form-check-label fw-semibold text-dark" for="action_salary_{{ $typeKey }}">
-                                                            Loss of Pay (Salary)
-                                                        </label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input action-toggle" type="radio" name="penalty_action" id="action_leave_{{ $typeKey }}" value="leave_deduction" {{ $action === 'leave_deduction' ? 'checked' : '' }} required>
-                                                        <label class="form-check-label fw-semibold text-dark" for="action_leave_{{ $typeKey }}">
-                                                            Deduct Leave Balance
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                                 <div class="col-12">
+                                                     <div class="table-responsive border rounded bg-white">
+                                                         <table class="table table-sm table-hover align-middle mb-0" id="under-hours-tiers-table" style="font-size: 13px;">
+                                                             <thead class="table-light">
+                                                                 <tr>
+                                                                     <th style="width: 20%; min-width: 150px;">If Shift Hours Less Than</th>
+                                                                     <th style="width: 25%; min-width: 195px;">Penalty Settlement Method</th>
+                                                                     <th style="width: 15%; min-width: 115px;">Deduction Value (Days)</th>
+                                                                     <th style="width: 30%; min-width: 175px;">Deduct From Leave Type</th>
+                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">Action</th>
+                                                                 </tr>
+                                                             </thead>
+                                                             <tbody id="under-hours-tiers-tbody">
+                                                                 <!-- Tiers will be dynamically rendered here -->
+                                                             </tbody>
+                                                         </table>
+                                                     </div>
+                                                     <div class="mt-3">
+                                                         <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-deficit-tier" icon="feather-plus">
+                                                             Add Penalty Tier
+                                                         </x-ui.button>
+                                                     </div>
+                                                 </div>
+                                             @endif
 
-                                            <!-- Penalty Amount / Rate -->
-                                            <div class="col-md-6 col-12">
-                                                <label class="form-label fw-bold">Deduction Value (Multiplier of Daily Rate) <span class="text-danger">*</span></label>
-                                                <div class="input-group">
-                                                    <input type="number" step="0.1" name="penalty_value" class="form-control" value="{{ $val }}" min="0" required>
-                                                    <span class="input-group-text bg-light">Day(s)</span>
-                                                </div>
-                                                <small class="text-muted fs-11">e.g., 0.5 to deduct half-day worth of leaves or salary per violation.</small>
-                                            </div>
+                                             @if($typeKey === 'missing_logs')
+                                                 <!-- Allowed Free Missing Log Counts (Per Month) -->
+                                                 <div class="col-12">
+                                                     <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-3 m-0 rounded-3 text-dark fs-13 flex-nowrap">
+                                                         <i class="feather-info text-primary fs-16"></i>
+                                                         <span>Employees are allowed a monthly grace of</span>
+                                                         <input type="number" name="threshold_count" class="form-control d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
+                                                         <span>missing logs before penalties trigger.</span>
+                                                     </div>
+                                                 </div>
 
-                                            <!-- Leave Type Dropdown Selector (Conditional) -->
-                                            <div class="col-md-6 col-12 leave-select-container {{ $action === 'leave_deduction' ? '' : 'd-none' }}">
-                                                <label class="form-label fw-bold">Deduct From Leave Type <span class="text-danger">*</span></label>
-                                                <select name="leave_type_id" class="form-select leave-type-dropdown" {{ $action === 'leave_deduction' ? 'required' : '' }}>
-                                                    <option value="">Select Leave Quota to Deduct</option>
-                                                    @foreach($leaveTypes as $lType)
-                                                        <option value="{{ $lType->id }}" {{ ($rule && $rule->leave_type_id === $lType->id) ? 'selected' : '' }}>
-                                                            {{ $lType->name }} ({{ strtoupper($lType->code) }})
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                                <small class="text-muted fs-11">Quota from which penalty days will be substracted.</small>
-                                            </div>
-                                        </div>
+                                                 <div class="col-12 border-top my-4 pt-4">
+                                                     <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
+                                                         <i class="feather-grid text-primary fs-16"></i> Configure Penalty Tiers
+                                                     </h6>
+                                                     <span class="text-muted fs-11 d-block mb-3">Define occurrence boundaries and corresponding penalty actions</span>
+                                                 </div>
+
+                                                 <div class="col-12">
+                                                     <div class="table-responsive border rounded bg-white">
+                                                         <table class="table table-sm table-hover align-middle mb-0" id="missing-logs-tiers-table" style="font-size: 13px;">
+                                                             <thead class="table-light">
+                                                                 <tr>
+                                                                     <th style="width: 11%; min-width: 95px;">Min Occurrences</th>
+                                                                     <th style="width: 12%; min-width: 105px;">Max Occurrences</th>
+                                                                     <th style="width: 25%; min-width: 195px;">Penalty Settlement Method</th>
+                                                                     <th style="width: 15%; min-width: 115px;">Deduction Value (Days)</th>
+                                                                     <th style="width: 27%; min-width: 175px;">Deduct From Leave Type</th>
+                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">Action</th>
+                                                                 </tr>
+                                                             </thead>
+                                                             <tbody id="missing-logs-tiers-tbody">
+                                                                 <!-- Tiers will be dynamically rendered here -->
+                                                             </tbody>
+                                                         </table>
+                                                     </div>
+                                                     <div class="mt-3">
+                                                         <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-missing-tier" icon="feather-plus">
+                                                             Add Penalty Tier
+                                                         </x-ui.button>
+                                                     </div>
+                                                 </div>
+                                             @endif
+                                         </div>
 
                                         <!-- Save Footer Button -->
                                         <div class="border-top pt-3 d-flex justify-content-end">
-                                            <button type="submit" class="btn btn-primary">
-                                                <i class="feather-save me-2"></i> Save Policy Settings
-                                            </button>
+                                            <x-ui.button type="submit" variant="primary" icon="feather-save">
+                                                Save Policy Settings
+                                            </x-ui.button>
                                         </div>
                                     </form>
                                 </div>
@@ -350,6 +509,359 @@
                     dropdown.val('');
                 }
             });
+
+            // Late Arrival Tiers Builder Logic
+            let tierIndex = 0;
+
+            function addTierRow(min_occ = '', max_occ = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
+                let tbody = $('#late-arrival-tiers-tbody');
+                
+                let leaveOptions = `<option value="">Select Leave Quota</option>`;
+                @foreach($leaveTypes as $lType)
+                    leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
+                @endforeach
+
+                let isLeaveRequired = (penalty_action === 'leave_deduction' || penalty_action === 'both_deductions');
+                let leaveStyles = isLeaveRequired ? '' : 'style="display:none;"';
+                let leaveDisabled = isLeaveRequired ? '' : 'disabled';
+                let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
+
+                let rowHtml = `
+                    <tr class="tier-row" data-index="${tierIndex}">
+                        <td>
+                            <input type="number" name="penalty_tiers[${tierIndex}][min_occurrence]" class="form-control form-control-sm min-occ" min="1" value="${min_occ}" required>
+                        </td>
+                        <td>
+                            <input type="number" name="penalty_tiers[${tierIndex}][max_occurrence]" class="form-control form-control-sm max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="Unlimited">
+                        </td>
+                        <td>
+                            <select name="penalty_tiers[${tierIndex}][penalty_action]" class="form-select form-select-sm tier-action-select" required>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
+                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Leave)</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" step="0.1" name="penalty_tiers[${tierIndex}][penalty_value]" class="form-control form-control-sm tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
+                        </td>
+                        <td>
+                            <select name="penalty_tiers[${tierIndex}][leave_type_id]" class="form-select form-select-sm tier-leave-select" ${leaveDisabled} ${leaveStyles}>
+                                ${leaveOptions}
+                            </select>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-tier"><i class="feather-trash-2"></i></button>
+                        </td>
+                    </tr>
+                `;
+
+                let row = $(rowHtml);
+                tbody.append(row);
+                
+                row.find('.tier-action-select, .tier-leave-select').select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#late-arrival-tiers-table')
+                });
+
+                tierIndex++;
+                updateLeaveColumnVisibility('late-arrival-tiers-table');
+            }
+
+            // Pre-populate late arrival tiers
+            let savedLateTiers = @json($savedLateTiers);
+            if (savedLateTiers && Array.isArray(savedLateTiers) && savedLateTiers.length > 0) {
+                savedLateTiers.forEach(t => {
+                    addTierRow(t.min_occurrence, t.max_occurrence, t.penalty_action, t.penalty_value, t.leave_type_id);
+                });
+            } else {
+                // Seed standard defaults: 1-3 Free, 4-5 Salary Deduct 1 day, 6+ Salary Deduct 2 days
+                addTierRow(1, 3, 'no_deduction', 0, '');
+                addTierRow(4, 5, 'salary_deduction', 1, '');
+                addTierRow(6, '', 'salary_deduction', 2, '');
+            }
+
+            // Add Tier Button Click handler
+            $(document).on('click', '#btn-add-tier', function() {
+                // Try to find the max value of existing rows to guess next min occurrence
+                let lastMax = 0;
+                $('.max-occ').each(function() {
+                    let val = parseInt($(this).val());
+                    if (!isNaN(val) && val > lastMax) {
+                        lastMax = val;
+                    }
+                });
+
+                let nextMin = lastMax ? lastMax + 1 : 1;
+                addTierRow(nextMin, '', 'salary_deduction', 1, '');
+            });
+
+            // Remove Tier Row handler
+            $(document).on('click', '.btn-remove-tier', function() {
+                let row = $(this).closest('tr');
+                row.remove();
+                
+                // If all rows removed, insert a default row
+                if ($('#late-arrival-tiers-tbody tr').length === 0) {
+                    addTierRow(1, '', 'no_deduction', 0, '');
+                }
+                updateLeaveColumnVisibility('late-arrival-tiers-table');
+            });
+
+            // Work Hours Deficit Tiers Builder Logic
+            let deficitTierIndex = 0;
+
+            function addDeficitTierRow(hours_threshold = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
+                let tbody = $('#under-hours-tiers-tbody');
+                
+                let leaveOptions = `<option value="">Select Leave Quota</option>`;
+                @foreach($leaveTypes as $lType)
+                    leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
+                @endforeach
+
+                let isLeaveRequired = (penalty_action === 'leave_deduction' || penalty_action === 'both_deductions');
+                let leaveStyles = isLeaveRequired ? '' : 'style="display:none;"';
+                let leaveDisabled = isLeaveRequired ? '' : 'disabled';
+                let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
+
+                let rowHtml = `
+                    <tr class="deficit-tier-row" data-index="${deficitTierIndex}">
+                        <td>
+                            <input type="number" step="0.1" name="penalty_tiers[${deficitTierIndex}][hours_threshold]" class="form-control form-control-sm hours-threshold" min="0" max="24" value="${hours_threshold}" required>
+                        </td>
+                        <td>
+                            <select name="penalty_tiers[${deficitTierIndex}][penalty_action]" class="form-select form-select-sm tier-action-select" required>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
+                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Leave)</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" step="0.1" name="penalty_tiers[${deficitTierIndex}][penalty_value]" class="form-control form-control-sm tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
+                        </td>
+                        <td>
+                            <select name="penalty_tiers[${deficitTierIndex}][leave_type_id]" class="form-select form-select-sm tier-leave-select" ${leaveDisabled} ${leaveStyles}>
+                                ${leaveOptions}
+                            </select>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-deficit-tier"><i class="feather-trash-2"></i></button>
+                        </td>
+                    </tr>
+                `;
+
+                let row = $(rowHtml);
+                tbody.append(row);
+                
+                row.find('.tier-action-select, .tier-leave-select').select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#under-hours-tiers-table')
+                });
+
+                deficitTierIndex++;
+                updateLeaveColumnVisibility('under-hours-tiers-table');
+            }
+
+            // Pre-populate deficit tiers
+            let savedDeficitTiers = @json($savedDeficitTiers);
+            if (savedDeficitTiers && Array.isArray(savedDeficitTiers) && savedDeficitTiers.length > 0) {
+                savedDeficitTiers.forEach(t => {
+                    addDeficitTierRow(t.hours_threshold, t.penalty_action, t.penalty_value, t.leave_type_id);
+                });
+            } else {
+                // Seed standard defaults: < 6 Hours -> Loss of Pay (1 Day), < 4 Hours -> Loss of Pay (2 Days)
+                addDeficitTierRow(6, 'salary_deduction', 1, '');
+                addDeficitTierRow(4, 'salary_deduction', 2, '');
+            }
+
+            // Add Deficit Tier Button Click handler
+            $(document).on('click', '#btn-add-deficit-tier', function() {
+                addDeficitTierRow('', 'salary_deduction', 1, '');
+            });
+
+            // Remove Deficit Tier Row handler
+            $(document).on('click', '.btn-remove-deficit-tier', function() {
+                let row = $(this).closest('tr');
+                row.remove();
+                
+                // If all rows removed, insert a default row
+                if ($('#under-hours-tiers-tbody tr').length === 0) {
+                    addDeficitTierRow(6, 'salary_deduction', 1, '');
+                }
+                updateLeaveColumnVisibility('under-hours-tiers-table');
+            });
+
+            // Missing Logs Tiers Builder Logic
+            let missingTierIndex = 0;
+
+            function addMissingTierRow(min_occ = '', max_occ = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
+                let tbody = $('#missing-logs-tiers-tbody');
+                
+                let leaveOptions = `<option value="">Select Leave Quota</option>`;
+                @foreach($leaveTypes as $lType)
+                    leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
+                @endforeach
+
+                let isLeaveRequired = (penalty_action === 'leave_deduction' || penalty_action === 'both_deductions');
+                let leaveStyles = isLeaveRequired ? '' : 'style="display:none;"';
+                let leaveDisabled = isLeaveRequired ? '' : 'disabled';
+                let valueReadonly = (penalty_action === 'no_deduction') ? 'readonly' : '';
+
+                let rowHtml = `
+                    <tr class="missing-tier-row" data-index="${missingTierIndex}">
+                        <td>
+                            <input type="number" name="penalty_tiers[${missingTierIndex}][min_occurrence]" class="form-control form-control-sm missing-min-occ" min="1" value="${min_occ}" required>
+                        </td>
+                        <td>
+                            <input type="number" name="penalty_tiers[${missingTierIndex}][max_occurrence]" class="form-control form-control-sm missing-max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="Unlimited">
+                        </td>
+                        <td>
+                            <select name="penalty_tiers[${missingTierIndex}][penalty_action]" class="form-select form-select-sm tier-action-select" required>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
+                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Leave)</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" step="0.1" name="penalty_tiers[${missingTierIndex}][penalty_value]" class="form-control form-control-sm tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
+                        </td>
+                        <td>
+                            <select name="penalty_tiers[${missingTierIndex}][leave_type_id]" class="form-select form-select-sm tier-leave-select" ${leaveDisabled} ${leaveStyles}>
+                                ${leaveOptions}
+                            </select>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-missing-tier"><i class="feather-trash-2"></i></button>
+                        </td>
+                    </tr>
+                `;
+
+                let row = $(rowHtml);
+                tbody.append(row);
+                
+                row.find('.tier-action-select, .tier-leave-select').select2({
+                    theme: 'bootstrap-5',
+                    dropdownParent: $('#missing-logs-tiers-table')
+                });
+
+                missingTierIndex++;
+                updateLeaveColumnVisibility('missing-logs-tiers-table');
+            }
+
+            // Pre-populate missing logs tiers
+            let savedMissingTiers = @json($savedMissingTiers);
+            if (savedMissingTiers && Array.isArray(savedMissingTiers) && savedMissingTiers.length > 0) {
+                savedMissingTiers.forEach(t => {
+                    addMissingTierRow(t.min_occurrence, t.max_occurrence, t.penalty_action, t.penalty_value, t.leave_type_id);
+                });
+            } else {
+                // Seed standard defaults: 1-3 Free, 4-5 Salary Deduct 0.5 day, 6+ Salary Deduct 1 day
+                addMissingTierRow(1, 3, 'no_deduction', 0, '');
+                addMissingTierRow(4, 5, 'salary_deduction', 0.5, '');
+                addMissingTierRow(6, '', 'salary_deduction', 1, '');
+            }
+
+            // Add Missing Tier Button Click handler
+            $(document).on('click', '#btn-add-missing-tier', function() {
+                // Try to find the max value of existing rows to guess next min occurrence
+                let lastMax = 0;
+                $('.missing-max-occ').each(function() {
+                    let val = parseInt($(this).val());
+                    if (!isNaN(val) && val > lastMax) {
+                        lastMax = val;
+                    }
+                });
+
+                let nextMin = lastMax ? lastMax + 1 : 1;
+                addMissingTierRow(nextMin, '', 'salary_deduction', 0.5, '');
+            });
+
+            // Remove Missing Tier Row handler
+            $(document).on('click', '.btn-remove-missing-tier', function() {
+                let row = $(this).closest('tr');
+                row.remove();
+                
+                // If all rows removed, insert a default row
+                if ($('#missing-logs-tiers-tbody tr').length === 0) {
+                    addMissingTierRow(1, '', 'no_deduction', 0, '');
+                }
+                updateLeaveColumnVisibility('missing-logs-tiers-table');
+            });
+
+            // Helper to dynamically show/hide the Deduct Leave column if no rows require it
+            function updateLeaveColumnVisibility(tableId) {
+                let table = $('#' + tableId);
+                if (table.length === 0) return;
+                
+                let hasLeaveAction = false;
+                table.find('.tier-action-select').each(function() {
+                    let val = $(this).val();
+                    if (val === 'leave_deduction' || val === 'both_deductions') {
+                        hasLeaveAction = true;
+                    }
+                });
+
+                // Find index of column header that contains "Leave Type"
+                let leaveColIdx = -1;
+                table.find('thead th').each(function(index) {
+                    let text = $(this).text().toUpperCase();
+                    if (text.indexOf('LEAVE TYPE') !== -1) {
+                        leaveColIdx = index;
+                    }
+                });
+
+                if (leaveColIdx !== -1) {
+                    if (hasLeaveAction) {
+                        table.find('thead th').eq(leaveColIdx).show();
+                        table.find('tbody tr').each(function() {
+                            $(this).find('td').eq(leaveColIdx).show();
+                        });
+                    } else {
+                        table.find('thead th').eq(leaveColIdx).hide();
+                        table.find('tbody tr').each(function() {
+                            $(this).find('td').eq(leaveColIdx).hide();
+                        });
+                    }
+                }
+            }
+
+            // Handle action select changes dynamically
+            $(document).on('change', '.tier-action-select', function() {
+                let select = $(this);
+                let row = select.closest('tr');
+                let valueInput = row.find('.tier-value-input');
+                let leaveSelect = row.find('.tier-leave-select');
+                let select2Container = leaveSelect.next('.select2-container');
+
+                if (select.val() === 'no_deduction') {
+                    valueInput.val(0).prop('readonly', true);
+                    leaveSelect.val('').prop('required', false).prop('disabled', true).trigger('change.select2');
+                    if (select2Container.length) select2Container.hide();
+                    else leaveSelect.hide();
+                } else {
+                    valueInput.prop('readonly', false);
+                    if (select.val() === 'leave_deduction' || select.val() === 'both_deductions') {
+                        leaveSelect.prop('required', true).prop('disabled', false);
+                        if (select2Container.length) select2Container.show();
+                        else leaveSelect.show();
+                    } else {
+                        // salary_deduction
+                        leaveSelect.val('').prop('required', false).prop('disabled', true).trigger('change.select2');
+                        if (select2Container.length) select2Container.hide();
+                        else leaveSelect.hide();
+                    }
+                }
+
+                let tableId = select.closest('table').attr('id');
+                updateLeaveColumnVisibility(tableId);
+            });
+
+            // Initial load visibility checks
+            updateLeaveColumnVisibility('late-arrival-tiers-table');
+            updateLeaveColumnVisibility('under-hours-tiers-table');
+            updateLeaveColumnVisibility('missing-logs-tiers-table');
         });
     </script>
 @endsection

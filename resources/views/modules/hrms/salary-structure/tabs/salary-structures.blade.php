@@ -75,8 +75,8 @@
                                                     @php
                                                         $calcTypeLabel = match($item->calculation_type) {
                                                             'fixed' => 'Fixed Amount',
-                                                            'percentage_of_ctc' => 'Percentage of CTC',
-                                                            'percentage_of_basic' => 'Percentage of Basic',
+                                                            'percentage_of_ctc' => 'of CTC',
+                                                            'percentage_of_basic' => 'of Basic',
                                                             'balancing' => 'Balancing / Remainder',
                                                             default => $item->calculation_type
                                                         };
@@ -91,7 +91,7 @@
                                                                 {!! $typeBadge !!}
                                                             </div>
                                                             <div class="border-top pt-2 mt-auto">
-                                                                <div class="d-flex justify-content-between align-items-center">
+                                                                <div class="d-flex align-items-center">
                                                                     <span class="fw-bold text-primary" style="font-size: 14px;">
                                                                         @if($item->calculation_type === 'fixed')
                                                                             ₹{{ number_format($item->value, 2) }}
@@ -101,7 +101,7 @@
                                                                             <span class="text-secondary">-</span>
                                                                         @endif
                                                                     </span>
-                                                                    <span class="text-muted" style="font-size: 12px; max-width: 65%;">{{ $calcTypeLabel }}</span>
+                                                                    <span class="text-muted ms-1" style="font-size: 12px; max-width: 65%;">{{ $calcTypeLabel }}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -146,32 +146,27 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6 col-12">
-                            <label class="form-label fw-bold">Structure/Slab Name <span class="text-danger">*</span></label>
-                            <input type="text" name="name" class="form-control" placeholder="e.g. Slab 0 - 6 Lakhs" required>
+                            <x-ui.input label="Structure/Slab Name" name="name" placeholder="e.g. Slab 0 - 6 Lakhs" required />
                         </div>
                         <div class="col-md-6 col-12">
-                            <label class="form-label fw-bold">Legal Entity (Company)</label>
-                            <select name="company_id" class="form-select">
+                            <x-ui.select label="Legal Entity (Company)" name="company_id" data-select2-selector="default">
                                 <option value="">Apply to All Companies</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-md-6 col-12">
-                            <label class="form-label fw-bold">Min Yearly CTC (₹) <span class="text-danger">*</span></label>
-                            <input type="number" name="min_ctc" class="form-control" placeholder="0" min="0" required>
+                            <x-ui.input label="Min Yearly CTC (₹)" name="min_ctc" type="number" placeholder="0" min="0" required />
                         </div>
                         <div class="col-md-6 col-12">
-                            <label class="form-label fw-bold">Max Yearly CTC (₹) <span class="text-danger">*</span></label>
-                            <input type="number" name="max_ctc" class="form-control" placeholder="600000" min="0" required>
+                            <x-ui.input label="Max Yearly CTC (₹)" name="max_ctc" type="number" placeholder="600000" min="0" required />
                         </div>
                         <div class="col-md-12 col-12">
-                            <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
-                            <select name="status" class="form-select">
+                            <x-ui.select label="Status" name="status" data-select2-selector="default" required>
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                     </div>
 
@@ -233,8 +228,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Create Structure</button>
+                    <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">Create Structure</x-ui.button>
                 </div>
             </form>
         </div>
@@ -256,32 +251,27 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6 col-12">
-                            <label class="form-label fw-bold">Structure/Slab Name <span class="text-danger">*</span></label>
-                            <input type="text" name="name" id="edit_name" class="form-control" required>
+                            <x-ui.input label="Structure/Slab Name" name="name" id="edit_name" required />
                         </div>
                         <div class="col-md-6 col-12">
-                            <label class="form-label fw-bold">Legal Entity (Company)</label>
-                            <select name="company_id" id="edit_company_id" class="form-select">
+                            <x-ui.select label="Legal Entity (Company)" name="company_id" id="edit_company_id" data-select2-selector="default">
                                 <option value="">Apply to All Companies</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-md-6 col-12">
-                            <label class="form-label fw-bold">Min Yearly CTC (₹) <span class="text-danger">*</span></label>
-                            <input type="number" name="min_ctc" id="edit_min_ctc" class="form-control" required>
+                            <x-ui.input label="Min Yearly CTC (₹)" name="min_ctc" id="edit_min_ctc" type="number" required />
                         </div>
                         <div class="col-md-6 col-12">
-                            <label class="form-label fw-bold">Max Yearly CTC (₹) <span class="text-danger">*</span></label>
-                            <input type="number" name="max_ctc" id="edit_max_ctc" class="form-control" required>
+                            <x-ui.input label="Max Yearly CTC (₹)" name="max_ctc" id="edit_max_ctc" type="number" required />
                         </div>
                         <div class="col-md-12 col-12">
-                            <label class="form-label fw-bold">Status <span class="text-danger">*</span></label>
-                            <select name="status" id="edit_status" class="form-select">
+                            <x-ui.select label="Status" name="status" id="edit_status" data-select2-selector="default" required>
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                     </div>
 
@@ -340,8 +330,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">Save Changes</x-ui.button>
                 </div>
             </form>
         </div>
@@ -349,7 +339,7 @@
 </div>
 
 <!-- CTC CALCULATOR DRAWER -->
-<x-ui.drawer id="ctcCalculatorDrawer" title="CTC Calculator & Simulator" position="end" :close-on-outside-click="true" style="width: 480px; max-width: 100%;">
+<x-ui.drawer id="ctcCalculatorDrawer" title="CTC Calculator & Simulator" position="end" :close-on-outside-click="true" style="width: 540px; max-width: 100%;">
     <div class="mb-4">
         <label for="sim_ctc" class="form-label fw-semibold text-dark">Enter Yearly CTC (₹)</label>
         <div class="input-group">

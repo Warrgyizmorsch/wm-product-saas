@@ -966,19 +966,7 @@
                                 <option value="deduction">Deduction</option>
                             </select>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Calculation Type <span class="text-danger">*</span></label>
-                            <select class="form-control" name="calculation_type" required>
-                                <option value="fixed">Fixed</option>
-                                <option value="percentage">Percentage</option>
-                                <option value="formula">Formula</option>
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Default Value / Expression</label>
-                            <input type="text" class="form-control" name="default_value" placeholder="e.g. 10000 or 10 or BASIC * 0.12">
-                            <small class="text-muted">Enter fixed amount, percentage rate, or math formula.</small>
-                        </div>
+                        <input type="hidden" name="calculation_type" value="fixed">
                         <div class="col-12">
                             <label class="form-label fw-semibold">Parent Company / Legal Entity</label>
                             <select class="form-control" name="company_id">
@@ -1037,18 +1025,7 @@
                                 <option value="deduction">Deduction</option>
                             </select>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Calculation Type <span class="text-danger">*</span></label>
-                            <select class="form-control" name="calculation_type" id="edit_sc_calculation_type" required>
-                                <option value="fixed">Fixed</option>
-                                <option value="percentage">Percentage</option>
-                                <option value="formula">Formula</option>
-                            </select>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold">Default Value / Expression</label>
-                            <input type="text" class="form-control" name="default_value" id="edit_sc_default_value">
-                        </div>
+                        <input type="hidden" name="calculation_type" id="edit_sc_calculation_type" value="fixed">
                         <div class="col-12">
                             <label class="form-label fw-semibold">Parent Company / Legal Entity</label>
                             <select class="form-control" name="company_id" id="edit_sc_company_id">

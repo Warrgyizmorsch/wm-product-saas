@@ -16,7 +16,6 @@
                             <th>Component Name</th>
                             <th>Code</th>
                             <th>Type</th>
-                            <th>Default Calculation</th>
                             <th>Legal Entity</th>
                             <th>Status</th>
                             <th width="150" class="text-end">Actions</th>
@@ -33,15 +32,6 @@
                                     <x-ui.badge variant="success" soft>Earning</x-ui.badge>
                                 @else
                                     <x-ui.badge variant="warning" soft>Deduction</x-ui.badge>
-                                @endif
-                            </td>
-                            <td>
-                                @if($sc->calculation_type == 'fixed')
-                                    <span>Fixed</span> @if($sc->default_value) ({{ $sc->default_value }}) @endif
-                                @elseif($sc->calculation_type == 'percentage')
-                                    <span>Percentage</span> @if($sc->default_value) ({{ $sc->default_value }}%) @endif
-                                @else
-                                    <span>Formula</span> @if($sc->default_value) (<code>{{ $sc->default_value }}</code>) @endif
                                 @endif
                             </td>
                             <td>{{ $sc->company->company_name ?? 'All Entities' }}</td>
@@ -91,7 +81,6 @@
                 document.getElementById('edit_sc_code').value = component.code || '';
                 document.getElementById('edit_sc_type').value = component.type || 'earning';
                 document.getElementById('edit_sc_calculation_type').value = component.calculation_type || 'fixed';
-                document.getElementById('edit_sc_default_value').value = component.default_value || '';
                 document.getElementById('edit_sc_company_id').value = component.company_id || '';
                 document.getElementById('edit_sc_description').value = component.description || '';
                 
