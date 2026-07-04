@@ -15,15 +15,7 @@
 @endpush
 
 @section('content')
-    <div class="erp-single-panel bg-white">
-        <!-- Header with Close Button -->
-        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-            <h4 class="fw-bold text-dark mb-0">New Machine Asset</h4>
-            <a href="{{ route('production.machines.index') }}" class="text-muted hover-danger fs-18">
-                <i class="feather-x"></i>
-            </a>
-        </div>
-
+    <div class="erp-single-panel">
         <!-- Validation Errors -->
         @if ($errors->any())
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
@@ -40,39 +32,58 @@
         <form method="POST" action="{{ route('production.machines.store') }}">
             @csrf
             
-            <div class="row g-4">
-                <!-- Left Column -->
-                <div class="col-md-6">
-                    <x-ui.select label="Work Center Assignment*" name="work_center_id" :options="['' => 'Select Work Center'] + $workCenters->pluck('name', 'id')->toArray()" selected="{{ old('work_center_id', $selectedWorkCenterId ?? '') }}" data-select2-selector="default" required />
-                    
-                    <x-ui.input label="Machine Name*" name="name" placeholder="e.g. Laser Cutter 3" value="{{ old('name') }}" required />
-                    
-                    <x-ui.input label="Machine Asset Code*" name="code" placeholder="e.g. MCH-LSR-03" value="{{ old('code') }}" required />
-                    
-                    <x-ui.input label="Machine Type / Category" name="machine_type" placeholder="e.g. CNC Laser" value="{{ old('machine_type') }}" />
-                    
-                    <x-ui.input label="Manufacturer" name="manufacturer" placeholder="e.g. Trumpf" value="{{ old('manufacturer') }}" />
-                    
-                    <x-ui.input label="Model Number" name="model_number" placeholder="e.g. TruLaser 3030" value="{{ old('model_number') }}" />
+            <x-ui.odoo-form-ui type="sheet">
+                <!-- Header with Close Button -->
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+                    <h4 class="fw-bold text-dark mb-0">New Machine Asset</h4>
+                    <a href="{{ route('production.machines.index') }}" class="btn btn-sm btn-light border">Cancel</a>
                 </div>
 
-                <!-- Right Column -->
-                <div class="col-md-6">
-                    <x-ui.input label="Machine Hourly Capacity" name="capacity" type="number" step="any" placeholder="e.g. 100.00" value="{{ old('capacity') }}" helperText="Throughput per hour in standard units" />
-                    
-                    <x-ui.select label="Status*" name="status" :options="$statuses" selected="{{ old('status', 'active') }}" data-select2-selector="default" required />
-                    
-                    <x-ui.input label="Installation Date" name="installation_date" type="date" value="{{ old('installation_date') }}" />
-                    
-                    <x-ui.input label="Maintenance Details" name="maintenance_status" placeholder="e.g. Normal, Scheduled" value="{{ old('maintenance_status') }}" />
-                </div>
-            </div>
+                <div class="row g-4 fs-13 text-dark">
+                    <!-- Left Column -->
+                    <div class="col-md-6 border-end">
+                        <x-ui.odoo-form-ui type="select" label="Work Center Assignment" name="work_center_id" :required="true">
+                            <option value="">Select Work Center</option>
+                            @foreach($workCenters as $wc)
+                                <option value="{{ $wc->id }}" @selected(old('work_center_id', $selectedWorkCenterId ?? '') == $wc->id)>
+                                    {{ $wc->name }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                        
+                        <x-ui.odoo-form-ui type="input" label="Machine Name" name="name" placeholder="e.g. Laser Cutter 3" :value="old('name')" :required="true" />
+                        
+                        <x-ui.odoo-form-ui type="input" label="Machine Asset Code" name="code" placeholder="e.g. MCH-LSR-03" :value="old('code')" :required="true" />
+                        
+                        <x-ui.odoo-form-ui type="input" label="Machine Type / Category" name="machine_type" placeholder="e.g. CNC Laser" :value="old('machine_type')" />
+                        
+                        <x-ui.odoo-form-ui type="input" label="Manufacturer" name="manufacturer" placeholder="e.g. Trumpf" :value="old('manufacturer')" />
+                        
+                        <x-ui.odoo-form-ui type="input" label="Model Number" name="model_number" placeholder="e.g. TruLaser 3030" :value="old('model_number')" />
+                    </div>
 
-            <!-- Footer Action Buttons -->
-            <div class="d-flex gap-2 pt-3 border-top mt-4">
-                <button type="submit" class="btn btn-primary px-4">Save Machine Asset</button>
-                <a href="{{ route('production.machines.index') }}" class="btn btn-secondary px-4">Cancel</a>
-            </div>
+                    <!-- Right Column -->
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="Machine Hourly Capacity" name="capacity" inputType="number" placeholder="e.g. 100.00" :value="old('capacity')" />
+                        
+                        <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
+                            @foreach($statuses as $k => $v)
+                                <option value="{{ $k }}" @selected(old('status', 'active') == $k)>{{ $v }}</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                        
+                        <x-ui.odoo-form-ui type="input" label="Installation Date" name="installation_date" inputType="date" :value="old('installation_date')" />
+                        
+                        <x-ui.odoo-form-ui type="input" label="Maintenance Details" name="maintenance_status" placeholder="e.g. Normal, Scheduled" :value="old('maintenance_status')" />
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div class="d-flex gap-2 pt-3 border-top mt-4">
+                    <button type="submit" class="btn btn-primary px-4">Save Machine Asset</button>
+                    <a href="{{ route('production.machines.index') }}" class="btn btn-secondary px-4">Cancel</a>
+                </div>
+            </x-ui.odoo-form-ui>
         </form>
     </div>
 @endsection

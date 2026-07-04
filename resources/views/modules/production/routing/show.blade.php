@@ -345,6 +345,7 @@
         </div>
     </div>
 
+
     <!-- Reject Comment Modal -->
     <div class="modal fade" id="rejectModal" data-bs-backdrop="static" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -356,7 +357,7 @@
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
-                        <x-ui.textarea label="Engineering / Management Rejection Comments" name="comments" placeholder="Detail any design faults, time study corrections, or validation errors preventing approval..." required rows="4" />
+                        <x-ui.odoo-form-ui type="textarea" label="Comments" name="comments" placeholder="Detail any design faults, time study corrections, or validation errors preventing approval..." :required="true" rows="4"></x-ui.odoo-form-ui>
                     </div>
                     <div class="modal-footer border-0 pt-0">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -378,7 +379,7 @@
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
-                        <x-ui.textarea label="Cancellation Reason" name="comments" placeholder="Detail the reason for termination or process decommissioning..." required rows="4" />
+                        <x-ui.odoo-form-ui type="textarea" label="Reason" name="comments" placeholder="Detail the reason for termination or process decommissioning..." :required="true" rows="4"></x-ui.odoo-form-ui>
                     </div>
                     <div class="modal-footer border-0 pt-0">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -399,13 +400,13 @@
                         <h5 class="modal-title fw-bold" id="duplicateVersionModalLabel"><i class="feather-git-branch me-2"></i>Release Next Version</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body p-4">
-                        <div class="mb-3">
-                            <span class="fs-12 text-muted d-block mb-1">Original Version Profile:</span>
+                    <div class="modal-body p-4 text-dark fs-13">
+                        <div class="mb-3 d-flex align-items-center">
+                            <span class="odoo-form-label" style="width: 150px;">Original Version Profile:</span>
                             <span class="fw-bold text-dark fs-14">{{ $routing->version }} (Revision {{ $routing->revision }})</span>
                         </div>
                         
-                        <x-ui.input label="Next Target Version Code" name="new_version" placeholder="e.g. 1.0.1 or 2.0.0" value="{{ old('new_version') }}" required />
+                        <x-ui.odoo-form-ui type="input" label="Next Version" name="new_version" placeholder="e.g. 1.0.1 or 2.0.0" :value="old('new_version')" :required="true" />
                         <small class="text-muted d-block mt-2">Creates a new draft routing duplicating all original operations. The new revision number will be incremented automatically.</small>
                     </div>
                     <div class="modal-footer border-0 pt-0">

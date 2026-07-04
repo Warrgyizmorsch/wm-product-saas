@@ -3,82 +3,82 @@
 @section('title', 'Production Order ' . $order->order_number . ' | SaaS ERP')
 
 @section('page-actions')
-    <a href="{{ route('production.orders.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>Back to List
+    {{-- Back to List --}}
+    <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-soft-secondary">
+        <i class="feather-arrow-left me-1"></i>Back to List
     </a>
 
     @if($order->isDraft())
-        <a href="{{ route('production.orders.edit', $order->id) }}" class="btn btn-primary me-2">
-            <i class="feather-edit me-2"></i>Edit Order
+        <a href="{{ route('production.orders.edit', $order->id) }}" class="btn btn-sm btn-soft-primary">
+            <i class="feather-edit me-1"></i>Edit Order
         </a>
 
-        <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline me-2">
+        <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline">
             @csrf
-            <button type="submit" class="btn btn-success">
-                <i class="feather-play-circle me-2"></i>Release Order
+            <button type="submit" class="btn btn-sm btn-soft-success">
+                <i class="feather-play-circle me-1"></i>Release Order
             </button>
         </form>
 
-        <form method="POST" action="{{ route('production.orders.destroy', $order->id) }}" class="d-inline me-2"
+        <form method="POST" action="{{ route('production.orders.destroy', $order->id) }}" class="d-inline"
               onsubmit="return confirm('Delete this draft production order?');">
             @csrf
             @method('DELETE')
-            <button type="submit" class="btn btn-outline-danger">
-                <i class="feather-trash-2 me-2"></i>Delete
+            <button type="submit" class="btn btn-sm btn-soft-danger">
+                <i class="feather-trash-2 me-1"></i>Delete Order
             </button>
         </form>
     @endif
 
     @if($order->isReleased() || $order->isInProgress())
-        <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#progressModal">
-            <i class="feather-edit-3 me-2"></i>Log Progress
+        <button type="button" class="btn btn-sm btn-soft-primary" data-bs-toggle="modal" data-bs-target="#progressModal">
+            <i class="feather-edit-3 me-1"></i>Log Progress
         </button>
 
-        <button type="button" class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#issueModal">
-            <i class="feather-log-in me-2"></i>Issue Materials
+        <button type="button" class="btn btn-sm btn-soft-info" data-bs-toggle="modal" data-bs-target="#issueModal">
+            <i class="feather-log-in me-1"></i>Issue Materials
         </button>
 
-        <button type="button" class="btn btn-outline-info me-2" data-bs-toggle="modal" data-bs-target="#returnModal">
-            <i class="feather-log-out me-2"></i>Return Materials
+        <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#returnModal">
+            <i class="feather-log-out me-1"></i>Return Materials
         </button>
 
-        <button type="button" class="btn btn-warning text-dark me-2" data-bs-toggle="modal" data-bs-target="#receiptModal">
-            <i class="feather-download me-2"></i>Receive Finished Goods
+        <button type="button" class="btn btn-sm btn-soft-warning text-dark" data-bs-toggle="modal" data-bs-target="#receiptModal">
+            <i class="feather-download me-1"></i>Receive FG
         </button>
 
-        <button type="button" class="btn btn-outline-danger me-2" data-bs-toggle="modal" data-bs-target="#scrapReworkModal">
-            <i class="feather-alert-triangle me-2"></i>Log Scrap / Rework
+        <button type="button" class="btn btn-sm btn-soft-danger" data-bs-toggle="modal" data-bs-target="#scrapReworkModal">
+            <i class="feather-alert-triangle me-1"></i>Log Scrap/Rework
         </button>
 
-        <form method="POST" action="{{ route('production.orders.complete', $order->id) }}" class="d-inline me-2"
-              onsubmit="return confirm('Complete this Production Order? This requires all operations to be completed.');">
+        <form method="POST" action="{{ route('production.orders.complete', $order->id) }}" class="d-inline"
+              onsubmit="return confirm('Complete this Production Order? All operations must be completed.');">
             @csrf
-            <button type="submit" class="btn btn-success">
-                <i class="feather-check-circle me-2"></i>Complete Order
+            <button type="submit" class="btn btn-sm btn-soft-success">
+                <i class="feather-check-circle me-1"></i>Complete Order
+            </button>
+        </form>
+
+        <form method="POST" action="{{ route('production.orders.cancel', $order->id) }}" class="d-inline"
+              onsubmit="return confirm('Cancel this Production Order?');">
+            @csrf
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="feather-slash me-1"></i>Cancel Order
             </button>
         </form>
     @endif
 
     @if($order->isCompleted())
-        <form method="POST" action="{{ route('production.orders.close', $order->id) }}" class="d-inline me-2"
+        <form method="POST" action="{{ route('production.orders.close', $order->id) }}" class="d-inline"
               onsubmit="return confirm('Close and Archive this completed order? Costs will be locked.');">
             @csrf
-            <button type="submit" class="btn btn-dark">
-                <i class="feather-archive me-2"></i>Close &amp; Archive
-            </button>
-        </form>
-    @endif
-
-    @if(!$order->isClosed() && !$order->isCompleted() && !$order->isCancelled())
-        <form method="POST" action="{{ route('production.orders.cancel', $order->id) }}" class="d-inline me-2"
-              onsubmit="return confirm('Cancel this Production Order? This will cancel all underlying operations.');">
-            @csrf
-            <button type="submit" class="btn btn-outline-danger">
-                <i class="feather-slash me-2"></i>Cancel Order
+            <button type="submit" class="btn btn-sm btn-soft-secondary">
+                <i class="feather-archive me-1"></i>Close &amp; Archive
             </button>
         </form>
     @endif
 @endsection
+
 
 @section('content')
 <div class="erp-single-panel bg-white">
@@ -720,47 +720,46 @@
     <x-ui.modal id="progressModal" title="Log Operation Execution" size="lg" class="text-start">
         <form method="POST" action="{{ route('production.orders.log-progress', $order->id) }}" id="progressForm">
             @csrf
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Select Operation</label>
-                <select name="operation_id" id="op_select_id" class="form-select" required>
-                    @foreach($order->operations as $op)
-                        @if($op->status !== 'completed')
-                            <option value="{{ $op->id }}">{{ $op->operation_number }} — {{ $op->name }}</option>
-                        @endif
-                    @endforeach
-                </select>
-            </div>
-            <div class="row g-2 mb-3">
+            
+            <x-ui.odoo-form-ui type="select" label="Select Operation" name="operation_id" id="op_select_id" :required="true">
+                @foreach($order->operations as $op)
+                    @if($op->status !== 'completed')
+                        <option value="{{ $op->id }}">{{ $op->operation_number }} — {{ $op->name }}</option>
+                    @endif
+                @endforeach
+            </x-ui.odoo-form-ui>
+
+            <div class="row g-2 mb-1 fs-13 text-dark">
                 <div class="col-4">
-                    <label class="form-label fw-bold fs-13">Qty Produced</label>
-                    <input type="number" step="0.0001" name="quantity_produced" class="form-control" value="0" required>
+                    <x-ui.odoo-form-ui type="input" label="Qty Produced" name="quantity_produced" inputType="number" step="0.0001" value="0" :required="true" />
                 </div>
                 <div class="col-4">
-                    <label class="form-label fw-bold fs-13">Qty Rejected</label>
-                    <input type="number" step="0.0001" name="quantity_rejected" class="form-control" value="0" required>
+                    <x-ui.odoo-form-ui type="input" label="Qty Rejected" name="quantity_rejected" inputType="number" step="0.0001" value="0" :required="true" />
                 </div>
                 <div class="col-4">
-                    <label class="form-label fw-bold fs-13">Qty Scrapped</label>
-                    <input type="number" step="0.0001" name="quantity_scrapped" class="form-control" value="0" required>
+                    <x-ui.odoo-form-ui type="input" label="Qty Scrapped" name="quantity_scrapped" inputType="number" step="0.0001" value="0" :required="true" />
                 </div>
             </div>
-            <div class="row g-2 mb-3">
+
+            <div class="row g-2 mb-1 fs-13 text-dark">
                 <div class="col-6">
-                    <label class="form-label fw-bold fs-13">Setup Minutes</label>
-                    <input type="number" name="setup_minutes_logged" class="form-control" value="0" required>
+                    <x-ui.odoo-form-ui type="input" label="Setup Minutes" name="setup_minutes_logged" inputType="number" value="0" :required="true" />
                 </div>
                 <div class="col-6">
-                    <label class="form-label fw-bold fs-13">Run Minutes</label>
-                    <input type="number" name="run_minutes_logged" class="form-control" value="0" required>
+                    <x-ui.odoo-form-ui type="input" label="Run Minutes" name="run_minutes_logged" inputType="number" value="0" :required="true" />
                 </div>
             </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Remarks</label>
-                <input type="text" name="remarks" class="form-control" placeholder="E.g. operator name, work center notes">
-            </div>
-            <div class="form-check form-switch mt-2">
-                <input class="form-check-input" type="checkbox" name="complete_operation" value="1" id="complete_operation">
-                <label class="form-check-label fw-bold fs-13" for="complete_operation">Mark Operation Completed (Ready for Next Sequence)</label>
+
+            <x-ui.odoo-form-ui type="input" label="Remarks" name="remarks" placeholder="E.g. operator name, work center notes" />
+
+            <div class="odoo-form-group">
+                <label class="odoo-form-label">Completion</label>
+                <div class="flex-grow-1">
+                    <div class="form-check form-switch pt-1">
+                        <input class="form-check-input" type="checkbox" name="complete_operation" value="1" id="complete_operation">
+                        <label class="form-check-label fw-bold text-dark fs-12 ms-2" for="complete_operation">Mark Operation Completed (Ready for Next Sequence)</label>
+                    </div>
+                </div>
             </div>
         </form>
         <x-slot name="footer">
@@ -773,24 +772,18 @@
     <x-ui.modal id="issueModal" title="Issue Raw Material Component" class="text-start">
         <form method="POST" action="{{ route('production.orders.issue', $order->id) }}" id="issueForm">
             @csrf
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Select Material Reservation</label>
-                <select name="reservation_id" id="issue_reservation_id" class="form-select" required>
-                    @foreach($order->reservations as $res)
-                        <option value="{{ $res->id }}">
-                            {{ $res->product->name }} ({{ $res->product->sku }}) — Reserved: {{ number_format($res->quantity_reserved, 2) }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Issue Quantity</label>
-                <input type="number" step="0.0001" name="quantity" class="form-control" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Remarks</label>
-                <input type="text" name="remarks" class="form-control">
-            </div>
+            
+            <x-ui.odoo-form-ui type="select" label="Reservation" name="reservation_id" id="issue_reservation_id" :required="true">
+                @foreach($order->reservations as $res)
+                    <option value="{{ $res->id }}">
+                        {{ $res->product->name }} ({{ $res->product->sku }}) — Reserved: {{ number_format($res->quantity_reserved, 2) }}
+                    </option>
+                @endforeach
+            </x-ui.odoo-form-ui>
+
+            <x-ui.odoo-form-ui type="input" label="Issue Qty" name="quantity" inputType="number" step="0.0001" :required="true" />
+            
+            <x-ui.odoo-form-ui type="input" label="Remarks" name="remarks" />
         </form>
         <x-slot name="footer">
             <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
@@ -802,24 +795,18 @@
     <x-ui.modal id="returnModal" title="Return Materials to Stock" class="text-start">
         <form method="POST" action="{{ route('production.orders.return', $order->id) }}" id="returnForm">
             @csrf
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Select Material Reservation</label>
-                <select name="reservation_id" id="return_reservation_id" class="form-select" required>
-                    @foreach($order->reservations as $res)
-                        <option value="{{ $res->id }}">
-                            {{ $res->product->name }} ({{ $res->product->sku }}) — Issued: {{ number_format($res->quantity_issued, 2) }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Return Quantity</label>
-                <input type="number" step="0.0001" name="quantity" class="form-control" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Remarks</label>
-                <input type="text" name="remarks" class="form-control">
-            </div>
+
+            <x-ui.odoo-form-ui type="select" label="Reservation" name="reservation_id" id="return_reservation_id" :required="true">
+                @foreach($order->reservations as $res)
+                    <option value="{{ $res->id }}">
+                        {{ $res->product->name }} ({{ $res->product->sku }}) — Issued: {{ number_format($res->quantity_issued, 2) }}
+                    </option>
+                @endforeach
+            </x-ui.odoo-form-ui>
+
+            <x-ui.odoo-form-ui type="input" label="Return Qty" name="quantity" inputType="number" step="0.0001" :required="true" />
+
+            <x-ui.odoo-form-ui type="input" label="Remarks" name="remarks" />
         </form>
         <x-slot name="footer">
             <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
@@ -831,26 +818,21 @@
     <x-ui.modal id="receiptModal" title="Receive Finished Goods" class="text-start">
         <form method="POST" action="{{ route('production.orders.receive-fg', $order->id) }}" id="receiptForm">
             @csrf
-            <div class="mb-3 bg-light p-3 rounded">
+            
+            <div class="mb-3 bg-light p-3 rounded fs-13 text-dark">
                 <label class="form-label fw-bold text-muted fs-11 text-uppercase mb-1">Target Product</label>
                 <div class="text-dark fw-bold">{{ $order->product->name }} ({{ $order->product->sku }})</div>
             </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Receipt Quantity</label>
-                <input type="number" step="0.0001" name="quantity_received" class="form-control" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Quality Status</label>
-                <select name="quality_status" class="form-select" required>
-                    <option value="passed">Passed (Standard Inventory)</option>
-                    <option value="quarantine">Quarantine (Under QA Inspection)</option>
-                    <option value="failed">Failed (Defective / Blocked)</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label fw-bold fs-13">Remarks</label>
-                <input type="text" name="remarks" class="form-control">
-            </div>
+
+            <x-ui.odoo-form-ui type="input" label="Receipt Qty" name="quantity_received" inputType="number" step="0.0001" :required="true" />
+
+            <x-ui.odoo-form-ui type="select" label="Quality Status" name="quality_status" :required="true">
+                <option value="passed">Passed (Standard Inventory)</option>
+                <option value="quarantine">Quarantine (Under QA Inspection)</option>
+                <option value="failed">Failed (Defective / Blocked)</option>
+            </x-ui.odoo-form-ui>
+
+            <x-ui.odoo-form-ui type="input" label="Remarks" name="remarks" />
         </form>
         <x-slot name="footer">
             <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
@@ -875,33 +857,26 @@
             <div class="tab-pane fade show active" id="sr-scrap" role="tabpanel">
                 <form method="POST" action="{{ route('production.orders.log-scrap', $order->id) }}" id="scrapForm">
                     @csrf
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-13">Operation (Optional)</label>
-                        <select name="operation_id" class="form-select">
-                            <option value="">Order Header (Whole assembly scrap)</option>
-                            @foreach($order->operations as $op)
-                                <option value="{{ $op->id }}">Op {{ $op->operation_number }} — {{ $op->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-13">Scrap Target Product (Optional)</label>
-                        <select name="product_id" class="form-select">
-                            <option value="">Finished Good ({{ $order->product->sku }})</option>
-                            @foreach($order->reservations as $res)
-                                <option value="{{ $res->product_id }}">{{ $res->product->name }} ({{ $res->product->sku }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-13">Scrap Quantity</label>
-                        <input type="number" step="0.0001" name="quantity" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-13">Reason for Scrapping</label>
-                        <input type="text" name="reason" class="form-control" placeholder="E.g. material defect, processing error" required>
-                    </div>
-                    <div class="text-end">
+
+                    <x-ui.odoo-form-ui type="select" label="Operation">
+                        <option value="">Order Header (Whole assembly scrap)</option>
+                        @foreach($order->operations as $op)
+                            <option value="{{ $op->id }}">Op {{ $op->operation_number }} — {{ $op->name }}</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+
+                    <x-ui.odoo-form-ui type="select" label="Scrap Target">
+                        <option value="">Finished Good ({{ $order->product->sku }})</option>
+                        @foreach($order->reservations as $res)
+                            <option value="{{ $res->product_id }}">{{ $res->product->name }} ({{ $res->product->sku }})</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+
+                    <x-ui.odoo-form-ui type="input" label="Scrap Qty" name="quantity" inputType="number" step="0.0001" :required="true" />
+
+                    <x-ui.odoo-form-ui type="input" label="Reason" name="reason" placeholder="E.g. material defect, processing error" :required="true" />
+
+                    <div class="text-end mt-3 border-top pt-2">
                         <button type="button" class="btn btn-light-brand me-2" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-danger">Log Scrap</button>
                     </div>
@@ -912,23 +887,18 @@
             <div class="tab-pane fade" id="sr-rework" role="tabpanel">
                 <form method="POST" action="{{ route('production.orders.log-rework', $order->id) }}" id="reworkForm">
                     @csrf
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-13">Operation Target for Rework</label>
-                        <select name="operation_id" class="form-select" required>
-                            @foreach($order->operations as $op)
-                                <option value="{{ $op->id }}">Op {{ $op->operation_number }} — {{ $op->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-13">Rework Quantity</label>
-                        <input type="number" step="0.0001" name="quantity" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold fs-13">Rework Notes</label>
-                        <input type="text" name="reason" class="form-control" placeholder="Describe issue and corrective actions" required>
-                    </div>
-                    <div class="text-end">
+
+                    <x-ui.odoo-form-ui type="select" label="Rework Target" name="operation_id" :required="true">
+                        @foreach($order->operations as $op)
+                            <option value="{{ $op->id }}">Op {{ $op->operation_number }} — {{ $op->name }}</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+
+                    <x-ui.odoo-form-ui type="input" label="Rework Qty" name="quantity" inputType="number" step="0.0001" :required="true" />
+
+                    <x-ui.odoo-form-ui type="input" label="Rework Notes" name="reason" placeholder="Describe issue and corrective actions" :required="true" />
+
+                    <div class="text-end mt-3 border-top pt-2">
                         <button type="button" class="btn btn-light-brand me-2" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-warning text-dark">Log Rework Loop</button>
                     </div>
@@ -936,7 +906,7 @@
             </div>
         </div>
 
-        {{-- Empty footer slot — scrap/rework forms have own buttons inside tabs --}}
+        {{-- Empty footer slot --}}
         <x-slot name="footer"></x-slot>
     </x-ui.modal>
 
