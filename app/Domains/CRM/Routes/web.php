@@ -13,6 +13,8 @@ Route::prefix('crm')
             ->name('leads.create');
         Route::get('leads', [LeadController::class, 'index'])
             ->name('leads.index');
+        Route::get('leads/track-status', [LeadController::class, 'trackStatus'])
+            ->name('leads.trackStatus');
         Route::get('leads/{lead}', [LeadController::class, 'show'])
             ->name('leads.show');
         Route::post('leads', [LeadController::class, 'store'])

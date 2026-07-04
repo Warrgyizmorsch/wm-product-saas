@@ -42,6 +42,14 @@ class LeadController extends Controller
     }
 
     /**
+     * Show the track status page.
+     */
+    public function trackStatus()
+    {
+        return view('modules.crm.leads.track-status');
+    }
+
+    /**
      * Show the form for creating a new lead.
      */
     public function create()

@@ -8,6 +8,9 @@
     <span class="badge bg-soft-success text-success p-2 me-2">
         <i class="feather-database me-1"></i> Database Connected
     </span>
+    <x-ui.button href="{{ route('crm.leads.trackStatus') }}" variant="soft-primary" icon="feather-activity" class="me-2">
+        Track Status
+    </x-ui.button>
     <x-ui.button href="{{ route('crm.leads.create') }}" variant="primary" icon="feather-plus">
         Add New Call / Lead
     </x-ui.button>
