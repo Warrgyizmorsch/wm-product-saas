@@ -113,6 +113,44 @@
                             </div>
                         </div>
 
+                        <!-- Advanced Form Fields Demonstration -->
+                        <div class="mt-4 pt-4 border-top">
+                            <h6 class="fw-bold text-dark mb-3">Advanced Odoo Form Elements & Validation</h6>
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="select" label="Tags Select" name="tags[]" :multiple="true" select2Selector="tag" :required="true" helperText="Select one or multiple tags to categorize this item.">
+                                        <option value="success" data-bg="bg-success">VIP</option>
+                                        <option value="info" data-bg="bg-info">Bugs</option>
+                                        <option value="primary" data-bg="bg-primary">Team</option>
+                                        <option value="teal" data-bg="bg-teal">Primary</option>
+                                        <option value="success" data-bg="bg-success">Updates</option>
+                                        <option value="warning" data-bg="bg-warning">Personal</option>
+                                        <option value="danger" data-bg="bg-danger" selected>Promotions</option>
+                                        <option value="indigo" data-bg="bg-indigo">Customs</option>
+                                        <option value="primary" data-bg="bg-primary">Wholesale</option>
+                                        <option value="danger" data-bg="bg-danger">Low Budget</option>
+                                        <option value="teal" data-bg="bg-teal" selected>High Budget</option>
+                                    </x-ui.odoo-form-ui>
+
+                                    <x-ui.odoo-form-ui type="input" label="Username Input" name="username_demo" placeholder="Enter username..." helperText="Username should be unique and must contain at least 6 characters." />
+
+                                    <x-ui.odoo-form-ui type="select" label="Priority Level" name="priority_demo" :required="true" errorText="Please select a priority level.">
+                                        <option value="">Choose priority...</option>
+                                        <option value="low">Low Priority</option>
+                                        <option value="medium">Medium Priority</option>
+                                        <option value="high">High Priority</option>
+                                    </x-ui.odoo-form-ui>
+
+                                    <x-ui.odoo-form-ui type="input" label="Email Address" name="email_demo" value="invalid-email-format" placeholder="Enter email..." errorText="Please specify a valid email address (e.g. user@domain.com)." />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="editor" label="Project Description" name="project_description" editorHeight="ht-200" :required="true" helperText="A rich text editor field for project descriptions.">
+                                        <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Asperiores beatae inventore reiciendis ipsum natus, porro recusandae sunt accusantium reprehenderit aliquid commodi est veniam sit molestiae, nesciunt cupiditate. Laborum, culpa maxime.</p>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Nested Odoo Table Component -->
                         <div class="mt-4">
                             <h6 class="fw-bold text-dark border-bottom pb-2">Line Items Grid</h6>
@@ -259,6 +297,56 @@
                         </div>
                     </x-ui.card>
                 </div>
+
+                <div class="col-12 mt-4">
+                    <x-ui.card title="Action Dropdowns & Options">
+                        <p class="text-muted fs-13 mb-3">
+                            Showcasing the <code>x-ui.action-dropdown</code> containing list item actions.
+                        </p>
+                        <div class="d-flex justify-content-start">
+                            <x-ui.action-dropdown viewUrl="javascript:void(0);">
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0)">
+                                        <i class="feather feather-edit-3 me-3"></i>
+                                        <span>Edit</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item printBTN" href="javascript:void(0)">
+                                        <i class="feather feather-printer me-3"></i>
+                                        <span>Print</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0)">
+                                        <i class="feather feather-clock me-3"></i>
+                                        <span>Remind</span>
+                                    </a>
+                                </li>
+                                <li class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0)">
+                                        <i class="feather feather-archive me-3"></i>
+                                        <span>Archive</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0)">
+                                        <i class="feather feather-alert-octagon me-3"></i>
+                                        <span>Report Spam</span>
+                                    </a>
+                                </li>
+                                <li class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0)">
+                                        <i class="feather feather-trash-2 me-3"></i>
+                                        <span>Delete</span>
+                                    </a>
+                                </li>
+                            </x-ui.action-dropdown>
+                        </div>
+                    </x-ui.card>
+                </div>
             </div>
         </div>
 
@@ -289,17 +377,14 @@
                         </p>
                         
                         <div class="d-flex flex-wrap gap-2">
-                            <x-ui.button variant="warning" onclick="$('#demoToast').toast('show')">
+                            <x-ui.toast
+                                id="demoToast"
+                                class="btn btn-warning"
+                                title="Your invoice has been saved successfully."
+                                type="success"
+                            >
                                 <i class="feather-bell me-2"></i>Trigger Live Toast
-                            </x-ui.button>
-                            <a href="javascript:void(0);" class="btn btn-light-brand successAlertMessage">
-                                <i class="feather-layers me-2"></i>
-                                <span>Save as Draft</span>
-                            </a>
-                            <a href="javascript:void(0);" class="btn btn-primary successAlertMessage">
-                                <i class="feather-save me-2"></i>
-                                <span>Save Invoice</span>
-                            </a>
+                            </x-ui.toast>
                         </div>
                     </x-ui.card>
                 </div>
@@ -309,50 +394,76 @@
         <!-- Tab 4: Tables & Filters -->
         <div class="tab-pane fade" id="tab-tables" role="tabpanel" aria-labelledby="tab-tables-tab">
             <x-ui.card title="Advanced Filters & Data Tables">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="d-flex gap-2">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="d-flex gap-2 ms-auto">
+                        <!-- Custom Sort Component -->
+                        <x-ui.sort-dropdown label="Sort">
+                            <a href="javascript:void(0);" class="dropdown-item active">
+                                <span>Material Code (Asc)</span>
+                                <i class="feather-chevron-up text-muted fs-12"></i>
+                            </a>
+                            <a href="javascript:void(0);" class="dropdown-item">
+                                <span>Material Code (Desc)</span>
+                                <i class="feather-chevron-down text-muted fs-12"></i>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="javascript:void(0);" class="dropdown-item">
+                                <span>Material Name (A-Z)</span>
+                            </a>
+                            <a href="javascript:void(0);" class="dropdown-item">
+                                <span>Material Name (Z-A)</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="javascript:void(0);" class="dropdown-item">
+                                <span>In Stock (Low to High)</span>
+                            </a>
+                            <a href="javascript:void(0);" class="dropdown-item">
+                                <span>In Stock (High to Low)</span>
+                            </a>
+                        </x-ui.sort-dropdown>
+
                         <!-- Custom Filter Component -->
-                        <x-ui.filter label="Filter Materials" offset="0, 5">
+                        <x-ui.filter label="Filter" offset="0, 5">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                             
                             <!-- Search Bar (Name, Number, Code) -->
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text bg-light border-end-0"><i class="feather-search text-muted"></i></span>
-                                    <input type="text" class="form-control form-control-sm border-start-0" name="filter_search" placeholder="Search by name, code...">
-                                </div>
+                                <x-ui.odoo-form-ui type="input" name="filter_search" placeholder="Search by name, code..." />
                             </div>
 
                             <!-- Stock Status Dropdown -->
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Stock Status</label>
-                                <select class="form-select form-select-sm" name="filter_status">
+                                <x-ui.odoo-form-ui type="select" name="filter_status">
                                     <option value="">All Statuses</option>
                                     <option value="in_stock">In Stock</option>
                                     <option value="low_stock">Low Stock</option>
                                     <option value="out_of_stock">Out of Stock</option>
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
 
-                            <!-- Date Range Picker Field -->
+                            <!-- Start Date -->
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date Range</label>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text bg-light border-end-0"><i class="feather-calendar text-muted"></i></span>
-                                    <input type="text" id="filter_date_range" class="form-control form-control-sm border-start-0" placeholder="Select date range..." readonly>
-                                </div>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Start Date</label>
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="filter_start_date" />
+                            </div>
+
+                            <!-- End Date -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">End Date</label>
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="filter_end_date" />
                             </div>
 
                             <!-- Warehouse / Location -->
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Warehouse Location</label>
-                                <select class="form-select form-select-sm" name="filter_warehouse">
+                                <x-ui.odoo-form-ui type="select" name="filter_warehouse">
                                     <option value="">All Warehouses</option>
                                     <option value="main">Main Warehouse</option>
                                     <option value="secondary">Secondary Storage</option>
                                     <option value="qa">QA/Inspection Lab</option>
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
 
                             <!-- Category Checkboxes -->
@@ -368,8 +479,8 @@
                             <div class="dropdown-divider my-3"></div>
 
                             <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-sm btn-primary flex-grow-1">Apply Filters</button>
-                                <button type="button" class="btn btn-sm btn-light border flex-grow-1" onclick="document.getElementById('filter_date_range').value=''">Reset</button>
+                                <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
+                                <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="document.querySelectorAll('.erp-filter-dropdown input, .erp-filter-dropdown select').forEach(el => el.value='')">Reset</x-ui.button>
                             </div>
                         </x-ui.filter>
                     </div>
@@ -510,12 +621,6 @@
         </x-slot>
     </x-ui.drawer>
 
-    <!-- Toast Container & Toast Instance -->
-    <div class="erp-toast-container">
-        <x-ui.toast id="demoToast" title="Real-time ERP Audit" subtitle="just now" type="success" delay="4000">
-            A background task successfully scanned all 4 integration hooks without errors.
-        </x-ui.toast>
-    </div>
 
     {{-- Global master quick-create modals --}}
     <x-ui.master-modals :masters="['product', 'uom']" />

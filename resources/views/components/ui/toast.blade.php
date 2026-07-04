@@ -1,61 +1,42 @@
 @props([
-    'id',
-    'title' => 'Notification',
-    'subtitle' => null,
-    'type' => 'primary', // primary, success, danger, warning, info
-    'autohide' => true,
-    'delay' => 5000
+    'id' => null,
+    'title' => 'Action Execute Successfully',
+    'type' => 'success',
+    'position' => 'top-end',
+    'delay' => 3000,
 ])
 
-@php
-    $icons = [
-        'primary' => 'feather-bell text-primary',
-        'success' => 'feather-check-circle text-success',
-        'danger' => 'feather-alert-circle text-danger',
-        'warning' => 'feather-alert-triangle text-warning',
-        'info' => 'feather-info text-info'
-    ];
-    $iconClass = $icons[$type] ?? 'feather-bell text-primary';
-    
-    // Border dynamic colors matching the theme status
-    $borderColors = [
-        'primary' => 'var(--bs-primary)',
-        'success' => '#10b981',
-        'danger' => '#ef4444',
-        'warning' => '#f59e0b',
-        'info' => '#3b82f6'
-    ];
-    $borderColor = $borderColors[$type] ?? 'var(--bs-primary)';
-@endphp
+<a href="javascript:void(0);"
+   id="{{ $id }}"
+   {{ $attributes->merge(['class' => '']) }}>
+    {{ $slot }}
+</a>
 
-<div class="toast fade" id="{{ $id }}" role="alert" aria-live="assertive" aria-atomic="true" 
-     data-bs-autohide="{{ $autohide ? 'true' : 'false' }}" data-bs-delay="{{ $delay }}"
-     style="border-left: 4px solid {{ $borderColor }} !important;"
-     {{ $attributes }}>
-    <div class="toast-header">
-        <i class="{{ $iconClass }} me-2 fs-15"></i>
-        <strong class="me-auto text-dark">{{ $title }}</strong>
-        @if($subtitle)
-            <small class="text-muted">{{ $subtitle }}</small>
-        @endif
-        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-    <div class="toast-body fs-12 text-secondary">
-        {{ $slot }}
-    </div>
-</div>
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const el = document.getElementById(@json($id));
 
-@once
-    @push('scripts')
-        <script>
-            $(function () {
-                var toastEl = document.getElementById('{{ $id }}');
-                if (toastEl && typeof bootstrap !== 'undefined') {
-                    var toastInstance = new bootstrap.Toast(toastEl);
-                    if (!window.erpToasts) window.erpToasts = {};
-                    window.erpToasts['{{ $id }}'] = toastInstance;
+        if (!el) return;
+
+        el.addEventListener('click', function (e) {
+            e.preventDefault();
+
+            Swal.mixin({
+                toast: true,
+                position: @json($position),
+                showConfirmButton: false,
+                timer: {{ $delay }},
+                timerProgressBar: true,
+                didOpen: function (toast) {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
                 }
+            }).fire({
+                icon: @json($type),
+                title: @json($title)
             });
-        </script>
-    @endpush
-@endonce
+        });
+    });
+</script>
+@endpush
