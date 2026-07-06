@@ -44,7 +44,7 @@
                             </td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
-                                    <x-ui.icon-btn variant="soft-info" icon="feather-edit" class="btn-edit-salary-component" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}" title="Edit" />
+                                    <x-ui.icon-btn variant="primary" icon="feather-edit" class="btn-edit-salary-component" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}" title="Edit" />
                                     <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this salary component?');">
                                         @csrf
                                         @method('DELETE')

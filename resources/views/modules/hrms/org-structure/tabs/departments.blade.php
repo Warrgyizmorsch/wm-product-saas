@@ -45,7 +45,7 @@
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
                                     <x-ui.icon-btn variant="soft-primary" icon="feather-eye" class="btn-view-dept" data-bs-toggle="modal" data-bs-target="#viewDeptModal" data-dept="{{ base64_encode($d->toJson()) }}" title="View" />
-                                    <x-ui.icon-btn variant="soft-info" icon="feather-edit" class="btn-edit-dept" data-bs-toggle="modal" data-bs-target="#editDeptModal" data-dept="{{ base64_encode($d->toJson()) }}" title="Edit" />
+                                    <x-ui.icon-btn variant="primary" icon="feather-edit" class="btn-edit-dept" data-bs-toggle="modal" data-bs-target="#editDeptModal" data-dept="{{ base64_encode($d->toJson()) }}" title="Edit" />
                                     <form action="{{ route('hrms.department.destroy', $d->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this department?');">
                                         @csrf
                                         @method('DELETE')
@@ -70,67 +70,97 @@
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        function getInitials(name, fallback) {
-            const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
+    (function() {
+        function init() {
+            function getInitials(name, fallback) {
+                const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
 
-            if (words.length >= 2) {
-                return (words[0][0] + words[1][0]).toUpperCase();
+                if (words.length >= 2) {
+                    return (words[0][0] + words[1][0]).toUpperCase();
+                }
+
+                return (words[0] || fallback || '').substring(0, 2).toUpperCase();
             }
 
-            return (words[0] || fallback || '').substring(0, 2).toUpperCase();
+            // View Action Trigger
+            document.querySelectorAll('.btn-view-dept').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    let dept = JSON.parse(atob(this.dataset.dept));
+                    
+                    let nameEl = document.getElementById('modal_view_dept_name');
+                    if (nameEl) nameEl.innerText = dept.name;
+                    
+                    let branchEl = document.getElementById('modal_view_dept_branch');
+                    if (branchEl) branchEl.innerText = (dept.branch && dept.branch.name) ? dept.branch.name : ((dept.business_unit && dept.business_unit.name) ? dept.business_unit.name : ((dept.company && dept.company.company_name) ? dept.company.company_name : 'N/A'));
+                    
+                    let codeEl = document.getElementById('modal_view_dept_code');
+                    if (codeEl) codeEl.innerText = dept.code;
+                    
+                    let headEl = document.getElementById('modal_view_dept_head');
+                    if (headEl) headEl.innerText = (dept.head) ? (dept.head.first_name + ' ' + dept.head.last_name) : 'N/A';
+                    
+                    let descEl = document.getElementById('modal_view_dept_desc');
+                    if (descEl) descEl.innerText = dept.description || 'No description provided.';
+                    
+                    let avatarEl = document.getElementById('modal_view_dept_avatar');
+                    if (avatarEl) {
+                        avatarEl.innerText = getInitials(dept.name, 'DP');
+                    }
+                    
+                    let statusEl = document.getElementById('modal_view_dept_status');
+                    if (statusEl) {
+                        if (dept.status === true || dept.status === 1 || dept.status === '1') {
+                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">Active</span>';
+                        } else {
+                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">Inactive</span>';
+                        }
+                    }
+                });
+            });
+
+            // Edit Action Trigger
+            document.querySelectorAll('.btn-edit-dept').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    let dept = JSON.parse(atob(this.dataset.dept));
+                    
+                    let nameEl = document.getElementById('edit_dept_name');
+                    if (nameEl) nameEl.value = dept.name || '';
+                    
+                    let codeEl = document.getElementById('edit_dept_code');
+                    if (codeEl) codeEl.value = dept.code || '';
+                    
+                    let branchEl = document.getElementById('edit_dept_branch_id');
+                    if (branchEl) branchEl.value = dept.branch_id || '';
+                    
+                    let companyEl = document.getElementById('edit_dept_company_id');
+                    if (companyEl) companyEl.value = dept.company_id || '';
+                    
+                    let buEl = document.getElementById('edit_dept_bu_id');
+                    if (buEl) buEl.value = dept.business_unit_id || '';
+                    
+                    let headEl = document.getElementById('edit_dept_head_id');
+                    if (headEl) headEl.value = dept.head_employee_id || '';
+                    
+                    let descEl = document.getElementById('edit_dept_description');
+                    if (descEl) descEl.value = dept.description || '';
+                    
+                    let statusSelect = document.getElementById('edit_dept_status');
+                    if (statusSelect) {
+                        statusSelect.value = (dept.status === true || dept.status === 1 || dept.status === '1') ? '1' : '0';
+                    }
+                    
+                    let form = document.getElementById('dept_edit_form');
+                    if (form) {
+                        form.action = '/hrms/org/department/update/' + dept.id;
+                    }
+                });
+            });
         }
 
-        // View Action Trigger
-        document.querySelectorAll('.btn-view-dept').forEach(btn => {
-            btn.addEventListener('click', function() {
-                let dept = JSON.parse(atob(this.dataset.dept));
-                
-                document.getElementById('modal_view_dept_name').innerText = dept.name;
-                document.getElementById('modal_view_dept_branch').innerText = (dept.branch && dept.branch.name) ? dept.branch.name : ((dept.business_unit && dept.business_unit.name) ? dept.business_unit.name : ((dept.company && dept.company.company_name) ? dept.company.company_name : 'N/A'));
-                document.getElementById('modal_view_dept_code').innerText = dept.code;
-                document.getElementById('modal_view_dept_head').innerText = (dept.head) ? (dept.head.first_name + ' ' + dept.head.last_name) : 'N/A';
-                document.getElementById('modal_view_dept_desc').innerText = dept.description || 'No description provided.';
-                
-                let avatarEl = document.getElementById('modal_view_dept_avatar');
-                if (avatarEl) {
-                    avatarEl.innerText = getInitials(dept.name, 'DP');
-                }
-                
-                let statusEl = document.getElementById('modal_view_dept_status');
-                if (statusEl) {
-                    if (dept.status === true || dept.status === 1 || dept.status === '1') {
-                        statusEl.innerHTML = '<span class="badge bg-soft-success text-success">Active</span>';
-                    } else {
-                        statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">Inactive</span>';
-                    }
-                }
-            });
-        });
-
-        // Edit Action Trigger
-        document.querySelectorAll('.btn-edit-dept').forEach(btn => {
-            btn.addEventListener('click', function() {
-                let dept = JSON.parse(atob(this.dataset.dept));
-                
-                document.getElementById('edit_dept_name').value = dept.name || '';
-                document.getElementById('edit_dept_code').value = dept.code || '';
-                document.getElementById('edit_dept_branch_id').value = dept.branch_id || '';
-                document.getElementById('edit_dept_company_id').value = dept.company_id || '';
-                document.getElementById('edit_dept_bu_id').value = dept.business_unit_id || '';
-                document.getElementById('edit_dept_head_id').value = dept.head_employee_id || '';
-                document.getElementById('edit_dept_description').value = dept.description || '';
-                
-                let statusSelect = document.getElementById('edit_dept_status');
-                if (statusSelect) {
-                    statusSelect.value = (dept.status === true || dept.status === 1 || dept.status === '1') ? '1' : '0';
-                }
-                
-                let form = document.getElementById('dept_edit_form');
-                if (form) {
-                    form.action = '/hrms/org/department/update/' + dept.id;
-                }
-            });
-        });
-    });
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", init);
+        } else {
+            init();
+        }
+    })();
 </script>

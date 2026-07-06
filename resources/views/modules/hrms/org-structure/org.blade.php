@@ -141,6 +141,15 @@
                     {{ session('error') }}
                 </x-ui.alert>
             @endif
+            @if($errors->any())
+                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                    <ul class="mb-0 ps-3">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </x-ui.alert>
+            @endif
 
             <div class="tab-content" id="settingsSubSidebarContent">
                 <!-- Org Structure Pane -->
@@ -234,15 +243,12 @@
             const urlParams = new URLSearchParams(window.location.search);
             const tabParam = urlParams.get('tab');
             if (tabParam) {
-                // Ensure Org Structure sub-sidebar menu is active
-                const orgMenu = document.getElementById('org-structure-menu');
-                if (orgMenu) {
-                    orgMenu.click();
-                }
-                const tabButton = document.getElementById(tabParam + '-tab');
-                if (tabButton) {
-                    tabButton.click();
-                }
+                setTimeout(function() {
+                    const tabButton = document.getElementById(tabParam + '-tab');
+                    if (tabButton) {
+                        tabButton.click();
+                    }
+                }, 100);
             }
 
             // Generic modal Select2 initializer inside HRMS boundaries

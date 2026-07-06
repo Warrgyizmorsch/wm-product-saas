@@ -43,7 +43,7 @@
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
                                     <x-ui.icon-btn variant="soft-primary" icon="feather-eye" class="btn-view-desig" data-bs-toggle="modal" data-bs-target="#viewDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}" title="View" />
-                                    <x-ui.icon-btn variant="soft-info" icon="feather-edit" class="btn-edit-desig" data-bs-toggle="modal" data-bs-target="#editDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}" title="Edit" />
+                                    <x-ui.icon-btn variant="primary" icon="feather-edit" class="btn-edit-desig" data-bs-toggle="modal" data-bs-target="#editDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}" title="Edit" />
                                     <form action="{{ route('hrms.designation.destroy', $ds->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this designation?');">
                                         @csrf
                                         @method('DELETE')
@@ -68,63 +68,85 @@
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        function getInitials(name, fallback) {
-            const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
+    (function() {
+        function init() {
+            function getInitials(name, fallback) {
+                const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
 
-            if (words.length >= 2) {
-                return (words[0][0] + words[1][0]).toUpperCase();
+                if (words.length >= 2) {
+                    return (words[0][0] + words[1][0]).toUpperCase();
+                }
+
+                return (words[0] || fallback || '').substring(0, 2).toUpperCase();
             }
 
-            return (words[0] || fallback || '').substring(0, 2).toUpperCase();
+            // View Action Trigger
+            document.querySelectorAll('.btn-view-desig').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    let desig = JSON.parse(atob(this.dataset.desig));
+                    
+                    let nameEl = document.getElementById('modal_view_desig_name');
+                    if (nameEl) nameEl.innerText = desig.name;
+                    
+                    let deptEl = document.getElementById('modal_view_desig_dept');
+                    if (deptEl) deptEl.innerText = (desig.department && desig.department.name) ? desig.department.name : 'N/A';
+                    
+                    let levelEl = document.getElementById('modal_view_desig_level');
+                    if (levelEl) levelEl.innerText = desig.level || 'N/A';
+                    
+                    let descEl = document.getElementById('modal_view_desig_desc');
+                    if (descEl) descEl.innerText = desig.description || 'No description provided.';
+                    
+                    let avatarEl = document.getElementById('modal_view_desig_avatar');
+                    if (avatarEl) {
+                        avatarEl.innerText = getInitials(desig.name, 'DS');
+                    }
+                    
+                    let statusEl = document.getElementById('modal_view_desig_status');
+                    if (statusEl) {
+                        if (desig.status === true || desig.status === 1 || desig.status === '1') {
+                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">Active</span>';
+                        } else {
+                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">Inactive</span>';
+                        }
+                    }
+                });
+            });
+
+            // Edit Action Trigger
+            document.querySelectorAll('.btn-edit-desig').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    let desig = JSON.parse(atob(this.dataset.desig));
+                    
+                    let nameEl = document.getElementById('edit_desig_name');
+                    if (nameEl) nameEl.value = desig.name || '';
+                    
+                    let levelEl = document.getElementById('edit_desig_level');
+                    if (levelEl) levelEl.value = desig.level || '';
+                    
+                    let deptEl = document.getElementById('edit_desig_dept_id');
+                    if (deptEl) deptEl.value = desig.department_id || '';
+                    
+                    let descEl = document.getElementById('edit_desig_description');
+                    if (descEl) descEl.value = desig.description || '';
+                    
+                    let statusSelect = document.getElementById('edit_desig_status');
+                    if (statusSelect) {
+                        statusSelect.value = (desig.status === true || desig.status === 1 || desig.status === '1') ? '1' : '0';
+                    }
+                    
+                    let form = document.getElementById('desig_edit_form');
+                    if (form) {
+                        form.action = '/hrms/org/designation/update/' + desig.id;
+                    }
+                });
+            });
         }
 
-        // View Action Trigger
-        document.querySelectorAll('.btn-view-desig').forEach(btn => {
-            btn.addEventListener('click', function() {
-                let desig = JSON.parse(atob(this.dataset.desig));
-                
-                document.getElementById('modal_view_desig_name').innerText = desig.name;
-                document.getElementById('modal_view_desig_dept').innerText = (desig.department && desig.department.name) ? desig.department.name : 'N/A';
-                document.getElementById('modal_view_desig_level').innerText = desig.level || 'N/A';
-                document.getElementById('modal_view_desig_desc').innerText = desig.description || 'No description provided.';
-                
-                let avatarEl = document.getElementById('modal_view_desig_avatar');
-                if (avatarEl) {
-                    avatarEl.innerText = getInitials(desig.name, 'DS');
-                }
-                
-                let statusEl = document.getElementById('modal_view_desig_status');
-                if (statusEl) {
-                    if (desig.status === true || desig.status === 1 || desig.status === '1') {
-                        statusEl.innerHTML = '<span class="badge bg-soft-success text-success">Active</span>';
-                    } else {
-                        statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">Inactive</span>';
-                    }
-                }
-            });
-        });
-
-        // Edit Action Trigger
-        document.querySelectorAll('.btn-edit-desig').forEach(btn => {
-            btn.addEventListener('click', function() {
-                let desig = JSON.parse(atob(this.dataset.desig));
-                
-                document.getElementById('edit_desig_name').value = desig.name || '';
-                document.getElementById('edit_desig_level').value = desig.level || '';
-                document.getElementById('edit_desig_dept_id').value = desig.department_id || '';
-                document.getElementById('edit_desig_description').value = desig.description || '';
-                
-                let statusSelect = document.getElementById('edit_desig_status');
-                if (statusSelect) {
-                    statusSelect.value = (desig.status === true || desig.status === 1 || desig.status === '1') ? '1' : '0';
-                }
-                
-                let form = document.getElementById('desig_edit_form');
-                if (form) {
-                    form.action = '/hrms/org/designation/update/' + desig.id;
-                }
-            });
-        });
-    });
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", init);
+        } else {
+            init();
+        }
+    })();
 </script>

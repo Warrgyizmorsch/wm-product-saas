@@ -182,22 +182,24 @@
                                             
                                             <!-- Actions Dropdown for Leave Plan -->
                                             <div class="dropdown">
-                                                <a href="javascript:void(0);" class="text-muted px-2" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <i class="feather-more-vertical fs-18"></i>
+                                                <a href="javascript:void(0);" class="btn btn-icon btn-sm text-muted px-2" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <i class="feather-more-vertical fs-16"></i>
                                                 </a>
-                                                <ul class="dropdown-menu dropdown-menu-end shadow border p-0" style="min-width: 95px; width: 95px; font-size: 12px; z-index: 1050;">
+                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="min-width: 110px; font-size: 13px; z-index: 1050; border-radius: 6px;">
                                                     <li>
-                                                        <a class="dropdown-item edit-plan-btn py-1.5 px-3" href="javascript:void(0);" data-plan="{{ base64_encode($plan->toJson()) }}">
-                                                            <i class="feather-edit me-1" style="font-size: 11px;"></i> Edit
+                                                        <a class="dropdown-item edit-plan-btn py-2 px-3 d-flex align-items-center" href="javascript:void(0);" data-plan="{{ base64_encode($plan->toJson()) }}">
+                                                            <i class="feather-edit me-2 text-muted fs-14"></i>
+                                                            <span>Edit Plan</span>
                                                         </a>
                                                     </li>
-                                                    <li><hr class="dropdown-divider m-0"></li>
+                                                    <li><hr class="dropdown-divider my-1"></li>
                                                     <li>
                                                         <form action="{{ route('hrms.leave-structure.plan.destroy', $plan->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this plan and all its configured leave types?');">
                                                             @csrf
                                                             @method('DELETE')
-                                                            <button type="submit" class="dropdown-item text-danger py-1.5 px-3">
-                                                                <i class="feather-trash-2 me-1" style="font-size: 11px;"></i> Delete
+                                                            <button type="submit" class="dropdown-item text-danger py-2 px-3 d-flex align-items-center w-100 border-0 bg-transparent">
+                                                                <i class="feather-trash-2 me-2 fs-14"></i>
+                                                                <span>Delete Plan</span>
                                                             </button>
                                                         </form>
                                                     </li>
@@ -249,26 +251,28 @@
                                                             <td class="text-end">
                                                                 <div class="d-flex justify-content-end align-items-center gap-1">
                                                                     <!-- Settings icon -->
-                                                                    <x-ui.icon-btn variant="soft-secondary" icon="feather-settings" title="Configure Rules" />
+                                                                    <x-ui.icon-btn variant="light-brand" icon="feather-settings" class="configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-rules="{{ json_encode($type->rules) }}" title="Configure Rules" />
                                                                     
                                                                     <!-- 3-Dot Dropdown -->
                                                                     <div class="dropdown d-inline-block">
-                                                                        <a href="javascript:void(0);" class="text-muted px-2" data-bs-toggle="dropdown" aria-expanded="false">
+                                                                        <a href="javascript:void(0);" class="btn btn-icon btn-sm text-muted px-2" data-bs-toggle="dropdown" aria-expanded="false">
                                                                             <i class="feather-more-vertical fs-14"></i>
                                                                         </a>
-                                                                        <ul class="dropdown-menu dropdown-menu-end shadow border p-0" style="min-width: 95px; width: 95px; font-size: 12px; z-index: 1050;">
+                                                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="min-width: 110px; font-size: 13px; z-index: 1050; border-radius: 6px;">
                                                                             <li>
-                                                                                <a class="dropdown-item edit-type-btn py-1.5 px-3" href="javascript:void(0);" data-type="{{ base64_encode($type->toJson()) }}">
-                                                                                    <i class="feather-edit me-1" style="font-size: 11px;"></i> Edit
+                                                                                <a class="dropdown-item edit-type-btn py-2 px-3 d-flex align-items-center" href="javascript:void(0);" data-type="{{ base64_encode($type->toJson()) }}">
+                                                                                    <i class="feather-edit me-2 text-muted fs-14"></i>
+                                                                                    <span>Edit Type</span>
                                                                                 </a>
                                                                             </li>
-                                                                            <li><hr class="dropdown-divider m-0"></li>
+                                                                            <li><hr class="dropdown-divider my-1"></li>
                                                                             <li>
                                                                                 <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this leave type?');">
                                                                                     @csrf
                                                                                     @method('DELETE')
-                                                                                    <button type="submit" class="dropdown-item text-danger py-1.5 px-3">
-                                                                                        <i class="feather-trash-2 me-1" style="font-size: 11px;"></i> Delete
+                                                                                    <button type="submit" class="dropdown-item text-danger py-2 px-3 d-flex align-items-center w-100 border-0 bg-transparent">
+                                                                                        <i class="feather-trash-2 me-2 fs-14"></i>
+                                                                                        <span>Delete Type</span>
                                                                                     </button>
                                                                                 </form>
                                                                             </li>
@@ -339,8 +343,7 @@
                                 </x-ui.select>
                             </div>
                             <div class="col-md-12 col-12">
-                                <label class="form-label fw-bold">Description</label>
-                                <textarea name="description" class="form-control" placeholder="Provide details about the plan parameters..." rows="3"></textarea>
+                                <x-ui.textarea label="Description" name="description" placeholder="Provide details about the plan parameters..." rows="3" />
                             </div>
                         </div>
                     </div>
@@ -388,8 +391,7 @@
                                 </x-ui.select>
                             </div>
                             <div class="col-md-12 col-12">
-                                <label class="form-label fw-bold">Description</label>
-                                <textarea name="description" id="edit_plan_description" class="form-control" rows="3"></textarea>
+                                <x-ui.textarea label="Description" name="description" id="edit_plan_description" rows="3" />
                             </div>
                         </div>
                     </div>
@@ -464,8 +466,7 @@
                                 </x-ui.select>
                             </div>
                             <div class="col-md-12 col-12">
-                                <label class="form-label fw-bold">Description</label>
-                                <textarea name="description" class="form-control" placeholder="Allotment rules, carry forward specifications, etc..." rows="3"></textarea>
+                                <x-ui.textarea label="Description" name="description" placeholder="Allotment rules, carry forward specifications, etc..." rows="3" />
                             </div>
                         </div>
                     </div>
@@ -540,8 +541,7 @@
                                 </x-ui.select>
                             </div>
                             <div class="col-md-12 col-12">
-                                <label class="form-label fw-bold">Description</label>
-                                <textarea name="description" id="edit_type_description" class="form-control" rows="3"></textarea>
+                                <x-ui.textarea label="Description" name="description" id="edit_type_description" rows="3" />
                             </div>
                         </div>
                     </div>
@@ -553,6 +553,419 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal for Configuring Leave Rules -->
+    <div class="modal fade" id="leaveRulesModal" tabindex="-1" aria-labelledby="leaveRulesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-light px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark" id="leaveRulesModalLabel">Leave Rules Configuration</h5>
+                        <p class="text-muted mb-0 fs-12">Set up policies, accruals, and constraints for <strong class="text-primary" id="rules-leave-type-name">Casual Leave</strong></p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                
+                <div class="modal-body p-0">
+                    <div class="row g-0">
+                        <!-- Left Navigation Column (col-3) -->
+                        <div class="col-md-3 border-end bg-light-subtle" style="min-height: 480px;">
+                            <div class="nav flex-column nav-pills p-3 gap-2" id="rulesTabList" role="tablist">
+                                <button class="nav-link text-start active py-2.5 px-3 d-flex align-items-center gap-2" id="tab-accrual" data-bs-toggle="pill" data-bs-target="#pane-accrual" type="button" role="tab"><i class="feather-calendar"></i> Accrual</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-application" data-bs-toggle="pill" data-bs-target="#pane-application" type="button" role="tab"><i class="feather-file-text"></i> Leave Application</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-approval" data-bs-toggle="pill" data-bs-target="#pane-approval" type="button" role="tab"><i class="feather-check-square"></i> Approval</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-yearend" data-bs-toggle="pill" data-bs-target="#pane-yearend" type="button" role="tab"><i class="feather-refresh-cw"></i> Year End Processing</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-probation" data-bs-toggle="pill" data-bs-target="#pane-probation" type="button" role="tab"><i class="feather-shield"></i> Probation</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-notice" data-bs-toggle="pill" data-bs-target="#pane-notice" type="button" role="tab"><i class="feather-alert-triangle"></i> Notice Period</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Right Configurations Pane Column (col-9) -->
+                        <div class="col-md-9 p-4" style="max-height: 520px; overflow-y: auto;">
+                            <input type="hidden" id="rules-leave-type-id">
+                            
+                            <div class="tab-content" id="rulesTabContent">
+                                <!-- Accrual Tab Pane -->
+                                <div class="tab-pane fade show active" id="pane-accrual" role="tabpanel">
+                                    <h5 class="fw-bold text-dark mb-3">Accrual</h5>
+                                    
+                                    <!-- Yearly Quota -->
+                                    <div class="card border mb-3 bg-light-subtle rounded-3 shadow-none">
+                                        <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapseQuota" aria-expanded="true">
+                                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-calendar me-2 text-muted"></i>Yearly Quota</h6>
+                                        </div>
+                                        <div id="collapseQuota" class="collapse show">
+                                            <div class="card-body bg-white border-top p-3 fs-13">
+                                                <div class="row align-items-center mb-3">
+                                                    <div class="col-sm-4 text-muted">This leave is calculated in:</div>
+                                                    <div class="col-sm-8 d-flex gap-3">
+                                                        <label class="form-check-label d-flex align-items-center gap-1.5 cursor-pointer">
+                                                            <input type="radio" name="accrual_calculate_in" value="days" class="form-check-input" checked> Days
+                                                        </label>
+                                                        <label class="form-check-label d-flex align-items-center gap-1.5 cursor-pointer">
+                                                            <input type="radio" name="accrual_calculate_in" value="hours" class="form-check-input"> Hours
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="row align-items-center">
+                                                    <div class="col-sm-4 text-muted">Yearly quota:</div>
+                                                    <div class="col-sm-8 d-flex align-items-center gap-2">
+                                                        <label class="form-check-label d-flex align-items-center gap-1.5 cursor-pointer me-3">
+                                                            <input type="radio" name="accrual_quota_type" value="fixed" class="form-check-input" checked> 
+                                                            <input type="number" id="accrual_quota_value" class="form-control form-control-sm text-center d-inline-block mx-1" style="width: 70px;" value="12"> days
+                                                        </label>
+                                                        <label class="form-check-label d-flex align-items-center gap-1.5 cursor-pointer">
+                                                            <input type="radio" name="accrual_quota_type" value="unlimited" class="form-check-input"> Unlimited
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Allocation & Accrual Rate -->
+                                    <div class="card border mb-3 bg-light-subtle rounded-3 shadow-none">
+                                        <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapseRate" aria-expanded="true">
+                                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-trending-up me-2 text-muted"></i>Allocation & Accrual Rate</h6>
+                                        </div>
+                                        <div id="collapseRate" class="collapse show">
+                                            <div class="card-body bg-white border-top p-3 fs-13 d-flex flex-column gap-3">
+                                                <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                    <input type="radio" name="accrual_rate" value="periodic" class="form-check-input mt-1">
+                                                    <div>
+                                                        <span class="fw-semibold text-dark d-block">Leave accrued periodically</span>
+                                                        <span class="text-muted fs-11">Leaves are credited automatically on a schedule (e.g. 1.5 days every month).</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="accrual_rate" value="attendance" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Leave accrues based on attendance</span>
+                                                         <span class="text-muted fs-11">Leaves are earned based on actual days worked (e.g. 1 day for every 20 worked days).</span>
+                                                     </div>
+                                                 </label>
+                                                 <div class="ps-4 mt-1 mb-2 d-none" id="accrual_attendance_div">
+                                                     <div class="d-flex align-items-center gap-2 fs-13">
+                                                         <span>Earn</span>
+                                                         <input type="number" id="accrual_attendance_earn" class="form-control form-control-sm text-center" style="width: 70px;" value="1">
+                                                         <span>day(s) of leave for every</span>
+                                                         <input type="number" id="accrual_attendance_period" class="form-control form-control-sm text-center" style="width: 70px;" value="20">
+                                                         <span>days worked.</span>
+                                                     </div>
+                                                 </div>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="accrual_rate" value="immediate" class="form-check-input mt-1" checked>
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Leave quota available immediately</span>
+                                                         <span class="text-muted fs-11">The full annual quota is credited upfront on the start of the year or joining date.</span>
+                                                     </div>
+                                                 </label>
+                                             </div>
+                                         </div>
+                                     </div>
+                                     
+                                     <!-- Accrual Restrictions -->
+                                     <div class="card border bg-light-subtle rounded-3 shadow-none">
+                                         <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapseRestrictions" aria-expanded="true">
+                                             <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-alert-circle me-2 text-muted"></i>Accrual Restrictions</h6>
+                                         </div>
+                                         <div id="collapseRestrictions" class="collapse show">
+                                             <div class="card-body bg-white border-top p-3 fs-13">
+                                                 <div class="form-check form-switch mb-1">
+                                                     <input class="form-check-input" type="checkbox" id="accrual_limit_carry">
+                                                     <label class="form-check-label fw-bold text-dark" for="accrual_limit_carry">Limit maximum accumulation of leaves</label>
+                                                     <div class="text-muted fs-11">Cap total leaves an employee can accumulate at any given point.</div>
+                                                 </div>
+                                                 <div class="ps-4 mt-2 d-none" id="accrual_max_accum_div">
+                                                     <div class="d-flex align-items-center gap-2">
+                                                         <span>Maximum accumulation balance:</span>
+                                                         <input type="number" id="accrual_max_accum_val" class="form-control form-control-sm text-center" style="width: 70px;" value="30"> days
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 <!-- Leave Application Tab Pane -->
+                                 <div class="tab-pane fade" id="pane-application" role="tabpanel">
+                                     <h5 class="fw-bold text-dark mb-3">Leave Application Settings</h5>
+                                     
+                                     <!-- Advance application -->
+                                     <div class="card border mb-3 rounded-3 shadow-none">
+                                         <div class="card-body p-3 fs-13">
+                                             <div class="form-check form-switch mb-1">
+                                                 <input class="form-check-input" type="checkbox" id="app_apply_in_advance">
+                                                 <label class="form-check-label fw-bold text-dark" for="app_apply_in_advance">Must apply in advance</label>
+                                                 <div class="text-muted fs-11">Restrict leaves from being applied at the last minute or retroactively.</div>
+                                             </div>
+                                             <div class="ps-4 mt-2 d-none" id="app_advance_days_div">
+                                                 <div class="d-flex align-items-center gap-2">
+                                                     <span>Apply at least</span>
+                                                     <input type="number" id="app_advance_days" class="form-control form-control-sm text-center" style="width: 70px;" value="3"> days before leave start date.
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                     
+                                     <!-- Duration bounds -->
+                                     <div class="card border mb-3 rounded-3 shadow-none">
+                                         <div class="card-body p-3 fs-13">
+                                             <h6 class="fw-bold text-dark mb-3">Duration Constraints</h6>
+                                             <div class="row align-items-center mb-3">
+                                                 <div class="col-sm-5 text-muted">Minimum duration per request:</div>
+                                                 <div class="col-sm-7 d-flex align-items-center gap-2">
+                                                     <input type="number" id="app_min_duration" class="form-control form-control-sm text-center" style="width: 70px;" value="1"> day(s)
+                                                 </div>
+                                             </div>
+                                             <div class="row align-items-center">
+                                                 <div class="col-sm-5 text-muted">Maximum duration per request:</div>
+                                                 <div class="col-sm-7 d-flex align-items-center gap-2">
+                                                     <input type="number" id="app_max_duration" class="form-control form-control-sm text-center" style="width: 70px;" value="10"> day(s)
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                     
+                                     <!-- Attachments -->
+                                     <div class="card border rounded-3 shadow-none">
+                                         <div class="card-body p-3 fs-13">
+                                             <div class="form-check form-switch mb-1">
+                                                 <input class="form-check-input" type="checkbox" id="app_require_attachment">
+                                                 <label class="form-check-label fw-bold text-dark" for="app_require_attachment">Require attachment/document proof</label>
+                                                 <div class="text-muted fs-11">Force attachments (e.g. medical certificates) for long leaves.</div>
+                                             </div>
+                                             <div class="ps-4 mt-2 d-none" id="app_attachment_days_div">
+                                                 <div class="d-flex align-items-center gap-2">
+                                                     <span>Mandatory if leave duration exceeds</span>
+                                                     <input type="number" id="app_attachment_days" class="form-control form-control-sm text-center" style="width: 70px;" value="3"> day(s).
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 <!-- Approval Tab Pane -->
+                                 <div class="tab-pane fade" id="pane-approval" role="tabpanel">
+                                     <h5 class="fw-bold text-dark mb-3">Approval Workflow</h5>
+                                     
+                                     <!-- Approval Level -->
+                                     <div class="card border mb-3 rounded-3 shadow-none">
+                                         <div class="card-body p-3 fs-13">
+                                             <h6 class="fw-bold text-dark mb-3">Approval Routing Level</h6>
+                                             <div class="d-flex flex-column gap-3">
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="approval_workflow_level" value="auto" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Auto-Approved</span>
+                                                         <span class="text-muted fs-11">Requests are approved automatically without manager reviews.</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="approval_workflow_level" value="1_level" class="form-check-input mt-1" checked>
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">1-Level Approval</span>
+                                                         <span class="text-muted fs-11">Requires approval from one supervisor before being active.</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="approval_workflow_level" value="2_level" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">2-Level Approval</span>
+                                                         <span class="text-muted fs-11">Requires sequence of two approvals (e.g. Reporting Manager then HR).</span>
+                                                     </div>
+                                                 </label>
+                                             </div>
+                                         </div>
+                                     </div>
+                                     
+                                     <!-- Approver roles definition -->
+                                     <div class="card border rounded-3 shadow-none" id="approver_roles_card">
+                                         <div class="card-body p-3 fs-13">
+                                             <h6 class="fw-bold text-dark mb-3">Workflow Roles</h6>
+                                             <div class="row align-items-center mb-3" id="first_approver_row">
+                                                 <div class="col-sm-4 text-muted">First Approver:</div>
+                                                 <div class="col-sm-8">
+                                                     <select id="approval_first_approver" class="form-select form-select-sm" style="max-width: 250px;">
+                                                         <option value="reporting_manager">Reporting Manager</option>
+                                                         <option value="department_head">Department Head</option>
+                                                         <option value="hr_manager">HR Manager</option>
+                                                     </select>
+                                                 </div>
+                                             </div>
+                                             <div class="row align-items-center d-none" id="second_approver_row">
+                                                 <div class="col-sm-4 text-muted">Second Approver:</div>
+                                                 <div class="col-sm-8">
+                                                     <select id="approval_second_approver" class="form-select form-select-sm" style="max-width: 250px;">
+                                                         <option value="hr_manager" selected>HR Manager</option>
+                                                         <option value="department_head">Department Head</option>
+                                                         <option value="ceo">CEO / Director</option>
+                                                     </select>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 <!-- Year End Processing Tab Pane -->
+                                 <div class="tab-pane fade" id="pane-yearend" role="tabpanel">
+                                     <h5 class="fw-bold text-dark mb-3">Year End Processing</h5>
+                                     
+                                     <div class="card border rounded-3 shadow-none">
+                                         <div class="card-body p-3 fs-13">
+                                             <h6 class="fw-bold text-dark mb-3">Action on Unused Balance</h6>
+                                             <div class="d-flex flex-column gap-3">
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="yearend_action" value="lapse" class="form-check-input mt-1" checked>
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Lapse (Use it or lose it)</span>
+                                                         <span class="text-muted fs-11">Unused leaves will reset to 0 at the end of the year.</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="yearend_action" value="carry_forward" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Carry Forward to next year</span>
+                                                         <span class="text-muted fs-11">Transfer unused balances forward, subject to limit rules.</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="yearend_action" value="encash" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Encashment (Pay out)</span>
+                                                         <span class="text-muted fs-11">Compensate employees monetarily for unused leave balance.</span>
+                                                     </div>
+                                                 </label>
+                                             </div>
+                                             
+                                             <!-- Carry forward value option -->
+                                             <div class="border-top pt-3 mt-3 d-none" id="yearend_carry_limit_div">
+                                                 <div class="d-flex align-items-center gap-2">
+                                                     <span>Maximum days to carry forward:</span>
+                                                     <input type="number" id="yearend_max_carry" class="form-control form-control-sm text-center" style="width: 70px;" value="6"> days
+                                                 </div>
+                                             </div>
+                                             
+                                             <!-- Encashment limit value option -->
+                                             <div class="border-top pt-3 mt-3 d-none" id="yearend_encash_limit_div">
+                                                 <div class="d-flex align-items-center gap-2">
+                                                     <span>Maximum days to encash:</span>
+                                                     <input type="number" id="yearend_max_encash" class="form-control form-control-sm text-center" style="width: 70px;" value="5"> days
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 <!-- Probation Tab Pane -->
+                                 <div class="tab-pane fade" id="pane-probation" role="tabpanel">
+                                     <h5 class="fw-bold text-dark mb-3">Probation Period Rules</h5>
+                                     
+                                     <div class="card border rounded-3 shadow-none">
+                                         <div class="card-body p-3 fs-13">
+                                             <h6 class="fw-bold text-dark mb-3">Usage during Probation</h6>
+                                             <div class="d-flex flex-column gap-3">
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="probation_rule" value="allow" class="form-check-input mt-1" checked>
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Allow applying during probation</span>
+                                                         <span class="text-muted fs-11">Employees can take this leave immediately after joining.</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="probation_rule" value="disallow" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Do not allow applying during probation</span>
+                                                         <span class="text-muted fs-11">Leave option remains locked until employee gets confirmed.</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="probation_rule" value="allow_after_months" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Allow after a certain period</span>
+                                                         <span class="text-muted fs-11">Employees can apply for this leave after a specific length of service.</span>
+                                                     </div>
+                                                 </label>
+                                             </div>
+                                             
+                                             <!-- Month value option -->
+                                             <div class="border-top pt-3 mt-3 d-none" id="probation_months_div">
+                                                 <div class="d-flex align-items-center gap-2">
+                                                     <span>Allowed after completing</span>
+                                                     <input type="number" id="probation_months" class="form-control form-control-sm text-center" style="width: 70px;" value="3"> month(s) of joining.
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 
+                                 <!-- Notice Period Tab Pane -->
+                                 <div class="tab-pane fade" id="pane-notice" role="tabpanel">
+                                     <h5 class="fw-bold text-dark mb-3">Notice Period Rules</h5>
+                                     
+                                     <div class="card border rounded-3 shadow-none">
+                                         <div class="card-body p-3 fs-13">
+                                             <h6 class="fw-bold text-dark mb-3">Usage during Notice Period</h6>
+                                             <div class="d-flex flex-column gap-3">
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="notice_rule" value="allow" class="form-check-input mt-1" checked>
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Allow applying during notice period</span>
+                                                         <span class="text-muted fs-11">Employees on notice period can apply for this leave normally.</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="notice_rule" value="disallow" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Do not allow applying during notice period</span>
+                                                         <span class="text-muted fs-11">Leave option becomes unavailable once exit clearance starts.</span>
+                                                     </div>
+                                                 </label>
+                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                     <input type="radio" name="notice_rule" value="special_approval" class="form-check-input mt-1">
+                                                     <div>
+                                                         <span class="fw-semibold text-dark d-block">Requires special HR approval</span>
+                                                         <span class="text-muted fs-11">Bypasses default flow; direct approval from Corporate HR is mandatory.</span>
+                                                     </div>
+                                                 </label>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+                 
+                 <div class="modal-footer bg-light border-top d-flex justify-content-end gap-2 px-4 py-3">
+                     <button type="button" class="btn btn-light fs-13" data-bs-dismiss="modal">Close</button>
+                     <button type="button" class="btn btn-primary fs-13" onclick="saveLeaveRules()">Save Rules</button>
+                 </div>
+             </div>
+         </div>
+     </div>
+
+     <style>
+         /* Sidebar tabs styling inside leave rules modal */
+         #rulesTabList .nav-link {
+             border-radius: 6px;
+             font-size: 13px;
+             font-weight: 500;
+             color: #475569;
+             border: none;
+             background-color: transparent;
+             transition: all 0.2s ease;
+         }
+         #rulesTabList .nav-link:hover {
+             background-color: #f1f5f9;
+             color: var(--bs-primary);
+         }
+         #rulesTabList .nav-link.active {
+             background-color: rgba(var(--bs-primary-rgb), 0.08);
+             color: var(--bs-primary);
+             font-weight: 600;
+         }
+     </style>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
@@ -679,6 +1092,261 @@
 
                 $('#editLeaveTypeModal').modal('show');
             });
+
+            // Trigger configuration modal for Leave Rules
+            $(document).on('click', '.configure-rules-btn', function() {
+                let typeId = $(this).attr('data-type-id');
+                let typeName = $(this).attr('data-type-name');
+
+                $('#rules-leave-type-id').val(typeId);
+                $('#rules-leave-type-name').text(typeName);
+
+                // Default fallback rules
+                const defaultRules = {
+                    accrual: {
+                        calculate_in: 'days',
+                        quota_type: 'fixed',
+                        quota_value: 12,
+                        rate: 'immediate',
+                        attendance_earn: 1,
+                        attendance_period: 20,
+                        limit_carry: false,
+                        max_accum: 30
+                    },
+                    application: {
+                        apply_in_advance: false,
+                        advance_days: 3,
+                        min_duration: 1,
+                        max_duration: 10,
+                        require_attachment: false,
+                        attachment_days: 3
+                    },
+                    approval: {
+                        workflow_level: '1_level',
+                        first_approver: 'reporting_manager',
+                        second_approver: 'hr_manager'
+                    },
+                    yearend: {
+                        action: 'lapse',
+                        max_carry: 6,
+                        max_encash: 5
+                    },
+                    probation: {
+                        rule: 'allow',
+                        months: 3
+                    },
+                    notice: {
+                        rule: 'allow'
+                    }
+                };
+
+                let rules = defaultRules;
+                try {
+                    let rulesDataStr = $(this).attr('data-rules');
+                    if (rulesDataStr) {
+                        let parsed = JSON.parse(rulesDataStr);
+                        if (parsed && typeof parsed === 'object') {
+                            rules = parsed;
+                        }
+                    }
+                } catch(e) {
+                    console.error("Failed to parse database rules:", e);
+                }
+
+                // Load state into UI
+                $(`input[name="accrual_calculate_in"][value="${rules.accrual?.calculate_in || 'days'}"]`).prop('checked', true);
+                $(`input[name="accrual_quota_type"][value="${rules.accrual?.quota_type || 'fixed'}"]`).prop('checked', true);
+                $('#accrual_quota_value').val(rules.accrual?.quota_value !== undefined ? rules.accrual.quota_value : 12);
+                $(`input[name="accrual_rate"][value="${rules.accrual?.rate || 'immediate'}"]`).prop('checked', true);
+                
+                // Attendance details loading
+                $('#accrual_attendance_earn').val(rules.accrual?.attendance_earn !== undefined ? rules.accrual.attendance_earn : 1);
+                $('#accrual_attendance_period').val(rules.accrual?.attendance_period !== undefined ? rules.accrual.attendance_period : 20);
+                if (rules.accrual?.rate === 'attendance') {
+                    $('#accrual_attendance_div').removeClass('d-none');
+                } else {
+                    $('#accrual_attendance_div').addClass('d-none');
+                }
+
+                $('#accrual_limit_carry').prop('checked', !!rules.accrual?.limit_carry).trigger('change');
+                $('#accrual_max_accum_val').val(rules.accrual?.max_accum || 30);
+
+                $('#app_apply_in_advance').prop('checked', !!rules.application?.apply_in_advance).trigger('change');
+                $('#app_advance_days').val(rules.application?.advance_days || 3);
+                $('#app_min_duration').val(rules.application?.min_duration || 1);
+                $('#app_max_duration').val(rules.application?.max_duration || 10);
+                $('#app_require_attachment').prop('checked', !!rules.application?.require_attachment).trigger('change');
+                $('#app_attachment_days').val(rules.application?.attachment_days || 3);
+
+                $(`input[name="approval_workflow_level"][value="${rules.approval?.workflow_level || '1_level'}"]`).prop('checked', true).trigger('change');
+                $('#approval_first_approver').val(rules.approval?.first_approver || 'reporting_manager');
+                $('#approval_second_approver').val(rules.approval?.second_approver || 'hr_manager');
+
+                $(`input[name="yearend_action"][value="${rules.yearend?.action || 'lapse'}"]`).prop('checked', true).trigger('change');
+                $('#yearend_max_carry').val(rules.yearend?.max_carry || 6);
+                $('#yearend_max_encash').val(rules.yearend?.max_encash || 5);
+
+                $(`input[name="probation_rule"][value="${rules.probation?.rule || 'allow'}"]`).prop('checked', true).trigger('change');
+                $('#probation_months').val(rules.probation?.months || 3);
+
+                $(`input[name="notice_rule"][value="${rules.notice?.rule || 'allow'}"]`).prop('checked', true);
+
+                // Show modal
+                $('#leaveRulesModal').modal('show');
+            });
+
+            // Toggle logic for conditional fields
+            $(document).on('change', 'input[name="accrual_rate"]', function() {
+                if ($(this).val() === 'attendance') {
+                    $('#accrual_attendance_div').removeClass('d-none');
+                } else {
+                    $('#accrual_attendance_div').addClass('d-none');
+                }
+            });
+
+            $('#accrual_limit_carry').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#accrual_max_accum_div').removeClass('d-none');
+                } else {
+                    $('#accrual_max_accum_div').addClass('d-none');
+                }
+            });
+
+            $('#app_apply_in_advance').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#app_advance_days_div').removeClass('d-none');
+                } else {
+                    $('#app_advance_days_div').addClass('d-none');
+                }
+            });
+
+            $('#app_require_attachment').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#app_attachment_days_div').removeClass('d-none');
+                } else {
+                    $('#app_attachment_days_div').addClass('d-none');
+                }
+            });
+
+            $(document).on('change', 'input[name="approval_workflow_level"]', function() {
+                let val = $(this).val();
+                if (val === 'auto') {
+                    $('#approver_roles_card').addClass('d-none');
+                } else if (val === '1_level') {
+                    $('#approver_roles_card').removeClass('d-none');
+                    $('#first_approver_row').removeClass('d-none');
+                    $('#second_approver_row').addClass('d-none');
+                } else {
+                    $('#approver_roles_card').removeClass('d-none');
+                    $('#first_approver_row').removeClass('d-none');
+                    $('#second_approver_row').removeClass('d-none');
+                }
+            });
+
+            $(document).on('change', 'input[name="yearend_action"]', function() {
+                let val = $(this).val();
+                if (val === 'lapse') {
+                    $('#yearend_carry_limit_div').addClass('d-none');
+                    $('#yearend_encash_limit_div').addClass('d-none');
+                } else if (val === 'carry_forward') {
+                    $('#yearend_carry_limit_div').removeClass('d-none');
+                    $('#yearend_encash_limit_div').addClass('d-none');
+                } else {
+                    $('#yearend_carry_limit_div').addClass('d-none');
+                    $('#yearend_encash_limit_div').removeClass('d-none');
+                }
+            });
+
+            $(document).on('change', 'input[name="probation_rule"]', function() {
+                let val = $(this).val();
+                if (val === 'allow_after_months') {
+                    $('#probation_months_div').removeClass('d-none');
+                } else {
+                    $('#probation_months_div').addClass('d-none');
+                }
+            });
+
+            // Save configuration logic
+            window.saveLeaveRules = function() {
+                let typeId = $('#rules-leave-type-id').val();
+                if (!typeId) return;
+
+                let data = {
+                    accrual: {
+                        calculate_in: $('input[name="accrual_calculate_in"]:checked').val(),
+                        quota_type: $('input[name="accrual_quota_type"]:checked').val(),
+                        quota_value: parseFloat($('#accrual_quota_value').val()) || 0,
+                        rate: $('input[name="accrual_rate"]:checked').val(),
+                        attendance_earn: parseFloat($('#accrual_attendance_earn').val()) || 1,
+                        attendance_period: parseInt($('#accrual_attendance_period').val()) || 20,
+                        limit_carry: $('#accrual_limit_carry').is(':checked'),
+                        max_accum: parseFloat($('#accrual_max_accum_val').val()) || 30
+                    },
+                    application: {
+                        apply_in_advance: $('#app_apply_in_advance').is(':checked'),
+                        advance_days: parseInt($('#app_advance_days').val()) || 3,
+                        min_duration: parseFloat($('#app_min_duration').val()) || 1,
+                        max_duration: parseFloat($('#app_max_duration').val()) || 10,
+                        require_attachment: $('#app_require_attachment').is(':checked'),
+                        attachment_days: parseFloat($('#app_attachment_days').val()) || 3
+                    },
+                    approval: {
+                        workflow_level: $('input[name="approval_workflow_level"]:checked').val(),
+                        first_approver: $('#approval_first_approver').val(),
+                        second_approver: $('#approval_second_approver').val()
+                    },
+                    yearend: {
+                        action: $('input[name="yearend_action"]:checked').val(),
+                        max_carry: parseFloat($('#yearend_max_carry').val()) || 6,
+                        max_encash: parseFloat($('#yearend_max_encash').val()) || 5
+                    },
+                    probation: {
+                        rule: $('input[name="probation_rule"]:checked').val(),
+                        months: parseFloat($('#probation_months').val()) || 3
+                    },
+                    notice: {
+                        rule: $('input[name="notice_rule"]:checked').val()
+                    }
+                };
+
+                // Send AJAX request to save in the database
+                $.ajax({
+                    url: `/hrms/leave-structure/type/${typeId}/rules`,
+                    method: 'POST',
+                    data: {
+                        _token: '{{ csrf_token() }}',
+                        rules: data
+                    },
+                    success: function(response) {
+                        // Update settings button's local data-rules attribute
+                        $(`.configure-rules-btn[data-type-id="${typeId}"]`).attr('data-rules', JSON.stringify(data));
+                        
+                        $('#leaveRulesModal').modal('hide');
+
+                        // Floating Toast alert
+                        let toast = document.createElement('div');
+                        toast.className = 'position-fixed top-0 end-0 p-3';
+                        toast.style.zIndex = '9999';
+                        toast.innerHTML = `
+                            <div class="toast show align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                              <div class="d-flex">
+                                <div class="toast-body d-flex align-items-center gap-2">
+                                  <i class="feather-check-circle"></i> Rules successfully saved to the database.
+                                </div>
+                                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                              </div>
+                            </div>
+                        `;
+                        document.body.appendChild(toast);
+                        setTimeout(() => {
+                            toast.remove();
+                        }, 3000);
+                    },
+                    error: function(xhr) {
+                        alert('Error saving rules to the database. Make sure migrations are run.');
+                    }
+                });
+            };
         });
     </script>
 @endsection
