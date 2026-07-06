@@ -351,6 +351,118 @@ class ProductController extends Controller
             ->with('success', 'Product updated successfully.');
     }
 
+    /**
+     * Show the Opening Stock entry form for a product (single & variant-aware).
+     */
+    public function openingStock(Product $product): View
+    {
+        $product->load(['uom', 'warehouseStocks.warehouse', 'variants.warehouseStocks.warehouse']);
+        $warehouses = Warehouse::query()->where('status', 'active')->get();
+
+        // For Single: map warehouse_id => {quantity, unit_cost}
+        $stockMap = $product->warehouseStocks->keyBy('warehouse_id')->map(fn($ws) => [
+            'quantity'  => $ws->quantity,
+            'unit_cost' => $ws->unit_cost,
+        ])->toArray();
+
+        // For Variants: map variant_id => warehouse_id => {quantity, unit_cost}
+        $variantStockMap = [];
+        foreach ($product->variants as $variant) {
+            $variantStockMap[$variant->id] = $variant->warehouseStocks->keyBy('warehouse_id')->map(fn($ws) => [
+                'quantity'  => $ws->quantity,
+                'unit_cost' => $ws->unit_cost,
+            ])->toArray();
+        }
+
+        return view('modules.inventory.products.opening-stock',
+            compact('product', 'warehouses', 'stockMap', 'variantStockMap'));
+    }
+
+    /**
+     * Save / Update Opening Stock (single & variant-aware).
+     */
+    public function saveOpeningStock(Request $request, Product $product): RedirectResponse
+    {
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $request->validate([
+            'warehouse_stocks'                          => 'nullable|array',
+            'warehouse_stocks.*.quantity'               => 'nullable|numeric|min:0',
+            'warehouse_stocks.*.unit_cost'              => 'nullable|numeric|min:0',
+            'variant_stocks'                            => 'nullable|array',
+            'variant_stocks.*.*.quantity'               => 'nullable|numeric|min:0',
+            'variant_stocks.*.*.unit_cost'              => 'nullable|numeric|min:0',
+        ]);
+
+        DB::transaction(function () use ($request, $product, $tenantId) {
+
+            if ($product->variation_type === 'Variant') {
+                // variant_stocks[variant_id][warehouse_id][quantity/unit_cost]
+                $variantStocks = $request->input('variant_stocks', []);
+                foreach ($variantStocks as $variantId => $whData) {
+                    // Ensure variant belongs to this parent product
+                    $variant = $product->variants->firstWhere('id', $variantId);
+                    if (!$variant) continue;
+
+                    foreach ($whData as $warehouseId => $data) {
+                        $qty  = (float)($data['quantity']  ?? 0);
+                        $cost = (float)($data['unit_cost'] ?? 0);
+
+                        if ($qty > 0) {
+                            ProductWarehouseStock::query()->updateOrCreate(
+                                [
+                                    'tenant_id'    => $tenantId,
+                                    'product_id'   => $variantId,
+                                    'warehouse_id' => $warehouseId,
+                                ],
+                                [
+                                    'quantity'  => $qty,
+                                    'unit_cost' => $cost > 0 ? $cost : $variant->cost_price,
+                                ]
+                            );
+                        } else {
+                            ProductWarehouseStock::query()
+                                ->where('tenant_id', $tenantId)
+                                ->where('product_id', $variantId)
+                                ->where('warehouse_id', $warehouseId)
+                                ->delete();
+                        }
+                    }
+                }
+            } else {
+                // Single product: warehouse_stocks[warehouse_id][quantity/unit_cost]
+                $stocks = $request->input('warehouse_stocks', []);
+                foreach ($stocks as $warehouseId => $data) {
+                    $qty  = (float)($data['quantity']  ?? 0);
+                    $cost = (float)($data['unit_cost'] ?? 0);
+
+                    if ($qty > 0) {
+                        ProductWarehouseStock::query()->updateOrCreate(
+                            [
+                                'tenant_id'    => $tenantId,
+                                'product_id'   => $product->id,
+                                'warehouse_id' => $warehouseId,
+                            ],
+                            [
+                                'quantity'  => $qty,
+                                'unit_cost' => $cost > 0 ? $cost : $product->cost_price,
+                            ]
+                        );
+                    } else {
+                        ProductWarehouseStock::query()
+                            ->where('tenant_id', $tenantId)
+                            ->where('product_id', $product->id)
+                            ->where('warehouse_id', $warehouseId)
+                            ->delete();
+                    }
+                }
+            }
+        });
+
+        return redirect()->route('inventory.products.show', $product)
+            ->with('success', 'Opening stock updated successfully.');
+    }
+
     public function destroy(Product $product): RedirectResponse
     {
         $product->delete();
@@ -358,6 +470,7 @@ class ProductController extends Controller
         return redirect()->route('inventory.products.index')
             ->with('success', 'Product deleted successfully.');
     }
+
 
     public function quickCreate(Request $request): JsonResponse
     {

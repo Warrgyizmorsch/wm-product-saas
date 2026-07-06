@@ -9,6 +9,11 @@
         <a href="{{ route('inventory.products.index') }}" class="btn btn-light">
             <i class="feather-arrow-left me-2"></i>Back
         </a>
+        @if($product->item_type === 'Goods')
+            <a href="{{ route('inventory.products.opening-stock', $product) }}" class="btn btn-soft-warning">
+                <i class="feather-package me-2"></i>Opening Stock
+            </a>
+        @endif
         <a href="{{ route('inventory.products.edit', $product) }}" class="btn btn-primary">
             <i class="feather-edit me-2"></i>Edit Item
         </a>
@@ -244,6 +249,15 @@
                     <!-- Tab 2: Warehouse Stock -->
                     @if($product->item_type === 'Goods')
                         <div class="tab-pane fade" id="stock-pane" role="tabpanel" aria-labelledby="stock-tab">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-dark">Stock On Hand &mdash; By Warehouse</h6>
+                                    <p class="text-muted fs-12 mb-0">Current opening stock levels per warehouse location.</p>
+                                </div>
+                                <a href="{{ route('inventory.products.opening-stock', $product) }}" class="btn btn-soft-warning btn-sm">
+                                    <i class="feather-package me-1"></i>Update Opening Stock
+                                </a>
+                            </div>
                             <div class="table-responsive">
                                 <table class="table table-bordered align-middle">
                                     <thead class="table-light text-muted">

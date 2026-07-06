@@ -15,6 +15,8 @@ Route::prefix('inventory')
         Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
         Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
         Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
+        Route::get('products/{product}/opening-stock', [ProductController::class, 'openingStock'])->name('products.opening-stock');
+        Route::post('products/{product}/opening-stock', [ProductController::class, 'saveOpeningStock'])->name('products.opening-stock.save');
 
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');

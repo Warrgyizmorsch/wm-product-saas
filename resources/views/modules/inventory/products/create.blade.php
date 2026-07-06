@@ -105,27 +105,15 @@
                     <!-- Radio Type Selector in Zoho style -->
                     <div class="custom-radio-group mb-3">
                         <span class="custom-radio-label">Item Type <span class="text-danger">*</span></span>
-                        <label class="custom-radio-option">
-                            <input type="radio" name="item_type" value="Goods" checked>
-                            <span>Goods (Physical Product)</span>
-                        </label>
-                        <label class="custom-radio-option ms-3">
-                            <input type="radio" name="item_type" value="Service">
-                            <span>Service (Labor / Subscription)</span>
-                        </label>
+                        <x-ui.radio name="item_type" value="Goods" label="Goods (Physical Product)" :checked="true" />
+                        <x-ui.radio name="item_type" value="Service" label="Service (Labor / Subscription)" />
                     </div>
 
                     <!-- Radio variation selector (Single vs Variant) -->
                     <div class="custom-radio-group mb-4" id="variationTypeWrapper">
                         <span class="custom-radio-label">Variation <span class="text-danger">*</span></span>
-                        <label class="custom-radio-option">
-                            <input type="radio" name="variation_type" value="Single" checked>
-                            <span>Single Item</span>
-                        </label>
-                        <label class="custom-radio-option ms-3">
-                            <input type="radio" name="variation_type" value="Variant">
-                            <span>Contains Variants (e.g. Size, Color)</span>
-                        </label>
+                        <x-ui.radio name="variation_type" value="Single" label="Single Item" :checked="true" />
+                        <x-ui.radio name="variation_type" value="Variant" label="Contains Variants (e.g. Size, Color)" />
                     </div>
 
                     <div class="row g-4 mb-4 fs-13 text-dark">
@@ -269,7 +257,7 @@
                     <div id="warehouseStocksSection" class="border-top pt-4 mt-4 single-item-only">
                         <h6 class="fw-bold text-primary mb-3"><i class="feather-home me-2"></i>Opening Stock by Warehouse</h6>
                         <div class="table-responsive">
-                            <table class="table table-bordered table-sm odoo-table">
+                            <x-ui.odoo-form-ui type="table">
                                 <thead class="table-light text-muted">
                                     <tr>
                                         <th>Warehouse Code</th>
@@ -284,15 +272,15 @@
                                             <td class="fw-semibold text-dark">{{ $wh->code }}</td>
                                             <td class="text-muted">{{ $wh->name }}</td>
                                             <td>
-                                                <input type="number" name="warehouse_stocks[{{ $wh->id }}][quantity]" class="form-control form-control-sm py-1 odoo-table-input" placeholder="0">
+                                                <x-ui.odoo-form-ui type="input" inputType="number" name="warehouse_stocks[{{ $wh->id }}][quantity]" placeholder="0" />
                                             </td>
                                             <td>
-                                                <input type="number" name="warehouse_stocks[{{ $wh->id }}][unit_cost]" class="form-control form-control-sm py-1 odoo-table-input" placeholder="0.00" step="0.01">
+                                                <x-ui.odoo-form-ui type="input" inputType="number" name="warehouse_stocks[{{ $wh->id }}][unit_cost]" placeholder="0.00" step="0.01" />
                                             </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
-                            </table>
+                            </x-ui.odoo-form-ui>
                         </div>
                     </div>
 
