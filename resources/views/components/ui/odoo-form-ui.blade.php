@@ -445,7 +445,6 @@
                        id="{{ $fieldId }}"
                        value="{{ $value }}" 
                        placeholder="{{ $placeholder }}" 
-                       {{ $required ? 'required' : '' }} 
                        {{ $readonly ? 'readonly' : '' }}
                        {{ $disabled ? 'disabled' : '' }}
                        {{ $attributes->class([
@@ -475,7 +474,7 @@
     @endif
                 <select name="{{ $name }}" 
                         id="{{ $fieldId }}"
-                        {{ $required ? 'required' : '' }} 
+                         
                         {{ $multiple ? 'multiple' : '' }}
                         {{ $disabled ? 'disabled' : '' }}
                         @if($select2Selector) data-select2-selector="{{ $select2Selector }}" @endif
@@ -512,7 +511,7 @@
                 <textarea name="{{ $name }}" 
                           id="{{ $fieldId }}"
                           rows="{{ $rows }}" 
-                          {{ $required ? 'required' : '' }}
+                          
                           {{ $readonly ? 'readonly' : '' }}
                           {{ $disabled ? 'disabled' : '' }}
                           {{ $attributes->class(['odoo-form-control', $errorText ? 'is-invalid' : '']) }} 
@@ -543,7 +542,7 @@
                            name="{{ $name }}" 
                            id="{{ $fieldId }}"
                            value="{{ $value ?? '1' }}" 
-                           {{ $required ? 'required' : '' }} 
+                            
                            {{ $disabled ? 'disabled' : '' }}
                            {{ $attributes->class(['form-check-input', $errorText ? 'is-invalid' : '']) }}>
                     @if(isset($slot) && $slot->isNotEmpty())
@@ -599,7 +598,7 @@
                         <input type="file" 
                                name="{{ $name }}" 
                                id="{{ $fieldId }}"
-                               {{ $required ? 'required' : '' }}
+                               
                                {{ $disabled ? 'disabled' : '' }}
                                {{ $attributes->class(['erp-file-input d-none', $errorText ? 'is-invalid' : '']) }}>
                     </label>
