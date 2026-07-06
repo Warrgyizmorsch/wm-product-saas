@@ -12,6 +12,10 @@ Route::prefix('production')
     ->as('production.')
     ->group(function (): void {
 
+        Route::get('track-status', function () {
+            return view('modules.production.track-status');
+        })->name('track-status');
+
         // ── BOM (Frozen) ──────────────────────────────────────────────────────
         Route::get('boms/check-child/{productId}', [ProductionBomController::class, 'checkChildBom'])->name('boms.check-child');
         Route::post('boms/{bom}/create-revision',  [ProductionBomController::class, 'createRevision'])->name('boms.create-revision');

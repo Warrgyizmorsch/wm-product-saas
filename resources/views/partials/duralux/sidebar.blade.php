@@ -40,7 +40,8 @@
                 ['label' => 'Routing', 'route' => 'production.routing.index'],
                 ['label' => 'Planning', 'route' => 'production.plans.index'],
                 ['label' => 'Production Orders', 'route' => 'production.orders.index'],
-                'Quality'
+                'Quality',
+                ['label' => 'Track Status', 'route' => 'production.track-status'],
             ]],
         ],
         'Finance & People' => [
