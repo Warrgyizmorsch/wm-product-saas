@@ -5,20 +5,6 @@
 @section('breadcrumb', 'CRM / Quotations')
 
 @section('content')
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-success text-white me-3">
-                    <i class="feather-check-circle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                    <p class="fs-12 mb-0">{{ session('success') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
 
     <x-ui.card title="All Quotations">
         <div class="table-responsive">

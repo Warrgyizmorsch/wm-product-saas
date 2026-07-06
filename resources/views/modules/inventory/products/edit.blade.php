@@ -230,7 +230,7 @@
                         <div id="warehouseStocksSection" class="border-top pt-4 mt-4">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-home me-2"></i>Update Warehouse Stock</h6>
                             <div class="table-responsive">
-                                <table class="table table-bordered table-sm odoo-table">
+                                <x-ui.odoo-form-ui type="table">
                                     <thead class="table-light text-muted">
                                         <tr>
                                             <th>Warehouse Code</th>
@@ -249,15 +249,15 @@
                                                 <td class="fw-semibold text-dark">{{ $wh->code }}</td>
                                                 <td class="text-muted">{{ $wh->name }}</td>
                                                 <td>
-                                                    <input type="number" name="warehouse_stocks[{{ $wh->id }}][quantity]" value="{{ $qty }}" class="form-control form-control-sm py-1 odoo-table-input" placeholder="0">
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="warehouse_stocks[{{ $wh->id }}][quantity]" value="{{ $qty }}" placeholder="0" />
                                                 </td>
                                                 <td>
-                                                    <input type="number" name="warehouse_stocks[{{ $wh->id }}][unit_cost]" value="{{ $cost }}" class="form-control form-control-sm py-1 odoo-table-input" placeholder="0.00" step="0.01">
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="warehouse_stocks[{{ $wh->id }}][unit_cost]" value="{{ $cost }}" placeholder="0.00" step="0.01" />
                                                 </td>
                                             </tr>
                                         @endforeach
                                     </tbody>
-                                </table>
+                                </x-ui.odoo-form-ui>
                             </div>
                         </div>
                     @endif

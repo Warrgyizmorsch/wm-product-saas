@@ -144,7 +144,7 @@
     <!-- Task List Card with Tabs -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">Lead Module Task Status Tracker</h5>
+            <h5 class="card-title mb-0">Task Status Tracker</h5>
         </div>
         <div class="card-body p-0">
             <!-- Tab Navigation -->
