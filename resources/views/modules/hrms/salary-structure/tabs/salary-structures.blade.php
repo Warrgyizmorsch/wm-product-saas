@@ -56,7 +56,7 @@
                                 <td class="text-end">
                                     <div class="d-flex justify-content-end gap-1">
                                         <x-ui.icon-btn variant="soft-primary" icon="feather-chevron-down" class="toggle-structure-details" data-target="#structure-details-{{ $structure->id }}" title="Show Components" />
-                                        <x-ui.icon-btn variant="soft-info" icon="feather-edit" class="edit-structure-btn" data-structure="{{ base64_encode($structure->toJson()) }}" title="Edit" />
+                                        <x-ui.icon-btn variant="primary" icon="feather-edit" class="edit-structure-btn" data-structure="{{ base64_encode($structure->toJson()) }}" title="Edit" />
                                         <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this structure slab?');">
                                             @csrf
                                             @method('DELETE')

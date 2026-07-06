@@ -15,11 +15,13 @@ class LeaveType extends Model
         'color',
         'quota',
         'status',
+        'rules',
     ];
 
     protected $casts = [
         'status' => 'boolean',
         'quota' => 'decimal:1',
+        'rules' => 'array',
     ];
 
     public function plan()

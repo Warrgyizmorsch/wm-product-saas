@@ -1,3 +1,12 @@
+@php
+    $companies = $companies ?? \App\Domains\HRMS\Models\Company::all();
+    $businessUnits = $businessUnits ?? \App\Domains\HRMS\Models\BusinessUnit::all();
+    $branches = $branches ?? \App\Domains\HRMS\Models\Branch::all();
+    $departments = $departments ?? \App\Domains\HRMS\Models\Department::all();
+    $employees = $employees ?? \App\Domains\HRMS\Models\Employee::all();
+    $salaryComponents = $salaryComponents ?? \App\Domains\HRMS\Models\SalaryComponent::all();
+@endphp
+
 <!-- ============================================ -->
 <!--            LEGAL ENTITIES MODALS             -->
 <!-- ============================================ -->
@@ -92,75 +101,58 @@
 
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Company Name</label>
-                            <input type="text" class="form-control" name="company_name" placeholder="Enter Company Name" required>
+                            <x-ui.input label="Company Name" name="company_name" :required="true" placeholder="Enter Company Name" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Legal Name</label>
-                            <input type="text" class="form-control" name="legal_name" placeholder="Enter Legal Name" required>
+                            <x-ui.input label="Legal Name" name="legal_name" :required="true" placeholder="Enter Legal Name" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">GST Number</label>
-                            <input type="text" class="form-control" name="gst_number" placeholder="Enter GST Number">
+                            <x-ui.input label="GST Number" name="gst_number" placeholder="Enter GST Number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">PAN Number</label>
-                            <input type="text" class="form-control" name="pan_number" placeholder="Enter PAN Number">
+                            <x-ui.input label="PAN Number" name="pan_number" placeholder="Enter PAN Number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">CIN Number</label>
-                            <input type="text" class="form-control" name="cin_number" placeholder="Enter CIN Number">
+                            <x-ui.input label="CIN Number" name="cin_number" placeholder="Enter CIN Number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Registration Number</label>
-                            <input type="text" class="form-control" name="registration_number" placeholder="Enter Registration Number">
+                            <x-ui.input label="Registration Number" name="registration_number" placeholder="Enter Registration Number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Email</label>
-                            <input type="email" class="form-control" name="email" placeholder="Enter Email Address">
+                            <x-ui.input label="Email" name="email" type="email" placeholder="Enter Email Address" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Phone</label>
-                            <input type="text" class="form-control" name="phone" placeholder="Enter Phone Number">
+                            <x-ui.input label="Phone" name="phone" placeholder="Enter Phone Number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Website</label>
-                            <input type="text" class="form-control" name="website" placeholder="Enter Website URL">
+                            <x-ui.input label="Website" name="website" placeholder="Enter Website URL" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Currency</label>
-                            <input type="text" class="form-control" name="currency" placeholder="e.g. INR, USD">
+                            <x-ui.input label="Currency" name="currency" placeholder="e.g. INR, USD" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Timezone</label>
-                            <input type="text" class="form-control" name="time_zone" placeholder="e.g. Asia/Kolkata">
+                            <x-ui.input label="Timezone" name="time_zone" placeholder="e.g. Asia/Kolkata" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status">
+                            <x-ui.select label="Status" name="status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Country</label>
-                            <input type="text" class="form-control" name="country" placeholder="Country">
+                            <x-ui.input label="Country" name="country" placeholder="Country" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">State</label>
-                            <input type="text" class="form-control" name="state" placeholder="State">
+                            <x-ui.input label="State" name="state" placeholder="State" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">City</label>
-                            <input type="text" class="form-control" name="city" placeholder="City">
+                            <x-ui.input label="City" name="city" placeholder="City" />
                         </div>
                         <div class="col-md-12">
-                            <label class="form-label fw-semibold">Postal Code</label>
-                            <input type="text" class="form-control" name="postal_code" placeholder="Postal Code">
+                            <x-ui.input label="Postal Code" name="postal_code" placeholder="Postal Code" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Address</label>
-                            <textarea class="form-control" name="address" rows="3" placeholder="Address Details"></textarea>
+                            <x-ui.textarea label="Address" name="address" rows="3" placeholder="Address Details" />
                         </div>
                     </div>
                 </div>
@@ -202,75 +194,58 @@
 
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Company Name</label>
-                            <input type="text" class="form-control" name="company_name" id="edit_company_name" required>
+                            <x-ui.input label="Company Name" name="company_name" id="edit_company_name" :required="true" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Legal Name</label>
-                            <input type="text" class="form-control" name="legal_name" id="edit_legal_name" required>
+                            <x-ui.input label="Legal Name" name="legal_name" id="edit_legal_name" :required="true" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">GST Number</label>
-                            <input type="text" class="form-control" name="gst_number" id="edit_gst_number">
+                            <x-ui.input label="GST Number" name="gst_number" id="edit_gst_number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">PAN Number</label>
-                            <input type="text" class="form-control" name="pan_number" id="edit_pan_number">
+                            <x-ui.input label="PAN Number" name="pan_number" id="edit_pan_number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">CIN Number</label>
-                            <input type="text" class="form-control" name="cin_number" id="edit_cin_number">
+                            <x-ui.input label="CIN Number" name="cin_number" id="edit_cin_number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Registration Number</label>
-                            <input type="text" class="form-control" name="registration_number" id="edit_registration_number">
+                            <x-ui.input label="Registration Number" name="registration_number" id="edit_registration_number" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Email</label>
-                            <input type="email" class="form-control" name="email" id="edit_email">
+                            <x-ui.input label="Email" name="email" id="edit_email" type="email" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Phone</label>
-                            <input type="text" class="form-control" name="phone" id="edit_phone">
+                            <x-ui.input label="Phone" name="phone" id="edit_phone" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Website</label>
-                            <input type="text" class="form-control" name="website" id="edit_website">
+                            <x-ui.input label="Website" name="website" id="edit_website" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Currency</label>
-                            <input type="text" class="form-control" name="currency" id="edit_currency">
+                            <x-ui.input label="Currency" name="currency" id="edit_currency" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Timezone</label>
-                            <input type="text" class="form-control" name="time_zone" id="edit_timezone">
+                            <x-ui.input label="Timezone" name="time_zone" id="edit_timezone" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status" id="edit_status">
+                            <x-ui.select label="Status" name="status" id="edit_status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Country</label>
-                            <input type="text" class="form-control" name="country" id="edit_country">
+                            <x-ui.input label="Country" name="country" id="edit_country" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">State</label>
-                            <input type="text" class="form-control" name="state" id="edit_state">
+                            <x-ui.input label="State" name="state" id="edit_state" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">City</label>
-                            <input type="text" class="form-control" name="city" id="edit_city">
+                            <x-ui.input label="City" name="city" id="edit_city" />
                         </div>
                         <div class="col-md-12">
-                            <label class="form-label fw-semibold">Postal Code</label>
-                            <input type="text" class="form-control" name="postal_code" id="edit_postal_code">
+                            <x-ui.input label="Postal Code" name="postal_code" id="edit_postal_code" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Address</label>
-                            <textarea class="form-control" name="address" id="edit_address" rows="3"></textarea>
+                            <x-ui.textarea label="Address" name="address" id="edit_address" rows="3" />
                         </div>
                     </div>
                 </div>
@@ -346,33 +321,27 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Business Unit Name</label>
-                            <input type="text" class="form-control" name="name" placeholder="Enter Unit Name" required>
+                            <x-ui.input label="Business Unit Name" name="name" :required="true" placeholder="Enter Unit Name" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Business Unit Code</label>
-                            <input type="text" class="form-control" name="code" placeholder="Enter Code" required>
+                            <x-ui.input label="Business Unit Code" name="code" :required="true" placeholder="Enter Code" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Parent Company</label>
-                            <select class="form-control" name="company_id" required>
+                            <x-ui.select label="Parent Company" name="company_id" :required="true" data-select2-selector="default">
                                 <option value="">Select Parent Company</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
-                        
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status">
+                            <x-ui.select label="Status" name="status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" rows="3" placeholder="Enter description details"></textarea>
+                            <x-ui.textarea label="Description" name="description" rows="3" placeholder="Enter description details" />
                         </div>
                     </div>
                 </div>
@@ -398,32 +367,26 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Business Unit Name</label>
-                            <input type="text" class="form-control" name="name" id="edit_bu_name" required>
+                            <x-ui.input label="Business Unit Name" name="name" id="edit_bu_name" :required="true" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Business Unit Code</label>
-                            <input type="text" class="form-control" name="code" id="edit_bu_code" required>
+                            <x-ui.input label="Business Unit Code" name="code" id="edit_bu_code" :required="true" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Parent Company</label>
-                            <select class="form-control" name="company_id" id="edit_bu_company_id" required>
+                            <x-ui.select label="Parent Company" name="company_id" id="edit_bu_company_id" :required="true" data-select2-selector="default">
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
-                        
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status" id="edit_bu_status">
+                            <x-ui.select label="Status" name="status" id="edit_bu_status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" id="edit_bu_description" rows="3"></textarea>
+                            <x-ui.textarea label="Description" name="description" id="edit_bu_description" rows="3" />
                         </div>
                     </div>
                 </div>
@@ -510,57 +473,61 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Branch Name</label>
-                            <input type="text" class="form-control" name="name" placeholder="Enter Branch Name" required>
+                            <x-ui.input label="Branch Name" name="name" :required="true" placeholder="Enter Branch Name" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Branch Code</label>
-                            <input type="text" class="form-control" name="code" placeholder="Enter Code" required>
+                            <x-ui.input label="Branch Code" name="code" :required="true" placeholder="Enter Code" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Parent Company / Legal Entity</label>
-                            <select class="form-control" name="company_id">
+                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" data-select2-selector="default">
                                 <option value="">Select Company (Required if no Business Unit)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Phone</label>
-                            <input type="text" class="form-control" name="phone" placeholder="Enter Phone">
+                            </x-ui.select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Email</label>
-                            <input type="email" class="form-control" name="email" placeholder="Enter Email">
+                            <x-ui.select label="Parent Business Unit" name="business_unit_id" data-select2-selector="default">
+                                <option value="">Select Business Unit (Optional)</option>
+                                @foreach($businessUnits as $buUnit)
+                                    <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.select label="Branch Manager" name="manager_employee_id" data-select2-selector="default">
+                                <option value="">Select Manager (Optional)</option>
+                                @foreach($employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input label="Phone" name="phone" placeholder="Enter Phone" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input label="Email" name="email" type="email" placeholder="Enter Email" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Country</label>
-                            <input type="text" class="form-control" name="country" placeholder="Country">
+                            <x-ui.input label="Country" name="country" placeholder="Country" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">State</label>
-                            <input type="text" class="form-control" name="state" placeholder="State">
+                            <x-ui.input label="State" name="state" placeholder="State" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">City</label>
-                            <input type="text" class="form-control" name="city" placeholder="City">
+                            <x-ui.input label="City" name="city" placeholder="City" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Postal Code</label>
-                            <input type="text" class="form-control" name="postal_code" placeholder="Postal Code">
+                            <x-ui.input label="Postal Code" name="postal_code" placeholder="Postal Code" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status">
+                            <x-ui.select label="Status" name="status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Address</label>
-                            <textarea class="form-control" name="address" rows="3" placeholder="Address Details"></textarea>
+                            <x-ui.textarea label="Address" name="address" rows="3" placeholder="Address Details" />
                         </div>
                     </div>
                 </div>
@@ -586,58 +553,61 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Branch Name</label>
-                            <input type="text" class="form-control" name="name" id="edit_branch_name" required>
+                            <x-ui.input label="Branch Name" name="name" id="edit_branch_name" :required="true" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Branch Code</label>
-                            <input type="text" class="form-control" name="code" id="edit_branch_code" required>
+                            <x-ui.input label="Branch Code" name="code" id="edit_branch_code" :required="true" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Parent Company / Legal Entity</label>
-                            <select class="form-control" name="company_id" id="edit_branch_company_id">
+                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" id="edit_branch_company_id" data-select2-selector="default">
                                 <option value="">Select Company (Required if no Business Unit)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
-                        </div>
-                        
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Phone</label>
-                            <input type="text" class="form-control" name="phone" id="edit_branch_phone">
+                            </x-ui.select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Email</label>
-                            <input type="email" class="form-control" name="email" id="edit_branch_email">
+                            <x-ui.select label="Parent Business Unit" name="business_unit_id" id="edit_branch_bu_id" data-select2-selector="default">
+                                <option value="">Select Business Unit (Optional)</option>
+                                @foreach($businessUnits as $buUnit)
+                                    <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.select label="Branch Manager" name="manager_employee_id" id="edit_branch_manager_id" data-select2-selector="default">
+                                <option value="">Select Manager (Optional)</option>
+                                @foreach($employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input label="Phone" name="phone" id="edit_branch_phone" />
+                        </div>
+                        <div class="col-md-6">
+                            <x-ui.input label="Email" name="email" id="edit_branch_email" type="email" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Country</label>
-                            <input type="text" class="form-control" name="country" id="edit_branch_country">
+                            <x-ui.input label="Country" name="country" id="edit_branch_country" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">State</label>
-                            <input type="text" class="form-control" name="state" id="edit_branch_state">
+                            <x-ui.input label="State" name="state" id="edit_branch_state" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">City</label>
-                            <input type="text" class="form-control" name="city" id="edit_branch_city">
+                            <x-ui.input label="City" name="city" id="edit_branch_city" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Postal Code</label>
-                            <input type="text" class="form-control" name="postal_code" id="edit_branch_postal_code">
+                            <x-ui.input label="Postal Code" name="postal_code" id="edit_branch_postal_code" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status" id="edit_branch_status">
+                            <x-ui.select label="Status" name="status" id="edit_branch_status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Address</label>
-                            <textarea class="form-control" name="address" id="edit_branch_address" rows="3"></textarea>
+                            <x-ui.textarea label="Address" name="address" id="edit_branch_address" rows="3" />
                         </div>
                     </div>
                 </div>
@@ -713,35 +683,51 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Department Name</label>
-                            <input type="text" class="form-control" name="name" placeholder="Enter Department Name" required>
+                            <x-ui.input label="Department Name" name="name" :required="true" placeholder="Enter Department Name" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Department Code</label>
-                            <input type="text" class="form-control" name="code" placeholder="Enter Code" required>
+                            <x-ui.input label="Department Code" name="code" :required="true" placeholder="Enter Code" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Parent Company / Legal Entity</label>
-                            <select class="form-control" name="company_id">
+                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" data-select2-selector="default">
                                 <option value="">Select Company (Required if no Branch/Business Unit)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
-                        
-                        
-                        
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status">
+                            <x-ui.select label="Parent Business Unit" name="business_unit_id" data-select2-selector="default">
+                                <option value="">Select Business Unit (Optional)</option>
+                                @foreach($businessUnits as $buUnit)
+                                    <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.select label="Parent Branch" name="branch_id" data-select2-selector="default">
+                                <option value="">Select Branch (Optional)</option>
+                                @foreach($branches as $branch)
+                                    <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.select label="Department Head" name="head_employee_id" data-select2-selector="default">
+                                <option value="">Select Department Head (Optional)</option>
+                                @foreach($employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.select label="Status" name="status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" rows="3" placeholder="Enter description details"></textarea>
+                            <x-ui.textarea label="Description" name="description" rows="3" placeholder="Enter description details" />
                         </div>
                     </div>
                 </div>
@@ -767,34 +753,51 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Department Name</label>
-                            <input type="text" class="form-control" name="name" id="edit_dept_name" required>
+                            <x-ui.input label="Department Name" name="name" id="edit_dept_name" :required="true" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Department Code</label>
-                            <input type="text" class="form-control" name="code" id="edit_dept_code" required>
+                            <x-ui.input label="Department Code" name="code" id="edit_dept_code" :required="true" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Parent Company / Legal Entity</label>
-                            <select class="form-control" name="company_id" id="edit_dept_company_id">
+                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" id="edit_dept_company_id" data-select2-selector="default">
                                 <option value="">Select Company (Required if no Branch/Business Unit)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
-                        
-                        
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status" id="edit_dept_status">
+                            <x-ui.select label="Parent Business Unit" name="business_unit_id" id="edit_dept_bu_id" data-select2-selector="default">
+                                <option value="">Select Business Unit (Optional)</option>
+                                @foreach($businessUnits as $buUnit)
+                                    <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.select label="Parent Branch" name="branch_id" id="edit_dept_branch_id" data-select2-selector="default">
+                                <option value="">Select Branch (Optional)</option>
+                                @foreach($branches as $branch)
+                                    <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.select label="Department Head" name="head_employee_id" id="edit_dept_head_id" data-select2-selector="default">
+                                <option value="">Select Department Head (Optional)</option>
+                                @foreach($employees as $employee)
+                                    <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.select label="Status" name="status" id="edit_dept_status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" id="edit_dept_description" rows="3"></textarea>
+                            <x-ui.textarea label="Description" name="description" id="edit_dept_description" rows="3" />
                         </div>
                     </div>
                 </div>
@@ -866,24 +869,27 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Designation Name</label>
-                            <input type="text" class="form-control" name="name" placeholder="Enter Designation Name" required>
+                            <x-ui.input label="Designation Name" name="name" :required="true" placeholder="Enter Designation Name" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Grade Level</label>
-                            <input type="text" class="form-control" name="level" placeholder="Enter Grade Level (e.g. L1, L2)">
+                            <x-ui.input label="Grade Level" name="level" placeholder="Enter Grade Level (e.g. L1, L2)" />
                         </div>
-                        
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status">
+                            <x-ui.select label="Parent Department" name="department_id" :required="true" data-select2-selector="default">
+                                <option value="">Select Department</option>
+                                @foreach($departments as $dept)
+                                    <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.select label="Status" name="status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" rows="3" placeholder="Enter description details"></textarea>
+                            <x-ui.textarea label="Description" name="description" rows="3" placeholder="Enter description details" />
                         </div>
                     </div>
                 </div>
@@ -909,24 +915,27 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Designation Name</label>
-                            <input type="text" class="form-control" name="name" id="edit_desig_name" required>
+                            <x-ui.input label="Designation Name" name="name" id="edit_desig_name" :required="true" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Grade Level</label>
-                            <input type="text" class="form-control" name="level" id="edit_desig_level">
+                            <x-ui.input label="Grade Level" name="level" id="edit_desig_level" />
                         </div>
-                        
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" name="status" id="edit_desig_status">
+                            <x-ui.select label="Parent Department" name="department_id" id="edit_desig_dept_id" :required="true" data-select2-selector="default">
+                                <option value="">Select Department</option>
+                                @foreach($departments as $dept)
+                                    <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.select label="Status" name="status" id="edit_desig_status" data-select2-selector="default">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" id="edit_desig_description" rows="3"></textarea>
+                            <x-ui.textarea label="Description" name="description" id="edit_desig_description" rows="3" />
                         </div>
                     </div>
                 </div>
@@ -952,40 +961,34 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Component Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="name" placeholder="Enter Component Name (e.g. Basic Salary)" required>
+                            <x-ui.input label="Component Name" name="name" :required="true" placeholder="Enter Component Name (e.g. Basic Salary)" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Code <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="code" placeholder="Enter Component Code (e.g. BASIC)" required>
+                            <x-ui.input label="Code" name="code" :required="true" placeholder="Enter Component Code (e.g. BASIC)" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
-                            <select class="form-control" name="type" required>
+                            <x-ui.select label="Type" name="type" :required="true" data-select2-selector="default">
                                 <option value="earning">Earning</option>
                                 <option value="deduction">Deduction</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <input type="hidden" name="calculation_type" value="fixed">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Parent Company / Legal Entity</label>
-                            <select class="form-control" name="company_id">
+                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" data-select2-selector="default">
                                 <option value="">All Entities (Global)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" data-select2-selector="status" name="status">
+                            <x-ui.select label="Status" name="status" data-select2-selector="status">
                                 <option value="1" data-bg="bg-success" selected>Active</option>
                                 <option value="0" data-bg="bg-danger">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" rows="3" placeholder="Enter description details"></textarea>
+                            <x-ui.textarea label="Description" name="description" rows="3" placeholder="Enter description details" />
                         </div>
                     </div>
                 </div>
@@ -1011,40 +1014,34 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Component Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="name" id="edit_sc_name" required>
+                            <x-ui.input label="Component Name" name="name" id="edit_sc_name" :required="true" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Code <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" name="code" id="edit_sc_code" required>
+                            <x-ui.input label="Code" name="code" id="edit_sc_code" :required="true" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
-                            <select class="form-control" name="type" id="edit_sc_type" required>
+                            <x-ui.select label="Type" name="type" id="edit_sc_type" :required="true" data-select2-selector="default">
                                 <option value="earning">Earning</option>
                                 <option value="deduction">Deduction</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <input type="hidden" name="calculation_type" id="edit_sc_calculation_type" value="fixed">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Parent Company / Legal Entity</label>
-                            <select class="form-control" name="company_id" id="edit_sc_company_id">
+                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" id="edit_sc_company_id" data-select2-selector="default">
                                 <option value="">All Entities (Global)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Status</label>
-                            <select class="form-control" data-select2-selector="status" name="status" id="edit_sc_status">
+                            <x-ui.select label="Status" name="status" id="edit_sc_status" data-select2-selector="status">
                                 <option value="1" data-bg="bg-success">Active</option>
                                 <option value="0" data-bg="bg-danger">Inactive</option>
-                            </select>
+                            </x-ui.select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Description</label>
-                            <textarea class="form-control" name="description" id="edit_sc_description" rows="3"></textarea>
+                            <x-ui.textarea label="Description" name="description" id="edit_sc_description" rows="3" />
                         </div>
                     </div>
                 </div>

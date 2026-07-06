@@ -155,4 +155,20 @@ class LeaveStructureController extends Controller
         $leaveType->delete();
         return redirect()->route('hrms.leave-structure.index', ['plan_id' => $planId])->with('success', 'Leave Type deleted successfully.');
     }
+
+    public function updateRules(Request $request, LeaveType $leaveType)
+    {
+        $request->validate([
+            'rules' => 'required|array'
+        ]);
+
+        $leaveType->update([
+            'rules' => $request->rules
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Rules updated successfully.'
+        ]);
+    }
 }

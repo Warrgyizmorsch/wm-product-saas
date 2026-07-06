@@ -56,4 +56,9 @@ Route::prefix('hrms')
         Route::delete('/org/department/delete/{department}', [OrgController::class, 'destroyDepartment'])->name('department.destroy');
         Route::delete('/org/designation/delete/{designation}', [OrgController::class, 'destroyDesignation'])->name('designation.destroy');
         Route::delete('/org/salary-component/delete/{salaryComponent}', [OrgController::class, 'destroySalaryComponent'])->name('salary-component.destroy');
+
+        // Leave Type Rules Configuration Route
+        Route::post('/leave-structure/type/{leaveType}/rules', [LeaveStructureController::class, 'updateRules'])->name('leave-structure.type.rules');
+
+        Route::view('/track-status', 'modules.hrms.track-status')->name('track-status');
     });

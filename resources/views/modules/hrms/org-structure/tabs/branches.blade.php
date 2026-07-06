@@ -45,7 +45,7 @@
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
                                     <x-ui.icon-btn variant="soft-primary" icon="feather-eye" class="btn-view-branch" data-bs-toggle="modal" data-bs-target="#viewBranchModal" data-branch="{{ base64_encode($br->toJson()) }}" title="View" />
-                                    <x-ui.icon-btn variant="soft-info" icon="feather-edit" class="btn-edit-branch" data-bs-toggle="modal" data-bs-target="#editBranchModal" data-branch="{{ base64_encode($br->toJson()) }}" title="Edit" />
+                                    <x-ui.icon-btn variant="primary" icon="feather-edit" class="btn-edit-branch" data-bs-toggle="modal" data-bs-target="#editBranchModal" data-branch="{{ base64_encode($br->toJson()) }}" title="Edit" />
                                     <form action="{{ route('hrms.branch.destroy', $br->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this branch?');">
                                         @csrf
                                         @method('DELETE')
@@ -70,78 +70,130 @@
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        function getInitials(name, fallback) {
-            const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
+    (function() {
+        function init() {
+            function getInitials(name, fallback) {
+                const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
 
-            if (words.length >= 2) {
-                return (words[0][0] + words[1][0]).toUpperCase();
+                if (words.length >= 2) {
+                    return (words[0][0] + words[1][0]).toUpperCase();
+                }
+
+                return (words[0] || fallback || '').substring(0, 2).toUpperCase();
             }
 
-            return (words[0] || fallback || '').substring(0, 2).toUpperCase();
+            // View Action Trigger
+            document.querySelectorAll('.btn-view-branch').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    let branch = JSON.parse(atob(this.dataset.branch));
+                    
+                    let nameEl = document.getElementById('modal_view_branch_name');
+                    if (nameEl) nameEl.innerText = branch.name;
+                    
+                    let buEl = document.getElementById('modal_view_branch_bu');
+                    if (buEl) buEl.innerText = (branch.business_unit && branch.business_unit.name) ? branch.business_unit.name : ((branch.company && branch.company.company_name) ? branch.company.company_name : 'N/A');
+                    
+                    let codeEl = document.getElementById('modal_view_branch_code');
+                    if (codeEl) codeEl.innerText = branch.code;
+                    
+                    let managerEl = document.getElementById('modal_view_branch_manager');
+                    if (managerEl) managerEl.innerText = (branch.manager) ? (branch.manager.first_name + ' ' + branch.manager.last_name) : 'N/A';
+                    
+                    let phoneEl = document.getElementById('modal_view_branch_phone');
+                    if (phoneEl) phoneEl.innerText = branch.phone || 'N/A';
+                    
+                    let emailEl = document.getElementById('modal_view_branch_email');
+                    if (emailEl) emailEl.innerText = branch.email || 'N/A';
+                    
+                    let countryEl = document.getElementById('modal_view_branch_country');
+                    if (countryEl) countryEl.innerText = branch.country || 'N/A';
+                    
+                    let stateEl = document.getElementById('modal_view_branch_state');
+                    if (stateEl) stateEl.innerText = branch.state || 'N/A';
+                    
+                    let cityEl = document.getElementById('modal_view_branch_city');
+                    if (cityEl) cityEl.innerText = branch.city || 'N/A';
+                    
+                    let zipEl = document.getElementById('modal_view_branch_zip');
+                    if (zipEl) zipEl.innerText = branch.postal_code || 'N/A';
+                    
+                    let addressEl = document.getElementById('modal_view_branch_address');
+                    if (addressEl) addressEl.innerText = branch.address || 'N/A';
+                    
+                    let avatarEl = document.getElementById('modal_view_branch_avatar');
+                    if (avatarEl) {
+                        avatarEl.innerText = getInitials(branch.name, 'BR');
+                    }
+                    
+                    let statusEl = document.getElementById('modal_view_branch_status');
+                    if (statusEl) {
+                        if (branch.status === true || branch.status === 1 || branch.status === '1') {
+                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success fw-bold fs-13">Active</span>';
+                        } else {
+                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger fw-bold fs-13">Inactive</span>';
+                        }
+                    }
+                });
+            });
+
+            // Edit Action Trigger
+            document.querySelectorAll('.btn-edit-branch').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    let branch = JSON.parse(atob(this.dataset.branch));
+                    
+                    let nameEl = document.getElementById('edit_branch_name');
+                    if (nameEl) nameEl.value = branch.name || '';
+                    
+                    let codeEl = document.getElementById('edit_branch_code');
+                    if (codeEl) codeEl.value = branch.code || '';
+                    
+                    let buEl = document.getElementById('edit_branch_bu_id');
+                    if (buEl) buEl.value = branch.business_unit_id || '';
+                    
+                    let companyEl = document.getElementById('edit_branch_company_id');
+                    if (companyEl) companyEl.value = branch.company_id || '';
+                    
+                    let managerEl = document.getElementById('edit_branch_manager_id');
+                    if (managerEl) managerEl.value = branch.manager_employee_id || '';
+                    
+                    let phoneEl = document.getElementById('edit_branch_phone');
+                    if (phoneEl) phoneEl.value = branch.phone || '';
+                    
+                    let emailEl = document.getElementById('edit_branch_email');
+                    if (emailEl) emailEl.value = branch.email || '';
+                    
+                    let countryEl = document.getElementById('edit_branch_country');
+                    if (countryEl) countryEl.value = branch.country || '';
+                    
+                    let stateEl = document.getElementById('edit_branch_state');
+                    if (stateEl) stateEl.value = branch.state || '';
+                    
+                    let cityEl = document.getElementById('edit_branch_city');
+                    if (cityEl) cityEl.value = branch.city || '';
+                    
+                    let postalEl = document.getElementById('edit_branch_postal_code');
+                    if (postalEl) postalEl.value = branch.postal_code || '';
+                    
+                    let addressEl = document.getElementById('edit_branch_address');
+                    if (addressEl) addressEl.value = branch.address || '';
+                    
+                    let statusSelect = document.getElementById('edit_branch_status');
+                    if (statusSelect) {
+                        statusSelect.value = (branch.status === true || branch.status === 1 || branch.status === '1') ? '1' : '0';
+                    }
+                    
+                    let form = document.getElementById('branch_edit_form');
+                    if (form) {
+                        form.action = '/hrms/org/branch/update/' + branch.id;
+                    }
+                });
+            });
         }
 
-        // View Action Trigger
-        document.querySelectorAll('.btn-view-branch').forEach(btn => {
-            btn.addEventListener('click', function() {
-                let branch = JSON.parse(atob(this.dataset.branch));
-                
-                document.getElementById('modal_view_branch_name').innerText = branch.name;
-                document.getElementById('modal_view_branch_bu').innerText = (branch.business_unit && branch.business_unit.name) ? branch.business_unit.name : ((branch.company && branch.company.company_name) ? branch.company.company_name : 'N/A');
-                document.getElementById('modal_view_branch_code').innerText = branch.code;
-                document.getElementById('modal_view_branch_manager').innerText = (branch.manager) ? (branch.manager.first_name + ' ' + branch.manager.last_name) : 'N/A';
-                document.getElementById('modal_view_branch_phone').innerText = branch.phone || 'N/A';
-                document.getElementById('modal_view_branch_email').innerText = branch.email || 'N/A';
-                document.getElementById('modal_view_branch_country').innerText = branch.country || 'N/A';
-                document.getElementById('modal_view_branch_state').innerText = branch.state || 'N/A';
-                document.getElementById('modal_view_branch_city').innerText = branch.city || 'N/A';
-                document.getElementById('modal_view_branch_zip').innerText = branch.postal_code || 'N/A';
-                document.getElementById('modal_view_branch_address').innerText = branch.address || 'N/A';
-                
-                let avatarEl = document.getElementById('modal_view_branch_avatar');
-                if (avatarEl) {
-                    avatarEl.innerText = getInitials(branch.name, 'BR');
-                }
-                
-                let statusEl = document.getElementById('modal_view_branch_status');
-                if (statusEl) {
-                    if (branch.status === true || branch.status === 1 || branch.status === '1') {
-                        statusEl.innerHTML = '<span class="badge bg-soft-success text-success fw-bold fs-13">Active</span>';
-                    } else {
-                        statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger fw-bold fs-13">Inactive</span>';
-                    }
-                }
-            });
-        });
-
-        // Edit Action Trigger
-        document.querySelectorAll('.btn-edit-branch').forEach(btn => {
-            btn.addEventListener('click', function() {
-                let branch = JSON.parse(atob(this.dataset.branch));
-                
-                document.getElementById('edit_branch_name').value = branch.name || '';
-                document.getElementById('edit_branch_code').value = branch.code || '';
-                document.getElementById('edit_branch_bu_id').value = branch.business_unit_id || '';
-                document.getElementById('edit_branch_company_id').value = branch.company_id || '';
-                document.getElementById('edit_branch_manager_id').value = branch.manager_employee_id || '';
-                document.getElementById('edit_branch_phone').value = branch.phone || '';
-                document.getElementById('edit_branch_email').value = branch.email || '';
-                document.getElementById('edit_branch_country').value = branch.country || '';
-                document.getElementById('edit_branch_state').value = branch.state || '';
-                document.getElementById('edit_branch_city').value = branch.city || '';
-                document.getElementById('edit_branch_postal_code').value = branch.postal_code || '';
-                document.getElementById('edit_branch_address').value = branch.address || '';
-                
-                let statusSelect = document.getElementById('edit_branch_status');
-                if (statusSelect) {
-                    statusSelect.value = (branch.status === true || branch.status === 1 || branch.status === '1') ? '1' : '0';
-                }
-                
-                let form = document.getElementById('branch_edit_form');
-                if (form) {
-                    form.action = '/hrms/org/branch/update/' + branch.id;
-                }
-            });
-        });
-    });
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", init);
+        } else {
+            init();
+        }
+    })();
 </script>
