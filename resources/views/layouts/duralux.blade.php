@@ -289,19 +289,11 @@
     <!-- Global Toast Notifications -->
     <div class="erp-toast-container">
         @if (session('success'))
-            <x-ui.toast id="globalSuccessToast" title="Success" type="success" delay="5000">
+            <x-ui.toast :auto="true" title="Success" type="success" delay="5000">
                 {{ session('success') }}
             </x-ui.toast>
         @endif
-        @if ($errors->any())
-            <x-ui.toast id="globalErrorToast" title="Error Details" type="danger" delay="7000">
-                <ul class="mb-0 ps-3">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </x-ui.toast>
-        @endif
+
     </div>
 
     <script>
@@ -313,13 +305,7 @@
                     successToast.show();
                 }
             @endif
-            @if ($errors->any())
-                var errorToastEl = document.getElementById('globalErrorToast');
-                if (errorToastEl) {
-                    var errorToast = bootstrap.Toast.getOrCreateInstance(errorToastEl);
-                    errorToast.show();
-                }
-            @endif
+
         });
     </script>
 
