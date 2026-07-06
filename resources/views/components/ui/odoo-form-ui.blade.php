@@ -15,7 +15,8 @@
     'select2Selector' => null,
     'helperText' => null,
     'errorText' => null,
-    'editorHeight' => 'ht-200'
+    'editorHeight' => 'ht-200',
+    'alpineError' => null
 ])
 
 @once
@@ -406,6 +407,48 @@
                 }
             }
 
+            // Clear error highlighting and messages on user input
+            function clearOdooError(input) {
+                input.classList.remove('is-invalid');
+                let errorContainer = input.parentElement;
+                
+                // Handle file input wrapper
+                if (input.classList.contains('erp-file-input')) {
+                    errorContainer = input.closest('.erp-custom-file-upload')?.parentElement || errorContainer;
+                    let fileLabel = input.closest('.file-upload-label');
+                    if (fileLabel) {
+                        fileLabel.classList.remove('is-invalid', 'border-danger', 'text-danger');
+                        fileLabel.querySelector('.feather-upload-cloud')?.classList.add('text-primary');
+                        fileLabel.querySelector('.feather-upload-cloud')?.classList.remove('text-danger');
+                    }
+                }
+                
+                // Handle select2 container wrapper styles
+                if (input.tagName === 'SELECT' && $(input).data('select2')) {
+                    let select2Selection = input.nextElementSibling?.querySelector('.select2-selection');
+                    if (select2Selection) {
+                        select2Selection.classList.remove('is-invalid');
+                    }
+                    let s2Container = input.nextElementSibling;
+                    if (s2Container && s2Container.classList.contains('select2-container')) {
+                        errorContainer = s2Container.parentElement;
+                    }
+                }
+
+                // Remove dynamic errors
+                let errorEl = errorContainer.querySelector('.invalid-feedback.dynamic-error-feedback');
+                if (errorEl) {
+                    errorEl.remove();
+                }
+
+                // Hide server-side validation error too if visible
+                let serverErrorEl = errorContainer.querySelector('.invalid-feedback');
+                if (serverErrorEl) {
+                    serverErrorEl.classList.remove('d-block');
+                    serverErrorEl.classList.add('d-none');
+                }
+            }
+
             $(document).ready(function() {
                 initOdooComponents();
 
@@ -413,6 +456,150 @@
                 $(document).on('change', '.erp-file-input', function() {
                     var fileName = this.files[0] ? this.files[0].name : 'Click to upload...';
                     $(this).siblings('.file-text').text(fileName);
+                });
+
+                // Auto-configure novalidate on forms containing Odoo components
+                $('form').each(function() {
+                    if (this.querySelector('.odoo-form-control, .odoo-table-input, .odoo-table-select')) {
+                        this.setAttribute('novalidate', '');
+                    }
+                });
+
+                // Clear errors on interaction
+                $(document).on('input change keyup', '.odoo-form-control, .odoo-table-input, .odoo-table-select, .erp-file-input', function() {
+                    clearOdooError(this);
+                });
+
+                // Handle select2 change clearing
+                $(document).on('change.select2', 'select', function() {
+                    clearOdooError(this);
+                });
+
+                // Generic form submit required validator
+                $(document).on('submit', 'form', function(e) {
+                    let form = this;
+                    if (!form.querySelector('.odoo-form-control, .odoo-table-input, .odoo-table-select, .erp-file-input')) {
+                        return;
+                    }
+
+                    let hasErrors = false;
+                    let firstErrEl = null;
+
+                    // Query required fields (inputs, selects, textareas)
+                    let requiredFields = form.querySelectorAll('input[required], select[required], textarea[required]');
+                    requiredFields.forEach(field => {
+                        if (field.disabled || field.readOnly || field.type === 'hidden') return;
+
+                        let val = field.value;
+                        let isEmpty = false;
+
+                        if (field.type === 'checkbox') {
+                            isEmpty = !field.checked;
+                        } else if (field.type === 'file') {
+                            isEmpty = !field.files || field.files.length === 0;
+                        } else {
+                            isEmpty = !val || !val.trim();
+                        }
+
+                        if (isEmpty) {
+                            hasErrors = true;
+                            field.classList.add('is-invalid');
+
+                            // Find select2 elements and style select2 container selection block
+                            if (field.tagName === 'SELECT' && $(field).data('select2')) {
+                                let select2Selection = field.nextElementSibling?.querySelector('.select2-selection');
+                                if (select2Selection) {
+                                    select2Selection.classList.add('is-invalid');
+                                }
+                            }
+
+                            // Check dynamic error element
+                            let errorContainer = field.parentElement;
+                            if (field.classList.contains('erp-file-input')) {
+                                errorContainer = field.closest('.erp-custom-file-upload').parentElement;
+                                let fileLabel = field.closest('.file-upload-label');
+                                if (fileLabel) {
+                                    fileLabel.classList.add('is-invalid', 'border-danger', 'text-danger');
+                                    fileLabel.querySelector('.feather-upload-cloud')?.classList.remove('text-primary');
+                                    fileLabel.querySelector('.feather-upload-cloud')?.classList.add('text-danger');
+                                }
+                            } else if (field.tagName === 'SELECT' && $(field).data('select2')) {
+                                let s2Container = field.nextElementSibling;
+                                if (s2Container && s2Container.classList.contains('select2-container')) {
+                                    errorContainer = s2Container.parentElement;
+                                }
+                            }
+
+                            let errorEl = errorContainer.querySelector('.invalid-feedback.dynamic-error-feedback');
+                            if (!errorEl) {
+                                errorEl = document.createElement('div');
+                                errorEl.className = 'invalid-feedback dynamic-error-feedback d-block fs-11 mt-1';
+
+                                // Find Label Text
+                                let labelName = '';
+                                let odooFormGroup = field.closest('.odoo-form-group');
+                                if (odooFormGroup) {
+                                    let labelEl = odooFormGroup.querySelector('.odoo-form-label');
+                                    if (labelEl) {
+                                        labelName = labelEl.textContent.replace('*', '').trim();
+                                    }
+                                }
+
+                                // Table support: trace header name from thead if inside a table column
+                                if (!labelName) {
+                                    let td = field.closest('td');
+                                    let tr = field.closest('tr');
+                                    let table = field.closest('table');
+                                    if (td && tr && table) {
+                                        let colIndex = Array.from(tr.children).indexOf(td);
+                                        let th = table.querySelector(`thead tr th:nth-child(${colIndex + 1})`);
+                                        if (th) {
+                                            labelName = th.textContent.trim();
+                                        }
+                                    }
+                                }
+
+                                if (!labelName) {
+                                    labelName = field.getAttribute('placeholder') || field.getAttribute('name') || 'This field';
+                                }
+
+                                errorEl.textContent = `${labelName} is required.`;
+
+                                // Insert error element
+                                if (field.tagName === 'SELECT' && $(field).data('select2')) {
+                                    let s2Container = field.nextElementSibling;
+                                    if (s2Container && s2Container.classList.contains('select2-container')) {
+                                        s2Container.parentNode.insertBefore(errorEl, s2Container.nextSibling);
+                                    } else {
+                                        field.parentNode.insertBefore(errorEl, field.nextSibling);
+                                    }
+                                } else if (field.classList.contains('erp-file-input')) {
+                                    let customUpload = field.closest('.erp-custom-file-upload');
+                                    customUpload.parentNode.insertBefore(errorEl, customUpload.nextSibling);
+                                } else {
+                                    field.parentNode.insertBefore(errorEl, field.nextSibling);
+                                }
+                            }
+
+                            if (!firstErrEl) {
+                                firstErrEl = field;
+                            }
+                        }
+                    });
+
+                    if (hasErrors) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if (firstErrEl) {
+                            firstErrEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            firstErrEl.focus();
+                            if (firstErrEl.tagName === 'SELECT' && $(firstErrEl).data('select2')) {
+                                $(firstErrEl).select2('focus');
+                            }
+                        }
+                        return false;
+                    }
                 });
             });
 
@@ -445,16 +632,23 @@
                        id="{{ $fieldId }}"
                        value="{{ $value }}" 
                        placeholder="{{ $placeholder }}" 
+                       {{ $required ? 'required' : '' }} 
                        {{ $readonly ? 'readonly' : '' }}
                        {{ $disabled ? 'disabled' : '' }}
                        {{ $attributes->class([
                            $label ? 'odoo-form-control' : 'odoo-table-input',
                            $errorText ? 'is-invalid' : ''
-                       ]) }}>
+                       ]) }}
+                       @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid' : ''" @endif>
+                @if($alpineError)
+                    <template x-if="{{ $alpineError }}">
+                        <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray({{ $alpineError }}) ? {{ $alpineError }}[0] : {{ $alpineError }}"></div>
+                    </template>
+                @endif
                 @if($errorText)
-                    <div class="invalid-feedback d-block fs-11 mt-1">{{ $errorText }}</div>
+                    <div class="invalid-feedback d-block fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $errorText }}</div>
                 @elseif($helperText)
-                    <div class="text-muted fs-11 mt-1">{{ $helperText }}</div>
+                    <div class="text-muted fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $helperText }}</div>
                 @endif
     @if($label)
             </div>
@@ -474,7 +668,7 @@
     @endif
                 <select name="{{ $name }}" 
                         id="{{ $fieldId }}"
-                         
+                        {{ $required ? 'required' : '' }} 
                         {{ $multiple ? 'multiple' : '' }}
                         {{ $disabled ? 'disabled' : '' }}
                         @if($select2Selector) data-select2-selector="{{ $select2Selector }}" @endif
@@ -484,13 +678,19 @@
                             $select2Selector ? 'max-select' : '',
                             $errorText ? 'is-invalid' : ''
                         ]) }}
+                        @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid' : ''" @endif
                         style="border-radius:0;">
                     {{ $slot }}
                 </select>
+                @if($alpineError)
+                    <template x-if="{{ $alpineError }}">
+                        <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray({{ $alpineError }}) ? {{ $alpineError }}[0] : {{ $alpineError }}"></div>
+                    </template>
+                @endif
                 @if($errorText)
-                    <div class="invalid-feedback d-block fs-11 mt-1">{{ $errorText }}</div>
+                    <div class="invalid-feedback d-block fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $errorText }}</div>
                 @elseif($helperText)
-                    <div class="text-muted fs-11 mt-1">{{ $helperText }}</div>
+                    <div class="text-muted fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $helperText }}</div>
                 @endif
     @if($label)
             </div>
@@ -511,15 +711,21 @@
                 <textarea name="{{ $name }}" 
                           id="{{ $fieldId }}"
                           rows="{{ $rows }}" 
-                          
+                          {{ $required ? 'required' : '' }}
                           {{ $readonly ? 'readonly' : '' }}
                           {{ $disabled ? 'disabled' : '' }}
                           {{ $attributes->class(['odoo-form-control', $errorText ? 'is-invalid' : '']) }} 
+                          @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid' : ''" @endif
                           placeholder="{{ $placeholder }}">{{ $value ?? $slot }}</textarea>
+                @if($alpineError)
+                    <template x-if="{{ $alpineError }}">
+                        <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray({{ $alpineError }}) ? {{ $alpineError }}[0] : {{ $alpineError }}"></div>
+                    </template>
+                @endif
                 @if($errorText)
-                    <div class="invalid-feedback d-block fs-11 mt-1">{{ $errorText }}</div>
+                    <div class="invalid-feedback d-block fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $errorText }}</div>
                 @elseif($helperText)
-                    <div class="text-muted fs-11 mt-1">{{ $helperText }}</div>
+                    <div class="text-muted fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $helperText }}</div>
                 @endif
     @if($label)
             </div>
@@ -542,17 +748,25 @@
                            name="{{ $name }}" 
                            id="{{ $fieldId }}"
                            value="{{ $value ?? '1' }}" 
-                            
+                           {{ $required ? 'required' : '' }} 
                            {{ $disabled ? 'disabled' : '' }}
-                           {{ $attributes->class(['form-check-input', $errorText ? 'is-invalid' : '']) }}>
+                           {{ $attributes->class(['form-check-input', $errorText ? 'is-invalid' : '']) }}
+                           @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid' : ''" @endif>
                     @if(isset($slot) && $slot->isNotEmpty())
-                        <label class="form-check-label fs-13 text-dark ms-1" for="{{ $fieldId }}">{{ $slot }}</label>
+                        <label class="form-check-label fs-13 text-dark ms-1" 
+                               @if($attributes->has('x-bind:id')) :for="{{ $attributes->get('x-bind:id') }}" @endif
+                               for="{{ $fieldId }}">{{ $slot }}</label>
                     @endif
                 </div>
+                @if($alpineError)
+                    <template x-if="{{ $alpineError }}">
+                        <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray({{ $alpineError }}) ? {{ $alpineError }}[0] : {{ $alpineError }}"></div>
+                    </template>
+                @endif
                 @if($errorText)
-                    <div class="invalid-feedback d-block fs-11 mt-1">{{ $errorText }}</div>
+                    <div class="invalid-feedback d-block fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $errorText }}</div>
                 @elseif($helperText)
-                    <div class="text-muted fs-11 mt-1">{{ $helperText }}</div>
+                    <div class="text-muted fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $helperText }}</div>
                 @endif
     @if($label)
             </div>
@@ -571,10 +785,15 @@
                     {{ $slot }}
     @if($label)
                 </div>
+                @if($alpineError)
+                    <template x-if="{{ $alpineError }}">
+                        <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray({{ $alpineError }}) ? {{ $alpineError }}[0] : {{ $alpineError }}"></div>
+                    </template>
+                @endif
                 @if($errorText)
-                    <div class="invalid-feedback d-block fs-11 mt-1">{{ $errorText }}</div>
+                    <div class="invalid-feedback d-block fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $errorText }}</div>
                 @elseif($helperText)
-                    <div class="text-muted fs-11 mt-1">{{ $helperText }}</div>
+                    <div class="text-muted fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $helperText }}</div>
                 @endif
             </div>
         </div>
@@ -592,21 +811,29 @@
             <div class="flex-grow-1">
     @endif
                 <div class="erp-custom-file-upload">
-                    <label class="file-upload-label w-100 {{ $disabled ? 'opacity-50 cursor-not-allowed' : '' }}" for="{{ $fieldId }}">
-                        <i class="feather-upload-cloud me-2 text-primary fs-16"></i>
+                    <label class="file-upload-label w-100 {{ $disabled ? 'opacity-50 cursor-not-allowed' : '' }}" 
+                           :class="@if($alpineError) {{ $alpineError }} ? 'is-invalid border-danger text-danger' : '' @else '' @endif"
+                           for="{{ $fieldId }}">
+                        <i class="feather-upload-cloud me-2 text-primary fs-16" :class="@if($alpineError) {{ $alpineError }} ? 'text-danger' : 'text-primary' @else 'text-primary' @endif"></i>
                         <span class="file-text text-muted">{{ $placeholder ?? 'Click to upload...' }}</span>
                         <input type="file" 
                                name="{{ $name }}" 
                                id="{{ $fieldId }}"
-                               
+                               {{ $required ? 'required' : '' }}
                                {{ $disabled ? 'disabled' : '' }}
-                               {{ $attributes->class(['erp-file-input d-none', $errorText ? 'is-invalid' : '']) }}>
+                               {{ $attributes->class(['erp-file-input d-none', $errorText ? 'is-invalid' : '']) }}
+                               @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid' : ''" @endif>
                     </label>
                 </div>
+                @if($alpineError)
+                    <template x-if="{{ $alpineError }}">
+                        <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray({{ $alpineError }}) ? {{ $alpineError }}[0] : {{ $alpineError }}"></div>
+                    </template>
+                @endif
                 @if($errorText)
-                    <div class="invalid-feedback d-block fs-11 mt-1">{{ $errorText }}</div>
+                    <div class="invalid-feedback d-block fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $errorText }}</div>
                 @elseif($helperText)
-                    <div class="text-muted fs-11 mt-1">{{ $helperText }}</div>
+                    <div class="text-muted fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $helperText }}</div>
                 @endif
     @if($label)
             </div>
@@ -624,16 +851,22 @@
             </label>
             <div class="flex-grow-1">
     @endif
-                <div class="odoo-editor-wrapper {{ $errorText ? 'is-invalid' : '' }}">
+                <div class="odoo-editor-wrapper {{ $errorText ? 'is-invalid' : '' }}"
+                     @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid border-danger' : ''" @endif>
                     <div id="{{ $fieldId }}" class="odoo-editor {{ $editorHeight }}">
                         {!! $value ?? $slot !!}
                     </div>
                 </div>
                 <input type="hidden" name="{{ $name }}" id="{{ $fieldId }}_input" value="{{ $value ?? $slot }}">
+                @if($alpineError)
+                    <template x-if="{{ $alpineError }}">
+                        <div class="invalid-feedback d-block fs-11 mt-1" x-text="Array.isArray({{ $alpineError }}) ? {{ $alpineError }}[0] : {{ $alpineError }}"></div>
+                    </template>
+                @endif
                 @if($errorText)
-                    <div class="invalid-feedback d-block fs-11 mt-1">{{ $errorText }}</div>
+                    <div class="invalid-feedback d-block fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $errorText }}</div>
                 @elseif($helperText)
-                    <div class="text-muted fs-11 mt-1">{{ $helperText }}</div>
+                    <div class="text-muted fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $helperText }}</div>
                 @endif
     @if($label)
             </div>

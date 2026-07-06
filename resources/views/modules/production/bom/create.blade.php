@@ -68,8 +68,8 @@
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="BOM Number" name="bom_number" placeholder="e.g. BOM-XYZ-001 or AUTO" :value="old('bom_number', 'AUTO')" :required="true" />
-                        <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" id="product_id" :required="true" data-master="product">
+                        <x-ui.odoo-form-ui type="input" label="BOM Number" name="bom_number" placeholder="e.g. BOM-XYZ-001 or AUTO" :value="old('bom_number', 'AUTO')" :required="true" :error-text="$errors->first('bom_number')" alpineError="errors.bom_number" />
+                        <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" id="product_id" :required="true" data-master="product" :error-text="$errors->first('product_id')" alpineError="errors.product_id">
                             <option value="">Select Product...</option>
                             <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
                             @foreach ($products as $p)
@@ -77,9 +77,9 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" label="BOM Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" :value="old('bom_name')" :required="true" />
+                        <x-ui.odoo-form-ui type="input" label="BOM Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" :value="old('bom_name')" :required="true" :error-text="$errors->first('bom_name')" alpineError="errors.bom_name" />
 
-                        <x-ui.odoo-form-ui type="select" label="BOM Type" name="bom_type" :required="true">
+                        <x-ui.odoo-form-ui type="select" label="BOM Type" name="bom_type" :required="true" :error-text="$errors->first('bom_type')" alpineError="errors.bom_type">
                             <option value="manufacturing" @selected(old('bom_type', 'manufacturing') === 'manufacturing')>Manufacturing BOM (Standard)</option>
                             <option value="engineering" @selected(old('bom_type') === 'engineering')>Engineering BOM (R&D)</option>
                             <option value="sales" @selected(old('bom_type') === 'sales')>Sales BOM (Kit)</option>
@@ -87,7 +87,7 @@
                             <option value="subcontracting" @selected(old('bom_type') === 'subcontracting')>Subcontracting (Outsourced)</option>
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="select" label="Usage Context" name="usage_context" :required="true">
+                        <x-ui.odoo-form-ui type="select" label="Usage Context" name="usage_context" :required="true" :error-text="$errors->first('usage_context')" alpineError="errors.usage_context">
                             <option value="manufacturing" @selected(old('usage_context', 'manufacturing') === 'manufacturing')>Manufacturing (Production execution ready)</option>
                             <option value="engineering" @selected(old('usage_context') === 'engineering')>Engineering (R&D staging)</option>
                             <option value="prototype" @selected(old('usage_context') === 'prototype')>Prototype (Sample testing)</option>
@@ -97,16 +97,16 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Base Quantity" name="base_quantity" inputType="number" step="any" placeholder="1.0" :value="old('base_quantity', '1.0000')" :required="true" />
+                        <x-ui.odoo-form-ui type="input" label="Base Quantity" name="base_quantity" inputType="number" step="any" placeholder="1.0" :value="old('base_quantity', '1.0000')" :required="true" :error-text="$errors->first('base_quantity')" alpineError="errors.base_quantity" />
                         
-                        <x-ui.odoo-form-ui type="select" label="Base Unit" name="base_uom_id" :required="true" data-master="uom">
+                        <x-ui.odoo-form-ui type="select" label="Base Unit" name="base_uom_id" :required="true" data-master="uom" :error-text="$errors->first('base_uom_id')" alpineError="errors.base_uom_id">
                             <option value="">Select UOM...</option>
                             <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
                             @foreach ($uoms as $uom)
                                 <option value="{{ $uom->id }}" @selected(old('base_uom_id') == $uom->id)>{{ $uom->name }} ({{ $uom->code }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>                        
-                        <x-ui.odoo-form-ui type="textarea" label="Description" name="notes" placeholder="Max. 500 characters" rows="3">{{ old('notes') }}</x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" label="Description" name="notes" placeholder="Max. 500 characters" rows="3" :error-text="$errors->first('notes')" alpineError="errors.notes">{{ old('notes') }}</x-ui.odoo-form-ui>
                     </div>
                 </div>
 
@@ -121,10 +121,10 @@
                          :style="showAdvanced ? 'max-height: 1000px; padding: 1rem; opacity: 1; border-top: 1px solid #dee2e6;' : 'max-height: 0px; padding: 0 1rem; opacity: 0; border-top: none;'">
                         <div class="row g-3 fs-13 text-dark">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Version ID" name="version" placeholder="e.g. 1.0.0" :value="old('version', '1.0.0')" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="Version ID" name="version" placeholder="e.g. 1.0.0" :value="old('version', '1.0.0')" :required="true" :error-text="$errors->first('version')" alpineError="errors.version" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" label="Routing Reference" name="routing_id" id="routing_id" x-model="selectedRoutingId">
+                                <x-ui.odoo-form-ui type="select" label="Routing Reference" name="routing_id" id="routing_id" x-model="selectedRoutingId" :error-text="$errors->first('routing_id')" alpineError="errors.routing_id">
                                     <option value="">No Routing Reference</option>
                                     @foreach($routings as $rt)
                                         <option value="{{ $rt->id }}">{{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})</option>
@@ -132,13 +132,13 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Start Date" name="effective_date" inputType="date" :value="old('effective_date', date('Y-m-d'))" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="Start Date" name="effective_date" inputType="date" :value="old('effective_date', date('Y-m-d'))" :required="true" :error-text="$errors->first('effective_date')" alpineError="errors.effective_date" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" inputType="date" :value="old('expiry_date')" />
+                                <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" inputType="date" :value="old('expiry_date')" :error-text="$errors->first('expiry_date')" alpineError="errors.expiry_date" />
                             </div>
                             <div class="col-md-12">
-                                <x-ui.odoo-form-ui type="input" label="Revision Reason" name="revision_reason" placeholder="e.g. Engineering specification update" :value="old('revision_reason')" />
+                                <x-ui.odoo-form-ui type="input" label="Revision Reason" name="revision_reason" placeholder="e.g. Engineering specification update" :value="old('revision_reason')" :error-text="$errors->first('revision_reason')" alpineError="errors.revision_reason" />
                             </div>
                         </div>
                     </div>
@@ -177,16 +177,13 @@
                                             
                                             <!-- Material Selection -->
                                             <td class="align-middle">
-                                                <select x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required data-select2-selector="default" data-master="product">
+                                                <x-ui.odoo-form-ui type="select" name="items[][material_id]" x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required data-select2-selector="default" data-master="product" alpineError="errors['items.' + index + '.material_id']">
                                                     <option value="">Select Material...</option>
                                                     <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
                                                     @foreach($materials as $material)
                                                         <option value="{{ $material->id }}" data-type="{{ $material->type }}" data-sku="{{ $material->sku }}">{{ $material->name }} ({{ $material->sku }})</option>
                                                     @endforeach
-                                                </select>
-                                                <template x-if="errors && errors['items.' + index + '.material_id']">
-                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_id'][0]"></span>
-                                                </template>
+                                                </x-ui.odoo-form-ui>
                                                 <input type="hidden" x-bind:name="'items['+index+'][child_bom_id]'" x-model="item.child_bom_id">
                                                 <template x-if="item.child_bom_loading">
                                                     <div class="mt-2 text-muted fs-11">
@@ -237,50 +234,35 @@
                                             
                                             <!-- Quantity -->
                                             <td class="align-middle">
-                                                <input type="number" step="any" x-bind:name="'items['+index+'][quantity]'" class="odoo-table-input text-end" x-model="item.quantity" placeholder="0.00" required min="0.0001" />
-                                                <template x-if="errors && errors['items.' + index + '.quantity']">
-                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.quantity'][0]"></span>
-                                                </template>
+                                                <x-ui.odoo-form-ui type="input" inputType="number" step="any" name="items[][quantity]" x-bind:name="'items['+index+'][quantity]'" class="odoo-table-input text-end" x-model="item.quantity" placeholder="0.00" required min="0.0001" alpineError="errors['items.' + index + '.quantity']" />
                                             </td>
                                             
                                             <!-- UOM -->
                                             <td class="align-middle">
-                                                <select x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required data-select2-selector="default" data-master="uom">
+                                                <x-ui.odoo-form-ui type="select" name="items[][uom_id]" x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required data-select2-selector="default" data-master="uom" alpineError="errors['items.' + index + '.uom_id']">
                                                     <option value="">Select UOM...</option>
                                                     <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
                                                     @foreach($uoms as $uom)
                                                         <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
                                                     @endforeach
-                                                </select>
+                                                </x-ui.odoo-form-ui>
                                             </td>
                                             
                                             <!-- Material Scrap Percentage -->
                                             <td class="align-middle">
-                                                <input type="number" step="any" x-bind:name="'items['+index+'][material_scrap_percentage]'" class="odoo-table-input text-end text-danger" x-model="item.material_scrap_percentage" placeholder="0.00" min="0" max="100" />
-                                                <template x-if="errors && errors['items.' + index + '.material_scrap_percentage']">
-                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.material_scrap_percentage'][0]"></span>
-                                                </template>
+                                                <x-ui.odoo-form-ui type="input" inputType="number" step="any" name="items[][material_scrap_percentage]" x-bind:name="'items['+index+'][material_scrap_percentage]'" class="odoo-table-input text-end text-danger" x-model="item.material_scrap_percentage" placeholder="0.00" min="0" max="100" alpineError="errors['items.' + index + '.material_scrap_percentage']" />
                                             </td>
                                             
                                             <!-- Priority -->
                                             <td class="align-middle">
-                                                <input type="number" x-bind:name="'items['+index+'][priority]'" class="odoo-table-input text-end" x-model="item.priority" placeholder="1" min="1" />
-                                                <template x-if="errors && errors['items.' + index + '.priority']">
-                                                    <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.priority'][0]"></span>
-                                                </template>
+                                                <x-ui.odoo-form-ui type="input" inputType="number" name="items[][priority]" x-bind:name="'items['+index+'][priority]'" class="odoo-table-input text-end" x-model="item.priority" placeholder="1" min="1" alpineError="errors['items.' + index + '.priority']" />
                                             </td>
 
                                             <!-- Validity limits -->
                                             <td class="align-middle">
                                                 <div class="d-flex flex-column gap-1">
-                                                    <input type="date" x-bind:name="'items['+index+'][effective_from]'" class="odoo-table-input fs-11" x-model="item.effective_from" />
-                                                    <template x-if="errors && errors['items.' + index + '.effective_from']">
-                                                        <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_from'][0]"></span>
-                                                    </template>
-                                                    <input type="date" x-bind:name="'items['+index+'][effective_to]'" class="odoo-table-input fs-11" x-model="item.effective_to" />
-                                                    <template x-if="errors && errors['items.' + index + '.effective_to']">
-                                                        <span class="text-danger fs-10 mt-1 d-block" x-text="errors['items.' + index + '.effective_to'][0]"></span>
-                                                    </template>
+                                                    <x-ui.odoo-form-ui type="input" inputType="date" name="items[][effective_from]" x-bind:name="'items['+index+'][effective_from]'" class="fs-11" x-model="item.effective_from" alpineError="errors['items.' + index + '.effective_from']" />
+                                                    <x-ui.odoo-form-ui type="input" inputType="date" name="items[][effective_to]" x-bind:name="'items['+index+'][effective_to]'" class="fs-11" x-model="item.effective_to" alpineError="errors['items.' + index + '.effective_to']" />
                                                 </div>
                                             </td>
                                             
@@ -289,16 +271,12 @@
                                                 <div class="d-flex flex-column gap-2">
                                                     <div>
                                                         <input type="hidden" x-bind:name="'items['+index+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
-                                                        <input type="checkbox" class="form-check-input" x-model="item.is_alternative" x-bind:id="'is_alternative_create_' + index" />
-                                                        <label class="form-check-label c-pointer fw-medium text-dark fs-11 ms-1" x-bind:for="'is_alternative_create_' + index">
+                                                        <x-ui.odoo-form-ui type="checkbox" name="items[][is_alternative]" x-model="item.is_alternative" x-bind:id="'is_alternative_create_' + index">
                                                             Is Alternative
-                                                        </label>
+                                                        </x-ui.odoo-form-ui>
                                                     </div>
                                                     <div x-show="item.is_alternative">
-                                                        <input type="text" x-bind:name="'items['+index+'][alternative_group]'" class="odoo-table-input fs-11" placeholder="Alt Group Code..." x-model="item.alternative_group" />
-                                                        <template x-if="errors && errors['items.' + index + '.alternative_group']">
-                                                            <span class="text-danger fs-11 mt-1 d-block" x-text="errors['items.' + index + '.alternative_group'][0]"></span>
-                                                        </template>
+                                                        <x-ui.odoo-form-ui type="input" name="items[][alternative_group]" x-bind:name="'items['+index+'][alternative_group]'" class="fs-11" placeholder="Alt Group Code..." x-model="item.alternative_group" alpineError="errors['items.' + index + '.alternative_group']" />
                                                     </div>
                                                 </div>
                                             </td>
@@ -616,10 +594,10 @@
                             
                             // Trigger native events to propagate up to Alpine
                             this.dispatchEvent(new Event('input', { bubbles: true }));
-                            this.dispatchEvent(new Event('change', { bubbles: true }));
                         });
                     });
-                }
+                },
+
             }));
 
             // Hook bootstrap horizontal tabs change to load operations on Alpine
