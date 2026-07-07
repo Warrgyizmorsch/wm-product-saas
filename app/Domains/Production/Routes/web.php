@@ -19,6 +19,11 @@ use App\Domains\Production\Controllers\ScannerController;
 use App\Domains\Production\Controllers\MachineStateController;
 use App\Domains\Production\Controllers\DowntimeController;
 use App\Domains\Production\Controllers\ProductionTimelineController;
+use App\Domains\Production\Controllers\ManufacturingDashboardController;
+use App\Domains\Production\Controllers\AndonController;
+use App\Domains\Production\Controllers\AnalyticsController;
+use App\Domains\Production\Controllers\ReportsController;
+use App\Domains\Production\Controllers\AlertController;
 
 Route::prefix('production')
     ->as('production.')
@@ -138,4 +143,15 @@ Route::prefix('production')
         Route::post('mes/downtime/start',          [DowntimeController::class, 'start'])->name('mes.downtime.start');
         Route::post('mes/downtime/{id}/end',       [DowntimeController::class, 'end'])->name('mes.downtime.end');
         Route::get('mes/timeline',                 [ProductionTimelineController::class, 'index'])->name('mes.timeline.index');
+
+        // ── Phase 3 Manufacturing Intelligence ────────────────────────────────
+        Route::get('intelligence/dashboard', [ManufacturingDashboardController::class, 'executiveDashboard'])->name('intelligence.dashboard');
+        Route::get('intelligence/work-centers', [ManufacturingDashboardController::class, 'workCenterDashboard'])->name('intelligence.work-centers');
+        Route::post('intelligence/dashboard/preferences', [ManufacturingDashboardController::class, 'savePreferences'])->name('intelligence.dashboard.preferences');
+        Route::get('intelligence/andon', [AndonController::class, 'index'])->name('intelligence.andon');
+        Route::get('intelligence/analytics', [AnalyticsController::class, 'historical'])->name('intelligence.analytics');
+        Route::get('intelligence/reports', [ReportsController::class, 'index'])->name('intelligence.reports.index');
+        Route::get('intelligence/reports/{type}', [ReportsController::class, 'show'])->name('intelligence.reports.show');
+        Route::get('intelligence/alerts', [AlertController::class, 'index'])->name('intelligence.alerts.index');
+        Route::post('intelligence/alerts/{id}', [AlertController::class, 'update'])->name('intelligence.alerts.update');
     });
