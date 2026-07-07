@@ -15,6 +15,8 @@ class LeadFollowupController extends Controller
      */
     public function store(Request $request, Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         $validated = $request->validate([
             'followup_date' => 'required|string',
             'type' => 'required|string|in:Call,Email,Meeting,Demo',
@@ -66,6 +68,8 @@ class LeadFollowupController extends Controller
      */
     public function update(Request $request, LeadFollowup $followup)
     {
+        $this->authorize('update', $followup->lead);
+
         $validated = $request->validate([
             'status' => 'nullable|string|in:Pending,Completed,Cancelled',
             'notes' => 'nullable|string',
@@ -118,6 +122,8 @@ class LeadFollowupController extends Controller
      */
     public function destroy(LeadFollowup $followup)
     {
+        $this->authorize('update', $followup->lead);
+
         $lead = $followup->lead;
 
         \App\Domains\CRM\Models\LeadHistory::logEvent(

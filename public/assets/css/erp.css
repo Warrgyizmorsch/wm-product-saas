@@ -2,6 +2,27 @@
     --bs-primary: #0000FF;
 }
 
+/* Tenant-uploaded branding logos can be any resolution/aspect ratio —
+   constrain them so the sidebar brand slot never overflows/crops. */
+.erp-tenant-brand {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.erp-brand-logo-full {
+    height: 32px;
+    width: auto;
+    max-width: 160px;
+    object-fit: contain;
+}
+
+.erp-brand-logo-abbr {
+    height: 32px;
+    width: 32px;
+    object-fit: contain;
+}
+
 .loader-bg {
     align-items: center;
     background: #f3f4f6;

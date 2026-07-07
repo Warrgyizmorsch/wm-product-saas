@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Access\Role;
+use App\Models\Access\UserRole;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -35,6 +38,16 @@ class CrmQuotationTest extends TestCase
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
+        ]);
+
+        // Grant the test user full CRM access via the tenant_owner role, seeded
+        // the same way production RBAC is (see database/seeders/RbacSeeder.php).
+        $this->seed(RbacSeeder::class);
+        $tenantOwnerRole = Role::query()->whereNull('tenant_id')->where('slug', 'tenant_owner')->firstOrFail();
+        UserRole::create([
+            'user_id' => $this->user->id,
+            'role_id' => $tenantOwnerRole->id,
+            'tenant_id' => $this->tenant->id,
         ]);
 
         // Create a lead in Qualified status

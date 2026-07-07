@@ -24,6 +24,8 @@ class QuotationController extends Controller
 
     public function index(): View
     {
+        $this->authorize('viewAny', Quotation::class);
+
         return view('modules.crm.quotations.index', [
             'quotations' => $this->quotations->latest(),
         ]);
@@ -36,6 +38,8 @@ class QuotationController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Quotation::class);
+
         $validated = $request->validate([
             'customer_id'         => ['required', 'exists:customers,id'],
             'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
@@ -101,6 +105,8 @@ class QuotationController extends Controller
             abort(404, 'Quotation not found.');
         }
 
+        $this->authorize('view', $quotation);
+
         return view('modules.crm.quotations.show', [
             'quotation' => $quotation,
         ]);
@@ -118,6 +124,8 @@ class QuotationController extends Controller
         if (!$quotation) {
             abort(404, 'Quotation not found.');
         }
+
+        $this->authorize('update', $quotation);
 
         $validated = $request->validate([
             'customer_id'         => ['required', 'exists:customers,id'],
@@ -219,6 +227,8 @@ class QuotationController extends Controller
             abort(404, 'Quotation not found.');
         }
 
+        $this->authorize('update', $quotation);
+
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
         ]);
@@ -266,6 +276,8 @@ class QuotationController extends Controller
             abort(404, 'Quotation not found.');
         }
 
+        $this->authorize('approve', $quotation);
+
         $oldStatus = $quotation->status;
         $quotation->update([
             'status' => 'Approved',
@@ -297,6 +309,8 @@ class QuotationController extends Controller
             abort(404, 'Quotation not found.');
         }
 
+        $this->authorize('approve', $quotation);
+
         $oldStatus = $quotation->status;
         $quotation->update([
             'status' => 'Rejected',
@@ -327,6 +341,8 @@ class QuotationController extends Controller
         if (!$quotation) {
             abort(404, 'Quotation not found.');
         }
+
+        $this->authorize('delete', $quotation);
 
         $this->quotations->delete($quotation);
 
