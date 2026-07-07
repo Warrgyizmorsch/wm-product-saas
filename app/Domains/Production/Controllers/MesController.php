@@ -9,6 +9,10 @@ use App\Domains\Production\Services\MesExecutionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
+use App\Domains\Production\Models\ProductionOperatorAssignment;
+use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionBatch;
+use App\Domains\Production\Models\ProductionSerialNumber;
 
 class MesController extends Controller
 {
@@ -66,6 +70,8 @@ class MesController extends Controller
 
     public function start(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $machineId = $request->input('machine_id') ? (int) $request->input('machine_id') : null;
             $this->mesService->startOperation($op, $machineId, Auth::id() ?: 1);
@@ -77,6 +83,8 @@ class MesController extends Controller
 
     public function pause(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $this->mesService->pauseOperation($op, $request->input('remarks'));
             return redirect()->back()->with('success', 'Operation paused.');
@@ -87,6 +95,8 @@ class MesController extends Controller
 
     public function resume(int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $this->mesService->resumeOperation($op);
             return redirect()->back()->with('success', 'Operation resumed.');
@@ -97,6 +107,8 @@ class MesController extends Controller
 
     public function complete(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         $data = $request->validate([
             'quantity_produced' => 'required|numeric|min:0',
             'quantity_rejected' => 'nullable|numeric|min:0',
@@ -116,6 +128,8 @@ class MesController extends Controller
 
     public function hold(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $this->mesService->holdOperation($op, $request->input('remarks'));
             return redirect()->back()->with('success', 'Operation placed on hold.');
@@ -126,11 +140,99 @@ class MesController extends Controller
 
     public function cancel(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $this->mesService->cancelOperation($op);
             return redirect()->back()->with('success', 'Operation cancelled.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Touch-Friendly Operator Dashboard.
+     */
+    public function operatorDashboard(Request $request)
+    {
+        $tenantId = require_tenant_id();
+        $userId   = Auth::id() ?: 1;
+
+        // My operator assignments
+        $myAssignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        // Running operations
+        $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
+            ->get();
+
+        // Ready queue
+        $ready = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->where('status', ProductionScheduleOperation::STATUS_READY)
+            ->get();
+
+        // Paused
+        $paused = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
+            ->get();
+
+        // Done today
+        $completedToday = ProductionScheduleOperation::where('status', ProductionScheduleOperation::STATUS_COMPLETED)
+            ->whereDate('actual_finish', today())
+            ->count();
+
+        return view('modules.production.mes.operator.dashboard', compact(
+            'myAssignments', 'running', 'ready', 'paused', 'completedToday'
+        ));
+    }
+
+    /**
+     * My Assigned Operations list view.
+     */
+    public function myOperations(Request $request)
+    {
+        $tenantId = require_tenant_id();
+        $userId   = Auth::id() ?: 1;
+
+        $assignments = ProductionOperatorAssignment::with(['operation.productionOrder.product', 'operation.workCenter'])
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return view('modules.production.mes.operator.my-operations', compact('assignments'));
+    }
+
+    /**
+     * Touch-Friendly Operation Execution details view.
+     */
+    public function operationExecution(Request $request, int $opId)
+    {
+        $tenantId = require_tenant_id();
+        $op = ProductionOrderOperation::with(['order.product', 'workCenter', 'machine'])->findOrFail($opId);
+
+        $order = $op->order;
+        $batches = ProductionBatch::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->get();
+        $serials = ProductionSerialNumber::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->get();
+
+        // Determine list of active assignments
+        $assignment = ProductionOperatorAssignment::where('tenant_id', $tenantId)
+            ->where('production_order_operation_id', $opId)
+            ->where('status', 'accepted')
+            ->first();
+
+        // Get list of all operators for quick reassignment list
+        $operators = \App\Models\User::where('tenant_id', $tenantId)->get();
+
+        // Try mapping the schedule operation if it exists
+        $scheduleOp = ProductionScheduleOperation::where('production_order_operation_id', $opId)->first();
+
+        return view('modules.production.mes.operator.operation-execution', compact(
+            'op', 'order', 'batches', 'serials', 'assignment', 'operators', 'scheduleOp'
+        ));
     }
 }

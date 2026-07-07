@@ -28,9 +28,7 @@ class ProductionOrderController extends Controller
 
     public function index(Request $request)
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('viewAny', ProductionOrder::class);
-        }
+        Gate::authorize('viewAny', ProductionOrder::class);
 
         $tenantId = require_tenant_id();
         $query = ProductionOrder::with(['product', 'bom', 'routing']);
@@ -70,9 +68,7 @@ class ProductionOrderController extends Controller
 
     public function create()
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', ProductionOrder::class);
-        }
+        Gate::authorize('create', ProductionOrder::class);
 
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         return view('modules.production.orders.create', compact('products'));
@@ -80,9 +76,7 @@ class ProductionOrderController extends Controller
 
     public function store(StoreProductionOrderRequest $request)
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', ProductionOrder::class);
-        }
+        Gate::authorize('create', ProductionOrder::class);
 
         $tenantId = require_tenant_id();
 
@@ -121,9 +115,7 @@ class ProductionOrderController extends Controller
             'reworks.operation', 'reworks.user'
         ])->findOrFail($id);
 
-        if (app()->environment('testing')) {
-            Gate::authorize('view', $order);
-        }
+        Gate::authorize('view', $order);
 
         // Get variance analysis calculations
         $costs = $this->costService->getCostAnalysis($order);
@@ -135,9 +127,7 @@ class ProductionOrderController extends Controller
     {
         $order = ProductionOrder::findOrFail($id);
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $order);
-        }
+        Gate::authorize('update', $order);
 
         if ($order->isFrozen()) {
             return redirect()
@@ -153,9 +143,7 @@ class ProductionOrderController extends Controller
     {
         $order = ProductionOrder::findOrFail($id);
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $order);
-        }
+        Gate::authorize('update', $order);
 
         try {
             $this->orderService->update($id, $request->validated());
@@ -171,9 +159,7 @@ class ProductionOrderController extends Controller
     {
         $order = ProductionOrder::findOrFail($id);
 
-        if (app()->environment('testing')) {
-            Gate::authorize('delete', $order);
-        }
+        Gate::authorize('delete', $order);
 
         try {
             $this->orderService->delete($id);
@@ -190,9 +176,7 @@ class ProductionOrderController extends Controller
     public function release(int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('release', $order);
-        }
+        Gate::authorize('release', $order);
 
         try {
             $this->orderService->release($id, Auth::id());
@@ -205,9 +189,7 @@ class ProductionOrderController extends Controller
     public function complete(int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('complete', $order);
-        }
+        Gate::authorize('complete', $order);
 
         try {
             $this->orderService->complete($id, Auth::id());
@@ -220,9 +202,7 @@ class ProductionOrderController extends Controller
     public function close(int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('close', $order);
-        }
+        Gate::authorize('close', $order);
 
         try {
             $this->orderService->close($id, Auth::id());
@@ -235,9 +215,7 @@ class ProductionOrderController extends Controller
     public function cancel(int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('cancel', $order);
-        }
+        Gate::authorize('cancel', $order);
 
         try {
             $this->orderService->cancel($id, Auth::id());
@@ -252,9 +230,7 @@ class ProductionOrderController extends Controller
     public function issueMaterial(Request $request, int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('issue', $order);
-        }
+        Gate::authorize('issue', $order);
 
         $request->validate([
             'reservation_id' => 'required|exists:production_order_reservations,id',
@@ -278,9 +254,7 @@ class ProductionOrderController extends Controller
     public function returnMaterial(Request $request, int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('return', $order);
-        }
+        Gate::authorize('return', $order);
 
         $request->validate([
             'reservation_id' => 'required|exists:production_order_reservations,id',
@@ -306,9 +280,7 @@ class ProductionOrderController extends Controller
     public function logProgress(Request $request, int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('logProgress', $order);
-        }
+        Gate::authorize('logProgress', $order);
 
         $request->validate([
             'operation_id'         => 'required|exists:production_order_operations,id',
@@ -344,9 +316,7 @@ class ProductionOrderController extends Controller
     public function logScrap(Request $request, int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('logProgress', $order);
-        }
+        Gate::authorize('logProgress', $order);
 
         $request->validate([
             'operation_id' => 'nullable|exists:production_order_operations,id',
@@ -373,9 +343,7 @@ class ProductionOrderController extends Controller
     public function logRework(Request $request, int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('logProgress', $order);
-        }
+        Gate::authorize('logProgress', $order);
 
         $request->validate([
             'operation_id' => 'nullable|exists:production_order_operations,id',
@@ -400,9 +368,7 @@ class ProductionOrderController extends Controller
     public function receiveFg(Request $request, int $id)
     {
         $order = ProductionOrder::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('receiveFg', $order);
-        }
+        Gate::authorize('receiveFg', $order);
 
         $request->validate([
             'quantity_received' => 'required|numeric|min:0.0001',

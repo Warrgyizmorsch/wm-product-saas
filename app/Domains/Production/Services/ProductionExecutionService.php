@@ -209,6 +209,16 @@ class ProductionExecutionService
             $order->quantity_produced += $quantity;
             $order->save();
 
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type'          => 'Finished Goods Received',
+                'title'               => 'Finished Goods Received',
+                'description'         => "Received {$quantity} finished goods with quality status '{$qualityStatus}'.",
+                'severity'            => 'success',
+                'event_source'        => 'ProductionExecutionService',
+                'triggered_by'        => $userId,
+            ]);
+
             return $receipt;
         });
     }

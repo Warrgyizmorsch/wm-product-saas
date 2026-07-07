@@ -31,6 +31,8 @@ class ProductionBomController extends Controller
 
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', ProductionBom::class);
+
         $filters = $request->only(['product_id', 'status', 'search']);
         $boms = $this->bomRepository->getAll($filters);
         
@@ -78,6 +80,8 @@ class ProductionBomController extends Controller
         $bom = $this->bomRepository->find($id);
         abort_if(!$bom, 404, 'BOM not found.');
 
+        $this->authorize('create', ProductionBom::class);
+
         $bumpType = $request->input('bump_type', 'patch');
 
         $newVersion = match ($bumpType) {
@@ -115,6 +119,8 @@ class ProductionBomController extends Controller
     {
         $bom = $this->bomRepository->getBomWithComponents($id);
         abort_if(!$bom, 404, 'BOM not found.');
+
+        $this->authorize('view', $bom);
 
         // Requirements multi-level explosion
         $calcQty = $request->input('calc_qty') ? (float) $request->input('calc_qty') : $bom->base_quantity;
@@ -185,6 +191,8 @@ class ProductionBomController extends Controller
 
     public function create(Request $request): View
     {
+        $this->authorize('create', ProductionBom::class);
+
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'semi_finished'])->get(); // support multi-level
         $uoms = Uom::all();
@@ -196,6 +204,8 @@ class ProductionBomController extends Controller
 
     public function store(StoreProductionBomRequest $request): RedirectResponse
     {
+        $this->authorize('create', ProductionBom::class);
+
         try {
             $dto = ProductionBomDTO::fromArray($request->validated());
             $bom = $this->bomService->create($dto, auth()->id() ?: 1);
@@ -222,6 +232,8 @@ class ProductionBomController extends Controller
         abort_if(!$bom, 404, 'BOM not found.');
         abort_if(!$bom->isDraft() && !$bom->isUnderRevision(), 403, 'Approved BOMs cannot be edited directly.');
 
+        $this->authorize('update', $bom);
+
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         $materials = Product::whereIn('type', ['raw_material', 'component', 'finished_good', 'semi_finished'])->get(); // support multi-level
         $uoms = Uom::all();
@@ -234,6 +246,8 @@ class ProductionBomController extends Controller
     {
         $bom = $this->bomRepository->find($id);
         abort_if(!$bom, 404, 'BOM not found.');
+
+        $this->authorize('update', $bom);
 
         try {
             $dto = ProductionBomDTO::fromArray($request->validated());
@@ -260,6 +274,8 @@ class ProductionBomController extends Controller
         $bom = $this->bomRepository->find($id);
         abort_if(!$bom, 404, 'BOM not found.');
 
+        $this->authorize('delete', $bom);
+
         $this->bomRepository->delete($id);
 
         return redirect()
@@ -271,6 +287,8 @@ class ProductionBomController extends Controller
     {
         $bom = $this->bomRepository->find($id);
         abort_if(!$bom, 404, 'BOM not found.');
+
+        $this->authorize('update', $bom);
 
         try {
             $this->bomService->submitApproval($id);
@@ -289,6 +307,8 @@ class ProductionBomController extends Controller
         $bom = $this->bomRepository->find($id);
         abort_if(!$bom, 404, 'BOM not found.');
 
+        $this->authorize('approve', $bom);
+
         try {
             $this->bomService->approve($id, auth()->id() ?: 1);
             return redirect()
@@ -303,6 +323,11 @@ class ProductionBomController extends Controller
 
     public function reject(int $id, Request $request): RedirectResponse
     {
+        $bom = $this->bomRepository->find($id);
+        abort_if(!$bom, 404, 'BOM not found.');
+
+        $this->authorize('approve', $bom);
+
         $request->validate(['comments' => 'nullable|string|max:1000']);
         try {
             $this->bomService->reject($id, auth()->id() ?: 1, $request->input('comments'));
@@ -318,6 +343,11 @@ class ProductionBomController extends Controller
 
     public function cancel(int $id, Request $request): RedirectResponse
     {
+        $bom = $this->bomRepository->find($id);
+        abort_if(!$bom, 404, 'BOM not found.');
+
+        $this->authorize('cancel', $bom);
+
         $request->validate(['comments' => 'nullable|string|max:1000']);
         try {
             $this->bomService->cancel($id, auth()->id() ?: 1, $request->input('comments'));
@@ -335,6 +365,8 @@ class ProductionBomController extends Controller
     {
         $bom = $this->bomRepository->find($id);
         abort_if(!$bom, 404, 'BOM not found.');
+
+        $this->authorize('create', ProductionBom::class);
 
         $request->validate([
             'new_version' => 'required|string|max:50',

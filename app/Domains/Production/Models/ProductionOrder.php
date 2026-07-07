@@ -57,6 +57,9 @@ class ProductionOrder extends BaseModel
         'released_at',
         'completed_at',
         'closed_at',
+        'production_mode',
+        'barcode',
+        'qr_code',
     ];
 
     protected $casts = [
@@ -146,6 +149,16 @@ class ProductionOrder extends BaseModel
     public function reworks(): HasMany
     {
         return $this->hasMany(ProductionOrderRework::class, 'production_order_id');
+    }
+
+    public function batches(): HasMany
+    {
+        return $this->hasMany(ProductionBatch::class, 'production_order_id');
+    }
+
+    public function serialNumbers(): HasMany
+    {
+        return $this->hasMany(ProductionSerialNumber::class, 'production_order_id');
     }
 
     // ── Status Helpers ──

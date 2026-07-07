@@ -41,6 +41,8 @@ class Machine extends BaseModel
         'status',
         'installation_date',
         'maintenance_status', // A7: future maintenance module integration point
+        'current_state',
+        'current_state_reason',
     ];
 
     protected $casts = [

@@ -27,9 +27,7 @@ class ProductionPlanController extends Controller
 
     public function index(Request $request)
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('viewAny', ProductionPlan::class);
-        }
+        Gate::authorize('viewAny', ProductionPlan::class);
 
         $tenantId = require_tenant_id();
 
@@ -72,9 +70,7 @@ class ProductionPlanController extends Controller
 
     public function create(Request $request)
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', ProductionPlan::class);
-        }
+        Gate::authorize('create', ProductionPlan::class);
 
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         
@@ -96,9 +92,7 @@ class ProductionPlanController extends Controller
 
     public function store(StoreProductionPlanRequest $request)
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', ProductionPlan::class);
-        }
+        Gate::authorize('create', ProductionPlan::class);
 
         $dto = ProductionPlanDTO::fromArray($request->validated());
 
@@ -121,9 +115,7 @@ class ProductionPlanController extends Controller
             'operations.workCenter', 'operations.machine'
         ])->findOrFail($id);
 
-        if (app()->environment('testing')) {
-            Gate::authorize('view', $plan);
-        }
+        Gate::authorize('view', $plan);
 
         // Get warnings
         $warnings = $this->validator->validatePlan($plan);
@@ -142,9 +134,7 @@ class ProductionPlanController extends Controller
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $plan);
-        }
+        Gate::authorize('update', $plan);
 
         if ($plan->isFrozen()) {
             return redirect()
@@ -175,9 +165,7 @@ class ProductionPlanController extends Controller
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $plan);
-        }
+        Gate::authorize('update', $plan);
 
         $dto = ProductionPlanDTO::fromArray($request->validated());
 
@@ -195,9 +183,7 @@ class ProductionPlanController extends Controller
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (app()->environment('testing')) {
-            Gate::authorize('delete', $plan);
-        }
+        Gate::authorize('delete', $plan);
 
         try {
             $this->planService->delete($id);
@@ -214,9 +200,7 @@ class ProductionPlanController extends Controller
     public function submitApproval(int $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('submit', $plan);
-        }
+        Gate::authorize('submit', $plan);
 
         try {
             $this->planService->submitApproval($id);
@@ -229,9 +213,7 @@ class ProductionPlanController extends Controller
     public function approve(int $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('approve', $plan);
-        }
+        Gate::authorize('approve', $plan);
 
         try {
             $this->planService->approve($id, Auth::id());
@@ -244,9 +226,7 @@ class ProductionPlanController extends Controller
     public function reject(int $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('reject', $plan);
-        }
+        Gate::authorize('reject', $plan);
 
         try {
             $this->planService->reject($id);
@@ -259,9 +239,7 @@ class ProductionPlanController extends Controller
     public function release(int $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('release', $plan);
-        }
+        Gate::authorize('release', $plan);
 
         try {
             $this->planService->release($id);
@@ -274,9 +252,7 @@ class ProductionPlanController extends Controller
     public function complete(int $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('complete', $plan);
-        }
+        Gate::authorize('complete', $plan);
 
         try {
             $this->planService->complete($id);
@@ -289,9 +265,7 @@ class ProductionPlanController extends Controller
     public function close(int $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('close', $plan);
-        }
+        Gate::authorize('close', $plan);
 
         try {
             $this->planService->close($id);
@@ -304,9 +278,7 @@ class ProductionPlanController extends Controller
     public function cancel(int $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('cancel', $plan);
-        }
+        Gate::authorize('cancel', $plan);
 
         try {
             $this->planService->cancel($id);
@@ -321,9 +293,7 @@ class ProductionPlanController extends Controller
     public function runMrp(int $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        if (app()->environment('testing')) {
-            Gate::authorize('runMrp', $plan);
-        }
+        Gate::authorize('runMrp', $plan);
 
         try {
             $this->mrpEngine->runMrp($plan);

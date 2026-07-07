@@ -5,27 +5,28 @@
 @section('breadcrumb', 'Sales / Sales Orders / Create')
 
 @section('content')
-    @if ($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
+    <div class="erp-single-panel bg-white">
+        @if ($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+                <div class="d-flex align-items-center">
+                    <div class="avatar-text avatar-md bg-danger text-white me-3">
+                        <i class="feather-alert-triangle"></i>
+                    </div>
+                    <div>
+                        <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+                        <ul class="fs-12 mb-0 ps-3">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                    <ul class="fs-12 mb-0 ps-3">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
+        @endif
 
-    <form action="{{ route('sales.orders.store') }}" method="POST" id="salesOrderForm">
-        @csrf
+        <form action="{{ route('sales.orders.store') }}" method="POST" id="salesOrderForm">
+            @csrf
         
         <x-ui.odoo-form-ui type="sheet">
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
@@ -93,12 +94,13 @@
                     <x-ui.odoo-form-ui type="table" id="itemsTable">
                         <thead>
                             <tr>
-                                <th style="width: 35%;">Product / Description</th>
+                                <th style="width: 25%;">Product / Description</th>
+                                <th style="width: 20%;">Warehouse</th>
                                 <th class="text-end" style="width: 10%;">Quantity</th>
                                 <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
                                 <th class="text-end" style="width: 10%;">Taxes (%)</th>
-                                <th class="text-end" style="width: 12%;">Discount (₹)</th>
-                                <th class="text-end pe-3" style="width: 13%;">Amount</th>
+                                <th class="text-end" style="width: 10%;">Discount (₹)</th>
+                                <th class="text-end pe-3" style="width: 15%;">Amount</th>
                                 <th class="text-center" style="width: 5%;"></th>
                             </tr>
                         </thead>
@@ -165,6 +167,7 @@
 
     {{-- Product quick-create modal --}}
     <x-ui.master-modals :masters="['product']" />
+    </div>
 @endsection
 
 @push('scripts')
@@ -190,7 +193,7 @@
                         'id' => $p->id,
                         'name' => $p->name,
                         'sku' => $p->sku,
-                        'unit_cost' => $p->unit_cost
+                        'selling_price' => $p->selling_price  // Sales price from item master (like Odoo list_price / Zoho item rate)
                     ];
                 });
             @endphp
@@ -208,17 +211,28 @@
                 });
             }
 
+            const warehousesList = @json($warehouses);
+
+            function buildWarehouseOptions(selectedId = '') {
+                let opts = '<option value="">Select Warehouse...</option>';
+                warehousesList.forEach(function(w) {
+                    const sel = (w.id == selectedId) ? ' selected' : '';
+                    opts += `<option value="${w.id}"${sel}>${escapeHtml(w.name)}</option>`;
+                });
+                return opts;
+            }
+
             function buildProductOptions(selectedId = '') {
                 let opts = '<option value="">Select Product...</option>';
                 opts += '<option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>';
                 productsList.forEach(function(p) {
                     const sel = (p.id == selectedId) ? ' selected' : '';
-                    opts += `<option value="${p.id}" data-unit-cost="${p.unit_cost ?? 0}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.sku)})</option>`;
+                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price ?? 0}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.sku)})</option>`;
                 });
                 return opts;
             }
 
-            function getRowHtml(index, selectedId = '') {
+            function getRowHtml(index, selectedId = '', selectedWarehouseId = '') {
                 return `
                     <tr class="item-row" data-row-id="${index}">
                         <td class="ps-3">
@@ -231,6 +245,11 @@
                             <a href="javascript:void(0)" class="toggle-desc-btn text-primary fs-11 mt-1 d-inline-block" data-row-id="${index}">
                                 <i class="feather-plus me-1"></i>Add Description
                             </a>
+                        </td>
+                        <td>
+                            <select name="items[${index}][warehouse_id]" class="form-select odoo-table-select warehouse-input" required>
+                                ${buildWarehouseOptions(selectedWarehouseId)}
+                            </select>
                         </td>
                         <td>
                             <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 80px; margin-left: auto;">
@@ -294,19 +313,21 @@
 
             function addRow(item = null) {
                 const selectedId = item ? (item.product_id || '') : '';
-                const newRow = $(getRowHtml(rowIndex, selectedId));
+                const selectedWarehouseId = item ? (item.warehouse_id || '') : '';
+                const newRow = $(getRowHtml(rowIndex, selectedId, selectedWarehouseId));
                 $('#itemsTable tbody').append(newRow);
 
-                // Initialize select2 on the newly added select element
-                newRow.find('.item-name-input').select2({
-                    theme: "bootstrap-5",
-                    width: "100%"
-                });
+                // Initialize select2 if plugin is loaded
+                if (typeof $.fn.select2 === 'function') {
+                    newRow.find('.item-name-input').select2({ theme: "bootstrap-5", width: "100%" });
+                    newRow.find('.warehouse-input').select2({ theme: "bootstrap-5", width: "100%" });
+                }
 
                 let isPrefilling = false;
                 if (item) {
                     isPrefilling = true;
                     newRow.find('.item-name-input').val(item.product_id).trigger('change');
+                    newRow.find('.warehouse-input').val(item.warehouse_id).trigger('change');
                     newRow.find('textarea').val(item.description || '');
                     if (item.description) {
                         $('#desc-container-' + rowIndex).show();
@@ -319,13 +340,13 @@
                     isPrefilling = false;
                 }
 
-                // Auto-fill price from product when changed
+                // Auto-fill selling price from item master when product is changed (like Odoo/Zoho)
                 newRow.find('.item-name-input').on('change', function() {
                     if (isPrefilling) return;
                     const selectedOption = $(this).find('option:selected');
-                    const unitCost = parseFloat(selectedOption.attr('data-unit-cost')) || 0;
-                    if (unitCost > 0) {
-                        $(this).closest('tr').find('.price-input').val(unitCost.toFixed(2));
+                    const sellingPrice = parseFloat(selectedOption.attr('data-selling-price')) || 0;
+                    if (sellingPrice > 0) {
+                        $(this).closest('tr').find('.price-input').val(sellingPrice.toFixed(2));
                         calculateTotals();
                     }
                 });

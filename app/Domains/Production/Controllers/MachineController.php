@@ -26,9 +26,7 @@ class MachineController extends Controller
 
     public function index(Request $request): View
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('viewAny', Machine::class);
-        }
+        Gate::authorize('viewAny', Machine::class);
 
         $filters      = $request->only(['work_center_id', 'status', 'search']);
         $machines     = $this->repository->getAll($filters);
@@ -40,9 +38,7 @@ class MachineController extends Controller
 
     public function create(Request $request): View
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', Machine::class);
-        }
+        Gate::authorize('create', Machine::class);
 
         $workCenters = $this->workCenterRepository->getActiveWorkCenters();
         $statuses    = config('production.machine_statuses', []);
@@ -53,9 +49,7 @@ class MachineController extends Controller
 
     public function store(StoreMachineRequest $request): RedirectResponse
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', Machine::class);
-        }
+        Gate::authorize('create', Machine::class);
 
         try {
             $tenantId = require_tenant_id();
@@ -75,9 +69,7 @@ class MachineController extends Controller
         $machine = $this->repository->find($id);
         abort_if(!$machine, 404, 'Machine not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $machine);
-        }
+        Gate::authorize('update', $machine);
 
         $workCenters = $this->workCenterRepository->getActiveWorkCenters();
         $statuses    = config('production.machine_statuses', []);
@@ -90,9 +82,7 @@ class MachineController extends Controller
         $machine = $this->repository->find($id);
         abort_if(!$machine, 404, 'Machine not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $machine);
-        }
+        Gate::authorize('update', $machine);
 
         try {
             $dto     = MachineDTO::fromArray($request->validated());
@@ -111,9 +101,7 @@ class MachineController extends Controller
         $machine = $this->repository->find($id);
         abort_if(!$machine, 404, 'Machine not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('delete', $machine);
-        }
+        Gate::authorize('delete', $machine);
 
         try {
             $this->service->delete($id);
@@ -130,9 +118,7 @@ class MachineController extends Controller
      */
     public function byWorkCenter(int $workCenter): JsonResponse
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('viewAny', Machine::class);
-        }
+        Gate::authorize('viewAny', Machine::class);
 
         $machines = $this->service->getMachinesForWorkCenter($workCenter, activeOnly: true);
         return response()->json($machines);

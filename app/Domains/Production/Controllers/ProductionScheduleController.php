@@ -21,6 +21,8 @@ class ProductionScheduleController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', ProductionSchedule::class);
+
         $query = ProductionSchedule::with(['order.product', 'creator']);
 
         if ($request->filled('search')) {
@@ -60,6 +62,8 @@ class ProductionScheduleController extends Controller
 
     public function create(Request $request)
     {
+        $this->authorize('create', ProductionSchedule::class);
+
         $tenantId = require_tenant_id();
 
         // Only released production orders can be scheduled
@@ -72,6 +76,8 @@ class ProductionScheduleController extends Controller
 
     public function store(StoreProductionScheduleRequest $request)
     {
+        $this->authorize('create', ProductionSchedule::class);
+
         $tenantId = require_tenant_id();
 
         try {
@@ -110,6 +116,8 @@ class ProductionScheduleController extends Controller
             'cancelledBy',
         ])->findOrFail($id);
 
+        $this->authorize('view', $schedule);
+
         $tenantId = require_tenant_id();
         $warnings = $this->schedulingService->detectOverloads($tenantId);
 
@@ -119,6 +127,8 @@ class ProductionScheduleController extends Controller
     public function destroy(int $id)
     {
         $schedule = ProductionSchedule::findOrFail($id);
+
+        $this->authorize('delete', $schedule);
 
         if ($schedule->isFrozen()) {
             return redirect()->back()->with('error', 'Completed or cancelled schedules cannot be deleted.');
@@ -134,6 +144,8 @@ class ProductionScheduleController extends Controller
     public function release(int $id)
     {
         $schedule = ProductionSchedule::findOrFail($id);
+
+        $this->authorize('release', $schedule);
 
         if (!$schedule->isScheduled()) {
             return redirect()->back()->with('error', 'Only scheduled (confirmed) schedules can be released.');
@@ -157,6 +169,8 @@ class ProductionScheduleController extends Controller
     public function cancel(int $id)
     {
         $schedule = ProductionSchedule::findOrFail($id);
+
+        $this->authorize('cancel', $schedule);
 
         if ($schedule->isFrozen()) {
             return redirect()->back()->with('error', 'Schedule is already in a terminal state and cannot be cancelled.');

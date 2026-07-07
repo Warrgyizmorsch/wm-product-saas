@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\Access\Role;
+use App\Models\Access\UserRole;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\ProductionBom;
@@ -11,6 +13,7 @@ use App\Domains\Production\Models\ProductionBomItem;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Services\BomExplosionService;
 use App\Domains\Production\Services\ProductionBomService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -47,6 +50,15 @@ class ProductionBomTest extends TestCase
             'name' => 'User A',
             'email' => 'usera@example.com',
             'password' => 'password',
+        ]);
+
+        $this->seed(RbacSeeder::class);
+
+        $productionManagerRole = Role::query()->whereNull('tenant_id')->where('slug', 'production_manager')->firstOrFail();
+        UserRole::create([
+            'user_id' => $this->userA->id,
+            'role_id' => $productionManagerRole->id,
+            'tenant_id' => $this->tenantA->id,
         ]);
 
         // 2. Create Tenant B

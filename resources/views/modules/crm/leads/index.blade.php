@@ -204,22 +204,33 @@
                                     </div>
                                 @endif
                             </td>
-                            <td class="text-end pe-4">
-                                <div class="d-inline-flex gap-1 justify-content-end align-items-center">
-                                    <!-- View Details -->
-                                    <x-ui.icon-btn href="{{ route('crm.leads.show', $lead->id) }}" variant="soft-primary" icon="feather-eye" title="View Details" />
-                                    
-                                    <!-- Edit -->
-                                    <x-ui.icon-btn href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" variant="soft-info" icon="feather-edit" title="Edit" />
-     
-                                    <!-- Delete -->
-                                    <form action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this lead?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete" />
-                                    </form>
-                                </div>
-                            </td>
+                           <td class="text-end pe-4">
+                           <x-ui.action-dropdown :viewUrl="route('crm.leads.show', $lead->id)">
+                       
+                               {{-- Edit --}}
+                               <li>
+                                   <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="dropdown-item">
+                                       <i class="feather-edit me-2 text-muted fs-12"></i>Edit Lead
+                                   </a>
+                               </li>
+                       
+                               {{-- Delete --}}
+                               <li><hr class="dropdown-divider"></li>
+                               <li>
+                                   <form action="{{ route('crm.leads.destroy', $lead->id) }}"
+                                         method="POST"
+                                         onsubmit="return confirm('Are you sure you want to delete this lead?');">
+                                       @csrf
+                                       @method('DELETE')
+                       
+                                       <button type="submit" class="dropdown-item text-danger">
+                                           <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Lead
+                                       </button>
+                                   </form>
+                               </li>
+                       
+                           </x-ui.action-dropdown>
+                       </td>
                         </tr>
                     @empty
                         <tr>

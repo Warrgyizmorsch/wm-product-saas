@@ -31,9 +31,7 @@ class RoutingController extends Controller
 
     public function index(Request $request): View
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('viewAny', Routing::class);
-        }
+        Gate::authorize('viewAny', Routing::class);
 
         $filters  = $request->only(['product_id', 'status', 'search']);
         $routings = $this->routingRepository->getAll($filters);
@@ -44,9 +42,7 @@ class RoutingController extends Controller
 
     public function create(Request $request): View
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', Routing::class);
-        }
+        Gate::authorize('create', Routing::class);
 
         $products    = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         $workCenters = $this->workCenterRepository->getActiveWorkCenters();
@@ -60,9 +56,7 @@ class RoutingController extends Controller
 
     public function store(StoreRoutingRequest $request): RedirectResponse
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', Routing::class);
-        }
+        Gate::authorize('create', Routing::class);
 
         try {
         $tenantId = require_tenant_id();
@@ -82,9 +76,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->getRoutingWithOperations($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('view', $routing);
-        }
+        Gate::authorize('view', $routing);
 
         // Cost preview (only if active or operations exist)
         $costSummary = null;
@@ -104,9 +96,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->getRoutingWithOperations($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $routing);
-        }
+        Gate::authorize('update', $routing);
 
         abort_if($routing->isReadOnly(), 403, 'This routing is read-only. Only draft routings can be edited.');
 
@@ -124,9 +114,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->find($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $routing);
-        }
+        Gate::authorize('update', $routing);
 
         try {
             $dto     = RoutingDTO::fromArray($request->validated());
@@ -145,9 +133,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->find($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('delete', $routing);
-        }
+        Gate::authorize('delete', $routing);
 
         abort_if(!$routing->isDraft(), 403, 'Only draft routings can be deleted.');
 
@@ -163,9 +149,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->find($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('submit', $routing);
-        }
+        Gate::authorize('submit', $routing);
 
         try {
             $this->routingService->submitApproval($id, auth()->id() ?: 1);
@@ -180,9 +164,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->find($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('approve', $routing);
-        }
+        Gate::authorize('approve', $routing);
 
         try {
             $this->routingService->approve($id, auth()->id() ?: 1);
@@ -198,9 +180,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->find($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('reject', $routing);
-        }
+        Gate::authorize('reject', $routing);
 
         $request->validate(['comments' => 'nullable|string|max:1000']);
         try {
@@ -216,9 +196,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->find($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('cancel', $routing);
-        }
+        Gate::authorize('cancel', $routing);
 
         $request->validate(['comments' => 'nullable|string|max:1000']);
         try {
@@ -234,9 +212,7 @@ class RoutingController extends Controller
         $routing = $this->routingRepository->find($id);
         abort_if(!$routing, 404, 'Routing not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('duplicate', $routing);
-        }
+        Gate::authorize('duplicate', $routing);
 
         $request->validate(['new_version' => 'required|string|max:50']);
         try {

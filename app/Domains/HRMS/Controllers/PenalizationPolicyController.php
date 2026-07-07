@@ -12,6 +12,8 @@ class PenalizationPolicyController extends Controller
 {
     public function index(Request $request)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         // Programmatically run schema updates if they haven't been applied yet
         try {
             if (!\Illuminate\Support\Facades\Schema::hasTable('attendance_penalties')) {
@@ -44,6 +46,8 @@ class PenalizationPolicyController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $rules = [
             'rule_type' => 'required|in:late_arrival,under_hours,missing_logs',
             'company_id' => 'nullable|integer',

@@ -43,6 +43,13 @@ class RbacSeeder extends Seeder
             'production.bom.update' => $permissions['production.bom.update'],
         ], RolePermission::SCOPE_TENANT);
 
+        foreach (['production_manager', 'production_engineer'] as $roleSlug) {
+            $this->grant($roles[$roleSlug], [
+                'production.mes.execute' => $permissions['production.mes.execute'],
+                'production.schedule.manage' => $permissions['production.schedule.manage'],
+            ], RolePermission::SCOPE_TENANT);
+        }
+
         $this->grant($roles['sales_manager'], [
             'crm.leads.view' => $permissions['crm.leads.view'],
             'crm.leads.create' => $permissions['crm.leads.create'],
@@ -75,6 +82,60 @@ class RbacSeeder extends Seeder
             'crm.quotations.view' => $permissions['crm.quotations.view'],
         ], RolePermission::SCOPE_OWN);
 
+        $this->grant($roles['inventory_manager'], [
+            'inventory.products.view' => $permissions['inventory.products.view'],
+            'inventory.products.create' => $permissions['inventory.products.create'],
+            'inventory.products.update' => $permissions['inventory.products.update'],
+            'inventory.products.delete' => $permissions['inventory.products.delete'],
+            'inventory.warehouses.manage' => $permissions['inventory.warehouses.manage'],
+            'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
+        ], RolePermission::SCOPE_TENANT);
+
+        $this->grant($roles['sales_manager'], [
+            'sales.orders.view' => $permissions['sales.orders.view'],
+            'sales.orders.create' => $permissions['sales.orders.create'],
+            'sales.orders.update' => $permissions['sales.orders.update'],
+            'sales.orders.delete' => $permissions['sales.orders.delete'],
+            'sales.orders.confirm' => $permissions['sales.orders.confirm'],
+            'sales.orders.cancel' => $permissions['sales.orders.cancel'],
+            'sales.deliveries.view' => $permissions['sales.deliveries.view'],
+            'sales.deliveries.create' => $permissions['sales.deliveries.create'],
+            'sales.deliveries.ship' => $permissions['sales.deliveries.ship'],
+            'sales.deliveries.cancel' => $permissions['sales.deliveries.cancel'],
+        ], RolePermission::SCOPE_TENANT);
+
+        // Creating an order has no existing record to own yet, so it's granted at
+        // tenant scope; deliveries are shared fulfillment work, not personally owned.
+        $this->grant($roles['sales_executive'], [
+            'sales.orders.create' => $permissions['sales.orders.create'],
+            'sales.deliveries.view' => $permissions['sales.deliveries.view'],
+            'sales.deliveries.create' => $permissions['sales.deliveries.create'],
+        ], RolePermission::SCOPE_TENANT);
+
+        // Viewing, updating, confirming, and cancelling orders is restricted to
+        // orders this sales rep is assigned as sales_person_id on.
+        $this->grant($roles['sales_executive'], [
+            'sales.orders.view' => $permissions['sales.orders.view'],
+            'sales.orders.update' => $permissions['sales.orders.update'],
+            'sales.orders.confirm' => $permissions['sales.orders.confirm'],
+            'sales.orders.cancel' => $permissions['sales.orders.cancel'],
+        ], RolePermission::SCOPE_OWN);
+
+        // Quick-create is an inline "add a missing product/uom while filling out
+        // another form" helper (used from Sales Order and BOM screens) — it's a
+        // low-risk additive action, not full catalog management, so it's granted
+        // to any role that references products in its own workflow.
+        foreach (['production_manager', 'production_engineer', 'sales_manager', 'sales_executive'] as $roleSlug) {
+            $this->grant($roles[$roleSlug], [
+                'inventory.products.create' => $permissions['inventory.products.create'],
+                'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
+            ], RolePermission::SCOPE_TENANT);
+        }
+
+        $this->grant($roles['hr_manager'], [
+            'hr.settings.manage' => $permissions['hr.settings.manage'],
+        ], RolePermission::SCOPE_TENANT);
+
         $this->assignDemoAdmin($roles['tenant_owner']);
     }
 
@@ -96,6 +157,9 @@ class RbacSeeder extends Seeder
             ['name' => 'production.bom.create', 'module' => 'production', 'entity' => 'bom', 'action' => 'create'],
             ['name' => 'production.bom.update', 'module' => 'production', 'entity' => 'bom', 'action' => 'update'],
             ['name' => 'production.bom.approve', 'module' => 'production', 'entity' => 'bom', 'action' => 'approve'],
+            ['name' => 'production.mes.execute', 'module' => 'production', 'entity' => 'mes', 'action' => 'execute'],
+            ['name' => 'production.schedule.manage', 'module' => 'production', 'entity' => 'schedule', 'action' => 'manage'],
+            ['name' => 'hr.settings.manage', 'module' => 'hr', 'entity' => 'settings', 'action' => 'manage'],
             ['name' => 'audit.logs.view', 'module' => 'audit', 'entity' => 'logs', 'action' => 'view'],
             ['name' => 'crm.leads.view', 'module' => 'crm', 'entity' => 'leads', 'action' => 'view'],
             ['name' => 'crm.leads.create', 'module' => 'crm', 'entity' => 'leads', 'action' => 'create'],
@@ -110,6 +174,22 @@ class RbacSeeder extends Seeder
             ['name' => 'crm.quotations.update', 'module' => 'crm', 'entity' => 'quotations', 'action' => 'update'],
             ['name' => 'crm.quotations.approve', 'module' => 'crm', 'entity' => 'quotations', 'action' => 'approve'],
             ['name' => 'crm.quotations.delete', 'module' => 'crm', 'entity' => 'quotations', 'action' => 'delete'],
+            ['name' => 'inventory.products.view', 'module' => 'inventory', 'entity' => 'products', 'action' => 'view'],
+            ['name' => 'inventory.products.create', 'module' => 'inventory', 'entity' => 'products', 'action' => 'create'],
+            ['name' => 'inventory.products.update', 'module' => 'inventory', 'entity' => 'products', 'action' => 'update'],
+            ['name' => 'inventory.products.delete', 'module' => 'inventory', 'entity' => 'products', 'action' => 'delete'],
+            ['name' => 'inventory.warehouses.manage', 'module' => 'inventory', 'entity' => 'warehouses', 'action' => 'manage'],
+            ['name' => 'inventory.uoms.manage', 'module' => 'inventory', 'entity' => 'uoms', 'action' => 'manage'],
+            ['name' => 'sales.orders.view', 'module' => 'sales', 'entity' => 'orders', 'action' => 'view'],
+            ['name' => 'sales.orders.create', 'module' => 'sales', 'entity' => 'orders', 'action' => 'create'],
+            ['name' => 'sales.orders.update', 'module' => 'sales', 'entity' => 'orders', 'action' => 'update'],
+            ['name' => 'sales.orders.delete', 'module' => 'sales', 'entity' => 'orders', 'action' => 'delete'],
+            ['name' => 'sales.orders.confirm', 'module' => 'sales', 'entity' => 'orders', 'action' => 'confirm'],
+            ['name' => 'sales.orders.cancel', 'module' => 'sales', 'entity' => 'orders', 'action' => 'cancel'],
+            ['name' => 'sales.deliveries.view', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'view'],
+            ['name' => 'sales.deliveries.create', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'create'],
+            ['name' => 'sales.deliveries.ship', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'ship'],
+            ['name' => 'sales.deliveries.cancel', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'cancel'],
         ];
 
         $permissions = [];
@@ -137,6 +217,8 @@ class RbacSeeder extends Seeder
             ['slug' => 'production_engineer', 'name' => 'Production Engineer', 'tenant_id' => null, 'level' => 50],
             ['slug' => 'sales_manager', 'name' => 'Sales Manager', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'sales_executive', 'name' => 'Sales Executive', 'tenant_id' => null, 'level' => 50],
+            ['slug' => 'inventory_manager', 'name' => 'Inventory Manager', 'tenant_id' => null, 'level' => 40],
+            ['slug' => 'hr_manager', 'name' => 'HR Manager', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'auditor', 'name' => 'Auditor', 'tenant_id' => null, 'level' => 80],
             ['slug' => 'read_only', 'name' => 'Read Only User', 'tenant_id' => null, 'level' => 90],
         ];

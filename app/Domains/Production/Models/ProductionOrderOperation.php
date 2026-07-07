@@ -52,6 +52,9 @@ class ProductionOrderOperation extends BaseModel
         'quantity_scrapped',
         'machine_used_id',
         'operator_id',
+        'parallel_group',
+        'is_parallel',
+        'parallel_type',
     ];
 
     protected $casts = [

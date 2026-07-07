@@ -4,6 +4,7 @@ namespace App\Domains\CRM\Controllers;
 
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\Customer;
+use App\Domains\CRM\Models\LeadDocument;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Services\QuotationService;
 use App\Domains\Inventory\Models\Product;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 class LeadController extends Controller
 {
@@ -62,7 +64,7 @@ class LeadController extends Controller
 
         $lead = new Lead();
         $users = User::orderBy('name')->get();
-        $products = Product::orderBy('name')->get();
+        $products = Product::whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
         return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
     }
 
@@ -71,6 +73,7 @@ class LeadController extends Controller
      */
     public function show(Lead $lead)
     {
+        $lead->load(['followups', 'histories.user', 'leadDocuments']);
         $this->authorize('view', $lead);
 
         $lead->load(['followups', 'histories.user']);
@@ -106,7 +109,7 @@ class LeadController extends Controller
 
         $customers = Customer::orderBy('name')->get();
         $nextQuotationNumber = app(QuotationService::class)->getNextQuotationNumber();
-        $products = Product::orderBy('name')->get();
+        $products = Product::whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
 
         // Get previous and next leads based on ID order (latest chronological order)
         $prevLead = Lead::where('id', '>', $lead->id)->orderBy('id', 'asc')->first();
@@ -235,7 +238,7 @@ class LeadController extends Controller
         $this->authorize('update', $lead);
 
         $users = User::orderBy('name')->get();
-        $products = Product::orderBy('name')->get();
+        $products = Product::whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
         return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
     }
 
@@ -435,10 +438,100 @@ class LeadController extends Controller
      */
     public function destroy(Lead $lead)
     {
+        $lead->leadDocuments->each(function ($document) {
+            Storage::disk('public')->delete($document->file_path);
+            $document->delete();
+        });
         $this->authorize('delete', $lead);
 
         $lead->delete();
         return redirect()->route('crm.leads.index')->with('success', 'Lead successfully deleted from Database!');
+    }
+
+    /**
+     * Upload documents for the lead.
+     */
+    public function uploadDocuments(Request $request, Lead $lead)
+    {
+        $validated = $request->validate([
+            'documents' => 'required',
+            'documents.*' => 'file|max:10240',
+        ]);
+
+        $uploadedIds = $lead->documents ?? [];
+
+        foreach ($request->file('documents') as $file) {
+            $path = $file->store('lead_documents/' . $lead->id, 'public');
+
+            $document = LeadDocument::create([
+                'tenant_id' => $lead->tenant_id,
+                'lead_id' => $lead->id,
+                'file_name' => $file->getClientOriginalName(),
+                'file_type' => $file->getClientOriginalExtension(),
+                'file_path' => $path,
+                'size' => $file->getSize(),
+            ]);
+
+            $uploadedIds[] = $document->id;
+        }
+
+        $lead->documents = array_values(array_filter($uploadedIds));
+        $lead->save();
+
+        return redirect()->back()->with('success', 'Lead documents uploaded successfully!');
+    }
+
+    /**
+     * View a lead document in the browser.
+     */
+    public function viewDocument(LeadDocument $document)
+    {
+        if (!$document->lead) {
+            abort(404);
+        }
+
+        $path = Storage::disk('public')->path($document->file_path);
+        if (!Storage::disk('public')->exists($document->file_path)) {
+            abort(404);
+        }
+
+        return response()->file($path);
+    }
+
+    /**
+     * Download a lead document.
+     */
+    public function downloadDocument(LeadDocument $document)
+    {
+        if (!$document->lead) {
+            abort(404);
+        }
+
+        $path = Storage::disk('public')->path($document->file_path);
+        if (!Storage::disk('public')->exists($document->file_path)) {
+            abort(404);
+        }
+
+        return response()->download($path, $document->file_name);
+    }
+
+    /**
+     * Delete a lead document.
+     */
+    public function deleteDocument(LeadDocument $document)
+    {
+        if (!$document->lead) {
+            abort(404);
+        }
+
+        $lead = $document->lead;
+        $document->delete();
+        Storage::disk('public')->delete($document->file_path);
+
+        $lead->documents = array_values(array_filter(array_diff($lead->documents ?? [], [$document->id])));
+        $lead->save();
+
+        return redirect()->back()->with('success', 'Lead document removed successfully.');
     }
 
     /**

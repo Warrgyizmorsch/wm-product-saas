@@ -19,6 +19,8 @@ class ProductController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Product::class);
+
         $query = Product::query()->whereNull('parent_id')->with(['uom', 'variants']);
 
         if ($request->filled('search')) {
@@ -44,6 +46,8 @@ class ProductController extends Controller
 
     public function create(): View
     {
+        $this->authorize('create', Product::class);
+
         $uoms = Uom::query()->get();
         $vendors = Vendor::query()->where('status', 'active')->get();
         $warehouses = Warehouse::query()->where('status', 'active')->get();
@@ -53,11 +57,14 @@ class ProductController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Product::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'item_type' => 'required|in:Goods,Service',
+            'type' => 'required|in:finished_good,semi_finished,raw_material,component,service',
             'variation_type' => 'required|in:Single,Variant',
             'sku' => [
                 'nullable',
@@ -106,6 +113,7 @@ class ProductController extends Controller
             // Tracking
             'track_serial_number' => 'nullable|boolean',
             'track_batch' => 'nullable|boolean',
+            'inventory_valuation_method' => 'nullable|string|in:FIFO,Weighted Average',
 
             // Attributes config for variants
             'attributes' => 'nullable|array',
@@ -119,7 +127,7 @@ class ProductController extends Controller
                 'tenant_id' => $tenantId,
                 'name' => $validated['name'],
                 'sku' => $validated['variation_type'] === 'Single' ? $validated['sku'] : ($validated['sku'] ?? strtoupper($validated['name'] . '-VAR')),
-                'type' => 'component', // default type
+                'type' => $validated['type'],
                 'item_type' => $validated['item_type'],
                 'variation_type' => $validated['variation_type'],
                 'uom_id' => $validated['uom_id'],
@@ -152,6 +160,7 @@ class ProductController extends Controller
                 'weight_unit' => $validated['weight_unit'],
                 'track_serial_number' => !empty($validated['track_serial_number']),
                 'track_batch' => !empty($validated['track_batch']),
+                'inventory_valuation_method' => $validated['inventory_valuation_method'] ?? 'FIFO',
                 'attributes_config' => $validated['attributes'] ?? null,
             ]);
 
@@ -162,13 +171,14 @@ class ProductController extends Controller
                         $qty = (float)($stockData['quantity'] ?? 0);
                         $cost = (float)($stockData['unit_cost'] ?? 0);
                         if ($qty > 0) {
-                            ProductWarehouseStock::create([
-                                'tenant_id' => $tenantId,
-                                'product_id' => $parentProduct->id,
-                                'warehouse_id' => $whId,
-                                'quantity' => $qty,
-                                'unit_cost' => $cost > 0 ? $cost : $parentProduct->cost_price,
-                            ]);
+                            \App\Domains\Inventory\Services\StockService::recordInflow(
+                                $tenantId,
+                                $parentProduct->id,
+                                $whId,
+                                $qty,
+                                $cost > 0 ? $cost : $parentProduct->cost_price,
+                                'Opening Stock'
+                            );
                         }
                     }
                 }
@@ -184,7 +194,7 @@ class ProductController extends Controller
                             'parent_id' => $parentProduct->id,
                             'name' => $parentProduct->name . ' (' . ($vData['attributes'] ?? '') . ')',
                             'sku' => $vData['sku'],
-                            'type' => 'component',
+                            'type' => $parentProduct->type,
                             'item_type' => $parentProduct->item_type,
                             'variation_type' => 'Single',
                             'uom_id' => $parentProduct->uom_id,
@@ -203,13 +213,14 @@ class ProductController extends Controller
                         // Save Variant Opening Stock to the default warehouse
                         $openingQty = (float)($vData['opening_stock'] ?? 0);
                         if ($openingQty > 0 && $defaultWarehouse) {
-                            ProductWarehouseStock::create([
-                                'tenant_id' => $tenantId,
-                                'product_id' => $variantProduct->id,
-                                'warehouse_id' => $defaultWarehouse->id,
-                                'quantity' => $openingQty,
-                                'unit_cost' => $variantProduct->cost_price,
-                            ]);
+                            \App\Domains\Inventory\Services\StockService::recordInflow(
+                                $tenantId,
+                                $variantProduct->id,
+                                $defaultWarehouse->id,
+                                $openingQty,
+                                $variantProduct->cost_price,
+                                'Opening Stock'
+                            );
                         }
                     }
                 }
@@ -222,7 +233,21 @@ class ProductController extends Controller
 
     public function show(Product $product): View
     {
-        $product->load(['uom', 'vendor', 'warehouseStocks.warehouse', 'variants.warehouseStocks.warehouse']);
+        $this->authorize('view', $product);
+
+        $product->load([
+            'uom', 
+            'vendor', 
+            'warehouseStocks.warehouse', 
+            'variants.warehouseStocks.warehouse',
+            'stockTransactions.warehouse',
+            'serialNumbers.warehouse',
+            'serialNumbers.batch',
+            'serialNumbers.transactionIn',
+            'serialNumbers.transactionOut',
+            'batches.stockTransactions',
+            'stockReservations.warehouse'
+        ]);
         
         $warehouses = Warehouse::query()->where('status', 'active')->get();
 
@@ -231,6 +256,8 @@ class ProductController extends Controller
 
     public function edit(Product $product): View
     {
+        $this->authorize('update', $product);
+
         $product->load(['uom', 'vendor', 'warehouseStocks']);
         $uoms = Uom::query()->get();
         $vendors = Vendor::query()->where('status', 'active')->get();
@@ -245,10 +272,13 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): RedirectResponse
     {
+        $this->authorize('update', $product);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'type' => 'required|in:finished_good,semi_finished,raw_material,component,service',
             'sku' => [
                 'required',
                 'string',
@@ -289,6 +319,7 @@ class ProductController extends Controller
             // Tracking
             'track_serial_number' => 'nullable|boolean',
             'track_batch' => 'nullable|boolean',
+            'inventory_valuation_method' => 'nullable|string|in:FIFO,Weighted Average',
 
             'warehouse_stocks' => 'nullable|array',
             'status' => 'required|in:active,inactive',
@@ -297,6 +328,7 @@ class ProductController extends Controller
         DB::transaction(function () use ($validated, $product, $tenantId) {
             $product->update([
                 'name' => $validated['name'],
+                'type' => $validated['type'],
                 'sku' => $validated['sku'],
                 'uom_id' => $validated['uom_id'],
                 'status' => $validated['status'],
@@ -326,7 +358,11 @@ class ProductController extends Controller
                 'weight_unit' => $validated['weight_unit'],
                 'track_serial_number' => !empty($validated['track_serial_number']),
                 'track_batch' => !empty($validated['track_batch']),
+                'inventory_valuation_method' => $validated['inventory_valuation_method'] ?? 'FIFO',
             ]);
+
+            // Sync type to variants
+            Product::where('parent_id', $product->id)->update(['type' => $validated['type']]);
 
             if ($product->variation_type === 'Single') {
                 // Update stock per warehouse
@@ -335,13 +371,37 @@ class ProductController extends Controller
                         $qty = (float)($stockData['quantity'] ?? 0);
                         $cost = (float)($stockData['unit_cost'] ?? 0);
 
-                        ProductWarehouseStock::query()->updateOrCreate(
-                            ['tenant_id' => $tenantId, 'product_id' => $product->id, 'warehouse_id' => $whId],
-                            [
-                                'quantity' => $qty,
-                                'unit_cost' => $cost > 0 ? $cost : $product->cost_price,
-                            ]
-                        );
+                        $oldStock = ProductWarehouseStock::query()
+                            ->where('tenant_id', $tenantId)
+                            ->where('product_id', $product->id)
+                            ->where('warehouse_id', $whId)
+                            ->first();
+
+                        $oldQty = $oldStock ? (float)$oldStock->quantity : 0.0;
+                        $rate = $cost > 0 ? $cost : $product->cost_price;
+
+                        if ($qty != $oldQty) {
+                            if ($qty > $oldQty) {
+                                $diff = $qty - $oldQty;
+                                \App\Domains\Inventory\Services\StockService::recordInflow(
+                                    $tenantId,
+                                    $product->id,
+                                    $whId,
+                                    $diff,
+                                    $rate,
+                                    'Adjustment'
+                                );
+                            } else {
+                                $diff = $oldQty - $qty;
+                                \App\Domains\Inventory\Services\StockService::recordOutflow(
+                                    $tenantId,
+                                    $product->id,
+                                    $whId,
+                                    $diff,
+                                    'Adjustment'
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -356,6 +416,8 @@ class ProductController extends Controller
      */
     public function openingStock(Product $product): View
     {
+        $this->authorize('update', $product);
+
         $product->load(['uom', 'warehouseStocks.warehouse', 'variants.warehouseStocks.warehouse']);
         $warehouses = Warehouse::query()->where('status', 'active')->get();
 
@@ -383,15 +445,21 @@ class ProductController extends Controller
      */
     public function saveOpeningStock(Request $request, Product $product): RedirectResponse
     {
+        $this->authorize('update', $product);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $request->validate([
             'warehouse_stocks'                          => 'nullable|array',
             'warehouse_stocks.*.quantity'               => 'nullable|numeric|min:0',
             'warehouse_stocks.*.unit_cost'              => 'nullable|numeric|min:0',
+            'warehouse_stocks.*.batch_number'           => 'nullable|string',
+            'warehouse_stocks.*.serial_numbers'         => 'nullable|string',
             'variant_stocks'                            => 'nullable|array',
             'variant_stocks.*.*.quantity'               => 'nullable|numeric|min:0',
             'variant_stocks.*.*.unit_cost'              => 'nullable|numeric|min:0',
+            'variant_stocks.*.*.batch_number'           => 'nullable|string',
+            'variant_stocks.*.*.serial_numbers'         => 'nullable|string',
         ]);
 
         DB::transaction(function () use ($request, $product, $tenantId) {
@@ -407,25 +475,45 @@ class ProductController extends Controller
                     foreach ($whData as $warehouseId => $data) {
                         $qty  = (float)($data['quantity']  ?? 0);
                         $cost = (float)($data['unit_cost'] ?? 0);
+                        $batchNumber = $data['batch_number'] ?? null;
+                        $snRaw = $data['serial_numbers'] ?? '';
+                        $serialNumbers = array_filter(array_map('trim', explode(',', $snRaw)));
 
-                        if ($qty > 0) {
-                            ProductWarehouseStock::query()->updateOrCreate(
-                                [
-                                    'tenant_id'    => $tenantId,
-                                    'product_id'   => $variantId,
-                                    'warehouse_id' => $warehouseId,
-                                ],
-                                [
-                                    'quantity'  => $qty,
-                                    'unit_cost' => $cost > 0 ? $cost : $variant->cost_price,
-                                ]
-                            );
-                        } else {
-                            ProductWarehouseStock::query()
-                                ->where('tenant_id', $tenantId)
-                                ->where('product_id', $variantId)
-                                ->where('warehouse_id', $warehouseId)
-                                ->delete();
+                        $stock = ProductWarehouseStock::query()
+                            ->where('tenant_id', $tenantId)
+                            ->where('product_id', $variantId)
+                            ->where('warehouse_id', $warehouseId)
+                            ->first();
+
+                        $oldQty = $stock ? (float)$stock->quantity : 0.0;
+                        $rate = $cost > 0 ? $cost : $variant->cost_price;
+
+                        if ($qty != $oldQty) {
+                            if ($qty > $oldQty) {
+                                $diff = $qty - $oldQty;
+                                \App\Domains\Inventory\Services\StockService::recordInflow(
+                                    $tenantId,
+                                    $variantId,
+                                    $warehouseId,
+                                    $diff,
+                                    $rate,
+                                    'Opening Stock',
+                                    null,
+                                    $batchNumber,
+                                    $serialNumbers
+                                );
+                            } else {
+                                $diff = $oldQty - $qty;
+                                \App\Domains\Inventory\Services\StockService::recordOutflow(
+                                    $tenantId,
+                                    $variantId,
+                                    $warehouseId,
+                                    $diff,
+                                    'Adjustment',
+                                    null,
+                                    $serialNumbers
+                                );
+                            }
                         }
                     }
                 }
@@ -435,25 +523,45 @@ class ProductController extends Controller
                 foreach ($stocks as $warehouseId => $data) {
                     $qty  = (float)($data['quantity']  ?? 0);
                     $cost = (float)($data['unit_cost'] ?? 0);
+                    $batchNumber = $data['batch_number'] ?? null;
+                    $snRaw = $data['serial_numbers'] ?? '';
+                    $serialNumbers = array_filter(array_map('trim', explode(',', $snRaw)));
 
-                    if ($qty > 0) {
-                        ProductWarehouseStock::query()->updateOrCreate(
-                            [
-                                'tenant_id'    => $tenantId,
-                                'product_id'   => $product->id,
-                                'warehouse_id' => $warehouseId,
-                            ],
-                            [
-                                'quantity'  => $qty,
-                                'unit_cost' => $cost > 0 ? $cost : $product->cost_price,
-                            ]
-                        );
-                    } else {
-                        ProductWarehouseStock::query()
-                            ->where('tenant_id', $tenantId)
-                            ->where('product_id', $product->id)
-                            ->where('warehouse_id', $warehouseId)
-                            ->delete();
+                    $stock = ProductWarehouseStock::query()
+                        ->where('tenant_id', $tenantId)
+                        ->where('product_id', $product->id)
+                        ->where('warehouse_id', $warehouseId)
+                        ->first();
+
+                    $oldQty = $stock ? (float)$stock->quantity : 0.0;
+                    $rate = $cost > 0 ? $cost : $product->cost_price;
+
+                    if ($qty != $oldQty) {
+                        if ($qty > $oldQty) {
+                            $diff = $qty - $oldQty;
+                            \App\Domains\Inventory\Services\StockService::recordInflow(
+                                $tenantId,
+                                $product->id,
+                                $warehouseId,
+                                $diff,
+                                $rate,
+                                'Opening Stock',
+                                null,
+                                $batchNumber,
+                                $serialNumbers
+                            );
+                        } else {
+                            $diff = $oldQty - $qty;
+                            \App\Domains\Inventory\Services\StockService::recordOutflow(
+                                $tenantId,
+                                $product->id,
+                                $warehouseId,
+                                $diff,
+                                'Adjustment',
+                                null,
+                                $serialNumbers
+                            );
+                        }
                     }
                 }
             }
@@ -465,6 +573,8 @@ class ProductController extends Controller
 
     public function destroy(Product $product): RedirectResponse
     {
+        $this->authorize('delete', $product);
+
         $product->delete();
 
         return redirect()->route('inventory.products.index')
@@ -474,6 +584,8 @@ class ProductController extends Controller
 
     public function quickCreate(Request $request): JsonResponse
     {
+        $this->authorize('create', Product::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
@@ -488,7 +600,7 @@ class ProductController extends Controller
                     }
                 }
             ],
-            'type' => 'required|in:finished_good,semi_finished,raw_material,component',
+            'type' => 'required|in:finished_good,semi_finished,raw_material,component,service',
             'unit_cost' => 'nullable|numeric|min:0',
         ]);
 

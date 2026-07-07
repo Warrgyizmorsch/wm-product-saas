@@ -36,6 +36,7 @@ class Lead extends Model
         'status',
         'next_followup_date',
         'is_customer',
+        'documents',
     ];
 
     protected $casts = [
@@ -45,6 +46,7 @@ class Lead extends Model
         'next_followup_date' => 'datetime',
         'is_customer' => 'boolean',
         'product_id' => 'integer',
+        'documents' => 'array',
     ];
 
     /**
@@ -77,6 +79,14 @@ class Lead extends Model
     public function histories(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(LeadHistory::class)->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Get the documents uploaded for this lead.
+     */
+    public function leadDocuments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LeadDocument::class)->orderBy('created_at', 'desc');
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\Concerns\HasHrPermissions;
 use App\Models\Concerns\HasProductionPermissions;
 use App\Models\Access\Role;
 use App\Models\Access\UserPermissionOverride;
@@ -19,7 +20,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use BelongsToTenant, HasFactory, Notifiable, HasProductionPermissions;
+    use BelongsToTenant, HasFactory, Notifiable, HasProductionPermissions, HasHrPermissions;
 
     /**
      * The attributes that are mass assignable.
