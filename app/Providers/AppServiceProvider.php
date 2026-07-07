@@ -74,6 +74,19 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Policies\ProductionOrderPolicy::class
         );
 
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionOperatorAssignment::class,
+            \App\Domains\Production\Policies\AdvancedMesPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionBatch::class,
+            \App\Domains\Production\Policies\AdvancedMesPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionSerialNumber::class,
+            \App\Domains\Production\Policies\AdvancedMesPolicy::class
         // ── CRM Policies ──────────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\CRM\Models\Lead::class,

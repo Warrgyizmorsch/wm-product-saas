@@ -11,6 +11,14 @@ use App\Domains\Production\Controllers\ProductionScheduleController;
 use App\Domains\Production\Controllers\MesController;
 use App\Domains\Production\Controllers\MachineDashboardController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
+use App\Domains\Production\Controllers\OperatorAssignmentController;
+use App\Domains\Production\Controllers\BatchProductionController;
+use App\Domains\Production\Controllers\SerialNumberController;
+use App\Domains\Production\Controllers\LotTraceabilityController;
+use App\Domains\Production\Controllers\ScannerController;
+use App\Domains\Production\Controllers\MachineStateController;
+use App\Domains\Production\Controllers\DowntimeController;
+use App\Domains\Production\Controllers\ProductionTimelineController;
 
 Route::prefix('production')
     ->as('production.')
@@ -90,9 +98,44 @@ Route::prefix('production')
         Route::post('mes/{op}/hold',         [MesController::class, 'hold'])->name('mes.hold');
         Route::post('mes/{op}/cancel',       [MesController::class, 'cancel'])->name('mes.cancel');
 
+        // ── Advanced MES Refinements ───────────────────────────────────────────
+        // Touch Operator Dashboard and My Operations
+        Route::get('mes/operator', [MesController::class, 'operatorDashboard'])->name('mes.operator.dashboard');
+        Route::get('mes/operator/my-operations', [MesController::class, 'myOperations'])->name('mes.operator.my-operations');
+        Route::get('mes/operator/operations/{op}', [MesController::class, 'operationExecution'])->name('mes.operator.execution');
+
+        // Operator Assignments
+        Route::post('mes/assignments', [OperatorAssignmentController::class, 'assign'])->name('mes.assignments.assign');
+        Route::post('mes/assignments/{assignment}/reassign', [OperatorAssignmentController::class, 'reassign'])->name('mes.assignments.reassign');
+        Route::post('mes/assignments/{assignment}/accept', [OperatorAssignmentController::class, 'accept'])->name('mes.assignments.accept');
+        Route::post('mes/assignments/{assignment}/reject', [OperatorAssignmentController::class, 'reject'])->name('mes.assignments.reject');
+
+        // Batch Management
+        Route::post('mes/batches', [BatchProductionController::class, 'create'])->name('mes.batches.create');
+        Route::post('mes/batches/split', [BatchProductionController::class, 'split'])->name('mes.batches.split');
+        Route::post('mes/batches/merge', [BatchProductionController::class, 'merge'])->name('mes.batches.merge');
+
+        // Serial Numbers
+        Route::post('mes/serials/generate', [SerialNumberController::class, 'generate'])->name('mes.serials.generate');
+        Route::post('mes/serials/manual-assign', [SerialNumberController::class, 'manualAssign'])->name('mes.serials.manual-assign');
+
+        // Lot Traceability
+        Route::get('mes/traceability', [LotTraceabilityController::class, 'index'])->name('mes.traceability.index');
+        Route::get('mes/traceability/search', [LotTraceabilityController::class, 'search'])->name('mes.traceability.search');
+
+        // Barcode / QR Scanning
+        Route::get('mes/scanner', [ScannerController::class, 'index'])->name('mes.scanner.index');
+        Route::post('mes/scanner/scan', [ScannerController::class, 'scan'])->name('mes.scanner.scan');
+
         // ── MES Machine & Work Center Dashboards ──────────────────────────────
         Route::get('mes/machines',           [MachineDashboardController::class, 'index'])->name('mes.machines.index');
         Route::get('mes/machines/{id}',      [MachineDashboardController::class, 'show'])->name('mes.machines.show');
         Route::get('mes/work-centers',       [WorkCenterDashboardController::class, 'index'])->name('mes.work-centers.index');
         Route::get('mes/work-centers/{id}',  [WorkCenterDashboardController::class, 'show'])->name('mes.work-centers.show');
+
+        // ── OEE Foundation routes ─────────────────────────────────────────────
+        Route::post('mes/machines/override-state', [MachineStateController::class, 'overrideState'])->name('mes.machines.override-state');
+        Route::post('mes/downtime/start',          [DowntimeController::class, 'start'])->name('mes.downtime.start');
+        Route::post('mes/downtime/{id}/end',       [DowntimeController::class, 'end'])->name('mes.downtime.end');
+        Route::get('mes/timeline',                 [ProductionTimelineController::class, 'index'])->name('mes.timeline.index');
     });

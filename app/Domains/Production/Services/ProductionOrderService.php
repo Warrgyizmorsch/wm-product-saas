@@ -97,6 +97,26 @@ class ProductionOrderService
             $plan->status = ProductionPlan::STATUS_RELEASED;
             $plan->save();
 
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type'          => 'Order Created',
+                'title'               => 'Production Order Created',
+                'description'         => "Production order {$order->order_number} has been created from plan.",
+                'severity'            => 'info',
+                'event_source'        => 'ProductionOrderService',
+                'triggered_by'        => $userId,
+            ]);
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type'          => 'Material Reserved',
+                'title'               => 'Materials Reserved',
+                'description'         => "Materials reserved for production order {$order->order_number}.",
+                'severity'            => 'info',
+                'event_source'        => 'ProductionOrderService',
+                'triggered_by'        => $userId,
+            ]);
+
             return $order;
         });
     }
@@ -199,6 +219,26 @@ class ProductionOrderService
                 $createdOps[$i]->save();
             }
 
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type'          => 'Order Created',
+                'title'               => 'Production Order Created',
+                'description'         => "Production order {$order->order_number} has been created directly.",
+                'severity'            => 'info',
+                'event_source'        => 'ProductionOrderService',
+                'triggered_by'        => $userId,
+            ]);
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type'          => 'Material Reserved',
+                'title'               => 'Materials Reserved',
+                'description'         => "Materials reserved for production order {$order->order_number}.",
+                'severity'            => 'info',
+                'event_source'        => 'ProductionOrderService',
+                'triggered_by'        => $userId,
+            ]);
+
             return $order;
         });
     }
@@ -218,6 +258,16 @@ class ProductionOrderService
         $order->released_by = $userId;
         $order->released_at = now();
         $order->save();
+
+        app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+            'production_order_id' => $order->id,
+            'event_type'          => 'Order Released',
+            'title'               => 'Production Order Released',
+            'description'         => "Production order {$order->order_number} released to the shop floor.",
+            'severity'            => 'success',
+            'event_source'        => 'ProductionOrderService',
+            'triggered_by'        => $userId,
+        ]);
     }
 
     /**
@@ -247,6 +297,16 @@ class ProductionOrderService
         $order->completed_at = now();
         $order->actual_end_date = now();
         $order->save();
+
+        app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+            'production_order_id' => $order->id,
+            'event_type'          => 'Production Completed',
+            'title'               => 'Production Order Completed',
+            'description'         => "Production order {$order->order_number} completed.",
+            'severity'            => 'success',
+            'event_source'        => 'ProductionOrderService',
+            'triggered_by'        => $userId,
+        ]);
     }
 
     /**
@@ -264,6 +324,16 @@ class ProductionOrderService
         $order->closed_by = $userId;
         $order->closed_at = now();
         $order->save();
+
+        app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+            'production_order_id' => $order->id,
+            'event_type'          => 'Production Closed',
+            'title'               => 'Production Order Closed',
+            'description'         => "Production order {$order->order_number} closed.",
+            'severity'            => 'info',
+            'event_source'        => 'ProductionOrderService',
+            'triggered_by'        => $userId,
+        ]);
     }
 
     /**
@@ -280,6 +350,16 @@ class ProductionOrderService
         DB::transaction(function () use ($order, $userId) {
             $order->status = ProductionOrder::STATUS_CANCELLED;
             $order->save();
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type'          => 'Production Cancelled',
+                'title'               => 'Production Order Cancelled',
+                'description'         => "Production order {$order->order_number} has been cancelled.",
+                'severity'            => 'warning',
+                'event_source'        => 'ProductionOrderService',
+                'triggered_by'        => $userId,
+            ]);
 
             // Cancel all operations
             $order->operations()->update(['status' => ProductionOrderOperation::STATUS_CANCELLED]);

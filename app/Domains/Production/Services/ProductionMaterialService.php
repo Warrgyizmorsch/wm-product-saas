@@ -52,6 +52,16 @@ class ProductionMaterialService
             $res->quantity_reserved = max(0.0000, $res->quantity_reserved - $quantity);
             $res->save();
 
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($res->tenant_id, [
+                'production_order_id' => $res->production_order_id,
+                'event_type'          => 'Material Issued',
+                'title'               => 'Material Issued',
+                'description'         => "Issued {$quantity} units of material for production order #{$res->production_order_id}.",
+                'severity'            => 'info',
+                'event_source'        => 'ProductionMaterialService',
+                'triggered_by'        => $userId,
+            ]);
+
             return $issue;
         });
     }

@@ -9,6 +9,10 @@ use App\Domains\Production\Services\MesExecutionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
+use App\Domains\Production\Models\ProductionOperatorAssignment;
+use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionBatch;
+use App\Domains\Production\Models\ProductionSerialNumber;
 
 class MesController extends Controller
 {
@@ -132,5 +136,91 @@ class MesController extends Controller
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Touch-Friendly Operator Dashboard.
+     */
+    public function operatorDashboard(Request $request)
+    {
+        $tenantId = require_tenant_id();
+        $userId   = Auth::id() ?: 1;
+
+        // My operator assignments
+        $myAssignments = ProductionOperatorAssignment::with(['operation.productionOrder.product', 'operation.workCenter'])
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        // Running operations
+        $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
+            ->get();
+
+        // Ready queue
+        $ready = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->where('status', ProductionScheduleOperation::STATUS_READY)
+            ->get();
+
+        // Paused
+        $paused = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
+            ->get();
+
+        // Done today
+        $completedToday = ProductionScheduleOperation::where('status', ProductionScheduleOperation::STATUS_COMPLETED)
+            ->whereDate('actual_finish', today())
+            ->count();
+
+        return view('modules.production.mes.operator.dashboard', compact(
+            'myAssignments', 'running', 'ready', 'paused', 'completedToday'
+        ));
+    }
+
+    /**
+     * My Assigned Operations list view.
+     */
+    public function myOperations(Request $request)
+    {
+        $tenantId = require_tenant_id();
+        $userId   = Auth::id() ?: 1;
+
+        $assignments = ProductionOperatorAssignment::with(['operation.productionOrder.product', 'operation.workCenter'])
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $userId)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return view('modules.production.mes.operator.my-operations', compact('assignments'));
+    }
+
+    /**
+     * Touch-Friendly Operation Execution details view.
+     */
+    public function operationExecution(Request $request, int $opId)
+    {
+        $tenantId = require_tenant_id();
+        $op = ProductionOrderOperation::with(['productionOrder.product', 'workCenter', 'machine'])->findOrFail($opId);
+
+        $order = $op->productionOrder;
+        $batches = ProductionBatch::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->get();
+        $serials = ProductionSerialNumber::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->get();
+
+        // Determine list of active assignments
+        $assignment = ProductionOperatorAssignment::where('tenant_id', $tenantId)
+            ->where('production_order_operation_id', $opId)
+            ->where('status', 'accepted')
+            ->first();
+
+        // Get list of all operators for quick reassignment list
+        $operators = \App\Models\User::where('tenant_id', $tenantId)->get();
+
+        // Try mapping the schedule operation if it exists
+        $scheduleOp = ProductionScheduleOperation::where('production_order_operation_id', $opId)->first();
+
+        return view('modules.production.mes.operator.operation-execution', compact(
+            'op', 'order', 'batches', 'serials', 'assignment', 'operators', 'scheduleOp'
+        ));
     }
 }

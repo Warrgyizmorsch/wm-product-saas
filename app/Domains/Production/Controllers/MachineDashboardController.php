@@ -52,6 +52,18 @@ class MachineDashboardController extends Controller
             ->take(20)
             ->get();
 
-        return view('modules.production.mes.machine-detail', compact('machine', 'currentOp', 'nextOp', 'history'));
+        $stateHistories = \App\Domains\Production\Models\ProductionMachineStateHistory::with('changer')
+            ->where('machine_id', $machine->id)
+            ->orderByDesc('started_at')
+            ->take(10)
+            ->get();
+
+        $downtimes = \App\Domains\Production\Models\ProductionMachineDowntime::with(['creator', 'approver', 'order'])
+            ->where('machine_id', $machine->id)
+            ->orderByDesc('id')
+            ->take(10)
+            ->get();
+
+        return view('modules.production.mes.machine-detail', compact('machine', 'currentOp', 'nextOp', 'history', 'stateHistories', 'downtimes'));
     }
 }
