@@ -874,7 +874,7 @@
     @endif
 
 @elseif ($type === 'table')
-    <table {{ $attributes->class(['odoo-table']) }}>
+    <table {{ $attributes->class(['odoo-table']) }} @if($id) id="{{ $id }}" @endif>
         {{ $slot }}
     </table>
 @endif

@@ -192,7 +192,7 @@
                         'id' => $p->id,
                         'name' => $p->name,
                         'sku' => $p->sku,
-                        'unit_cost' => $p->unit_cost
+                        'selling_price' => $p->selling_price  // Sales price from item master (like Odoo list_price / Zoho item rate)
                     ];
                 });
             @endphp
@@ -226,7 +226,7 @@
                 opts += '<option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>';
                 productsList.forEach(function(p) {
                     const sel = (p.id == selectedId) ? ' selected' : '';
-                    opts += `<option value="${p.id}" data-unit-cost="${p.unit_cost ?? 0}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.sku)})</option>`;
+                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price ?? 0}"${sel}>${escapeHtml(p.name)} (${escapeHtml(p.sku)})</option>`;
                 });
                 return opts;
             }
@@ -316,15 +316,11 @@
                 const newRow = $(getRowHtml(rowIndex, selectedId, selectedWarehouseId));
                 $('#itemsTable tbody').append(newRow);
 
-                // Initialize select2 on the newly added select element
-                newRow.find('.item-name-input').select2({
-                    theme: "bootstrap-5",
-                    width: "100%"
-                });
-                newRow.find('.warehouse-input').select2({
-                    theme: "bootstrap-5",
-                    width: "100%"
-                });
+                // Initialize select2 if plugin is loaded
+                if (typeof $.fn.select2 === 'function') {
+                    newRow.find('.item-name-input').select2({ theme: "bootstrap-5", width: "100%" });
+                    newRow.find('.warehouse-input').select2({ theme: "bootstrap-5", width: "100%" });
+                }
 
                 let isPrefilling = false;
                 if (item) {
@@ -343,13 +339,13 @@
                     isPrefilling = false;
                 }
 
-                // Auto-fill price from product when changed
+                // Auto-fill selling price from item master when product is changed (like Odoo/Zoho)
                 newRow.find('.item-name-input').on('change', function() {
                     if (isPrefilling) return;
                     const selectedOption = $(this).find('option:selected');
-                    const unitCost = parseFloat(selectedOption.attr('data-unit-cost')) || 0;
-                    if (unitCost > 0) {
-                        $(this).closest('tr').find('.price-input').val(unitCost.toFixed(2));
+                    const sellingPrice = parseFloat(selectedOption.attr('data-selling-price')) || 0;
+                    if (sellingPrice > 0) {
+                        $(this).closest('tr').find('.price-input').val(sellingPrice.toFixed(2));
                         calculateTotals();
                     }
                 });

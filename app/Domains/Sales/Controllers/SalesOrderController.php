@@ -196,7 +196,7 @@ class SalesOrderController extends Controller
             return back()->withErrors(['status' => 'Only Draft Sales Orders can be confirmed.']);
         }
 
-        // Validate stock availability and warehouse allocation
+        // Validate warehouse allocation
         $errors = [];
         foreach ($order->items as $item) {
             if (!$item->product_id || $item->product->type === 'Service') continue;
@@ -205,37 +205,18 @@ class SalesOrderController extends Controller
                 $errors[] = "Warehouse must be allocated for product line: {$item->product->name}";
                 continue;
             }
-
-            $available = StockService::getAvailableStock($item->product_id, $item->warehouse_id);
-            if ($available < (float)$item->quantity) {
-                $errors[] = "Insufficient stock for '{$item->product->name}' in warehouse '{$item->warehouse->name}'. Ordered: {$item->quantity}, Available: {$available}.";
-            }
         }
 
         if (!empty($errors)) {
             return back()->withErrors($errors);
         }
 
-        // Execute Line-Level Reservations
+        // Confirm the Sales Order without reservation
         DB::transaction(function () use ($order) {
-            foreach ($order->items as $item) {
-                if (!$item->product_id || $item->product->type === 'Service') continue;
-
-                StockService::reserveStock(
-                    $order->tenant_id,
-                    $item->product_id,
-                    $item->warehouse_id,
-                    $item->quantity,
-                    'SalesOrder',
-                    $order->id,
-                    $item->id
-                );
-            }
-
             $order->update(['status' => 'Confirmed']);
         });
 
-        return back()->with('success', 'Sales Order confirmed successfully! Stock reserved.');
+        return back()->with('success', 'Sales Order confirmed successfully!');
     }
 
     public function cancel(int $id): RedirectResponse
