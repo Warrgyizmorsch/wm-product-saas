@@ -51,6 +51,11 @@ class ProductionScheduleOperation extends BaseModel
         'shift_code',
         'quality_checkpoint_status',
         'maintenance_hold_status',
+        'lane',
+        'resource_id',
+        'warnings',
+        'locked',
+        'actual_machine_id',
     ];
 
     protected $casts = [
@@ -61,6 +66,8 @@ class ProductionScheduleOperation extends BaseModel
         'planned_duration_minutes' => 'float',
         'sequence'                 => 'integer',
         'priority'                 => 'integer',
+        'warnings'                 => 'array',
+        'locked'                   => 'boolean',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
@@ -88,6 +95,11 @@ class ProductionScheduleOperation extends BaseModel
     public function machine(): BelongsTo
     {
         return $this->belongsTo(Machine::class, 'machine_id');
+    }
+
+    public function actualMachine(): BelongsTo
+    {
+        return $this->belongsTo(Machine::class, 'actual_machine_id');
     }
 
     // ─── Status Helpers ───────────────────────────────────────────────────────

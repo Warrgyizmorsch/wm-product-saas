@@ -82,15 +82,15 @@
                                 <option value="forward" {{ old('scheduling_type', 'forward') === 'forward' ? 'selected' : '' }}>
                                     Forward Scheduling (Start → Finish)
                                 </option>
-                                <option value="backward" disabled title="Coming in future release">
-                                    Backward Scheduling (Finish → Start) — Coming Soon
+                                <option value="backward" {{ old('scheduling_type') === 'backward' ? 'selected' : '' }}>
+                                    Backward Scheduling (Finish → Start)
                                 </option>
                                 <option value="manual" disabled title="Coming in future release">
                                     Manual Scheduling — Coming Soon
                                 </option>
                             </x-ui.odoo-form-ui>
                             <small class="text-muted fs-11 mt-1 d-block">
-                                <i class="feather-info me-1"></i>Only Forward Scheduling is available in this release. Additional strategies are in development.
+                                <i class="feather-info me-1"></i>Forward and Backward Scheduling are available.
                             </small>
                         </div>
 

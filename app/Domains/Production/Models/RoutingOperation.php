@@ -85,6 +85,11 @@ class RoutingOperation extends BaseModel
         return $this->hasMany(RoutingOperationMaterial::class, 'routing_operation_id')->orderBy('sequence');
     }
 
+    public function alternateMachines(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RoutingOperationAlternateMachine::class, 'routing_operation_id')->orderBy('priority');
+    }
+
     // ─── Operation Type Helpers ───────────────────────────────────────────────
 
     public function isManufacturing(): bool

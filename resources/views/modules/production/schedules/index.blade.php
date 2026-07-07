@@ -39,11 +39,12 @@
 @section('content')
     @php
         $totalSchedules  = array_sum($statusCounts);
-        $draftCount      = $statusCounts['draft']     ?? 0;
-        $scheduledCount  = $statusCounts['scheduled'] ?? 0;
-        $releasedCount   = $statusCounts['released']  ?? 0;
-        $completedCount  = $statusCounts['completed'] ?? 0;
-        $cancelledCount  = $statusCounts['cancelled'] ?? 0;
+        $draftCount      = $statusCounts['draft']       ?? 0;
+        $scheduledCount  = $statusCounts['scheduled']   ?? 0;
+        $releasedCount   = $statusCounts['released']    ?? 0;
+        $inProgressCount = $statusCounts['in_progress'] ?? 0;
+        $completedCount  = $statusCounts['completed']   ?? 0;
+        $cancelledCount  = $statusCounts['cancelled']   ?? 0;
     @endphp
 
     <div class="erp-single-panel">
@@ -120,6 +121,21 @@
                 <div class="card border-0 shadow-sm">
                     <div class="card-body py-3">
                         <div class="d-flex align-items-center">
+                            <div class="avatar-text avatar-md bg-soft-warning text-warning rounded me-3">
+                                <i class="feather-activity"></i>
+                            </div>
+                            <div>
+                                <div class="fs-18 fw-bold text-dark">{{ $inProgressCount }}</div>
+                                <div class="fs-11 text-muted text-uppercase">In Progress</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md col-6">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
                             <div class="avatar-text avatar-md bg-soft-success text-success rounded me-3">
                                 <i class="feather-check-circle"></i>
                             </div>
@@ -152,9 +168,10 @@
                                 <option value="">All Statuses</option>
                                 <option value="draft"     {{ request('status') === 'draft'     ? 'selected' : '' }}>Draft</option>
                                 <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>Scheduled</option>
-                                <option value="released"  {{ request('status') === 'released'  ? 'selected' : '' }}>Released</option>
-                                <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Completed</option>
-                                <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                                <option value="released"    {{ request('status') === 'released'    ? 'selected' : '' }}>Released</option>
+                                <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>In Progress</option>
+                                <option value="completed"   {{ request('status') === 'completed'   ? 'selected' : '' }}>Completed</option>
+                                <option value="cancelled"   {{ request('status') === 'cancelled'   ? 'selected' : '' }}>Cancelled</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
@@ -221,6 +238,8 @@
                             <td>
                                 @if($schedule->status === 'released')
                                     <span class="erp-badge-active">Released</span>
+                                @elseif($schedule->status === 'in_progress')
+                                    <span class="badge bg-soft-warning text-warning">In Progress</span>
                                 @elseif($schedule->status === 'scheduled')
                                     <span class="badge bg-soft-info text-info">Scheduled</span>
                                 @elseif($schedule->status === 'draft')

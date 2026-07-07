@@ -40,6 +40,8 @@
             <div>
                 @if($schedule->status === 'released')
                     <span class="erp-badge-active">Released</span>
+                @elseif($schedule->status === 'in_progress')
+                    <span class="badge bg-soft-warning text-warning">In Progress</span>
                 @elseif($schedule->status === 'scheduled')
                     <span class="badge bg-soft-info text-info">Scheduled</span>
                 @elseif($schedule->status === 'draft')
@@ -134,6 +136,20 @@
                     <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Scheduled At:</span></div>
                     <div class="col-md-8"><span class="text-dark fs-13">{{ $schedule->scheduled_at?->format('d/m/Y H:i') ?? '—' }}</span></div>
                 </div>
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Source:</span></div>
+                    <div class="col-md-8">
+                        <span class="badge bg-soft-secondary text-secondary text-uppercase">{{ $schedule->generated_by ?? 'forward' }}</span>
+                    </div>
+                </div>
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Capacity Utilization:</span></div>
+                    <div class="col-md-8">
+                        <span class="fw-bold {{ ($schedule->capacity_utilization ?? 0) > 85 ? 'text-danger' : 'text-success' }}">
+                            {{ number_format($schedule->capacity_utilization ?? 0, 2) }}%
+                        </span>
+                    </div>
+                </div>
                 @if($schedule->released_at)
                     <div class="row erp-form-row mb-2">
                         <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Released:</span></div>
@@ -171,26 +187,36 @@
                         <thead>
                             <tr>
                                 <th style="width: 5%" class="text-center">Seq</th>
-                                <th style="width: 18%">Operation</th>
-                                <th style="width: 15%">Work Center</th>
-                                <th style="width: 12%">Machine</th>
-                                <th style="width: 12%">Status</th>
-                                <th style="width: 12%">Planned Start</th>
-                                <th style="width: 12%">Actual Start</th>
-                                <th style="width: 12%">Planned Finish</th>
-                                <th style="width: 12%">Actual Finish</th>
+                                <th style="width: 15%">Operation</th>
+                                <th style="width: 12%">Work Center</th>
+                                <th style="width: 12%">Planned Machine</th>
+                                <th style="width: 12%">Actual Machine</th>
+                                <th style="width: 8%">Status</th>
+                                <th style="width: 10%">Planned Start</th>
+                                <th style="width: 10%">Planned Finish</th>
+                                <th style="width: 13%">Gantt Config</th>
+                                <th style="width: 5%" class="text-center">Lock</th>
+                                <th style="width: 8%">Warnings</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($schedule->operations as $op)
-                                <tr>
+                                <tr class="{{ $op->locked ? 'bg-light' : '' }}">
                                     <td class="fw-bold text-center align-middle">{{ $op->sequence }}</td>
                                     <td class="align-middle">
                                         <span class="fw-semibold text-dark">{{ $op->orderOperation->name ?? '—' }}</span>
                                         <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
                                     </td>
                                     <td class="align-middle">{{ $op->workCenter->name ?? '—' }}</td>
-                                    <td class="align-middle text-muted">{{ $op->machine->name ?? '—' }}</td>
+                                    <td class="align-middle text-muted">
+                                        {{ $op->machine->name ?? '—' }}
+                                        @if(($op->priority ?? 1) > 1)
+                                            <span class="badge bg-soft-warning text-warning d-block mt-1 text-center" style="width: max-content">Alt Priority {{ $op->priority }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="align-middle text-muted">
+                                        {{ $op->actualMachine->name ?? '—' }}
+                                    </td>
                                     <td class="align-middle">
                                         @if($op->status === 'completed')
                                             <span class="badge bg-soft-success text-success">Completed</span>
@@ -208,18 +234,34 @@
                                             <span class="erp-badge-draft text-uppercase">{{ $op->status }}</span>
                                         @endif
                                     </td>
-                                    <td class="align-middle fs-12 text-muted">{{ $op->planned_start->format('d/m/Y H:i') }}</td>
-                                    <td class="align-middle fs-12 {{ $op->actual_start ? 'text-dark fw-semibold' : 'text-muted' }}">
-                                        {{ $op->actual_start ? $op->actual_start->format('d/m/Y H:i') : '—' }}
+                                    <td class="align-middle fs-11 text-muted">{{ $op->planned_start->format('d/m H:i') }}</td>
+                                    <td class="align-middle fs-11 text-muted">{{ $op->planned_finish->format('d/m H:i') }}</td>
+                                    <td class="align-middle fs-11 text-muted">
+                                        <strong>Lane:</strong> {{ $op->lane ?? 'N/A' }}<br>
+                                        <strong>Res:</strong> {{ $op->resource_id ?? 'N/A' }}
                                     </td>
-                                    <td class="align-middle fs-12 text-muted">{{ $op->planned_finish->format('d/m/Y H:i') }}</td>
-                                    <td class="align-middle fs-12 {{ $op->actual_finish ? 'text-success fw-semibold' : 'text-muted' }}">
-                                        {{ $op->actual_finish ? $op->actual_finish->format('d/m/Y H:i') : '—' }}
+                                    <td class="align-middle text-center">
+                                        @if($op->locked)
+                                            <span class="text-danger" title="Locked Operation"><i class="feather-lock"></i></span>
+                                        @else
+                                            <span class="text-muted" title="Unlocked"><i class="feather-unlock"></i></span>
+                                        @endif
+                                    </td>
+                                    <td class="align-middle">
+                                        @if($op->warnings && count($op->warnings) > 0)
+                                            @foreach($op->warnings as $warn)
+                                                <span class="badge bg-soft-danger text-danger d-block mb-1 font-monospace" style="font-size: 10px;" title="{{ $warn['message'] }}">
+                                                    {{ $warn['code'] }}
+                                                </span>
+                                            @endforeach
+                                        @else
+                                            <span class="text-success fs-12"><i class="feather-check-circle"></i> Clean</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center py-4 text-muted">
+                                    <td colspan="11" class="text-center py-4 text-muted">
                                         <i class="feather-info me-2"></i>No operations scheduled.
                                     </td>
                                 </tr>

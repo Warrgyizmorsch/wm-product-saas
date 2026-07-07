@@ -24,24 +24,23 @@ class MesController extends Controller
         $tenantId  = require_tenant_id();
         $userId    = Auth::id();
 
-        // My assigned running operations (assigned machine operator)
+        // Running operations in this tenant
         $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('orderOperation', fn ($q) => $q->where('operator_id', $userId))
             ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
             ->orderBy('planned_start')
             ->get();
 
-        // Ready queue — operations ready to start across released schedules
+        // Ready queue — operations ready to start across active schedules
         $ready = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->where('status', ProductionSchedule::STATUS_RELEASED))
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_READY)
             ->orderBy('priority')
             ->orderBy('planned_start')
             ->get();
 
-        // Upcoming — next waiting operations (not yet ready) for released schedules
+        // Upcoming — next waiting operations (not yet ready) for active schedules
         $upcoming = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->where('status', ProductionSchedule::STATUS_RELEASED))
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_WAITING)
             ->orderBy('planned_start')
             ->take(10)
@@ -55,7 +54,7 @@ class MesController extends Controller
 
         // Paused / on-hold
         $paused = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->where('status', ProductionSchedule::STATUS_RELEASED))
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
             ->orderBy('planned_start')
             ->get();

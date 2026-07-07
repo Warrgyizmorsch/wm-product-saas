@@ -191,7 +191,11 @@ class ProductionScheduleController extends Controller
             'schedule', 'order.product', 'workCenter', 'machine',
         ])
         ->whereHas('schedule', fn ($q) =>
-            $q->whereIn('status', [ProductionSchedule::STATUS_SCHEDULED, ProductionSchedule::STATUS_RELEASED])
+            $q->whereIn('status', [
+                ProductionSchedule::STATUS_SCHEDULED,
+                ProductionSchedule::STATUS_RELEASED,
+                ProductionSchedule::STATUS_IN_PROGRESS
+            ])
         )
         ->whereBetween('planned_start', [$startDate, $endDate])
         ->orderBy('planned_start')
@@ -210,7 +214,11 @@ class ProductionScheduleController extends Controller
             'schedule', 'order.product', 'machine', 'orderOperation',
         ])
         ->whereHas('schedule', fn ($q) =>
-            $q->whereIn('status', [ProductionSchedule::STATUS_SCHEDULED, ProductionSchedule::STATUS_RELEASED])
+            $q->whereIn('status', [
+                ProductionSchedule::STATUS_SCHEDULED,
+                ProductionSchedule::STATUS_RELEASED,
+                ProductionSchedule::STATUS_IN_PROGRESS
+            ])
         )
         ->whereNotIn('status', [
             ProductionScheduleOperation::STATUS_COMPLETED,

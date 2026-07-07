@@ -20,16 +20,18 @@ class ProductionSchedule extends BaseModel
     // ─── Status Constants (Planning Lifecycle Only) ───────────────────────────
     // NOTE: 'running' and 'paused' are MES operation statuses — never schedule statuses.
 
-    public const STATUS_DRAFT     = 'draft';
-    public const STATUS_SCHEDULED = 'scheduled';
-    public const STATUS_RELEASED  = 'released';
-    public const STATUS_COMPLETED = 'completed';
-    public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_DRAFT       = 'draft';
+    public const STATUS_SCHEDULED   = 'scheduled';
+    public const STATUS_RELEASED    = 'released';
+    public const STATUS_IN_PROGRESS = 'in_progress';
+    public const STATUS_COMPLETED   = 'completed';
+    public const STATUS_CANCELLED   = 'cancelled';
 
     public const STATUSES = [
         self::STATUS_DRAFT,
         self::STATUS_SCHEDULED,
         self::STATUS_RELEASED,
+        self::STATUS_IN_PROGRESS,
         self::STATUS_COMPLETED,
         self::STATUS_CANCELLED,
     ];
@@ -63,13 +65,16 @@ class ProductionSchedule extends BaseModel
         'completed_by',
         'cancelled_by',
         'notes',
+        'generated_by',
+        'capacity_utilization',
     ];
 
     protected $casts = [
-        'scheduled_at' => 'datetime',
-        'released_at'  => 'datetime',
-        'completed_at' => 'datetime',
-        'cancelled_at' => 'datetime',
+        'scheduled_at'         => 'datetime',
+        'released_at'          => 'datetime',
+        'completed_at'         => 'datetime',
+        'cancelled_at'         => 'datetime',
+        'capacity_utilization' => 'float',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────
@@ -122,6 +127,11 @@ class ProductionSchedule extends BaseModel
         return $this->status === self::STATUS_RELEASED;
     }
 
+    public function isInProgress(): bool
+    {
+        return $this->status === self::STATUS_IN_PROGRESS;
+    }
+
     public function isCompleted(): bool
     {
         return $this->status === self::STATUS_COMPLETED;
@@ -147,7 +157,7 @@ class ProductionSchedule extends BaseModel
 
     public function scopeActive(Builder $query): void
     {
-        $query->whereIn('status', [self::STATUS_SCHEDULED, self::STATUS_RELEASED]);
+        $query->whereIn('status', [self::STATUS_SCHEDULED, self::STATUS_RELEASED, self::STATUS_IN_PROGRESS]);
     }
 
     public function scopeReleased(Builder $query): void

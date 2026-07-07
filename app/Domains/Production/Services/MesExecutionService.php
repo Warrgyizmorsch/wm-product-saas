@@ -74,9 +74,10 @@ class MesExecutionService
 
             // Update schedule operation
             $schedOp->update([
-                'status'       => ProductionScheduleOperation::STATUS_RUNNING,
-                'actual_start' => now(),
-                'machine_id'   => $resolvedMachineId ?? $schedOp->machine_id,
+                'status'            => ProductionScheduleOperation::STATUS_RUNNING,
+                'actual_start'      => now(),
+                'machine_id'        => $resolvedMachineId ?? $schedOp->machine_id,
+                'actual_machine_id' => $resolvedMachineId ?? $schedOp->machine_id,
             ]);
 
             // Sync the underlying ProductionOrderOperation
@@ -87,6 +88,14 @@ class MesExecutionService
                 $orderOp->operator_id       = $operatorId;
                 $orderOp->machine_used_id   = $resolvedMachineId ?? $orderOp->machine_id;
                 $orderOp->save();
+            }
+
+            // Transition ProductionSchedule to in_progress if needed
+            $schedule = $schedOp->schedule;
+            if ($schedule && in_array($schedule->status, [ProductionSchedule::STATUS_SCHEDULED, ProductionSchedule::STATUS_RELEASED])) {
+                $schedule->update([
+                    'status' => ProductionSchedule::STATUS_IN_PROGRESS,
+                ]);
             }
 
             // Transition parent order to in_progress if needed

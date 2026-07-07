@@ -47,7 +47,11 @@ class WorkCenterDashboardController extends Controller
         ])
         ->where('work_center_id', $workCenter->id)
         ->whereHas('schedule', fn ($q) =>
-            $q->whereIn('status', [ProductionSchedule::STATUS_SCHEDULED, ProductionSchedule::STATUS_RELEASED])
+            $q->whereIn('status', [
+                ProductionSchedule::STATUS_SCHEDULED,
+                ProductionSchedule::STATUS_RELEASED,
+                ProductionSchedule::STATUS_IN_PROGRESS
+            ])
         )
         ->whereNotIn('status', [
             ProductionScheduleOperation::STATUS_COMPLETED,
