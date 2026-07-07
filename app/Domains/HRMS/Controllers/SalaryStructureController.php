@@ -27,6 +27,7 @@ class SalaryStructureController extends Controller
                     '--force' => true
                 ]);
             }
+
         } catch (\Exception $e) {
             // Silently capture any setup errors
         }

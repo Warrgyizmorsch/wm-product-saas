@@ -5,9 +5,9 @@
 @section('breadcrumb', 'HRMS / Org Structure / Legal Entities / Create')
 
 @section('page-actions')
-    <a href="{{ route('crm.customers.index') }}" class="btn btn-light">
-        <i class="feather-arrow-left me-2"></i>Back to Customers
-    </a>
+    <x-ui.button href="{{ route('crm.customers.index') }}" variant="light" icon="feather-arrow-left">
+        Back to Customers
+    </x-ui.button>
 @endsection
 
 @section('content')
@@ -23,7 +23,7 @@
                                                 <span class="d-block mb-2">Company Information:</span>
                                                 <!-- <span class="fs-12 fw-normal text-muted text-truncate-1-line">Following information is publicly displayed, be careful! </span> -->
                                             </h5>
-                                            <button type="submit" class="btn btn-lg btn-light-brand">Add New</button>
+                                            <x-ui.button type="submit" variant="light-brand" size="lg">Add New</x-ui.button>
                                         </div>
                                          <!-- Logo Section -->
                                          <div class="mb-4">
@@ -47,125 +47,70 @@
                                         <!-- Row 1: Company Name & Legal Name -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <label for="companyNameInput" class="form-label fw-semibold">Company Name: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-briefcase"></i></div>
-                                                    <input type="text" class="form-control" id="companyNameInput" name="company_name" placeholder="Company Name">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="Company Name" name="company_name" id="companyNameInput" :required="true" placeholder="Company Name" :errorText="$errors->first('company_name')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="legalNameInput" class="form-label fw-semibold">Legal Name: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-file-text"></i></div>
-                                                    <input type="text" class="form-control" id="legalNameInput" name="legal_name" placeholder="Legal Name">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="Legal Name" name="legal_name" id="legalNameInput" :required="true" placeholder="Legal Name" :errorText="$errors->first('legal_name')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 2: GST Number & PAN Number -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <label for="gstNumberInput" class="form-label fw-semibold">GST Number: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-percent"></i></div>
-                                                    <input type="text" class="form-control" id="gstNumberInput" name="gst_number" placeholder="GST">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="GST Number" name="gst_number" id="gstNumberInput" placeholder="GST" :errorText="$errors->first('gst_number')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="panNumberInput" class="form-label fw-semibold">PAN Number: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-credit-card"></i></div>
-                                                    <input type="text" class="form-control" id="panNumberInput" name="pan_number" placeholder="PAN">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" id="panNumberInput" placeholder="PAN" :errorText="$errors->first('pan_number')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 3: CIN Number & Registration Number -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <label for="cinNumberInput" class="form-label fw-semibold">CIN Number: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-hash"></i></div>
-                                                    <input type="text" class="form-control" id="cinNumberInput" name="cin_number" placeholder="CIN">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="CIN Number" name="cin_number" id="cinNumberInput" placeholder="CIN" :errorText="$errors->first('cin_number')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="registrationNumberInput" class="form-label fw-semibold">Registration Number: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-key"></i></div>
-                                                    <input type="text" class="form-control" id="registrationNumberInput" name="registration_number" placeholder="Registration Number">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="Registration Number" name="registration_number" id="registrationNumberInput" placeholder="Registration Number" :errorText="$errors->first('registration_number')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 4: Email & Phone -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <label for="emailInput" class="form-label fw-semibold">Email: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-mail"></i></div>
-                                                    <input type="text" class="form-control" id="emailInput" name="email" placeholder="Email">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="Email" name="email" id="emailInput" placeholder="Email" :errorText="$errors->first('email')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="phoneInput" class="form-label fw-semibold">Phone: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-phone"></i></div>
-                                                    <input type="text" class="form-control" name="phone" id="phoneInput" placeholder="Phone">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="Phone" name="phone" id="phoneInput" placeholder="Phone" :errorText="$errors->first('phone')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 5: Website & Postal Code -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <label for="websiteInput" class="form-label fw-semibold">Website: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-link"></i></div>
-                                                    <input type="text" class="form-control" name="website" id="websiteInput" placeholder="Website">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="Website" name="website" id="websiteInput" placeholder="Website" :errorText="$errors->first('website')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="postalCodeInput" class="form-label fw-semibold">Postal Code: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-map-pin"></i></div>
-                                                    <input type="text" class="form-control" name="postal_code" id="postalCodeInput" placeholder="Postal Code">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" id="postalCodeInput" placeholder="Postal Code" :errorText="$errors->first('postal_code')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 6: Address (Full Width) -->
                                         <div class="mb-4">
-                                            <label for="addressInput" class="form-label fw-semibold">Address: </label>
-                                            <div class="input-group">
-                                                <div class="input-group-text"><i class="feather-map-pin"></i></div>
-                                                <textarea class="form-control" name="address" id="addressInput" cols="30" rows="3" placeholder="Address"></textarea>
-                                            </div>
+                                            <x-ui.odoo-form-ui type="textarea" label="Address" name="address" id="addressInput" rows="3" placeholder="Address" :errorText="$errors->first('address')" />
                                         </div>
 
                                         <!-- Row 7: City & State -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <label for="cityInput" class="form-label fw-semibold">City: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-map-pin"></i></div>
-                                                    <input class="form-control" name="city" id="cityInput" placeholder="City">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="City" name="city" id="cityInput" placeholder="City" :errorText="$errors->first('city')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="stateInput" class="form-label fw-semibold">State: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-map"></i></div>
-                                                    <input class="form-control" name="state" id="stateInput" placeholder="State">
-                                                </div>
+                                                <x-ui.odoo-form-ui type="input" label="State" name="state" id="stateInput" placeholder="State" :errorText="$errors->first('state')" />
                                             </div>
                                         </div>
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <label class="form-label fw-semibold">Country: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-globe"></i></div>
-                                                    <select class="form-control" data-select2-selector="country" name="country">
+                                                <x-ui.odoo-form-ui type="select" label="Country" name="country" select2-selector="country" :errorText="$errors->first('country')">
                                                     <option data-country="af">Afghanistan</option>
                                                     <option data-country="ax">Åland Islands</option>
                                                     <option data-country="al">Albania</option>
@@ -422,10 +367,7 @@
                                                 </div>
                                             </div>
                                             <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Currency: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-dollar-sign"></i></div>
-                                                <select class="form-control" data-select2-selector="currency" name="currency">
+                                                <x-ui.odoo-form-ui type="select" label="Currency" name="currency" :required="true" select2-selector="currency" :errorText="$errors->first('currency')">
                                                     <option data-currency="af">AFN - Afghan Afghani - ؋</option>
                                                     <option data-currency="al">ALL - Albanian Lek - Lek</option>
                                                     <option data-currency="dz">DZD - Algerian Dinar - دج</option>
@@ -589,23 +531,28 @@
                                                     <option data-currency="vn">VND - Vietnamese Dong - ₫</option>
                                                     <option data-currency="ye">YER - Yemeni Rial - ﷼</option>
                                                     <option data-currency="zm">ZMK - Zambian Kwacha - ZK</option>
-                                                </select>
-                                                </div>
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                        </div>
+
+                                        <!-- Row 7: City & State -->
+                                        <div class="row mb-4">
+                                            <div class="col-md-6 mb-3 mb-md-0">
+                                                <x-ui.odoo-form-ui type="select" label="City" name="city" id="cityInput" :errorText="$errors->first('city')">
+                                                    <option value="">Select City</option>
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <x-ui.odoo-form-ui type="select" label="State" name="state" id="stateInput" :errorText="$errors->first('state')">
+                                                    <option value="">Select State</option>
+                                                </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
 
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <label class="form-label fw-semibold">Time Zone: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-clock"></i></div>
-                                                <select class="form-control" data-select2-selector="tzone" name="time_zone">
+                                                <x-ui.odoo-form-ui type="select" label="Time Zone" name="time_zone" :required="true" select2-selector="tzone" :errorText="$errors->first('time_zone')">
                                                     <option data-tzone="feather-moon">(GMT -12:00) Eniwetok, Kwajalein</option>
-                                                    <option data-tzone="feather-moon">(GMT -11:00) Midway Island, Samoa</option>
-                                                    <option data-tzone="feather-moon">(GMT -10:00) Hawaii</option>
-                                                    <option data-tzone="feather-moon">(GMT -9:30) Taiohae</option>
-                                                    <option data-tzone="feather-moon">(GMT -9:00) Alaska</option>
-                                                    <option data-tzone="feather-moon">(GMT -8:00) Pacific Time (US &amp; Canada)</option>
                                                     <option data-tzone="feather-moon">(GMT -7:00) Mountain Time (US &amp; Canada)</option>
                                                     <option data-tzone="feather-moon">(GMT -6:00) Central Time (US &amp; Canada), Mexico City</option>
                                                     <option data-tzone="feather-moon">(GMT -5:00) Eastern Time (US &amp; Canada), Bogota, Lima</option>
@@ -640,18 +587,13 @@
                                                     <option data-tzone="feather-sun">(GMT +12:45) Chatham Islands</option>
                                                     <option data-tzone="feather-sun">(GMT +13:00) Apia, Nukualofa</option>
                                                     <option data-tzone="feather-sun">(GMT +14:00) Line Islands, Tokelau</option>
-                                                </select>
-                                                </div>
+                                                </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Status: </label>
-                                                <div class="input-group">
-                                                    <div class="input-group-text"><i class="feather-check-circle"></i></div>
-                                                    <select class="form-control" data-select2-selector="status" name="status">
+                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="status" :errorText="$errors->first('status')">
                                                         <option value="success" data-bg="bg-success" selected>Active</option>
                                                         <option value="warning" data-bg="bg-warning">Inactive</option>
-                                                    </select>
-                                                </div>
+                                                </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
                                     </form>
@@ -680,5 +622,84 @@ $(document).ready(function(){
         }
     });
 });
+</script>
+@endpush
+
+@push('scripts')
+<script>
+(function () {
+    if (window.hrmsThemedValidationInstalled) return;
+    window.hrmsThemedValidationInstalled = true;
+
+    function fieldLabel(field) {
+        const label = field.closest('.odoo-form-group')?.querySelector('.odoo-form-label');
+        return label ? label.textContent.replace('*', '').trim().toLowerCase() : 'this field';
+    }
+
+    function fieldAnchor(field) {
+        if (field.tagName === 'SELECT' && field.nextElementSibling?.classList.contains('select2-container')) {
+            return field.nextElementSibling;
+        }
+        return field.type === 'radio' ? (field.closest('.odoo-form-group')?.querySelector('.flex-grow-1') || field) : field;
+    }
+
+    function showError(field) {
+        field.classList.add('is-invalid');
+        field.setAttribute('aria-invalid', 'true');
+        const anchor = fieldAnchor(field);
+        let error = anchor.nextElementSibling;
+        if (!error || !error.classList.contains('hrms-client-validation-error')) {
+            error = document.createElement('div');
+            error.className = 'invalid-feedback d-block fs-11 mt-1 hrms-client-validation-error';
+            anchor.insertAdjacentElement('afterend', error);
+        }
+        error.textContent = field.validity.valueMissing
+            ? (field.tagName === 'SELECT' ? `Please select ${fieldLabel(field)}.` : `Please enter ${fieldLabel(field)}.`)
+            : (field.validationMessage || 'Please enter a valid value.');
+    }
+
+    function clearError(field) {
+        field.classList.remove('is-invalid');
+        field.removeAttribute('aria-invalid');
+        const error = fieldAnchor(field).nextElementSibling;
+        if (error?.classList.contains('hrms-client-validation-error')) error.remove();
+    }
+
+    function requiredFields(form) {
+        return Array.from(form.querySelectorAll('[required]')).filter(field => !field.disabled && field.type !== 'hidden');
+    }
+
+    function validate(field) {
+        if (field.checkValidity()) {
+            clearError(field);
+            return true;
+        }
+        showError(field);
+        return false;
+    }
+
+    function bind(root) {
+        root.querySelectorAll('form').forEach(form => {
+            if (form.dataset.hrmsThemedValidation === '1' || !form.querySelector('[required]')) return;
+            form.dataset.hrmsThemedValidation = '1';
+            form.setAttribute('novalidate', 'novalidate');
+            requiredFields(form).forEach(field => {
+                field.addEventListener('input', () => validate(field));
+                field.addEventListener('change', () => validate(field));
+            });
+            form.addEventListener('submit', event => {
+                const invalid = requiredFields(form).find(field => !validate(field));
+                if (!invalid) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                const target = invalid.tagName === 'SELECT' && invalid.nextElementSibling?.classList.contains('select2-container') ? invalid.nextElementSibling : invalid;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                (target.querySelector?.('.select2-selection') || invalid).focus({ preventScroll: true });
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => bind(document));
+})();
 </script>
 @endpush
