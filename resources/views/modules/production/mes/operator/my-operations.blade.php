@@ -48,7 +48,7 @@
                                                 <span class="badge bg-soft-secondary font-monospace">{{ $assign->operation->operation_number ?? '' }}</span>
                                             </div>
                                             <div class="text-muted fs-13 mt-1">
-                                                Order: <strong>{{ $assign->operation->productionOrder->order_number ?? '—' }}</strong> 
+                                                Order: <strong>{{ $assign->operation->order->order_number ?? '—' }}</strong> 
                                                 | WC: {{ $assign->operation->workCenter->name ?? '—' }}
                                                 @if($assign->operation->machine)
                                                     | Machine: <strong>{{ $assign->operation->machine->name }}</strong>

@@ -19,6 +19,18 @@ use App\Domains\Production\Controllers\ScannerController;
 use App\Domains\Production\Controllers\MachineStateController;
 use App\Domains\Production\Controllers\DowntimeController;
 use App\Domains\Production\Controllers\ProductionTimelineController;
+use App\Domains\Production\Controllers\ManufacturingDashboardController;
+use App\Domains\Production\Controllers\AndonController;
+use App\Domains\Production\Controllers\AnalyticsController;
+use App\Domains\Production\Controllers\ReportsController;
+use App\Domains\Production\Controllers\AlertController;
+use App\Domains\Production\Controllers\QualityInspectionController;
+use App\Domains\Production\Controllers\NcrController;
+use App\Domains\Production\Controllers\CapaController;
+use App\Domains\Production\Controllers\ReworkController;
+use App\Domains\Production\Controllers\ScrapController;
+use App\Domains\Production\Controllers\DeviationController;
+use App\Domains\Production\Controllers\QualityDashboardController;
 
 Route::prefix('production')
     ->as('production.')
@@ -138,4 +150,40 @@ Route::prefix('production')
         Route::post('mes/downtime/start',          [DowntimeController::class, 'start'])->name('mes.downtime.start');
         Route::post('mes/downtime/{id}/end',       [DowntimeController::class, 'end'])->name('mes.downtime.end');
         Route::get('mes/timeline',                 [ProductionTimelineController::class, 'index'])->name('mes.timeline.index');
+
+        // ── Phase 3 Manufacturing Intelligence ────────────────────────────────
+        Route::get('intelligence/dashboard', [ManufacturingDashboardController::class, 'executiveDashboard'])->name('intelligence.dashboard');
+        Route::get('intelligence/work-centers', [ManufacturingDashboardController::class, 'workCenterDashboard'])->name('intelligence.work-centers');
+        Route::post('intelligence/dashboard/preferences', [ManufacturingDashboardController::class, 'savePreferences'])->name('intelligence.dashboard.preferences');
+        Route::get('intelligence/andon', [AndonController::class, 'index'])->name('intelligence.andon');
+        Route::get('intelligence/analytics', [AnalyticsController::class, 'historical'])->name('intelligence.analytics');
+        Route::get('intelligence/reports', [ReportsController::class, 'index'])->name('intelligence.reports.index');
+        Route::get('intelligence/reports/{type}', [ReportsController::class, 'show'])->name('intelligence.reports.show');
+        Route::get('intelligence/alerts', [AlertController::class, 'index'])->name('intelligence.alerts.index');
+        Route::post('intelligence/alerts/{id}', [AlertController::class, 'update'])->name('intelligence.alerts.update');
+
+        // ── Phase 4 Quality Management ──────────────────────────────────────
+        Route::get('quality/dashboard', [QualityDashboardController::class, 'index'])->name('quality.dashboard');
+        
+        Route::post('quality/inspections/{id}/results', [QualityInspectionController::class, 'saveResults'])->name('quality.inspections.results');
+        Route::post('quality/inspections/{id}/approve', [QualityInspectionController::class, 'approve'])->name('quality.inspections.approve');
+        Route::resource('quality/inspections', QualityInspectionController::class);
+
+        Route::post('quality/ncrs/{id}/disposition', [NcrController::class, 'disposition'])->name('quality.ncrs.disposition');
+        Route::post('quality/ncrs/{id}/close', [NcrController::class, 'close'])->name('quality.ncrs.close');
+        Route::resource('quality/ncrs', NcrController::class);
+
+        Route::post('quality/capas/{id}/rca', [CapaController::class, 'saveRca'])->name('quality.capas.rca');
+        Route::post('quality/capas/{id}/close', [CapaController::class, 'close'])->name('quality.capas.close');
+        Route::resource('quality/capas', CapaController::class);
+
+        Route::post('quality/rework/ops/{id}/start', [ReworkController::class, 'startOp'])->name('quality.rework.ops.start');
+        Route::post('quality/rework/ops/{id}/complete', [ReworkController::class, 'completeOp'])->name('quality.rework.ops.complete');
+        Route::resource('quality/rework', ReworkController::class);
+
+        Route::post('quality/scrap/{id}/approve', [ScrapController::class, 'approve'])->name('quality.scrap.approve');
+        Route::resource('quality/scrap', ScrapController::class);
+
+        Route::post('quality/deviations/{id}/approve', [DeviationController::class, 'approve'])->name('quality.deviations.approve');
+        Route::resource('quality/deviations', DeviationController::class);
     });

@@ -106,7 +106,7 @@
                                                     @endif
                                                 </div>
                                                 <h6 class="fw-bold text-dark mb-1">{{ $assign->operation->name ?? '—' }}</h6>
-                                                <p class="text-muted fs-12 mb-2">Order: <strong>{{ $assign->operation->productionOrder->order_number ?? '—' }}</strong></p>
+                                                <p class="text-muted fs-12 mb-2">Order: <strong>{{ $assign->operation->order->order_number ?? '—' }}</strong></p>
                                                 <div class="fs-11 text-muted"><i class="feather-map-pin me-1"></i> {{ $assign->operation->workCenter->name ?? '—' }}</div>
                                             </div>
 
