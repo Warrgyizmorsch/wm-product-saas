@@ -24,6 +24,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant' => ResolveTenant::class,
             'tenant.required' => TenantMiddleware::class,
         ]);
+
+            // ResolveTenant must run before auth resolves the user (TenantAwareUserProvider
+            // needs the tenant context to decide whether the session user is accessible),
+            // but Laravel's default priority list otherwise runs Authenticate first since
+            // ResolveTenant isn't in it.
+            $middleware->prependToPriorityList(
+                before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+                prepend: ResolveTenant::class,
+            );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
