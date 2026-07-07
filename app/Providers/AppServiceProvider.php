@@ -87,7 +87,7 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionSerialNumber::class,
             \App\Domains\Production\Policies\AdvancedMesPolicy::class
-        // ── CRM Policies ──────────────────────────────────────────────────────
+        );
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\CRM\Models\Lead::class,
             \App\Domains\CRM\Policies\LeadPolicy::class
