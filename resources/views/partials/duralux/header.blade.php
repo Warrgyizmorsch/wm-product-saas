@@ -427,7 +427,7 @@
                             <i class="feather-calendar"></i>
                             <span>{{ $currentTenant['year'] }}</span>
                         </a>
-                        <a href="javascript:void(0);" class="dropdown-item">
+                        <a href="{{ route('access.roles.index') }}" class="dropdown-item">
                             <i class="feather-shield"></i>
                             <span>{{ __('ui.roles_permissions') }}</span>
                         </a>

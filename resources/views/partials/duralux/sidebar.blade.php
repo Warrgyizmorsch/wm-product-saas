@@ -67,7 +67,13 @@
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],
         __('ui.platform_admin') => [
-            ['label' => __('ui.access_control'), 'icon' => 'feather-shield', 'url' => '#', 'children' => ['Roles', 'Permissions', 'Teams', 'Policies']],
+            ['label' => __('ui.access_control'), 'icon' => 'feather-shield', 'url' => '#', 'children' => [
+                ['label' => 'Users', 'route' => 'access.users.index'],
+                ['label' => 'Roles', 'route' => 'access.roles.index'],
+                ['label' => 'Permissions', 'route' => 'access.roles.index'],
+                'Teams',
+                'Policies',
+            ]],
             ['label' => 'Automation', 'icon' => 'feather-zap', 'url' => '#', 'children' => ['Workflows', 'Alerts', 'Schedulers', 'Webhooks']],
             ['label' => 'Audit & Settings', 'icon' => 'feather-settings', 'url' => '#', 'children' => ['Audit Logs', 'Localization', 'Currencies', 'System Settings']],
         ],

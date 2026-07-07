@@ -69,6 +69,28 @@ class AuthLoginTest extends TestCase
     }
 
     /** @test */
+    public function a_regular_user_stays_authenticated_on_a_second_request_after_login()
+    {
+        // Regression test: TenantAwareUserProvider must resolve the current
+        // tenant independently of TenantContext, since the app's `tenant`
+        // middleware is not guaranteed to run before Laravel's own auth
+        // middleware resolves the session user. A plain user (no
+        // platform-scope permission to fall back on) previously got
+        // silently logged out on their very next request after login.
+        $this->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('login.store'), [
+                'email' => 'test@example.com',
+                'password' => 'password',
+            ])->assertRedirect(route('dashboard'));
+
+        $response = $this->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('dashboard'));
+
+        $response->assertOk();
+        $this->assertAuthenticatedAs($this->user);
+    }
+
+    /** @test */
     public function logout_clears_the_session_and_reblocks_protected_routes()
     {
         $this->actingAs($this->user)
