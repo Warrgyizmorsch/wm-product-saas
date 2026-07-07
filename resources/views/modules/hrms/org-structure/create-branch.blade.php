@@ -103,15 +103,21 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Country" name="country" id="country" placeholder="Enter Country" />
+                                    <x-ui.odoo-form-ui type="select" label="Country" name="country" id="country" select2-selector="country" class="geo-country" data-initial-value="{{ old('country', 'United States') }}">
+                                        <option value="">Select Country</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="State" name="state" id="state" placeholder="Enter State" />
+                                    <x-ui.odoo-form-ui type="select" label="State" name="state" id="state" select2-selector="default" class="geo-state">
+                                        <option value="">Select State</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="City" name="city" id="city" placeholder="Enter City" />
+                                    <x-ui.odoo-form-ui type="select" label="City" name="city" id="city" select2-selector="default" class="geo-city">
+                                        <option value="">Select City</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-md-6">

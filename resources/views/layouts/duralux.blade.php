@@ -313,6 +313,7 @@
         });
     </script>
 
+    <script src="{{ asset('assets/js/dynamic-geography.js') }}"></script>
     @stack('scripts')
 </body>
 </html>

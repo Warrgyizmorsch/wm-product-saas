@@ -108,7 +108,7 @@
             transform: translateX(2px);
         }
 
-        /* Form inputs design enhancements */
+        /* HRMS theme form controls */
         .form-label {
             font-size: 12.5px !important;
             color: #334155 !important;
@@ -118,23 +118,43 @@
             display: inline !important;
             white-space: nowrap !important;
         }
-        .form-control, .form-select {
-            border-color: #cbd5e1 !important;
+        .settings-content-col .form-control,
+        .settings-content-col .form-select,
+        .settings-content-col .odoo-table-input,
+        .settings-content-col .odoo-table-select {
+            border: none !important;
+            border-bottom: 1px solid #cbd5e1 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
             font-size: 13px !important;
-            border-radius: 6px !important;
-            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+            color: #334155 !important;
+            padding: 6px 2px !important;
+            transition: border-bottom-color 0.15s ease-in-out !important;
         }
-        .form-control:focus, .form-select:focus {
-            border-color: var(--bs-primary) !important;
-            box-shadow: 0 0 0 2.5px rgba(74, 108, 247, 0.12) !important;
+        .settings-content-col .form-control:hover,
+        .settings-content-col .form-select:hover,
+        .settings-content-col .odoo-table-input:hover,
+        .settings-content-col .odoo-table-select:hover {
+            border-bottom-color: #94a3b8 !important;
+        }
+        .settings-content-col .form-control:focus,
+        .settings-content-col .form-select:focus,
+        .settings-content-col .odoo-table-input:focus,
+        .settings-content-col .odoo-table-select:focus {
+            border-bottom-color: var(--bs-primary) !important;
+            box-shadow: none !important;
         }
         .form-control-sm, .form-select-sm {
-            height: 34px !important;
+            height: 32px !important;
             font-size: 12px !important;
-            padding: 0.25rem 0.5rem !important;
+            padding: 4px 2px !important;
         }
         .input-group-text {
-            border-color: #cbd5e1 !important;
+            border: none !important;
+            border-bottom: 1px solid #cbd5e1 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
             font-size: 12.5px !important;
             color: #475569 !important;
         }
@@ -158,67 +178,59 @@
             padding: 8px 12px !important;
             border-bottom: 1px solid #f1f5f9 !important;
         }
-        .table tbody td input, .table tbody td select {
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 6px !important;
-            padding: 4px 8px !important;
-            font-size: 12.5px !important;
-            background-color: #ffffff !important;
-            transition: all 0.2s ease !important;
-            height: 32px !important;
-        }
-        .table tbody td input:focus, .table tbody td select:focus {
-            border-color: var(--bs-primary) !important;
-            background-color: #ffffff !important;
-            box-shadow: 0 0 0 2.5px rgba(74, 108, 247, 0.12) !important;
-        }
         .settings-content-col .select2-container--bootstrap-5 {
             width: 100% !important;
         }
-        .settings-content-col .select2-container--bootstrap-5 .select2-selection--single {
-            min-height: 41px !important;
-            height: 41px !important;
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 6px !important;
-            padding: 6px 2.5rem 6px 12px !important;
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--single,
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--multiple {
+            min-height: 32px !important;
+            height: auto !important;
+            border: none !important;
+            border-bottom: 1px solid #cbd5e1 !important;
+            border-radius: 0 !important;
+            padding: 4px 2rem 4px 2px !important;
             display: flex !important;
-            align-items: center;
-            background-color: #fff !important;
+            align-items: center !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            transition: border-bottom-color 0.15s ease-in-out !important;
         }
-        .settings-content-col .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--single:hover,
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--multiple:hover {
+            border-bottom-color: #94a3b8 !important;
+        }
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered,
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
             padding: 0 !important;
             color: #334155 !important;
             line-height: 1.4 !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
         }
         .settings-content-col .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
-            right: 12px !important;
+            right: 2px !important;
         }
-        .table tbody td .select2-container--bootstrap-5 .select2-selection--single {
-            min-height: 32px !important;
-            height: 32px !important;
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 6px !important;
-            padding: 4px 2rem 4px 10px !important;
-            background-color: #fff !important;
+        .table tbody td .select2-container--bootstrap-5 .select2-selection--single,
+        .table tbody td .select2-container--bootstrap-5 .select2-selection--multiple {
+            min-height: 30px !important;
+            padding: 4px 1.75rem 4px 2px !important;
         }
-        .table tbody td .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        .table tbody td .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered,
+        .table tbody td .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
             font-size: 12.5px !important;
             line-height: 1.3 !important;
         }
         .table tbody td .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
-            right: 10px !important;
+            right: 0 !important;
         }
         .table tbody td .select2-container--bootstrap-5.select2-container--focus .select2-selection--single,
-        .settings-content-col .select2-container--bootstrap-5.select2-container--focus .select2-selection--single {
-            border-color: var(--bs-primary) !important;
-            box-shadow: 0 0 0 2.5px rgba(74, 108, 247, 0.12) !important;
+        .table tbody td .select2-container--bootstrap-5.select2-container--focus .select2-selection--multiple,
+        .settings-content-col .select2-container--bootstrap-5.select2-container--focus .select2-selection--single,
+        .settings-content-col .select2-container--bootstrap-5.select2-container--focus .select2-selection--multiple {
+            border-bottom-color: var(--bs-primary) !important;
+            box-shadow: none !important;
         }
         .table tbody td input[readonly] {
-            background-color: #f1f5f9 !important;
-            border-color: #e2e8f0 !important;
+            background-color: transparent !important;
+            border-bottom-color: #e2e8f0 !important;
             color: #64748b !important;
         }
         .table-hover tbody tr:hover {

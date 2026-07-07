@@ -8,6 +8,7 @@ class SalaryStructure extends Model
 {
     protected $fillable = [
         'company_id',
+        'pay_group_id',
         'name',
         'min_ctc',
         'max_ctc',
@@ -28,5 +29,13 @@ class SalaryStructure extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * Get the pay group that owns the salary structure.
+     */
+    public function payGroup()
+    {
+        return $this->belongsTo(PayGroup::class, 'pay_group_id');
     }
 }
