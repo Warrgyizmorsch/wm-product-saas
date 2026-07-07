@@ -35,6 +35,10 @@ Route::prefix('hrms')
         Route::post('/salary-structure/structure/update/{salaryStructure}', [SalaryStructureController::class, 'updateStructure'])->name('salary-structure.structure.update');
         Route::delete('/salary-structure/structure/delete/{salaryStructure}', [SalaryStructureController::class, 'destroyStructure'])->name('salary-structure.structure.destroy');
 
+        Route::post('/salary-structure/pay-group/store', [SalaryStructureController::class, 'storePayGroup'])->name('salary-structure.pay-group.store');
+        Route::post('/salary-structure/pay-group/update/{payGroup}', [SalaryStructureController::class, 'updatePayGroup'])->name('salary-structure.pay-group.update');
+        Route::delete('/salary-structure/pay-group/delete/{payGroup}', [SalaryStructureController::class, 'destroyPayGroup'])->name('salary-structure.pay-group.destroy');
+
         Route::get('/leave-structure', [LeaveStructureController::class, 'index'])->name('leave-structure.index');
         Route::post('/leave-structure/plan/store', [LeaveStructureController::class, 'storePlan'])->name('leave-structure.plan.store');
         Route::post('/leave-structure/plan/update/{leavePlan}', [LeaveStructureController::class, 'updatePlan'])->name('leave-structure.plan.update');

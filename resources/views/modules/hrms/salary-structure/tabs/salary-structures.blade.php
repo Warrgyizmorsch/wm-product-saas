@@ -6,7 +6,7 @@
                 <x-ui.button variant="light" icon="feather-activity" data-bs-toggle="offcanvas" data-bs-target="#ctcCalculatorDrawer" class="me-2">
                     CTC Calculator
                 </x-ui.button>
-                <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addSalaryStructureModal">
+                <x-ui.button variant="primary" icon="feather-plus" class="add-structure-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-bs-toggle="modal" data-bs-target="#addSalaryStructureModal">
                     Add Structure
                 </x-ui.button>
             </x-slot>
@@ -171,6 +171,7 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
+                        <input type="hidden" name="pay_group_id" id="add_structure_pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
                         <div class="col-md-6 col-12">
                             <x-ui.odoo-form-ui type="input" label="Min Yearly CTC (₹)" name="min_ctc" inputType="number" placeholder="0" min="0" :required="true" :errorText="$errors->first('min_ctc')" />
                         </div>
@@ -199,7 +200,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse($salaryComponents as $comp)
+                                    @forelse($recurringComponents as $comp)
                                         <tr>
                                             <td>
                                                 <span class="fw-bold">{{ $comp->name }}</span>
@@ -280,6 +281,7 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
+                        <input type="hidden" name="pay_group_id" id="edit_structure_pay_group_id">
                         <div class="col-md-6 col-12">
                             <x-ui.odoo-form-ui type="input" label="Min Yearly CTC (₹)" name="min_ctc" id="edit_min_ctc" inputType="number" :required="true" :errorText="$errors->first('min_ctc')" />
                         </div>
@@ -308,7 +310,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($salaryComponents as $comp)
+                                    @foreach($recurringComponents as $comp)
                                         <tr>
                                             <td>
                                                 <span class="fw-bold">{{ $comp->name }}</span>
@@ -364,12 +366,8 @@
 <!-- CTC CALCULATOR DRAWER -->
 <x-ui.drawer id="ctcCalculatorDrawer" title="CTC Calculator & Simulator" position="end" :close-on-outside-click="true" style="width: 540px; max-width: 100%;">
     <div class="mb-4">
-        <label for="sim_ctc" class="form-label fw-semibold text-dark">Enter Yearly CTC (₹)</label>
-        <div class="input-group">
-            <span class="input-group-text bg-light text-dark fw-bold">₹</span>
-            <x-ui.odoo-form-ui type="input" inputType="number" id="sim_ctc" class="ps-2" placeholder="e.g. 600000" onkeyup="calculateSimulator()" onchange="calculateSimulator()" />
-        </div>
-        <small class="text-muted d-block mt-1">Slabs will automatically match based on range limits.</small>
+        <x-ui.odoo-form-ui type="input" inputType="number" label="Yearly CTC (₹)" name="sim_ctc" id="sim_ctc" placeholder="e.g. 600000" onkeyup="calculateSimulator()" onchange="calculateSimulator()" />
+        <small class="text-muted d-block mt-1" style="margin-left: 170px;">Slabs will automatically match based on range limits.</small>
     </div>
 
     <div id="sim-error-msg" class="alert alert-soft-danger py-3 px-3 align-items-center" style="display: none;"></div>
@@ -437,6 +435,12 @@
             }
         });
 
+        // Add structure pre-populates pay_group_id
+        $(document).on('click', '.add-structure-trigger', function() {
+            let pgId = $(this).attr('data-pay-group-id');
+            $('#add_structure_pay_group_id').val(pgId);
+        });
+
         // Use robust event delegation for the edit handler
         $(document).on('click', '.edit-structure-btn', function() {
             let dataStr = $(this).attr('data-structure');
@@ -448,6 +452,7 @@
             let id = structure.id;
             let name = structure.name;
             let company_id = structure.company_id;
+            let pay_group_id = structure.pay_group_id;
             let min_ctc = parseFloat(structure.min_ctc);
             let max_ctc = parseFloat(structure.max_ctc);
             let status = (structure.status === true || structure.status === 1 || structure.status === '1') ? '1' : '0';
@@ -456,6 +461,7 @@
             $('#editSalaryStructureForm').attr('action', `/hrms/salary-structure/structure/update/${id}`);
             $('#edit_name').val(name);
             $('#edit_company_id').val(company_id || '');
+            $('#edit_structure_pay_group_id').val(pay_group_id || '');
             $('#edit_min_ctc').val(min_ctc);
             $('#edit_max_ctc').val(max_ctc);
             $('#edit_status').val(status);
@@ -596,12 +602,39 @@
             totalMonthly += r.monthly;
         });
 
-        // Add summary row
+        // Gross Salary is equal to the total Cost to Company (CTC) before employee deductions
+        let grossYearly = totalYearly;
+        let grossMonthly = totalMonthly;
+        
+        let deductionsYearly = 0;
+        let deductionsMonthly = 0;
+
+        rows.forEach(r => {
+            if (r.type === 'deduction') {
+                deductionsYearly += r.yearly;
+                deductionsMonthly += r.monthly;
+            }
+        });
+
+        let netYearly = grossYearly - deductionsYearly;
+        let netMonthly = grossMonthly - deductionsMonthly;
+
+        // Add summary rows
         tbody.append(`
+            <tr class="table-light fw-bold border-top">
+                <td colspan="2">Gross Salary (Total CTC)</td>
+                <td class="text-end text-success">₹${grossMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-success">₹${grossYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>
             <tr class="table-light fw-bold">
-                <td colspan="2">Total (CTC)</td>
-                <td class="text-end text-primary">₹${totalMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td class="text-end text-primary">₹${totalYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td colspan="2">Total Deductions (PF / taxes)</td>
+                <td class="text-end text-danger">₹${deductionsMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-danger">₹${deductionsYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+            </tr>
+            <tr class="fw-bold border-top border-bottom" style="background-color: rgba(30, 64, 175, 0.08) !important;">
+                <td colspan="2"><span class="text-primary">Net Salary (In-Hand / Take Home)</span></td>
+                <td class="text-end text-primary">₹${netMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="text-end text-primary">₹${netYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
         `);
 

@@ -318,7 +318,9 @@
                                     <x-ui.odoo-form-ui type="input" label="Currency" name="currency" :required="true" placeholder="e.g. INR, USD" :errorText="$errors->first('currency')" />
                                 </div>
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Timezone" name="time_zone" :required="true" placeholder="e.g. Asia/Kolkata" :errorText="$errors->first('time_zone')" />
+                                    <x-ui.odoo-form-ui type="select" label="Timezone" name="time_zone" select2-selector="tzone" class="geo-timezone" :required="true" :errorText="$errors->first('time_zone')" data-initial-value="{{ old('time_zone', 'Asia/Kolkata') }}">
+                                        <option value="">Select Timezone</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
                             </div>
                         </div>
@@ -362,13 +364,19 @@
                     <div class="hrms-section-title">Location</div>
                     <div class="row g-3">
                         <div class="col-lg-6">
-                            <x-ui.odoo-form-ui type="input" label="Country" name="country" placeholder="Country" :errorText="$errors->first('country')" />
+                            <x-ui.odoo-form-ui type="select" label="Country" name="country" select2-selector="country" class="geo-country" :errorText="$errors->first('country')" data-initial-value="{{ old('country', 'United States') }}">
+                                <option value="">Select Country</option>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-lg-6">
-                            <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" :errorText="$errors->first('state')" />
+                            <x-ui.odoo-form-ui type="select" label="State" name="state" select2-selector="default" class="geo-state" :errorText="$errors->first('state')">
+                                <option value="">Select State</option>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-lg-6">
-                            <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" :errorText="$errors->first('city')" />
+                            <x-ui.odoo-form-ui type="select" label="City" name="city" select2-selector="default" class="geo-city" :errorText="$errors->first('city')">
+                                <option value="">Select City</option>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-lg-6">
                             <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" placeholder="Postal Code" :errorText="$errors->first('postal_code')" />
@@ -432,7 +440,9 @@
                                     <x-ui.odoo-form-ui type="input" label="Currency" name="currency" id="edit_currency" :required="true" :errorText="$errors->first('currency')" />
                                 </div>
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Timezone" name="time_zone" id="edit_timezone" :required="true" :errorText="$errors->first('time_zone')" />
+                                    <x-ui.odoo-form-ui type="select" label="Timezone" name="time_zone" id="edit_timezone" select2-selector="tzone" class="geo-timezone" :required="true" :errorText="$errors->first('time_zone')">
+                                        <option value="">Select Timezone</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
                             </div>
                         </div>
@@ -476,13 +486,19 @@
                     <div class="hrms-section-title">Location</div>
                     <div class="row g-3">
                         <div class="col-lg-6">
-                            <x-ui.odoo-form-ui type="input" label="Country" name="country" id="edit_country" :errorText="$errors->first('country')" />
+                            <x-ui.odoo-form-ui type="select" label="Country" name="country" id="edit_country" select2-selector="country" class="geo-country" :errorText="$errors->first('country')">
+                                <option value="">Select Country</option>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-lg-6">
-                            <x-ui.odoo-form-ui type="input" label="State" name="state" id="edit_state" :errorText="$errors->first('state')" />
+                            <x-ui.odoo-form-ui type="select" label="State" name="state" id="edit_state" select2-selector="default" class="geo-state" :errorText="$errors->first('state')">
+                                <option value="">Select State</option>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-lg-6">
-                            <x-ui.odoo-form-ui type="input" label="City" name="city" id="edit_city" :errorText="$errors->first('city')" />
+                            <x-ui.odoo-form-ui type="select" label="City" name="city" id="edit_city" select2-selector="default" class="geo-city" :errorText="$errors->first('city')">
+                                <option value="">Select City</option>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-lg-6">
                             <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" id="edit_postal_code" :errorText="$errors->first('postal_code')" />
@@ -757,16 +773,22 @@
                                 <option value="0">Inactive</option>
                             </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-3 branch-address-field">
-                            <x-ui.odoo-form-ui type="input" label="Country" name="country" placeholder="Country" :errorText="$errors->first('country')" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Country" name="country" select2-selector="country" class="geo-country" :errorText="$errors->first('country')" data-initial-value="{{ old('country', 'United States') }}">
+                                <option value="">Select Country</option>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-3 branch-address-field">
-                            <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" :errorText="$errors->first('state')" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="State" name="state" select2-selector="default" class="geo-state" :errorText="$errors->first('state')">
+                                <option value="">Select State</option>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-3 branch-address-field">
-                            <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" :errorText="$errors->first('city')" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="City" name="city" select2-selector="default" class="geo-city" :errorText="$errors->first('city')">
+                                <option value="">Select City</option>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-3 branch-address-field">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" placeholder="Postal Code" :errorText="$errors->first('postal_code')" />
                         </div>
                         <div class="col-12">
@@ -837,16 +859,22 @@
                                 <option value="0">Inactive</option>
                             </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-3 branch-address-field">
-                            <x-ui.odoo-form-ui type="input" label="Country" name="country" id="edit_branch_country" :errorText="$errors->first('country')" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Country" name="country" id="edit_branch_country" select2-selector="country" class="geo-country" :errorText="$errors->first('country')">
+                                <option value="">Select Country</option>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-3 branch-address-field">
-                            <x-ui.odoo-form-ui type="input" label="State" name="state" id="edit_branch_state" :errorText="$errors->first('state')" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="State" name="state" id="edit_branch_state" select2-selector="default" class="geo-state" :errorText="$errors->first('state')">
+                                <option value="">Select State</option>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-3 branch-address-field">
-                            <x-ui.odoo-form-ui type="input" label="City" name="city" id="edit_branch_city" :errorText="$errors->first('city')" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="City" name="city" id="edit_branch_city" select2-selector="default" class="geo-city" :errorText="$errors->first('city')">
+                                <option value="">Select City</option>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-3 branch-address-field">
+                        <div class="col-md-6">
                             <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" id="edit_branch_postal_code" :errorText="$errors->first('postal_code')" />
                         </div>
                         <div class="col-12">
@@ -1217,6 +1245,8 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <input type="hidden" name="calculation_type" value="fixed">
+                        <input type="hidden" name="pay_group_id" id="add_component_pay_group_id" value="{{ isset($selectedPayGroup) && $selectedPayGroup ? $selectedPayGroup->id : '' }}">
+                        <input type="hidden" name="is_adhoc" id="add_component_is_adhoc" value="0">
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">All Entities (Global)</option>
@@ -1270,6 +1300,8 @@
                             </x-ui.odoo-form-ui>
                         </div>
                         <input type="hidden" name="calculation_type" id="edit_sc_calculation_type" value="fixed">
+                        <input type="hidden" name="pay_group_id" id="edit_sc_pay_group_id">
+                        <input type="hidden" name="is_adhoc" id="edit_sc_is_adhoc" value="0">
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" id="edit_sc_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">All Entities (Global)</option>
@@ -1292,6 +1324,96 @@
                 <div class="modal-footer bg-light py-2">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="submit" class="btn btn-primary">Update Component</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!--              PAY GROUPS MODALS               -->
+<!-- ============================================ -->
+
+<!-- Add Pay Group Modal -->
+<div class="modal fade" id="addPayGroupModal" tabindex="-1" aria-labelledby="addPayGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="addPayGroupModalLabel"><i class="feather-plus me-2 text-primary"></i>Add Pay Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.salary-structure.pay-group.store') }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Pay Group Name" name="name" :required="true" placeholder="Enter Pay Group Name (e.g. Salaried Staff)" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Company / Legal Entity" name="company_id" select2-selector="default">
+                                <option value="">Apply to All Companies</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="status">
+                                <option value="1" data-bg="bg-success" selected>Active</option>
+                                <option value="0" data-bg="bg-danger">Inactive</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="3" placeholder="Enter description or comments" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save Pay Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Pay Group Modal -->
+<div class="modal fade" id="editPayGroupModal" tabindex="-1" aria-labelledby="editPayGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="editPayGroupModalLabel"><i class="feather-edit me-2 text-primary"></i>Edit Pay Group</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editPayGroupForm" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Pay Group Name" name="name" id="edit_pg_name" :required="true" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Company / Legal Entity" name="company_id" id="edit_pg_company_id" select2-selector="default">
+                                <option value="">Apply to All Companies</option>
+                                @foreach($companies as $company)
+                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_pg_status" select2-selector="status">
+                                <option value="1" data-bg="bg-success">Active</option>
+                                <option value="0" data-bg="bg-danger">Inactive</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_pg_description" rows="3" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Update Pay Group</button>
                 </div>
             </form>
         </div>
