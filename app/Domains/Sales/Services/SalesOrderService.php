@@ -54,6 +54,7 @@ class SalesOrderService
                 $taxRate = floatval($item['tax_rate'] ?? 0);
                 $discount = floatval($item['discount'] ?? 0);
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
+                $warehouseId = !empty($item['warehouse_id']) ? intval($item['warehouse_id']) : null;
 
                 $amount = ($qty * $price) - $discount;
                 $itemTax = $amount * ($taxRate / 100);
@@ -71,6 +72,7 @@ class SalesOrderService
 
                 $itemsData[] = [
                     'product_id' => $productId,
+                    'warehouse_id' => $warehouseId,
                     'item_name' => $itemName,
                     'description' => $item['description'] ?? null,
                     'quantity' => $qty,
@@ -110,6 +112,7 @@ class SalesOrderService
                 $taxRate = floatval($item['tax_rate'] ?? 0);
                 $discount = floatval($item['discount'] ?? 0);
                 $productId = !empty($item['product_id']) ? intval($item['product_id']) : null;
+                $warehouseId = !empty($item['warehouse_id']) ? intval($item['warehouse_id']) : null;
 
                 $amount = ($qty * $price) - $discount;
                 $itemTax = $amount * ($taxRate / 100);
@@ -127,6 +130,7 @@ class SalesOrderService
 
                 $itemsData[] = [
                     'product_id' => $productId,
+                    'warehouse_id' => $warehouseId,
                     'item_name' => $itemName,
                     'description' => $item['description'] ?? null,
                     'quantity' => $qty,
