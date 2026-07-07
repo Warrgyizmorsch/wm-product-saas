@@ -25,12 +25,4 @@ class Designation extends Model
     {
         return $this->belongsTo(Department::class);
     }
-
-    /**
-     * Employees having this designation.
-     */
-    public function employees()
-    {
-        return $this->hasMany(Employee::class);
-    }
 }

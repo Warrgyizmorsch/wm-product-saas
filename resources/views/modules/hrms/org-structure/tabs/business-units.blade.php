@@ -37,15 +37,30 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <div class="d-flex justify-content-end gap-1">
-                                    <x-ui.icon-btn variant="soft-primary" icon="feather-eye" class="btn-view-bu" data-bs-toggle="modal" data-bs-target="#viewBuModal" data-bu="{{ base64_encode($unit->toJson()) }}" title="View" />
-                                    <x-ui.icon-btn variant="primary" icon="feather-edit" class="btn-edit-bu" data-bs-toggle="modal" data-bs-target="#editBuModal" data-bu="{{ base64_encode($unit->toJson()) }}" title="Edit" />
-                                    <form action="{{ route('hrms.business-unit.destroy', $unit->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this business unit?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete" />
-                                    </form>
-                                </div>
+                                <form action="{{ route('hrms.business-unit.destroy', $unit->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this business unit?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <div class="hstack gap-2 justify-content-end">
+                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-bu" data-bs-toggle="modal" data-bs-target="#viewBuModal" data-bu="{{ base64_encode($unit->toJson()) }}" title="View Details" data-bs-toggle="tooltip">
+                                            <i class="feather feather-eye"></i>
+                                        </a>
+                                        <x-ui.action-dropdown>
+                                            <li>
+                                                <a class="dropdown-item btn-edit-bu" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editBuModal" data-bu="{{ base64_encode($unit->toJson()) }}">
+                                                    <i class="feather feather-edit-3 me-3"></i>
+                                                    <span>Edit</span>
+                                                </a>
+                                            </li>
+                                            <li class="dropdown-divider"></li>
+                                            <li>
+                                                <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
+                                                    <i class="feather feather-trash-2 me-3"></i>
+                                                    <span>Delete</span>
+                                                </button>
+                                            </li>
+                                        </x-ui.action-dropdown>
+                                    </div>
+                                </form>
                             </td>
                         </tr>
                         @endforeach

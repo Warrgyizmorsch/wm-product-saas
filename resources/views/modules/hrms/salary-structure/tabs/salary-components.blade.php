@@ -43,14 +43,25 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <div class="d-flex justify-content-end gap-1">
-                                    <x-ui.icon-btn variant="primary" icon="feather-edit" class="btn-edit-salary-component" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}" title="Edit" />
-                                    <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this salary component?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete" />
-                                    </form>
-                                </div>
+                                <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this salary component?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <x-ui.action-dropdown>
+                                        <li>
+                                            <a class="dropdown-item btn-edit-salary-component" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}">
+                                                <i class="feather feather-edit-3 me-3"></i>
+                                                <span>Edit</span>
+                                            </a>
+                                        </li>
+                                        <li class="dropdown-divider"></li>
+                                        <li>
+                                            <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
+                                                <i class="feather feather-trash-2 me-3"></i>
+                                                <span>Delete</span>
+                                            </button>
+                                        </li>
+                                    </x-ui.action-dropdown>
+                                </form>
                             </td>
                         </tr>
                         @endforeach

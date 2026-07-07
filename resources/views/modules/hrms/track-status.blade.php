@@ -235,14 +235,14 @@
                                             </td>
                                             <td class="text-end pe-4">
                                                 <div class="form-group select-wd-lg mb-0 ms-auto" style="width: 230px;">
-                                                    <x-ui.select name="status" class="status-select" data-select2-selector="icon">
+                                                    <x-ui.odoo-form-ui type="select" name="status" class="status-select" select2-selector="icon">
                                                         <option value="Pending" data-icon="feather-clock" {{ $task['status'] === 'Pending' ? 'selected' : '' }}>Pending</option>
                                                         <option value="Developer Complete" data-icon="feather-code" {{ $task['status'] === 'Developer Complete' ? 'selected' : '' }}>Developer Complete</option>
                                                         <option value="Internal Testing Complete" data-icon="feather-check" {{ $task['status'] === 'Internal Testing Complete' ? 'selected' : '' }}>Internal Testing Complete</option>
                                                         <option value="External Testing Complete" data-icon="feather-shield" {{ $task['status'] === 'External Testing Complete' ? 'selected' : '' }}>External Testing Complete</option>
                                                         <option value="Rework" data-icon="feather-rotate-ccw" {{ $task['status'] === 'Rework' ? 'selected' : '' }}>Rework</option>
                                                         <option value="Complete" data-icon="feather-check-circle" {{ $task['status'] === 'Complete' ? 'selected' : '' }}>Complete</option>
-                                                    </x-ui.select>
+                                                    </x-ui.odoo-form-ui>
                                                 </div>
                                             </td>
                                         </tr>

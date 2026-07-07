@@ -30,3 +30,40 @@
         </div>
     </div>
 </div>
+
+<style>
+    /* Premium dynamic settings sidebar shadow styles */
+    #settingsSubSidebar .nav-link {
+        background-color: transparent;
+        transition: all 0.25s ease-in-out;
+        border-radius: 8px !important;
+        font-size: 14px;
+        font-weight: 500;
+        color: #475569 !important;
+        padding: 12px 16px !important;
+        border: 0 !important;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        margin-left: 6px; /* Offset spacing to accommodate the left shadow */
+    }
+    #settingsSubSidebar .nav-link:hover {
+        background-color: #f1f5f9;
+        color: #1e293b !important;
+    }
+    #settingsSubSidebar .nav-link.active {
+        background-color: var(--bs-primary) !important; /* Dynamically matches the active primary theme color */
+        color: #ffffff !important;
+        font-weight: 600;
+        border: none !important;
+        /* Renders a solid dynamic contrast offset shadow/shape on the left side of the active item */
+        box-shadow: -6px 0 0 0 color-mix(in srgb, var(--bs-primary) 70%, #555555) !important;
+    }
+    #settingsSubSidebar .nav-link i {
+        transition: all 0.25s ease;
+    }
+    #settingsSubSidebar .nav-link.active i {
+        color: #ffffff !important;
+        transform: scale(1.1);
+    }
+</style>

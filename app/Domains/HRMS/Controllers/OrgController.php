@@ -52,6 +52,7 @@ class OrgController extends Controller {
                     $table->foreign('business_unit_id')->references('id')->on('business_units')->nullOnDelete();
                 });
             }
+
         } catch (\Exception $e) {
             // Silently capture any setup errors
         }
@@ -90,8 +91,8 @@ class OrgController extends Controller {
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
             'postal_code' => 'nullable|max:20',
-            'currency' => 'nullable', // Removed max:20 constraint since select option labels are long
-            'time_zone' => 'nullable|max:100',
+            'currency' => 'required|string|max:255',
+            'time_zone' => 'required|string|max:100',
             'status' => 'required',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
@@ -166,8 +167,8 @@ class OrgController extends Controller {
             'state' => 'nullable|max:100',
             'country' => 'nullable|max:100',
             'postal_code' => 'nullable|max:20',
-            'currency' => 'nullable|max:50',
-            'time_zone' => 'nullable|max:100',
+            'currency' => 'required|string|max:255',
+            'time_zone' => 'required|string|max:100',
             'status' => 'required',
             'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
