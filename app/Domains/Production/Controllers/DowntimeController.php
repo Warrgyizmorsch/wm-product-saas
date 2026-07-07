@@ -15,6 +15,8 @@ class DowntimeController extends Controller
 
     public function start(Request $request)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'machine_id'                     => 'required|integer',
@@ -43,6 +45,8 @@ class DowntimeController extends Controller
 
     public function end(Request $request, int $id)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'remarks' => 'nullable|string|max:1000',

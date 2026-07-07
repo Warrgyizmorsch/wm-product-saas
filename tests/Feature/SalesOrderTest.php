@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\Access\Role;
+use App\Models\Access\UserRole;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Sales\Models\SalesOrder;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -32,12 +35,23 @@ class SalesOrderTest extends TestCase
             'plan' => 'enterprise',
         ]);
 
-        // Create user
+        $this->seed(RbacSeeder::class);
+
+        // Create user with full sales access (this suite exercises the whole
+        // order lifecycle — index/create/confirm/cancel/ship — not scoped
+        // ownership, so sales_manager is the right fit).
         $this->user = User::create([
             'tenant_id' => $this->tenant->id,
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => bcrypt('password'),
+        ]);
+
+        $salesManagerRole = Role::query()->whereNull('tenant_id')->where('slug', 'sales_manager')->firstOrFail();
+        UserRole::create([
+            'user_id' => $this->user->id,
+            'role_id' => $salesManagerRole->id,
+            'tenant_id' => $this->tenant->id,
         ]);
 
         // Create customer

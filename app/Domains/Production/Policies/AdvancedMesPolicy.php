@@ -4,15 +4,22 @@ namespace App\Domains\Production\Policies;
 
 use App\Models\User;
 use App\Domains\Production\Models\ProductionOperatorAssignment;
+use App\Services\Access\AccessService;
 
 class AdvancedMesPolicy
 {
+    public function __construct(private readonly AccessService $access)
+    {
+    }
+
     /**
      * Determine if the user can assign operators or manage batches/serials.
      */
     public function manage(User $user): bool
     {
-        return in_array($user->role, ['admin', 'production_manager', 'production_supervisor']);
+        return $this->access->allows($user, 'production.mes.execute', [
+            'tenant_id' => $user->tenant_id,
+        ]);
     }
 
     /**
@@ -20,7 +27,7 @@ class AdvancedMesPolicy
      */
     public function execute(User $user): bool
     {
-        return in_array($user->role, ['admin', 'production_manager', 'production_supervisor', 'production_operator', 'operator']);
+        return $this->manage($user);
     }
 
     /**
@@ -28,6 +35,7 @@ class AdvancedMesPolicy
      */
     public function manageOwnAssignment(User $user, ProductionOperatorAssignment $assignment): bool
     {
-        return $assignment->user_id === $user->id || $this->manage($user);
+        return $assignment->tenant_id === $user->tenant_id
+            && ($assignment->user_id === $user->id || $this->manage($user));
     }
 }

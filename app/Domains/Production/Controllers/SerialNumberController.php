@@ -3,6 +3,7 @@
 namespace App\Domains\Production\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Domains\Production\Models\ProductionSerialNumber;
 use App\Domains\Production\Services\SerialNumberService;
 use Illuminate\Http\Request;
 
@@ -14,6 +15,8 @@ class SerialNumberController extends Controller
 
     public function generate(Request $request)
     {
+        $this->authorize('manage', ProductionSerialNumber::class);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'production_order_id' => 'required|integer',
@@ -43,6 +46,8 @@ class SerialNumberController extends Controller
 
     public function manualAssign(Request $request)
     {
+        $this->authorize('manage', ProductionSerialNumber::class);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'production_order_id' => 'required|integer',

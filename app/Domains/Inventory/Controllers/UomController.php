@@ -11,6 +11,8 @@ class UomController extends Controller
 {
     public function quickCreate(Request $request): JsonResponse
     {
+        $this->authorize('create', Uom::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([

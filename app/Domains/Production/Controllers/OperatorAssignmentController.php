@@ -3,6 +3,7 @@
 namespace App\Domains\Production\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Domains\Production\Models\ProductionOperatorAssignment;
 use App\Domains\Production\Services\OperatorAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,8 @@ class OperatorAssignmentController extends Controller
 
     public function assign(Request $request)
     {
+        $this->authorize('manage', ProductionOperatorAssignment::class);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'production_order_operation_id' => 'required|integer',
@@ -39,6 +42,8 @@ class OperatorAssignmentController extends Controller
 
     public function reassign(Request $request, int $assignment)
     {
+        $this->authorize('manage', ProductionOperatorAssignment::class);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'user_id' => 'required|integer',
@@ -63,6 +68,9 @@ class OperatorAssignmentController extends Controller
     public function accept(Request $request, int $assignment)
     {
         $tenantId = require_tenant_id();
+
+        $this->authorize('manageOwnAssignment', ProductionOperatorAssignment::findOrFail($assignment));
+
         try {
             $this->assignmentService->accept($tenantId, $assignment, Auth::id() ?: 1, $request->input('remarks'));
             return redirect()->back()->with('success', 'Assignment accepted.');
@@ -74,6 +82,9 @@ class OperatorAssignmentController extends Controller
     public function reject(Request $request, int $assignment)
     {
         $tenantId = require_tenant_id();
+
+        $this->authorize('manageOwnAssignment', ProductionOperatorAssignment::findOrFail($assignment));
+
         try {
             $this->assignmentService->reject($tenantId, $assignment, Auth::id() ?: 1, $request->input('remarks'));
             return redirect()->back()->with('success', 'Assignment rejected.');

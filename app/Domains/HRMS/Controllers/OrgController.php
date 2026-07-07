@@ -15,6 +15,8 @@ use Illuminate\Http\Request;
 
 class OrgController extends Controller {
     public function index() {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         // Programmatically run schema updates if they haven't been applied yet
         try {
             if (!\Illuminate\Support\Facades\Schema::hasColumn('branches', 'company_id')) {
@@ -71,11 +73,15 @@ class OrgController extends Controller {
     }
 
     public function create() {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         return view('modules.hrms.org-structure.create-company');
     }
 
     public function store(Request $request)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'company_name' => 'required|max:255',
             'legal_name' => 'required|max:255',
@@ -152,6 +158,8 @@ class OrgController extends Controller {
 
     public function update(Request $request, Company $company)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'company_name' => 'required|max:255',
             'legal_name' => 'required|max:255',
@@ -215,12 +223,16 @@ class OrgController extends Controller {
     }
 
     public function createBusinessUnit() {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $companies = Company::all();
         $employees = Employee::all();
         return view('modules.hrms.org-structure.create-business-unit', compact('companies', 'employees'));
     }
 
     public function storeBusinessUnit(Request $request) {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|max:255',
@@ -245,6 +257,8 @@ class OrgController extends Controller {
     }
 
     public function updateBusinessUnit(Request $request, BusinessUnit $businessUnit) {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|max:255',
@@ -269,12 +283,16 @@ class OrgController extends Controller {
     }
 
     public function createBranch() {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $businessUnits = BusinessUnit::all();
         $employees = Employee::all();
         return view('modules.hrms.org-structure.create-branch', compact('businessUnits', 'employees'));
     }
 
     public function storeBranch(Request $request) {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'company_id' => 'required_without:business_unit_id|nullable|exists:companies,id',
             'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
@@ -321,6 +339,8 @@ class OrgController extends Controller {
     }
 
     public function updateBranch(Request $request, Branch $branch) {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'company_id' => 'required_without:business_unit_id|nullable|exists:companies,id',
             'business_unit_id' => 'required_without:company_id|nullable|exists:business_units,id',
@@ -367,12 +387,16 @@ class OrgController extends Controller {
     }
 
     public function createDepartment() {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $branches = Branch::all();
         $employees = Employee::all();
         return view('modules.hrms.org-structure.create-department', compact('branches', 'employees'));
     }
 
     public function storeDepartment(Request $request) {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'company_id' => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
@@ -418,6 +442,8 @@ class OrgController extends Controller {
     }
 
     public function updateDepartment(Request $request, Department $department) {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'company_id' => 'required_without_all:branch_id,business_unit_id|nullable|exists:companies,id',
             'business_unit_id' => 'nullable|exists:business_units,id',
@@ -463,11 +489,15 @@ class OrgController extends Controller {
     }
 
     public function createDesignation() {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $departments = Department::all();
         return view('modules.hrms.org-structure.create-designation', compact('departments'));
     }
 
     public function storeDesignation(Request $request) {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
@@ -490,6 +520,8 @@ class OrgController extends Controller {
     }
 
     public function updateDesignation(Request $request, Designation $designation) {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
@@ -513,36 +545,48 @@ class OrgController extends Controller {
 
     public function destroy(Company $company)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $company->delete();
         return redirect()->route('hrms.org.index', ['tab' => 'legal-entities'])->with('success', 'Legal Entity deleted successfully.');
     }
 
     public function destroyBusinessUnit(BusinessUnit $businessUnit)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $businessUnit->delete();
         return redirect()->route('hrms.org.index', ['tab' => 'business-units'])->with('success', 'Business Unit deleted successfully.');
     }
 
     public function destroyBranch(Branch $branch)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $branch->delete();
         return redirect()->route('hrms.org.index', ['tab' => 'branches'])->with('success', 'Branch deleted successfully.');
     }
 
     public function destroyDepartment(Department $department)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $department->delete();
         return redirect()->route('hrms.org.index', ['tab' => 'departments'])->with('success', 'Department deleted successfully.');
     }
 
     public function destroyDesignation(Designation $designation)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $designation->delete();
         return redirect()->route('hrms.org.index', ['tab' => 'designations'])->with('success', 'Designation deleted successfully.');
     }
 
     public function storeSalaryComponent(Request $request)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'name' => 'required|max:255',
             'code' => 'required|max:50',
@@ -573,6 +617,8 @@ class OrgController extends Controller {
 
     public function updateSalaryComponent(Request $request, SalaryComponent $salaryComponent)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'name' => 'required|max:255',
             'code' => 'required|max:50',
@@ -602,6 +648,8 @@ class OrgController extends Controller {
 
     public function destroySalaryComponent(SalaryComponent $salaryComponent)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $salaryComponent->delete();
         return redirect()->route('hrms.org.index', ['tab' => 'salary-structure'])->with('success', 'Salary Component deleted successfully.');
     }

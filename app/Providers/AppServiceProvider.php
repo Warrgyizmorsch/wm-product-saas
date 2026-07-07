@@ -16,6 +16,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Tenancy::class);
         $this->app->singleton(TenantContext::class, fn ($app) => $app->make(Tenancy::class));
 
+        \Illuminate\Support\Facades\Auth::provider('tenant-eloquent', function ($app, array $config) {
+            return new \App\Support\Auth\TenantAwareUserProvider($app['hash'], $config['model']);
+        });
+
         // ── Production: BOM (Frozen) ──────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Production\Repositories\ProductionBomRepositoryInterface::class,
@@ -80,6 +84,11 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionSchedule::class,
+            \App\Domains\Production\Policies\ProductionSchedulePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionBatch::class,
             \App\Domains\Production\Policies\AdvancedMesPolicy::class
         );
@@ -101,6 +110,38 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\CRM\Models\Quotation::class,
             \App\Domains\CRM\Policies\QuotationPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Models\Tenant::class,
+            \App\Domains\Platform\Policies\TenantPolicy::class
+        );
+
+        // ── Inventory Policies ────────────────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\Product::class,
+            \App\Domains\Inventory\Policies\ProductPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\Warehouse::class,
+            \App\Domains\Inventory\Policies\WarehousePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Inventory\Models\Uom::class,
+            \App\Domains\Inventory\Policies\UomPolicy::class
+        );
+
+        // ── Sales Policies ─────────────────────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Sales\Models\SalesOrder::class,
+            \App\Domains\Sales\Policies\SalesOrderPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Sales\Models\DeliveryOrder::class,
+            \App\Domains\Sales\Policies\DeliveryOrderPolicy::class
         );
     }
 }

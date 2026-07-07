@@ -23,9 +23,7 @@ class WorkCenterController extends Controller
 
     public function index(Request $request): View
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('viewAny', WorkCenter::class);
-        }
+        Gate::authorize('viewAny', WorkCenter::class);
 
         $filters     = $request->only(['status', 'work_center_type', 'search']);
         $workCenters = $this->repository->getAll($filters);
@@ -37,9 +35,7 @@ class WorkCenterController extends Controller
 
     public function create(): View
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', WorkCenter::class);
-        }
+        Gate::authorize('create', WorkCenter::class);
 
         $workCenterTypes = config('production.work_center_types', []);
         $parentOptions = WorkCenter::orderBy('name')->get();
@@ -48,9 +44,7 @@ class WorkCenterController extends Controller
 
     public function store(StoreWorkCenterRequest $request): RedirectResponse
     {
-        if (app()->environment('testing')) {
-            Gate::authorize('create', WorkCenter::class);
-        }
+        Gate::authorize('create', WorkCenter::class);
 
         try {
             $tenantId = require_tenant_id();
@@ -70,9 +64,7 @@ class WorkCenterController extends Controller
         $workCenter = $this->repository->find($id);
         abort_if(!$workCenter, 404, 'Work center not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('view', $workCenter);
-        }
+        Gate::authorize('view', $workCenter);
 
         return view('modules.production.work-centers.show', compact('workCenter'));
     }
@@ -82,9 +74,7 @@ class WorkCenterController extends Controller
         $workCenter = $this->repository->find($id);
         abort_if(!$workCenter, 404, 'Work center not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $workCenter);
-        }
+        Gate::authorize('update', $workCenter);
 
         $workCenterTypes = config('production.work_center_types', []);
         $parentOptions = WorkCenter::where('id', '!=', $id)->orderBy('name')->get();
@@ -96,9 +86,7 @@ class WorkCenterController extends Controller
         $workCenter = $this->repository->find($id);
         abort_if(!$workCenter, 404, 'Work center not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('update', $workCenter);
-        }
+        Gate::authorize('update', $workCenter);
 
         try {
             $dto = WorkCenterDTO::fromArray($request->validated());
@@ -117,9 +105,7 @@ class WorkCenterController extends Controller
         $workCenter = $this->repository->find($id);
         abort_if(!$workCenter, 404, 'Work center not found.');
 
-        if (app()->environment('testing')) {
-            Gate::authorize('delete', $workCenter);
-        }
+        Gate::authorize('delete', $workCenter);
 
         try {
             $this->service->delete($id);

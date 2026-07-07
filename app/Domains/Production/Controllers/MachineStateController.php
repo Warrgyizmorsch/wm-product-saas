@@ -15,6 +15,8 @@ class MachineStateController extends Controller
 
     public function overrideState(Request $request)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'machine_id' => 'required|integer',

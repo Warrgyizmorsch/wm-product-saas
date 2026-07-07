@@ -13,6 +13,8 @@ class WarehouseController extends Controller
 {
     public function index(): View
     {
+        $this->authorize('viewAny', Warehouse::class);
+
         $warehouses = Warehouse::query()->latest()->get();
 
         return view('modules.inventory.warehouses.index', compact('warehouses'));
@@ -20,6 +22,8 @@ class WarehouseController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Warehouse::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
@@ -60,6 +64,8 @@ class WarehouseController extends Controller
 
     public function update(Request $request, Warehouse $warehouse): RedirectResponse
     {
+        $this->authorize('update', $warehouse);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
@@ -105,6 +111,8 @@ class WarehouseController extends Controller
 
     public function destroy(Warehouse $warehouse): RedirectResponse
     {
+        $this->authorize('delete', $warehouse);
+
         // Prevent deleting the default warehouse unless another exists
         if ($warehouse->is_default) {
             // Try to assign default to another warehouse

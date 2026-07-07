@@ -19,6 +19,8 @@ class TenantController extends Controller
 
     public function index(): View
     {
+        $this->authorize('viewAny', Tenant::class);
+
         return view('modules.platform.tenants.index', [
             'tenants' => $this->tenants->all(),
             'summary' => $this->tenants->summary(),
@@ -27,6 +29,8 @@ class TenantController extends Controller
 
     public function create(): View
     {
+        $this->authorize('create', Tenant::class);
+
         return view('modules.platform.tenants.create', [
             'tenant' => new Tenant(),
         ]);
@@ -34,6 +38,8 @@ class TenantController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Tenant::class);
+
         $tenant = $this->tenants->create($this->validated($request));
 
         return redirect()
@@ -43,6 +49,8 @@ class TenantController extends Controller
 
     public function edit(Tenant $tenant): View
     {
+        $this->authorize('view', $tenant);
+
         return view('modules.platform.tenants.edit', [
             'tenant' => $tenant,
         ]);
@@ -50,6 +58,8 @@ class TenantController extends Controller
 
     public function update(Request $request, Tenant $tenant): RedirectResponse
     {
+        $this->authorize('update', $tenant);
+
         $this->tenants->update($tenant, $this->validated($request, $tenant));
 
         return redirect()
@@ -59,6 +69,8 @@ class TenantController extends Controller
 
     public function status(Request $request, Tenant $tenant): RedirectResponse
     {
+        $this->authorize('updateStatus', $tenant);
+
         $validated = $request->validate([
             'status' => ['required', 'string', Rule::in([Tenant::STATUS_ACTIVE, Tenant::STATUS_SUSPENDED])],
         ]);

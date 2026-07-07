@@ -70,6 +70,8 @@ class MesController extends Controller
 
     public function start(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $machineId = $request->input('machine_id') ? (int) $request->input('machine_id') : null;
             $this->mesService->startOperation($op, $machineId, Auth::id() ?: 1);
@@ -81,6 +83,8 @@ class MesController extends Controller
 
     public function pause(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $this->mesService->pauseOperation($op, $request->input('remarks'));
             return redirect()->back()->with('success', 'Operation paused.');
@@ -91,6 +95,8 @@ class MesController extends Controller
 
     public function resume(int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $this->mesService->resumeOperation($op);
             return redirect()->back()->with('success', 'Operation resumed.');
@@ -101,6 +107,8 @@ class MesController extends Controller
 
     public function complete(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         $data = $request->validate([
             'quantity_produced' => 'required|numeric|min:0',
             'quantity_rejected' => 'nullable|numeric|min:0',
@@ -120,6 +128,8 @@ class MesController extends Controller
 
     public function hold(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $this->mesService->holdOperation($op, $request->input('remarks'));
             return redirect()->back()->with('success', 'Operation placed on hold.');
@@ -130,6 +140,8 @@ class MesController extends Controller
 
     public function cancel(Request $request, int $op)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         try {
             $this->mesService->cancelOperation($op);
             return redirect()->back()->with('success', 'Operation cancelled.');

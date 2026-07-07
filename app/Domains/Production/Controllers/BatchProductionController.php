@@ -3,6 +3,7 @@
 namespace App\Domains\Production\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Services\BatchProductionService;
 use Illuminate\Http\Request;
 
@@ -14,6 +15,8 @@ class BatchProductionController extends Controller
 
     public function create(Request $request)
     {
+        $this->authorize('manage', ProductionBatch::class);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'production_order_id' => 'required|integer',
@@ -42,6 +45,8 @@ class BatchProductionController extends Controller
 
     public function split(Request $request)
     {
+        $this->authorize('manage', ProductionBatch::class);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'parent_batch_id' => 'required|integer',
@@ -65,6 +70,8 @@ class BatchProductionController extends Controller
 
     public function merge(Request $request)
     {
+        $this->authorize('manage', ProductionBatch::class);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'parent_batch_ids'        => 'required|array|min:2',

@@ -23,6 +23,8 @@ class ScannerController extends Controller
 
     public function scan(Request $request)
     {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
         $tenantId = require_tenant_id();
         $request->validate([
             'code'              => 'required|string|max:100',

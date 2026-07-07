@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\Access\Role;
+use App\Models\Access\UserRole;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Production\Models\WorkCenter;
@@ -15,6 +17,7 @@ use App\Domains\Production\Models\RoutingOperationMaterial;
 use App\Domains\Production\Services\ProductionBomVersionService;
 use App\Domains\Production\Services\ProductionCostService;
 use App\Domains\Production\Services\BomWhereUsedService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -43,6 +46,15 @@ class ProductionEnterpriseTest extends TestCase
             'email' => 'mfg-admin@example.com',
             'password' => bcrypt('password'),
             'role' => 'admin',
+        ]);
+
+        $this->seed(RbacSeeder::class);
+
+        $productionManagerRole = Role::query()->whereNull('tenant_id')->where('slug', 'production_manager')->firstOrFail();
+        UserRole::create([
+            'user_id' => $this->user->id,
+            'role_id' => $productionManagerRole->id,
+            'tenant_id' => $this->tenant->id,
         ]);
 
         $this->uom = Uom::create([

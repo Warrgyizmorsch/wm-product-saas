@@ -13,6 +13,8 @@ class SalaryStructureController extends Controller
 {
     public function index()
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         // Programmatically run schema updates if they haven't been applied yet
         try {
             if (!\Illuminate\Support\Facades\Schema::hasTable('salary_components')) {
@@ -41,6 +43,8 @@ class SalaryStructureController extends Controller
 
     public function storeComponent(Request $request)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'name' => 'required|max:255',
             'code' => 'required|max:50',
@@ -71,6 +75,8 @@ class SalaryStructureController extends Controller
 
     public function updateComponent(Request $request, SalaryComponent $salaryComponent)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'name' => 'required|max:255',
             'code' => 'required|max:50',
@@ -100,12 +106,16 @@ class SalaryStructureController extends Controller
 
     public function destroyComponent(SalaryComponent $salaryComponent)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $salaryComponent->delete();
         return redirect()->route('hrms.salary-structure.index', ['tab' => 'components'])->with('success', 'Salary Component deleted successfully.');
     }
 
     public function storeStructure(Request $request)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'name' => 'required|max:255',
             'company_id' => 'nullable|integer',
@@ -179,6 +189,8 @@ class SalaryStructureController extends Controller
 
     public function updateStructure(Request $request, SalaryStructure $salaryStructure)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'name' => 'required|max:255',
             'company_id' => 'nullable|integer',
@@ -255,6 +267,8 @@ class SalaryStructureController extends Controller
 
     public function destroyStructure(SalaryStructure $salaryStructure)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $salaryStructure->items()->delete();
         $salaryStructure->delete();
         return redirect()->route('hrms.salary-structure.index', ['tab' => 'structures'])->with('success', 'Salary Structure slab deleted successfully.');

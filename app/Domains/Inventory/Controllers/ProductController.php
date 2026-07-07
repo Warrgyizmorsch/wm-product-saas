@@ -19,6 +19,8 @@ class ProductController extends Controller
 {
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Product::class);
+
         $query = Product::query()->whereNull('parent_id')->with(['uom', 'variants']);
 
         if ($request->filled('search')) {
@@ -44,6 +46,8 @@ class ProductController extends Controller
 
     public function create(): View
     {
+        $this->authorize('create', Product::class);
+
         $uoms = Uom::query()->get();
         $vendors = Vendor::query()->where('status', 'active')->get();
         $warehouses = Warehouse::query()->where('status', 'active')->get();
@@ -53,6 +57,8 @@ class ProductController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Product::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
@@ -227,6 +233,8 @@ class ProductController extends Controller
 
     public function show(Product $product): View
     {
+        $this->authorize('view', $product);
+
         $product->load([
             'uom', 
             'vendor', 
@@ -248,6 +256,8 @@ class ProductController extends Controller
 
     public function edit(Product $product): View
     {
+        $this->authorize('update', $product);
+
         $product->load(['uom', 'vendor', 'warehouseStocks']);
         $uoms = Uom::query()->get();
         $vendors = Vendor::query()->where('status', 'active')->get();
@@ -262,6 +272,8 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): RedirectResponse
     {
+        $this->authorize('update', $product);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
@@ -404,6 +416,8 @@ class ProductController extends Controller
      */
     public function openingStock(Product $product): View
     {
+        $this->authorize('update', $product);
+
         $product->load(['uom', 'warehouseStocks.warehouse', 'variants.warehouseStocks.warehouse']);
         $warehouses = Warehouse::query()->where('status', 'active')->get();
 
@@ -431,6 +445,8 @@ class ProductController extends Controller
      */
     public function saveOpeningStock(Request $request, Product $product): RedirectResponse
     {
+        $this->authorize('update', $product);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $request->validate([
@@ -557,6 +573,8 @@ class ProductController extends Controller
 
     public function destroy(Product $product): RedirectResponse
     {
+        $this->authorize('delete', $product);
+
         $product->delete();
 
         return redirect()->route('inventory.products.index')
@@ -566,6 +584,8 @@ class ProductController extends Controller
 
     public function quickCreate(Request $request): JsonResponse
     {
+        $this->authorize('create', Product::class);
+
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([

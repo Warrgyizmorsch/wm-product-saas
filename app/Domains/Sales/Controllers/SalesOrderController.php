@@ -25,6 +25,8 @@ class SalesOrderController extends Controller
 
     public function index(): View
     {
+        $this->authorize('viewAny', SalesOrder::class);
+
         return view('modules.sales.orders.index', [
             'orders' => $this->salesOrders->latest(),
         ]);
@@ -32,6 +34,8 @@ class SalesOrderController extends Controller
 
     public function create(Request $request): View
     {
+        $this->authorize('create', SalesOrder::class);
+
         $customers = Customer::query()->orderBy('name')->get();
         $products = Product::query()
             ->where('status', 'active')
@@ -66,6 +70,8 @@ class SalesOrderController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', SalesOrder::class);
+
         $validated = $request->validate([
             'customer_id'        => ['required', 'exists:customers,id'],
             'quotation_id'       => ['nullable', 'exists:quotations,id'],
@@ -106,6 +112,8 @@ class SalesOrderController extends Controller
             abort(404, 'Sales Order not found.');
         }
 
+        $this->authorize('view', $order);
+
         return view('modules.sales.orders.show', [
             'order' => $order,
         ]);
@@ -118,6 +126,8 @@ class SalesOrderController extends Controller
         if (!$order) {
             abort(404, 'Sales Order not found.');
         }
+
+        $this->authorize('update', $order);
 
         $customers = Customer::query()->orderBy('name')->get();
         $products = Product::query()
@@ -151,6 +161,8 @@ class SalesOrderController extends Controller
         if (!$order) {
             abort(404, 'Sales Order not found.');
         }
+
+        $this->authorize('update', $order);
 
         $validated = $request->validate([
             'customer_id'        => ['required', 'exists:customers,id'],
@@ -191,6 +203,8 @@ class SalesOrderController extends Controller
         if (!$order) {
             abort(404, 'Sales Order not found.');
         }
+
+        $this->authorize('confirm', $order);
 
         if ($order->status !== 'Draft') {
             return back()->withErrors(['status' => 'Only Draft Sales Orders can be confirmed.']);
@@ -246,6 +260,8 @@ class SalesOrderController extends Controller
             abort(404, 'Sales Order not found.');
         }
 
+        $this->authorize('cancel', $order);
+
         if ($order->status === 'Shipped') {
             return back()->withErrors(['status' => 'Cannot cancel a Shipped Sales Order.']);
         }
@@ -281,6 +297,8 @@ class SalesOrderController extends Controller
         if (!$order) {
             abort(404, 'Sales Order not found.');
         }
+
+        $this->authorize('delete', $order);
 
         $this->salesOrders->delete($order);
 

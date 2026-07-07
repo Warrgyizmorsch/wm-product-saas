@@ -23,6 +23,8 @@ class DeliveryOrderController extends Controller
 
     public function index(): View
     {
+        $this->authorize('viewAny', DeliveryOrder::class);
+
         $deliveries = DeliveryOrder::with('salesOrder.customer')->latest()->get();
 
         return view('modules.sales.deliveries.index', [
@@ -32,6 +34,8 @@ class DeliveryOrderController extends Controller
 
     public function create(Request $request): View
     {
+        $this->authorize('create', DeliveryOrder::class);
+
         $salesOrderId = $request->input('sales_order_id');
         $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->findOrFail($salesOrderId);
 
@@ -62,6 +66,8 @@ class DeliveryOrderController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', DeliveryOrder::class);
+
         $validated = $request->validate([
             'sales_order_id'   => ['required', 'exists:sales_orders,id'],
             'delivery_number'  => ['required', 'string', 'max:255'],
@@ -88,6 +94,8 @@ class DeliveryOrderController extends Controller
     public function show(int $id): View
     {
         $delivery = DeliveryOrder::with('salesOrder.customer', 'items.product', 'items.warehouse', 'items.salesOrderItem')->findOrFail($id);
+
+        $this->authorize('view', $delivery);
 
         // Fetch serial numbers and batches available for selection if in Draft status
         $itemAllocations = [];
@@ -133,6 +141,8 @@ class DeliveryOrderController extends Controller
     {
         $delivery = DeliveryOrder::findOrFail($id);
 
+        $this->authorize('ship', $delivery);
+
         $allocations = $request->input('allocations', []);
 
         // Validate serial number allocations
@@ -174,6 +184,8 @@ class DeliveryOrderController extends Controller
     public function cancel(int $id): RedirectResponse
     {
         $delivery = DeliveryOrder::findOrFail($id);
+
+        $this->authorize('cancel', $delivery);
 
         try {
             $this->deliveryService->cancel($delivery);
