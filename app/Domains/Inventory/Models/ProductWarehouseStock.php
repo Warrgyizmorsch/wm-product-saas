@@ -14,11 +14,15 @@ class ProductWarehouseStock extends BaseModel
         'product_id',
         'warehouse_id',
         'quantity',
+        'reserved_qty',
+        'available_qty',
         'unit_cost',
     ];
 
     protected $casts = [
         'quantity' => 'float',
+        'reserved_qty' => 'float',
+        'available_qty' => 'float',
         'unit_cost' => 'float',
     ];
 

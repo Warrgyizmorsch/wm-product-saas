@@ -22,7 +22,7 @@ class Department extends Model
     ];
 
     /**
-     * Department belongs to a Company (when branch/bu are skipped).
+     * Department belongs to a Company.
      */
     public function company()
     {
@@ -30,7 +30,7 @@ class Department extends Model
     }
 
     /**
-     * Department belongs to a Business Unit (when branch is skipped).
+     * Department belongs to a Business Unit.
      */
     public function businessUnit()
     {

@@ -7,11 +7,14 @@ use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Services\StockService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
 
 class SalesOrderController extends Controller
 {
@@ -30,7 +33,10 @@ class SalesOrderController extends Controller
     public function create(Request $request): View
     {
         $customers = Customer::query()->orderBy('name')->get();
-        $products = Product::query()->where('status', 'active')->get();
+        $products = Product::query()
+            ->where('status', 'active')
+            ->whereIn('type', ['finished_good', 'component'])
+            ->get();
         $salesReps = User::query()->orderBy('name')->get();
         
         // Fetch accepted/approved quotations that can be referenced
@@ -45,9 +51,12 @@ class SalesOrderController extends Controller
             $prefillQuotation = Quotation::query()->with('items.product')->find($request->input('quotation_id'));
         }
 
+        $warehouses = Warehouse::query()->orderBy('name')->get();
+
         return view('modules.sales.orders.create', [
             'customers' => $customers,
             'products' => $products,
+            'warehouses' => $warehouses,
             'salesReps' => $salesReps,
             'quotations' => $quotations,
             'prefillQuotation' => $prefillQuotation,
@@ -73,6 +82,7 @@ class SalesOrderController extends Controller
             'terms_conditions'   => ['nullable', 'string'],
             'notes'              => ['nullable', 'string'],
             'items.*.product_id'  => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.warehouse_id'=> ['nullable', 'integer', 'exists:warehouses,id'],
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1'],
@@ -110,7 +120,10 @@ class SalesOrderController extends Controller
         }
 
         $customers = Customer::query()->orderBy('name')->get();
-        $products = Product::query()->where('status', 'active')->get();
+        $products = Product::query()
+            ->where('status', 'active')
+            ->whereIn('type', ['finished_good', 'component'])
+            ->get();
         $salesReps = User::query()->orderBy('name')->get();
         
         $quotations = Quotation::query()
@@ -119,10 +132,13 @@ class SalesOrderController extends Controller
             ->latest()
             ->get();
 
+        $warehouses = Warehouse::query()->orderBy('name')->get();
+
         return view('modules.sales.orders.edit', [
             'order' => $order,
             'customers' => $customers,
             'products' => $products,
+            'warehouses' => $warehouses,
             'salesReps' => $salesReps,
             'quotations' => $quotations,
         ]);
@@ -152,6 +168,7 @@ class SalesOrderController extends Controller
             'terms_conditions'   => ['nullable', 'string'],
             'notes'              => ['nullable', 'string'],
             'items.*.product_id'  => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.warehouse_id'=> ['nullable', 'integer', 'exists:warehouses,id'],
             'items.*.item_name'   => ['nullable', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1'],
@@ -175,26 +192,50 @@ class SalesOrderController extends Controller
             abort(404, 'Sales Order not found.');
         }
 
-        $order->update(['status' => 'Confirmed']);
-
-        return back()->with('success', 'Sales Order confirmed successfully!');
-    }
-
-    public function ship(int $id): RedirectResponse
-    {
-        $order = $this->salesOrders->find($id);
-
-        if (!$order) {
-            abort(404, 'Sales Order not found.');
+        if ($order->status !== 'Draft') {
+            return back()->withErrors(['status' => 'Only Draft Sales Orders can be confirmed.']);
         }
 
-        if ($order->status !== 'Confirmed') {
-            return back()->withErrors(['status' => 'Sales Order must be Confirmed before shipping.']);
+        // Validate stock availability and warehouse allocation
+        $errors = [];
+        foreach ($order->items as $item) {
+            if (!$item->product_id || $item->product->type === 'Service') continue;
+
+            if (!$item->warehouse_id) {
+                $errors[] = "Warehouse must be allocated for product line: {$item->product->name}";
+                continue;
+            }
+
+            $available = StockService::getAvailableStock($item->product_id, $item->warehouse_id);
+            if ($available < (float)$item->quantity) {
+                $errors[] = "Insufficient stock for '{$item->product->name}' in warehouse '{$item->warehouse->name}'. Ordered: {$item->quantity}, Available: {$available}.";
+            }
         }
 
-        $order->update(['status' => 'Shipped']);
+        if (!empty($errors)) {
+            return back()->withErrors($errors);
+        }
 
-        return back()->with('success', 'Sales Order marked as Shipped!');
+        // Execute Line-Level Reservations
+        DB::transaction(function () use ($order) {
+            foreach ($order->items as $item) {
+                if (!$item->product_id || $item->product->type === 'Service') continue;
+
+                StockService::reserveStock(
+                    $order->tenant_id,
+                    $item->product_id,
+                    $item->warehouse_id,
+                    $item->quantity,
+                    'SalesOrder',
+                    $order->id,
+                    $item->id
+                );
+            }
+
+            $order->update(['status' => 'Confirmed']);
+        });
+
+        return back()->with('success', 'Sales Order confirmed successfully! Stock reserved.');
     }
 
     public function cancel(int $id): RedirectResponse
@@ -209,9 +250,28 @@ class SalesOrderController extends Controller
             return back()->withErrors(['status' => 'Cannot cancel a Shipped Sales Order.']);
         }
 
+        // Release reservations if it was Confirmed/Partially Shipped
+        if (in_array($order->status, ['Confirmed', 'Partially Shipped'])) {
+            DB::transaction(function () use ($order) {
+                foreach ($order->items as $item) {
+                    if (!$item->product_id || $item->product->type === 'Service') continue;
+
+                    StockService::releaseStock(
+                        $order->tenant_id,
+                        $item->product_id,
+                        $item->warehouse_id,
+                        $item->quantity,
+                        'SalesOrder',
+                        $order->id,
+                        $item->id
+                    );
+                }
+            });
+        }
+
         $order->update(['status' => 'Cancelled']);
 
-        return back()->with('success', 'Sales Order cancelled successfully.');
+        return back()->with('success', 'Sales Order cancelled successfully. Reservations released.');
     }
 
     public function destroy(int $id): RedirectResponse

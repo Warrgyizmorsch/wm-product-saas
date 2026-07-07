@@ -15,6 +15,7 @@ class SalesOrderItem extends Model
     protected $fillable = [
         'sales_order_id',
         'product_id',
+        'warehouse_id',
         'item_name',
         'description',
         'quantity',
@@ -26,6 +27,7 @@ class SalesOrderItem extends Model
 
     protected $casts = [
         'product_id' => 'integer',
+        'warehouse_id' => 'integer',
         'quantity' => 'integer',
         'unit_price' => 'decimal:2',
         'tax_rate' => 'decimal:2',
@@ -41,5 +43,10 @@ class SalesOrderItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'product_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Inventory\Models\Warehouse::class, 'warehouse_id');
     }
 }

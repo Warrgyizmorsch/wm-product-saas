@@ -108,11 +108,7 @@
 
         <!-- Content Column -->
         <div class="settings-content-col">
-            @if(session('success'))
-                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                    {{ session('success') }}
-                </x-ui.alert>
-            @endif
+
             @if(session('error'))
                 <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                     {{ session('error') }}
@@ -181,30 +177,25 @@
                                             </div>
                                             
                                             <!-- Actions Dropdown for Leave Plan -->
-                                            <div class="dropdown">
-                                                <a href="javascript:void(0);" class="btn btn-icon btn-sm text-muted px-2" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <i class="feather-more-vertical fs-16"></i>
-                                                </a>
-                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="min-width: 110px; font-size: 13px; z-index: 1050; border-radius: 6px;">
+                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $plan->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this plan and all its configured leave types?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <x-ui.action-dropdown>
                                                     <li>
-                                                        <a class="dropdown-item edit-plan-btn py-2 px-3 d-flex align-items-center" href="javascript:void(0);" data-plan="{{ base64_encode($plan->toJson()) }}">
-                                                            <i class="feather-edit me-2 text-muted fs-14"></i>
+                                                        <a class="dropdown-item edit-plan-btn" href="javascript:void(0)" data-plan="{{ base64_encode($plan->toJson()) }}">
+                                                            <i class="feather feather-edit-3 me-3"></i>
                                                             <span>Edit Plan</span>
                                                         </a>
                                                     </li>
-                                                    <li><hr class="dropdown-divider my-1"></li>
+                                                    <li class="dropdown-divider"></li>
                                                     <li>
-                                                        <form action="{{ route('hrms.leave-structure.plan.destroy', $plan->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this plan and all its configured leave types?');">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="dropdown-item text-danger py-2 px-3 d-flex align-items-center w-100 border-0 bg-transparent">
-                                                                <i class="feather-trash-2 me-2 fs-14"></i>
-                                                                <span>Delete Plan</span>
-                                                            </button>
-                                                        </form>
+                                                        <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
+                                                            <i class="feather feather-trash-2 me-3"></i>
+                                                            <span>Delete Plan</span>
+                                                        </button>
                                                     </li>
-                                                </ul>
-                                            </div>
+                                                </x-ui.action-dropdown>
+                                            </form>
                                         </div>
 
                                         @if($plan->description)
@@ -249,36 +240,30 @@
                                                                 <span class="fw-bold text-dark">{{ floatval($type->quota) }} Days</span>
                                                             </td>
                                                             <td class="text-end">
-                                                                <div class="d-flex justify-content-end align-items-center gap-1">
-                                                                    <!-- Settings icon -->
-                                                                    <x-ui.icon-btn variant="light-brand" icon="feather-settings" class="configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-rules="{{ json_encode($type->rules) }}" title="Configure Rules" />
-                                                                    
-                                                                    <!-- 3-Dot Dropdown -->
-                                                                    <div class="dropdown d-inline-block">
-                                                                        <a href="javascript:void(0);" class="btn btn-icon btn-sm text-muted px-2" data-bs-toggle="dropdown" aria-expanded="false">
-                                                                            <i class="feather-more-vertical fs-14"></i>
+                                                                <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this leave type?');">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <div class="hstack gap-2 justify-content-end">
+                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-rules="{{ json_encode($type->rules) }}" title="Configure Rules" data-bs-toggle="tooltip">
+                                                                            <i class="feather feather-settings"></i>
                                                                         </a>
-                                                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 py-1" style="min-width: 110px; font-size: 13px; z-index: 1050; border-radius: 6px;">
+                                                                        <x-ui.action-dropdown>
                                                                             <li>
-                                                                                <a class="dropdown-item edit-type-btn py-2 px-3 d-flex align-items-center" href="javascript:void(0);" data-type="{{ base64_encode($type->toJson()) }}">
-                                                                                    <i class="feather-edit me-2 text-muted fs-14"></i>
+                                                                                <a class="dropdown-item edit-type-btn" href="javascript:void(0)" data-type="{{ base64_encode($type->toJson()) }}">
+                                                                                    <i class="feather feather-edit-3 me-3"></i>
                                                                                     <span>Edit Type</span>
                                                                                 </a>
                                                                             </li>
-                                                                            <li><hr class="dropdown-divider my-1"></li>
+                                                                            <li class="dropdown-divider"></li>
                                                                             <li>
-                                                                                <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this leave type?');">
-                                                                                    @csrf
-                                                                                    @method('DELETE')
-                                                                                    <button type="submit" class="dropdown-item text-danger py-2 px-3 d-flex align-items-center w-100 border-0 bg-transparent">
-                                                                                        <i class="feather-trash-2 me-2 fs-14"></i>
-                                                                                        <span>Delete Type</span>
-                                                                                    </button>
-                                                                                </form>
+                                                                                <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
+                                                                                    <i class="feather feather-trash-2 me-3"></i>
+                                                                                    <span>Delete Type</span>
+                                                                                </button>
                                                                             </li>
-                                                                        </ul>
+                                                                        </x-ui.action-dropdown>
                                                                     </div>
-                                                                </div>
+                                                                </form>
                                                             </td>
                                                         </tr>
                                                     @empty
@@ -323,27 +308,27 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
-                                <x-ui.input label="Plan Name" name="name" placeholder="e.g. Corporate Plan 2026" required />
+                                <x-ui.odoo-form-ui type="input" label="Plan Name" name="name" placeholder="e.g. Corporate Plan 2026" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.select label="Legal Entity (Company)" name="company_id" data-select2-selector="default">
+                                <x-ui.odoo-form-ui type="select" label="Legal Entity (Company)" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                     <option value="">Apply to All Companies</option>
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
-                                </x-ui.select>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.input label="Effective From" name="effective_from" type="date" required />
+                                <x-ui.odoo-form-ui type="input" label="Effective From" name="effective_from" inputType="date" :required="true" :errorText="$errors->first('effective_from')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.select label="Status" name="status" data-select2-selector="default" required>
+                                <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
-                                </x-ui.select>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
-                                <x-ui.textarea label="Description" name="description" placeholder="Provide details about the plan parameters..." rows="3" />
+                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Provide details about the plan parameters..." rows="3" :errorText="$errors->first('description')" />
                             </div>
                         </div>
                     </div>
@@ -371,27 +356,27 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
-                                <x-ui.input label="Plan Name" name="name" id="edit_plan_name" required />
+                                <x-ui.odoo-form-ui type="input" label="Plan Name" name="name" id="edit_plan_name" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.select label="Legal Entity (Company)" name="company_id" id="edit_plan_company_id" data-select2-selector="default">
+                                <x-ui.odoo-form-ui type="select" label="Legal Entity (Company)" name="company_id" id="edit_plan_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                     <option value="">Apply to All Companies</option>
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
-                                </x-ui.select>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.input label="Effective From" name="effective_from" id="edit_plan_effective_from" type="date" required />
+                                <x-ui.odoo-form-ui type="input" label="Effective From" name="effective_from" id="edit_plan_effective_from" inputType="date" :required="true" :errorText="$errors->first('effective_from')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.select label="Status" name="status" id="edit_plan_status" data-select2-selector="default" required>
+                                <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_plan_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
-                                </x-ui.select>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
-                                <x-ui.textarea label="Description" name="description" id="edit_plan_description" rows="3" />
+                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_plan_description" rows="3" :errorText="$errors->first('description')" />
                             </div>
                         </div>
                     </div>
@@ -418,33 +403,21 @@
                     @csrf
                     <div class="modal-body">
                         <div class="row g-3">
+                            <input type="hidden" name="leave_plan_id" id="add_type_plan_id" value="{{ $selectedPlan ? $selectedPlan->id : '' }}">
                             <div class="col-md-6 col-12">
-                                <x-ui.select label="Leave Plan" name="leave_plan_id" id="add_type_plan_id" data-select2-selector="default" required>
-                                    <option value="">Select Leave Plan</option>
-                                    @foreach($leavePlans as $plan)
-                                        <option value="{{ $plan->id }}" {{ $selectedPlan && $selectedPlan->id === $plan->id ? 'selected' : '' }}>{{ $plan->name }}</option>
-                                    @endforeach
-                                </x-ui.select>
+                                <x-ui.odoo-form-ui type="input" label="Type Name" name="name" placeholder="e.g. Sick Leave" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.input label="Type Name" name="name" placeholder="e.g. Sick Leave" required />
-                            </div>
-                            <div class="col-md-4 col-12">
-                                <x-ui.input label="Code" name="code" placeholder="e.g. SL" required />
-                            </div>
-                            <div class="col-md-4 col-12">
-                                <x-ui.input label="Annual Quota (Days)" name="quota" type="number" step="0.5" placeholder="e.g. 12" min="0" required />
-                            </div>
-                            <div class="col-md-4 col-12">
-                                <label class="form-label fw-bold">Color Theme <span class="text-danger">*</span></label>
-                                <div class="d-flex align-items-center gap-2">
-                                    <input type="color" name="color" class="form-control form-control-color" value="#3b82f6" style="width: 50px;" required>
-                                    <span class="text-muted fs-12">Click to select color</span>
-                                </div>
+                                <x-ui.odoo-form-ui type="input" label="Color Theme" name="color" inputType="color" value="#3b82f6" class="form-control-color" style="width: 50px;" :required="true" helperText="Click to select color" :errorText="$errors->first('color')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold d-block">Classification <span class="text-danger">*</span></label>
-                                <div class="d-flex gap-4 mt-2">
+                                <x-ui.odoo-form-ui type="input" label="Code" name="code" placeholder="e.g. SL" :required="true" :errorText="$errors->first('code')" />
+                            </div>
+                            <div class="col-md-6 col-12">
+                                <x-ui.odoo-form-ui type="input" label="Annual Quota (Days)" name="quota" inputType="number" step="0.5" placeholder="e.g. 12" min="0" :required="true" :errorText="$errors->first('quota')" />
+                            </div>
+                            <div class="col-md-6 col-12">
+                                <x-ui.odoo-form-ui type="radio" label="Classification" :required="true" :errorText="$errors->first('type')">
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="type" id="add_type_paid" value="paid" checked required>
                                         <label class="form-check-label fw-semibold text-dark" for="add_type_paid">
@@ -457,16 +430,16 @@
                                             Unpaid Leave
                                         </label>
                                     </div>
-                                </div>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.select label="Status" name="status" data-select2-selector="default" required>
+                                <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
-                                </x-ui.select>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
-                                <x-ui.textarea label="Description" name="description" placeholder="Allotment rules, carry forward specifications, etc..." rows="3" />
+                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Allotment rules, carry forward specifications, etc..." rows="3" :errorText="$errors->first('description')" />
                             </div>
                         </div>
                     </div>
@@ -493,33 +466,21 @@
                     @csrf
                     <div class="modal-body">
                         <div class="row g-3">
+                            <input type="hidden" name="leave_plan_id" id="edit_type_plan_id">
                             <div class="col-md-6 col-12">
-                                <x-ui.select label="Leave Plan" name="leave_plan_id" id="edit_type_plan_id" data-select2-selector="default" required>
-                                    <option value="">Select Leave Plan</option>
-                                    @foreach($leavePlans as $plan)
-                                        <option value="{{ $plan->id }}">{{ $plan->name }}</option>
-                                    @endforeach
-                                </x-ui.select>
+                                <x-ui.odoo-form-ui type="input" label="Type Name" name="name" id="edit_type_name" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.input label="Type Name" name="name" id="edit_type_name" required />
-                            </div>
-                            <div class="col-md-4 col-12">
-                                <x-ui.input label="Code" name="code" id="edit_type_code" required />
-                            </div>
-                            <div class="col-md-4 col-12">
-                                <x-ui.input label="Annual Quota (Days)" name="quota" id="edit_type_quota" type="number" step="0.5" min="0" required />
-                            </div>
-                            <div class="col-md-4 col-12">
-                                <label class="form-label fw-bold">Color Theme <span class="text-danger">*</span></label>
-                                <div class="d-flex align-items-center gap-2">
-                                    <input type="color" name="color" id="edit_type_color" class="form-control form-control-color" style="width: 50px;" required>
-                                    <span class="text-muted fs-12">Click to select color</span>
-                                </div>
+                                <x-ui.odoo-form-ui type="input" label="Color Theme" name="color" id="edit_type_color" inputType="color" class="form-control-color" style="width: 50px;" :required="true" helperText="Click to select color" :errorText="$errors->first('color')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <label class="form-label fw-bold d-block">Classification <span class="text-danger">*</span></label>
-                                <div class="d-flex gap-4 mt-2">
+                                <x-ui.odoo-form-ui type="input" label="Code" name="code" id="edit_type_code" :required="true" :errorText="$errors->first('code')" />
+                            </div>
+                            <div class="col-md-6 col-12">
+                                <x-ui.odoo-form-ui type="input" label="Annual Quota (Days)" name="quota" id="edit_type_quota" inputType="number" step="0.5" min="0" :required="true" :errorText="$errors->first('quota')" />
+                            </div>
+                            <div class="col-md-6 col-12">
+                                <x-ui.odoo-form-ui type="radio" label="Classification" :required="true" :errorText="$errors->first('type')">
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="type" id="edit_type_paid" value="paid" required>
                                         <label class="form-check-label fw-semibold text-dark" for="edit_type_paid">
@@ -532,16 +493,16 @@
                                             Unpaid Leave
                                         </label>
                                     </div>
-                                </div>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.select label="Status" name="status" id="edit_type_status" data-select2-selector="default" required>
+                                <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_type_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
                                     <option value="1">Active</option>
                                     <option value="0">Inactive</option>
-                                </x-ui.select>
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
-                                <x-ui.textarea label="Description" name="description" id="edit_type_description" rows="3" />
+                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_type_description" rows="3" :errorText="$errors->first('description')" />
                             </div>
                         </div>
                     </div>
@@ -599,23 +560,23 @@
                                                 <div class="row align-items-center mb-3">
                                                     <div class="col-sm-4 text-muted">This leave is calculated in:</div>
                                                     <div class="col-sm-8 d-flex gap-3">
-                                                        <label class="form-check-label d-flex align-items-center gap-1.5 cursor-pointer">
-                                                            <input type="radio" name="accrual_calculate_in" value="days" class="form-check-input" checked> Days
+                                                        <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer">
+                                                            <input type="radio" name="accrual_calculate_in" value="days" class="form-check-input me-2" checked> Days
                                                         </label>
-                                                        <label class="form-check-label d-flex align-items-center gap-1.5 cursor-pointer">
-                                                            <input type="radio" name="accrual_calculate_in" value="hours" class="form-check-input"> Hours
+                                                        <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer">
+                                                            <input type="radio" name="accrual_calculate_in" value="hours" class="form-check-input me-2"> Hours
                                                         </label>
                                                     </div>
                                                 </div>
                                                 <div class="row align-items-center">
                                                     <div class="col-sm-4 text-muted">Yearly quota:</div>
                                                     <div class="col-sm-8 d-flex align-items-center gap-2">
-                                                        <label class="form-check-label d-flex align-items-center gap-1.5 cursor-pointer me-3">
-                                                            <input type="radio" name="accrual_quota_type" value="fixed" class="form-check-input" checked> 
-                                                            <input type="number" id="accrual_quota_value" class="form-control form-control-sm text-center d-inline-block mx-1" style="width: 70px;" value="12"> days
+                                                        <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer me-3">
+                                                            <input type="radio" name="accrual_quota_type" value="fixed" class="form-check-input me-2" checked> 
+                                                            <input type="number" id="accrual_quota_value" class="odoo-table-input text-center d-inline-block mx-1" style="width: 70px;" value="12"> days
                                                         </label>
-                                                        <label class="form-check-label d-flex align-items-center gap-1.5 cursor-pointer">
-                                                            <input type="radio" name="accrual_quota_type" value="unlimited" class="form-check-input"> Unlimited
+                                                        <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer">
+                                                            <input type="radio" name="accrual_quota_type" value="unlimited" class="form-check-input me-2"> Unlimited
                                                         </label>
                                                     </div>
                                                 </div>
@@ -630,14 +591,14 @@
                                         </div>
                                         <div id="collapseRate" class="collapse show">
                                             <div class="card-body bg-white border-top p-3 fs-13 d-flex flex-column gap-3">
-                                                <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                     <input type="radio" name="accrual_rate" value="periodic" class="form-check-input mt-1">
                                                     <div>
                                                         <span class="fw-semibold text-dark d-block">Leave accrued periodically</span>
                                                         <span class="text-muted fs-11">Leaves are credited automatically on a schedule (e.g. 1.5 days every month).</span>
                                                      </div>
                                                  </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                 <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                      <input type="radio" name="accrual_rate" value="attendance" class="form-check-input mt-1">
                                                      <div>
                                                          <span class="fw-semibold text-dark d-block">Leave accrues based on attendance</span>
@@ -647,13 +608,13 @@
                                                  <div class="ps-4 mt-1 mb-2 d-none" id="accrual_attendance_div">
                                                      <div class="d-flex align-items-center gap-2 fs-13">
                                                          <span>Earn</span>
-                                                         <input type="number" id="accrual_attendance_earn" class="form-control form-control-sm text-center" style="width: 70px;" value="1">
+                                                         <input type="number" id="accrual_attendance_earn" class="odoo-table-input text-center" style="width: 70px;" value="1">
                                                          <span>day(s) of leave for every</span>
-                                                         <input type="number" id="accrual_attendance_period" class="form-control form-control-sm text-center" style="width: 70px;" value="20">
+                                                         <input type="number" id="accrual_attendance_period" class="odoo-table-input text-center" style="width: 70px;" value="20">
                                                          <span>days worked.</span>
                                                      </div>
                                                  </div>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
+                                                 <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                      <input type="radio" name="accrual_rate" value="immediate" class="form-check-input mt-1" checked>
                                                      <div>
                                                          <span class="fw-semibold text-dark d-block">Leave quota available immediately</span>
@@ -673,13 +634,13 @@
                                              <div class="card-body bg-white border-top p-3 fs-13">
                                                  <div class="form-check form-switch mb-1">
                                                      <input class="form-check-input" type="checkbox" id="accrual_limit_carry">
-                                                     <label class="form-check-label fw-bold text-dark" for="accrual_limit_carry">Limit maximum accumulation of leaves</label>
-                                                     <div class="text-muted fs-11">Cap total leaves an employee can accumulate at any given point.</div>
+                                                     <label class="form-check-label fw-bold text-dark ms-2" for="accrual_limit_carry">Limit maximum accumulation of leaves</label>
+                                                     <div class="text-muted fs-11 ms-2">Cap total leaves an employee can accumulate at any given point.</div>
                                                  </div>
                                                  <div class="ps-4 mt-2 d-none" id="accrual_max_accum_div">
                                                      <div class="d-flex align-items-center gap-2">
                                                          <span>Maximum accumulation balance:</span>
-                                                         <input type="number" id="accrual_max_accum_val" class="form-control form-control-sm text-center" style="width: 70px;" value="30"> days
+                                                         <input type="number" id="accrual_max_accum_val" class="odoo-table-input text-center" style="width: 70px;" value="30"> days
                                                      </div>
                                                  </div>
                                              </div>
@@ -696,13 +657,13 @@
                                          <div class="card-body p-3 fs-13">
                                              <div class="form-check form-switch mb-1">
                                                  <input class="form-check-input" type="checkbox" id="app_apply_in_advance">
-                                                 <label class="form-check-label fw-bold text-dark" for="app_apply_in_advance">Must apply in advance</label>
-                                                 <div class="text-muted fs-11">Restrict leaves from being applied at the last minute or retroactively.</div>
+                                                 <label class="form-check-label fw-bold text-dark ms-2" for="app_apply_in_advance">Must apply in advance</label>
+                                                 <div class="text-muted fs-11 ms-2">Restrict leaves from being applied at the last minute or retroactively.</div>
                                              </div>
                                              <div class="ps-4 mt-2 d-none" id="app_advance_days_div">
                                                  <div class="d-flex align-items-center gap-2">
                                                      <span>Apply at least</span>
-                                                     <input type="number" id="app_advance_days" class="form-control form-control-sm text-center" style="width: 70px;" value="3"> days before leave start date.
+                                                     <input type="number" id="app_advance_days" class="odoo-table-input text-center" style="width: 70px;" value="3"> days before leave start date.
                                                  </div>
                                              </div>
                                          </div>
@@ -715,13 +676,13 @@
                                              <div class="row align-items-center mb-3">
                                                  <div class="col-sm-5 text-muted">Minimum duration per request:</div>
                                                  <div class="col-sm-7 d-flex align-items-center gap-2">
-                                                     <input type="number" id="app_min_duration" class="form-control form-control-sm text-center" style="width: 70px;" value="1"> day(s)
+                                                     <input type="number" id="app_min_duration" class="odoo-table-input text-center" style="width: 70px;" value="1"> day(s)
                                                  </div>
                                              </div>
                                              <div class="row align-items-center">
                                                  <div class="col-sm-5 text-muted">Maximum duration per request:</div>
                                                  <div class="col-sm-7 d-flex align-items-center gap-2">
-                                                     <input type="number" id="app_max_duration" class="form-control form-control-sm text-center" style="width: 70px;" value="10"> day(s)
+                                                     <input type="number" id="app_max_duration" class="odoo-table-input text-center" style="width: 70px;" value="10"> day(s)
                                                  </div>
                                              </div>
                                          </div>
@@ -738,200 +699,200 @@
                                              <div class="ps-4 mt-2 d-none" id="app_attachment_days_div">
                                                  <div class="d-flex align-items-center gap-2">
                                                      <span>Mandatory if leave duration exceeds</span>
-                                                     <input type="number" id="app_attachment_days" class="form-control form-control-sm text-center" style="width: 70px;" value="3"> day(s).
+                                                     <input type="number" id="app_attachment_days" class="odoo-table-input text-center" style="width: 70px;" value="3"> day(s).
                                                  </div>
                                              </div>
                                          </div>
                                      </div>
                                  </div>
                                  
-                                 <!-- Approval Tab Pane -->
-                                 <div class="tab-pane fade" id="pane-approval" role="tabpanel">
-                                     <h5 class="fw-bold text-dark mb-3">Approval Workflow</h5>
-                                     
-                                     <!-- Approval Level -->
-                                     <div class="card border mb-3 rounded-3 shadow-none">
-                                         <div class="card-body p-3 fs-13">
-                                             <h6 class="fw-bold text-dark mb-3">Approval Routing Level</h6>
-                                             <div class="d-flex flex-column gap-3">
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="approval_workflow_level" value="auto" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Auto-Approved</span>
-                                                         <span class="text-muted fs-11">Requests are approved automatically without manager reviews.</span>
-                                                     </div>
-                                                 </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="approval_workflow_level" value="1_level" class="form-check-input mt-1" checked>
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">1-Level Approval</span>
-                                                         <span class="text-muted fs-11">Requires approval from one supervisor before being active.</span>
-                                                     </div>
-                                                 </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="approval_workflow_level" value="2_level" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">2-Level Approval</span>
-                                                         <span class="text-muted fs-11">Requires sequence of two approvals (e.g. Reporting Manager then HR).</span>
-                                                     </div>
-                                                 </label>
-                                             </div>
-                                         </div>
-                                     </div>
-                                     
-                                     <!-- Approver roles definition -->
-                                     <div class="card border rounded-3 shadow-none" id="approver_roles_card">
-                                         <div class="card-body p-3 fs-13">
-                                             <h6 class="fw-bold text-dark mb-3">Workflow Roles</h6>
-                                             <div class="row align-items-center mb-3" id="first_approver_row">
-                                                 <div class="col-sm-4 text-muted">First Approver:</div>
-                                                 <div class="col-sm-8">
-                                                     <select id="approval_first_approver" class="form-select form-select-sm" style="max-width: 250px;">
-                                                         <option value="reporting_manager">Reporting Manager</option>
-                                                         <option value="department_head">Department Head</option>
-                                                         <option value="hr_manager">HR Manager</option>
-                                                     </select>
-                                                 </div>
-                                             </div>
-                                             <div class="row align-items-center d-none" id="second_approver_row">
-                                                 <div class="col-sm-4 text-muted">Second Approver:</div>
-                                                 <div class="col-sm-8">
-                                                     <select id="approval_second_approver" class="form-select form-select-sm" style="max-width: 250px;">
-                                                         <option value="hr_manager" selected>HR Manager</option>
-                                                         <option value="department_head">Department Head</option>
-                                                         <option value="ceo">CEO / Director</option>
-                                                     </select>
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     </div>
-                                 </div>
-                                 
-                                 <!-- Year End Processing Tab Pane -->
-                                 <div class="tab-pane fade" id="pane-yearend" role="tabpanel">
-                                     <h5 class="fw-bold text-dark mb-3">Year End Processing</h5>
-                                     
-                                     <div class="card border rounded-3 shadow-none">
-                                         <div class="card-body p-3 fs-13">
-                                             <h6 class="fw-bold text-dark mb-3">Action on Unused Balance</h6>
-                                             <div class="d-flex flex-column gap-3">
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="yearend_action" value="lapse" class="form-check-input mt-1" checked>
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Lapse (Use it or lose it)</span>
-                                                         <span class="text-muted fs-11">Unused leaves will reset to 0 at the end of the year.</span>
-                                                     </div>
-                                                 </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="yearend_action" value="carry_forward" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Carry Forward to next year</span>
-                                                         <span class="text-muted fs-11">Transfer unused balances forward, subject to limit rules.</span>
-                                                     </div>
-                                                 </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="yearend_action" value="encash" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Encashment (Pay out)</span>
-                                                         <span class="text-muted fs-11">Compensate employees monetarily for unused leave balance.</span>
-                                                     </div>
-                                                 </label>
-                                             </div>
-                                             
-                                             <!-- Carry forward value option -->
-                                             <div class="border-top pt-3 mt-3 d-none" id="yearend_carry_limit_div">
-                                                 <div class="d-flex align-items-center gap-2">
-                                                     <span>Maximum days to carry forward:</span>
-                                                     <input type="number" id="yearend_max_carry" class="form-control form-control-sm text-center" style="width: 70px;" value="6"> days
-                                                 </div>
-                                             </div>
-                                             
-                                             <!-- Encashment limit value option -->
-                                             <div class="border-top pt-3 mt-3 d-none" id="yearend_encash_limit_div">
-                                                 <div class="d-flex align-items-center gap-2">
-                                                     <span>Maximum days to encash:</span>
-                                                     <input type="number" id="yearend_max_encash" class="form-control form-control-sm text-center" style="width: 70px;" value="5"> days
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     </div>
-                                 </div>
-                                 
-                                 <!-- Probation Tab Pane -->
-                                 <div class="tab-pane fade" id="pane-probation" role="tabpanel">
-                                     <h5 class="fw-bold text-dark mb-3">Probation Period Rules</h5>
-                                     
-                                     <div class="card border rounded-3 shadow-none">
-                                         <div class="card-body p-3 fs-13">
-                                             <h6 class="fw-bold text-dark mb-3">Usage during Probation</h6>
-                                             <div class="d-flex flex-column gap-3">
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="probation_rule" value="allow" class="form-check-input mt-1" checked>
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Allow applying during probation</span>
-                                                         <span class="text-muted fs-11">Employees can take this leave immediately after joining.</span>
-                                                     </div>
-                                                 </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="probation_rule" value="disallow" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Do not allow applying during probation</span>
-                                                         <span class="text-muted fs-11">Leave option remains locked until employee gets confirmed.</span>
-                                                     </div>
-                                                 </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="probation_rule" value="allow_after_months" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Allow after a certain period</span>
-                                                         <span class="text-muted fs-11">Employees can apply for this leave after a specific length of service.</span>
-                                                     </div>
-                                                 </label>
-                                             </div>
-                                             
-                                             <!-- Month value option -->
-                                             <div class="border-top pt-3 mt-3 d-none" id="probation_months_div">
-                                                 <div class="d-flex align-items-center gap-2">
-                                                     <span>Allowed after completing</span>
-                                                     <input type="number" id="probation_months" class="form-control form-control-sm text-center" style="width: 70px;" value="3"> month(s) of joining.
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     </div>
-                                 </div>
-                                 
-                                 <!-- Notice Period Tab Pane -->
-                                 <div class="tab-pane fade" id="pane-notice" role="tabpanel">
-                                     <h5 class="fw-bold text-dark mb-3">Notice Period Rules</h5>
-                                     
-                                     <div class="card border rounded-3 shadow-none">
-                                         <div class="card-body p-3 fs-13">
-                                             <h6 class="fw-bold text-dark mb-3">Usage during Notice Period</h6>
-                                             <div class="d-flex flex-column gap-3">
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="notice_rule" value="allow" class="form-check-input mt-1" checked>
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Allow applying during notice period</span>
-                                                         <span class="text-muted fs-11">Employees on notice period can apply for this leave normally.</span>
-                                                     </div>
-                                                 </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="notice_rule" value="disallow" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Do not allow applying during notice period</span>
-                                                         <span class="text-muted fs-11">Leave option becomes unavailable once exit clearance starts.</span>
-                                                     </div>
-                                                 </label>
-                                                 <label class="form-check-label d-flex align-items-start gap-2.5 cursor-pointer">
-                                                     <input type="radio" name="notice_rule" value="special_approval" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">Requires special HR approval</span>
-                                                         <span class="text-muted fs-11">Bypasses default flow; direct approval from Corporate HR is mandatory.</span>
-                                                     </div>
-                                                 </label>
-                                             </div>
-                                         </div>
-                                     </div>
-                                 </div>
+                                  <!-- Approval Tab Pane -->
+                                  <div class="tab-pane fade" id="pane-approval" role="tabpanel">
+                                      <h5 class="fw-bold text-dark mb-3">Approval Workflow</h5>
+                                      
+                                      <!-- Approval Level -->
+                                      <div class="card border mb-3 rounded-3 shadow-none">
+                                          <div class="card-body p-3 fs-13">
+                                              <h6 class="fw-bold text-dark mb-3">Approval Routing Level</h6>
+                                              <div class="d-flex flex-column gap-3">
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="approval_workflow_level" value="auto" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Auto-Approved</span>
+                                                          <span class="text-muted fs-11">Requests are approved automatically without manager reviews.</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="approval_workflow_level" value="1_level" class="form-check-input mt-1" checked>
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">1-Level Approval</span>
+                                                          <span class="text-muted fs-11">Requires approval from one supervisor before being active.</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="approval_workflow_level" value="2_level" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">2-Level Approval</span>
+                                                          <span class="text-muted fs-11">Requires sequence of two approvals (e.g. Reporting Manager then HR).</span>
+                                                      </div>
+                                                  </label>
+                                              </div>
+                                          </div>
+                                      </div>
+                                      
+                                      <!-- Approver roles definition -->
+                                      <div class="card border rounded-3 shadow-none" id="approver_roles_card">
+                                          <div class="card-body p-3 fs-13">
+                                              <h6 class="fw-bold text-dark mb-3">Workflow Roles</h6>
+                                              <div class="row align-items-center mb-3" id="first_approver_row">
+                                                  <div class="col-sm-4 text-muted">First Approver:</div>
+                                                  <div class="col-sm-8">
+                                                      <select id="approval_first_approver" class="odoo-table-select" style="max-width: 250px;">
+                                                          <option value="reporting_manager">Reporting Manager</option>
+                                                          <option value="department_head">Department Head</option>
+                                                          <option value="hr_manager">HR Manager</option>
+                                                      </select>
+                                                  </div>
+                                              </div>
+                                              <div class="row align-items-center d-none" id="second_approver_row">
+                                                  <div class="col-sm-4 text-muted">Second Approver:</div>
+                                                  <div class="col-sm-8">
+                                                      <select id="approval_second_approver" class="odoo-table-select" style="max-width: 250px;">
+                                                          <option value="hr_manager" selected>HR Manager</option>
+                                                          <option value="department_head">Department Head</option>
+                                                          <option value="ceo">CEO / Director</option>
+                                                      </select>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  <!-- Year End Processing Tab Pane -->
+                                  <div class="tab-pane fade" id="pane-yearend" role="tabpanel">
+                                      <h5 class="fw-bold text-dark mb-3">Year End Processing</h5>
+                                      
+                                      <div class="card border rounded-3 shadow-none">
+                                          <div class="card-body p-3 fs-13">
+                                              <h6 class="fw-bold text-dark mb-3">Action on Unused Balance</h6>
+                                              <div class="d-flex flex-column gap-3">
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="yearend_action" value="lapse" class="form-check-input mt-1" checked>
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Lapse (Use it or lose it)</span>
+                                                          <span class="text-muted fs-11">Unused leaves will reset to 0 at the end of the year.</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="yearend_action" value="carry_forward" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Carry Forward to next year</span>
+                                                          <span class="text-muted fs-11">Transfer unused balances forward, subject to limit rules.</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="yearend_action" value="encash" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Encashment (Pay out)</span>
+                                                          <span class="text-muted fs-11">Compensate employees monetarily for unused leave balance.</span>
+                                                      </div>
+                                                  </label>
+                                              </div>
+                                              
+                                              <!-- Carry forward value option -->
+                                              <div class="border-top pt-3 mt-3 d-none" id="yearend_carry_limit_div">
+                                                  <div class="d-flex align-items-center gap-2">
+                                                      <span>Maximum days to carry forward:</span>
+                                                      <input type="number" id="yearend_max_carry" class="odoo-table-input text-center" style="width: 70px;" value="6"> days
+                                                  </div>
+                                              </div>
+                                              
+                                              <!-- Encashment limit value option -->
+                                              <div class="border-top pt-3 mt-3 d-none" id="yearend_encash_limit_div">
+                                                  <div class="d-flex align-items-center gap-2">
+                                                      <span>Maximum days to encash:</span>
+                                                      <input type="number" id="yearend_max_encash" class="odoo-table-input text-center" style="width: 70px;" value="5"> days
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  <!-- Probation Tab Pane -->
+                                  <div class="tab-pane fade" id="pane-probation" role="tabpanel">
+                                      <h5 class="fw-bold text-dark mb-3">Probation Period Rules</h5>
+                                      
+                                      <div class="card border rounded-3 shadow-none">
+                                          <div class="card-body p-3 fs-13">
+                                              <h6 class="fw-bold text-dark mb-3">Usage during Probation</h6>
+                                              <div class="d-flex flex-column gap-3">
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="probation_rule" value="allow" class="form-check-input mt-1" checked>
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Allow applying during probation</span>
+                                                          <span class="text-muted fs-11">Employees can take this leave immediately after joining.</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="probation_rule" value="disallow" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Do not allow applying during probation</span>
+                                                          <span class="text-muted fs-11">Leave option remains locked until employee gets confirmed.</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="probation_rule" value="allow_after_months" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Allow after a certain period</span>
+                                                          <span class="text-muted fs-11">Employees can apply for this leave after a specific length of service.</span>
+                                                      </div>
+                                                  </label>
+                                              </div>
+                                              
+                                              <!-- Month value option -->
+                                              <div class="border-top pt-3 mt-3 d-none" id="probation_months_div">
+                                                  <div class="d-flex align-items-center gap-2">
+                                                      <span>Allowed after completing</span>
+                                                      <input type="number" id="probation_months" class="odoo-table-input text-center" style="width: 70px;" value="3"> month(s) of joining.
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  <!-- Notice Period Tab Pane -->
+                                  <div class="tab-pane fade" id="pane-notice" role="tabpanel">
+                                      <h5 class="fw-bold text-dark mb-3">Notice Period Rules</h5>
+                                      
+                                      <div class="card border rounded-3 shadow-none">
+                                          <div class="card-body p-3 fs-13">
+                                              <h6 class="fw-bold text-dark mb-3">Usage during Notice Period</h6>
+                                              <div class="d-flex flex-column gap-3">
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="notice_rule" value="allow" class="form-check-input mt-1" checked>
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Allow applying during notice period</span>
+                                                          <span class="text-muted fs-11">Employees on notice period can apply for this leave normally.</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="notice_rule" value="disallow" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Do not allow applying during notice period</span>
+                                                          <span class="text-muted fs-11">Leave option becomes unavailable once exit clearance starts.</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="notice_rule" value="special_approval" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">Requires special HR approval</span>
+                                                          <span class="text-muted fs-11">Bypasses default flow; direct approval from Corporate HR is mandatory.</span>
+                                                      </div>
+                                                  </label>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
                              </div>
                          </div>
                      </div>
@@ -1348,5 +1309,118 @@
                 });
             };
         });
+    </script>
+    <script>
+        (function () {
+            if (window.hrmsThemedValidationInstalled) {
+                return;
+            }
+
+            window.hrmsThemedValidationInstalled = true;
+
+            function getFieldLabel(field) {
+                const group = field.closest('.odoo-form-group');
+                const label = group ? group.querySelector('.odoo-form-label') : null;
+                return label ? label.textContent.replace('*', '').trim() : 'This field';
+            }
+
+            function getValidationMessage(field) {
+                const label = getFieldLabel(field).toLowerCase();
+
+                if (field.validity.valueMissing) {
+                    return field.tagName === 'SELECT' ? `Please select ${label}.` : `Please enter ${label}.`;
+                }
+
+                return field.validationMessage || 'Please enter a valid value.';
+            }
+
+            function getErrorAnchor(field) {
+                if (field.tagName === 'SELECT' && field.nextElementSibling && field.nextElementSibling.classList.contains('select2-container')) {
+                    return field.nextElementSibling;
+                }
+
+                if (field.type === 'radio') {
+                    return field.closest('.odoo-form-group')?.querySelector('.flex-grow-1') || field;
+                }
+
+                return field;
+            }
+
+            function showFieldError(field) {
+                field.classList.add('is-invalid');
+                field.setAttribute('aria-invalid', 'true');
+
+                const anchor = getErrorAnchor(field);
+                let error = anchor.nextElementSibling;
+
+                if (!error || !error.classList.contains('hrms-client-validation-error')) {
+                    error = document.createElement('div');
+                    error.className = 'invalid-feedback d-block fs-11 mt-1 hrms-client-validation-error';
+                    anchor.insertAdjacentElement('afterend', error);
+                }
+
+                error.textContent = getValidationMessage(field);
+            }
+
+            function clearFieldError(field) {
+                field.classList.remove('is-invalid');
+                field.removeAttribute('aria-invalid');
+
+                const error = getErrorAnchor(field).nextElementSibling;
+                if (error && error.classList.contains('hrms-client-validation-error')) {
+                    error.remove();
+                }
+            }
+
+            function getRequiredFields(form) {
+                return Array.from(form.querySelectorAll('[required]')).filter(field => !field.disabled && field.type !== 'hidden');
+            }
+
+            function validateField(field) {
+                if (field.checkValidity()) {
+                    clearFieldError(field);
+                    return true;
+                }
+
+                showFieldError(field);
+                return false;
+            }
+
+            function focusField(field) {
+                const select2 = field.tagName === 'SELECT' && field.nextElementSibling?.classList.contains('select2-container') ? field.nextElementSibling : null;
+                const target = select2 || field;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                (select2?.querySelector('.select2-selection') || field).focus({ preventScroll: true });
+            }
+
+            function bindHrmsValidation(root) {
+                root.querySelectorAll('form').forEach(function (form) {
+                    if (form.dataset.hrmsThemedValidation === '1' || !form.querySelector('[required]')) {
+                        return;
+                    }
+
+                    form.dataset.hrmsThemedValidation = '1';
+                    form.setAttribute('novalidate', 'novalidate');
+
+                    getRequiredFields(form).forEach(function (field) {
+                        field.addEventListener('input', () => validateField(field));
+                        field.addEventListener('change', () => validateField(field));
+                    });
+
+                    form.addEventListener('submit', function (event) {
+                        const invalidField = getRequiredFields(form).find(field => !validateField(field));
+
+                        if (invalidField) {
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+                            focusField(invalidField);
+                        }
+                    });
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', () => bindHrmsValidation(document));
+            document.addEventListener('shown.bs.modal', event => bindHrmsValidation(event.target));
+        })();
     </script>
 @endsection

@@ -114,6 +114,10 @@
             color: #334155 !important;
             margin-bottom: 6px !important;
         }
+        .form-label .text-danger {
+            display: inline !important;
+            white-space: nowrap !important;
+        }
         .form-control, .form-select {
             border-color: #cbd5e1 !important;
             font-size: 13px !important;
@@ -166,6 +170,50 @@
         .table tbody td input:focus, .table tbody td select:focus {
             border-color: var(--bs-primary) !important;
             background-color: #ffffff !important;
+            box-shadow: 0 0 0 2.5px rgba(74, 108, 247, 0.12) !important;
+        }
+        .settings-content-col .select2-container--bootstrap-5 {
+            width: 100% !important;
+        }
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--single {
+            min-height: 41px !important;
+            height: 41px !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+            padding: 6px 2.5rem 6px 12px !important;
+            display: flex !important;
+            align-items: center;
+            background-color: #fff !important;
+        }
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            padding: 0 !important;
+            color: #334155 !important;
+            line-height: 1.4 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        .settings-content-col .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+            right: 12px !important;
+        }
+        .table tbody td .select2-container--bootstrap-5 .select2-selection--single {
+            min-height: 32px !important;
+            height: 32px !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 6px !important;
+            padding: 4px 2rem 4px 10px !important;
+            background-color: #fff !important;
+        }
+        .table tbody td .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            font-size: 12.5px !important;
+            line-height: 1.3 !important;
+        }
+        .table tbody td .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+            right: 10px !important;
+        }
+        .table tbody td .select2-container--bootstrap-5.select2-container--focus .select2-selection--single,
+        .settings-content-col .select2-container--bootstrap-5.select2-container--focus .select2-selection--single {
+            border-color: var(--bs-primary) !important;
             box-shadow: 0 0 0 2.5px rgba(74, 108, 247, 0.12) !important;
         }
         .table tbody td input[readonly] {
@@ -291,22 +339,22 @@
                                         <div class="row g-3 mb-4">
                                             <!-- Entity Scope -->
                                             <div class="col-md-6 col-12">
-                                                <x-ui.select label="Company Scope" name="company_id" data-select2-selector="default">
+                                                <x-ui.odoo-form-ui type="select" label="Company Scope" name="company_id" select2-selector="default">
                                                     <option value="">Apply Globally (All Entities)</option>
                                                     @foreach($companies as $company)
                                                         <option value="{{ $company->id }}" {{ ($rule && $rule->company_id === $company->id) ? 'selected' : '' }}>
                                                             {{ $company->company_name }}
                                                         </option>
                                                     @endforeach
-                                                </x-ui.select>
+                                                </x-ui.odoo-form-ui>
                                             </div>
 
                                             <!-- Status -->
                                             <div class="col-md-6 col-12">
-                                                <x-ui.select label="Policy Status" name="status" data-select2-selector="default" required>
+                                                <x-ui.odoo-form-ui type="select" label="Policy Status" name="status" select2-selector="default" :required="true">
                                                     <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>Active (Enforce Policy)</option>
                                                     <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>Inactive (Ignore Violations)</option>
-                                                </x-ui.select>
+                                                </x-ui.odoo-form-ui>
                                             </div>
 
                                              <!-- Type-Specific Parameters -->
@@ -316,7 +364,7 @@
                                                      <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-3 m-0 rounded-3 text-dark fs-13 flex-nowrap">
                                                          <i class="feather-info text-primary fs-16"></i>
                                                          <span>Late arrival grace period is</span>
-                                                         <input type="number" name="grace_period_minutes" class="form-control d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
+                                                         <input type="number" name="grace_period_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
                                                          <span>minutes relative to shift start time.</span>
                                                      </div>
                                                  </div>
@@ -330,14 +378,14 @@
 
                                                  <div class="col-12">
                                                      <div class="table-responsive border rounded bg-white">
-                                                         <table class="table table-sm table-hover align-middle mb-0" id="late-arrival-tiers-table" style="font-size: 13px;">
+                                                         <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="late-arrival-tiers-table" style="font-size: 13px;">
                                                              <thead class="table-light">
                                                                  <tr>
-                                                                     <th style="width: 11%; min-width: 95px;">Min Occurrences</th>
-                                                                     <th style="width: 12%; min-width: 105px;">Max Occurrences</th>
-                                                                     <th style="width: 25%; min-width: 195px;">Penalty Settlement Method</th>
-                                                                     <th style="width: 15%; min-width: 115px;">Deduction Value (Days)</th>
-                                                                     <th style="width: 27%; min-width: 175px;">Deduct From Leave Type</th>
+                                                                     <th style="width: 10%; min-width: 95px;">Min Occurrences</th>
+                                                                     <th style="width: 10%; min-width: 105px;">Max Occurrences</th>
+                                                                     <th style="width: 30%; min-width: 240px;">Penalty Settlement Method</th>
+                                                                     <th style="width: 12%; min-width: 115px;">Deduction Value (Days)</th>
+                                                                     <th style="width: 28%; min-width: 210px;">Deduct From Leave Type</th>
                                                                      <th style="width: 10%; min-width: 60px;" class="text-center">Action</th>
                                                                  </tr>
                                                              </thead>
@@ -360,13 +408,13 @@
                                                      <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-2.5 m-0 rounded-3 text-dark fs-13 flex-nowrap">
                                                          <i class="feather-info text-primary fs-16"></i>
                                                          <span>Shift working hours target is</span>
-                                                         <input type="number" name="grace_period_hours" step="0.5" class="form-control d-inline-block text-center px-1 mx-1" value="{{ $rule ? ($rule->grace_period_minutes / 60) : 8 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
+                                                         <input type="number" name="grace_period_hours" step="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? ($rule->grace_period_minutes / 60) : 8 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
                                                          <span>hours.</span>
                                                      </div>
                                                      <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-2.5 m-0 rounded-3 text-dark fs-13 flex-nowrap">
                                                          <i class="feather-calendar text-primary fs-16"></i>
                                                          <span>Allowed monthly grace of</span>
-                                                         <input type="number" name="threshold_count" class="form-control d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
+                                                         <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
                                                          <span>deficit occurrences before penalties trigger.</span>
                                                      </div>
                                                  </div>
@@ -380,13 +428,13 @@
 
                                                  <div class="col-12">
                                                      <div class="table-responsive border rounded bg-white">
-                                                         <table class="table table-sm table-hover align-middle mb-0" id="under-hours-tiers-table" style="font-size: 13px;">
+                                                         <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="under-hours-tiers-table" style="font-size: 13px;">
                                                              <thead class="table-light">
                                                                  <tr>
-                                                                     <th style="width: 20%; min-width: 150px;">If Shift Hours Less Than</th>
-                                                                     <th style="width: 25%; min-width: 195px;">Penalty Settlement Method</th>
-                                                                     <th style="width: 15%; min-width: 115px;">Deduction Value (Days)</th>
-                                                                     <th style="width: 30%; min-width: 175px;">Deduct From Leave Type</th>
+                                                                     <th style="width: 18%; min-width: 150px;">If Shift Hours Less Than</th>
+                                                                     <th style="width: 32%; min-width: 240px;">Penalty Settlement Method</th>
+                                                                     <th style="width: 12%; min-width: 115px;">Deduction Value (Days)</th>
+                                                                     <th style="width: 28%; min-width: 210px;">Deduct From Leave Type</th>
                                                                      <th style="width: 10%; min-width: 60px;" class="text-center">Action</th>
                                                                  </tr>
                                                              </thead>
@@ -409,7 +457,7 @@
                                                      <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-3 m-0 rounded-3 text-dark fs-13 flex-nowrap">
                                                          <i class="feather-info text-primary fs-16"></i>
                                                          <span>Employees are allowed a monthly grace of</span>
-                                                         <input type="number" name="threshold_count" class="form-control d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
+                                                         <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
                                                          <span>missing logs before penalties trigger.</span>
                                                      </div>
                                                  </div>
@@ -423,7 +471,7 @@
 
                                                  <div class="col-12">
                                                      <div class="table-responsive border rounded bg-white">
-                                                         <table class="table table-sm table-hover align-middle mb-0" id="missing-logs-tiers-table" style="font-size: 13px;">
+                                                         <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="missing-logs-tiers-table" style="font-size: 13px;">
                                                              <thead class="table-light">
                                                                  <tr>
                                                                      <th style="width: 11%; min-width: 95px;">Min Occurrences</th>
@@ -466,6 +514,45 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            function buildPolicySelect2Options($select, $pane) {
+                let selectorType = $select.attr('data-select2-selector') || 'default';
+                let options = {
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    dropdownParent: $pane
+                };
+
+                if (selectorType === 'status' && typeof bgformat === 'function') {
+                    options.templateResult = bgformat;
+                    options.templateSelection = bgformat;
+                    options.minimumResultsForSearch = Infinity;
+                } else if (selectorType === 'currency' && typeof currencyformat === 'function') {
+                    options.templateResult = currencyformat;
+                    options.templateSelection = currencyformat;
+                } else if (selectorType === 'country' && typeof countryformat === 'function') {
+                    options.templateResult = countryformat;
+                    options.templateSelection = countryformat;
+                } else if (selectorType === 'tzone' && typeof tzoneformat === 'function') {
+                    options.templateResult = tzoneformat;
+                    options.templateSelection = tzoneformat;
+                }
+
+                return options;
+            }
+
+            function initPolicyPaneSelects(paneSelector) {
+                let $pane = $(paneSelector);
+                if (!$pane.length) return;
+
+                $pane.find('select[data-select2-selector]').each(function() {
+                    let $select = $(this);
+                    if ($select.hasClass('select2-hidden-accessible')) {
+                        $select.select2('destroy');
+                    }
+                    $select.select2(buildPolicySelect2Options($select, $pane));
+                });
+            }
+
             // Client-side Policy Pane Switching (Zero reloads)
             $(document).on('click', '.policy-switch-btn', function(e) {
                 e.preventDefault();
@@ -485,6 +572,7 @@
                 // Toggle visibility of target details pane
                 $('.policy-details-pane').addClass('d-none');
                 $(targetPaneId).removeClass('d-none');
+                initPolicyPaneSelects(targetPaneId);
 
                 // Update URL history parameters to persist select focus on reload
                 if (history.pushState) {
@@ -529,13 +617,13 @@
                 let rowHtml = `
                     <tr class="tier-row" data-index="${tierIndex}">
                         <td>
-                            <input type="number" name="penalty_tiers[${tierIndex}][min_occurrence]" class="form-control form-control-sm min-occ" min="1" value="${min_occ}" required>
+                            <input type="number" name="penalty_tiers[${tierIndex}][min_occurrence]" class="odoo-table-input min-occ" min="1" value="${min_occ}" required>
                         </td>
                         <td>
-                            <input type="number" name="penalty_tiers[${tierIndex}][max_occurrence]" class="form-control form-control-sm max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="Unlimited">
+                            <input type="number" name="penalty_tiers[${tierIndex}][max_occurrence]" class="odoo-table-input max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="Unlimited">
                         </td>
                         <td>
-                            <select name="penalty_tiers[${tierIndex}][penalty_action]" class="form-select form-select-sm tier-action-select" required>
+                            <select name="penalty_tiers[${tierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
                                 <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
                                 <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
                                 <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
@@ -543,10 +631,10 @@
                             </select>
                         </td>
                         <td>
-                            <input type="number" step="0.1" name="penalty_tiers[${tierIndex}][penalty_value]" class="form-control form-control-sm tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
+                            <input type="number" step="0.1" name="penalty_tiers[${tierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td>
-                            <select name="penalty_tiers[${tierIndex}][leave_type_id]" class="form-select form-select-sm tier-leave-select" ${leaveDisabled} ${leaveStyles}>
+                            <select name="penalty_tiers[${tierIndex}][leave_type_id]" class="odoo-table-select tier-leave-select" ${leaveDisabled} ${leaveStyles}>
                                 ${leaveOptions}
                             </select>
                         </td>
@@ -627,10 +715,10 @@
                 let rowHtml = `
                     <tr class="deficit-tier-row" data-index="${deficitTierIndex}">
                         <td>
-                            <input type="number" step="0.1" name="penalty_tiers[${deficitTierIndex}][hours_threshold]" class="form-control form-control-sm hours-threshold" min="0" max="24" value="${hours_threshold}" required>
+                            <input type="number" step="0.1" name="penalty_tiers[${deficitTierIndex}][hours_threshold]" class="odoo-table-input hours-threshold" min="0" max="24" value="${hours_threshold}" required>
                         </td>
                         <td>
-                            <select name="penalty_tiers[${deficitTierIndex}][penalty_action]" class="form-select form-select-sm tier-action-select" required>
+                            <select name="penalty_tiers[${deficitTierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
                                 <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
                                 <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
                                 <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
@@ -638,10 +726,10 @@
                             </select>
                         </td>
                         <td>
-                            <input type="number" step="0.1" name="penalty_tiers[${deficitTierIndex}][penalty_value]" class="form-control form-control-sm tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
+                            <input type="number" step="0.1" name="penalty_tiers[${deficitTierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td>
-                            <select name="penalty_tiers[${deficitTierIndex}][leave_type_id]" class="form-select form-select-sm tier-leave-select" ${leaveDisabled} ${leaveStyles}>
+                            <select name="penalty_tiers[${deficitTierIndex}][leave_type_id]" class="odoo-table-select tier-leave-select" ${leaveDisabled} ${leaveStyles}>
                                 ${leaveOptions}
                             </select>
                         </td>
@@ -711,13 +799,13 @@
                 let rowHtml = `
                     <tr class="missing-tier-row" data-index="${missingTierIndex}">
                         <td>
-                            <input type="number" name="penalty_tiers[${missingTierIndex}][min_occurrence]" class="form-control form-control-sm missing-min-occ" min="1" value="${min_occ}" required>
+                            <input type="number" name="penalty_tiers[${missingTierIndex}][min_occurrence]" class="odoo-table-input missing-min-occ" min="1" value="${min_occ}" required>
                         </td>
                         <td>
-                            <input type="number" name="penalty_tiers[${missingTierIndex}][max_occurrence]" class="form-control form-control-sm missing-max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="Unlimited">
+                            <input type="number" name="penalty_tiers[${missingTierIndex}][max_occurrence]" class="odoo-table-input missing-max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="Unlimited">
                         </td>
                         <td>
-                            <select name="penalty_tiers[${missingTierIndex}][penalty_action]" class="form-select form-select-sm tier-action-select" required>
+                            <select name="penalty_tiers[${missingTierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
                                 <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
                                 <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
                                 <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
@@ -725,10 +813,10 @@
                             </select>
                         </td>
                         <td>
-                            <input type="number" step="0.1" name="penalty_tiers[${missingTierIndex}][penalty_value]" class="form-control form-control-sm tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
+                            <input type="number" step="0.1" name="penalty_tiers[${missingTierIndex}][penalty_value]" class="odoo-table-input tier-value-input" min="0" value="${penalty_value}" ${valueReadonly} required>
                         </td>
                         <td>
-                            <select name="penalty_tiers[${missingTierIndex}][leave_type_id]" class="form-select form-select-sm tier-leave-select" ${leaveDisabled} ${leaveStyles}>
+                            <select name="penalty_tiers[${missingTierIndex}][leave_type_id]" class="odoo-table-select tier-leave-select" ${leaveDisabled} ${leaveStyles}>
                                 ${leaveOptions}
                             </select>
                         </td>
@@ -859,9 +947,123 @@
             });
 
             // Initial load visibility checks
+            initPolicyPaneSelects('.policy-details-pane:not(.d-none)');
             updateLeaveColumnVisibility('late-arrival-tiers-table');
             updateLeaveColumnVisibility('under-hours-tiers-table');
             updateLeaveColumnVisibility('missing-logs-tiers-table');
         });
+    </script>
+    <script>
+        (function () {
+            if (window.hrmsThemedValidationInstalled) {
+                return;
+            }
+
+            window.hrmsThemedValidationInstalled = true;
+
+            function getFieldLabel(field) {
+                const group = field.closest('.odoo-form-group');
+                const label = group ? group.querySelector('.odoo-form-label') : null;
+                return label ? label.textContent.replace('*', '').trim() : 'This field';
+            }
+
+            function getValidationMessage(field) {
+                const label = getFieldLabel(field).toLowerCase();
+
+                if (field.validity.valueMissing) {
+                    return field.tagName === 'SELECT' ? `Please select ${label}.` : `Please enter ${label}.`;
+                }
+
+                return field.validationMessage || 'Please enter a valid value.';
+            }
+
+            function getErrorAnchor(field) {
+                if (field.tagName === 'SELECT' && field.nextElementSibling && field.nextElementSibling.classList.contains('select2-container')) {
+                    return field.nextElementSibling;
+                }
+
+                if (field.type === 'radio') {
+                    return field.closest('.odoo-form-group')?.querySelector('.flex-grow-1') || field;
+                }
+
+                return field;
+            }
+
+            function showFieldError(field) {
+                field.classList.add('is-invalid');
+                field.setAttribute('aria-invalid', 'true');
+
+                const anchor = getErrorAnchor(field);
+                let error = anchor.nextElementSibling;
+
+                if (!error || !error.classList.contains('hrms-client-validation-error')) {
+                    error = document.createElement('div');
+                    error.className = 'invalid-feedback d-block fs-11 mt-1 hrms-client-validation-error';
+                    anchor.insertAdjacentElement('afterend', error);
+                }
+
+                error.textContent = getValidationMessage(field);
+            }
+
+            function clearFieldError(field) {
+                field.classList.remove('is-invalid');
+                field.removeAttribute('aria-invalid');
+
+                const error = getErrorAnchor(field).nextElementSibling;
+                if (error && error.classList.contains('hrms-client-validation-error')) {
+                    error.remove();
+                }
+            }
+
+            function getRequiredFields(form) {
+                return Array.from(form.querySelectorAll('[required]')).filter(field => !field.disabled && field.type !== 'hidden');
+            }
+
+            function validateField(field) {
+                if (field.checkValidity()) {
+                    clearFieldError(field);
+                    return true;
+                }
+
+                showFieldError(field);
+                return false;
+            }
+
+            function focusField(field) {
+                const select2 = field.tagName === 'SELECT' && field.nextElementSibling?.classList.contains('select2-container') ? field.nextElementSibling : null;
+                const target = select2 || field;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                (select2?.querySelector('.select2-selection') || field).focus({ preventScroll: true });
+            }
+
+            function bindHrmsValidation(root) {
+                root.querySelectorAll('form').forEach(function (form) {
+                    if (form.dataset.hrmsThemedValidation === '1' || !form.querySelector('[required]')) {
+                        return;
+                    }
+
+                    form.dataset.hrmsThemedValidation = '1';
+                    form.setAttribute('novalidate', 'novalidate');
+
+                    getRequiredFields(form).forEach(function (field) {
+                        field.addEventListener('input', () => validateField(field));
+                        field.addEventListener('change', () => validateField(field));
+                    });
+
+                    form.addEventListener('submit', function (event) {
+                        const invalidField = getRequiredFields(form).find(field => !validateField(field));
+
+                        if (invalidField) {
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+                            focusField(invalidField);
+                        }
+                    });
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', () => bindHrmsValidation(document));
+            document.addEventListener('shown.bs.modal', event => bindHrmsValidation(event.target));
+        })();
     </script>
 @endsection

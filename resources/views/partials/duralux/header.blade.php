@@ -414,8 +414,8 @@
                             <div class="d-flex align-items-center">
                                 <img src="{{ asset('assets/images/avatar/1.png') }}" alt="user-image" class="img-fluid user-avtar">
                                 <div>
-                                    <h6 class="text-dark mb-0">{{ __('ui.erp_admin') }} <span class="badge bg-soft-success text-success ms-1">{{ $currentTenant['plan'] }}</span></h6>
-                                    <span class="fs-12 fw-medium text-muted">admin@saas-erp.local</span>
+                                    <h6 class="text-dark mb-0">{{ auth()->user()->name ?? __('ui.erp_admin') }} <span class="badge bg-soft-success text-success ms-1">{{ $currentTenant['plan'] }}</span></h6>
+                                    <span class="fs-12 fw-medium text-muted">{{ auth()->user()->email ?? '' }}</span>
                                 </div>
                             </div>
                         </div>
@@ -436,10 +436,13 @@
                             <span>{{ __('ui.account_settings') }}</span>
                         </a>
                         <div class="dropdown-divider"></div>
-                        <a href="javascript:void(0);" class="dropdown-item">
-                            <i class="feather-log-out"></i>
-                            <span>{{ __('ui.logout') }}</span>
-                        </a>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="dropdown-item border-0 bg-transparent w-100 text-start">
+                                <i class="feather-log-out"></i>
+                                <span>{{ __('ui.logout') }}</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>

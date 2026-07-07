@@ -175,6 +175,24 @@ class SalesOrderTest extends TestCase
     /** @test */
     public function sales_order_status_transitions_operate_correctly()
     {
+        // Create warehouse
+        $warehouse = \App\Domains\Inventory\Models\Warehouse::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Main WH',
+            'code' => 'MAIN-WH',
+            'status' => 'active'
+        ]);
+
+        // Record stock inflow to ensure we have available stock to confirm order
+        \App\Domains\Inventory\Services\StockService::recordInflow(
+            $this->tenant->id,
+            $this->product->id,
+            $warehouse->id,
+            10.0,
+            100.0,
+            'Opening Stock'
+        );
+
         $order = SalesOrder::create([
             'tenant_id' => $this->tenant->id,
             'customer_id' => $this->customer->id,
@@ -185,6 +203,15 @@ class SalesOrderTest extends TestCase
             'total_amount' => 118,
         ]);
 
+        $item = $order->items()->create([
+            'product_id' => $this->product->id,
+            'warehouse_id' => $warehouse->id,
+            'item_name' => 'Standard Widget',
+            'quantity' => 1,
+            'unit_price' => 100.00,
+            'amount' => 100.00
+        ]);
+
         // 1. Confirm
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
@@ -193,10 +220,24 @@ class SalesOrderTest extends TestCase
         $order->refresh();
         $this->assertEquals('Confirmed', $order->status);
 
-        // 2. Ship
+        // 2. Ship via Delivery Order
+        $do = \App\Domains\Sales\Models\DeliveryOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'sales_order_id' => $order->id,
+            'delivery_number' => 'DO-001',
+            'delivery_date' => now(),
+            'status' => 'Draft',
+        ]);
+        $doItem = $do->items()->create([
+            'sales_order_item_id' => $item->id,
+            'product_id' => $this->product->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 1,
+        ]);
+
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
-            ->post(route('sales.orders.ship', $order->id));
+            ->post(route('sales.deliveries.ship', $do->id));
 
         $order->refresh();
         $this->assertEquals('Shipped', $order->status);

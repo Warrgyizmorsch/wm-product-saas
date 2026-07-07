@@ -141,16 +141,6 @@
                     {{ session('error') }}
                 </x-ui.alert>
             @endif
-            @if($errors->any())
-                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                    <ul class="mb-0 ps-3">
-                        @foreach($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </x-ui.alert>
-            @endif
-
             <div class="tab-content" id="settingsSubSidebarContent">
                 <!-- Org Structure Pane -->
                 <div class="tab-pane fade show active" id="org-structure-pane" role="tabpanel" aria-labelledby="org-structure-menu">
@@ -242,6 +232,7 @@
 
             const urlParams = new URLSearchParams(window.location.search);
             const tabParam = urlParams.get('tab');
+            const companyFormMode = @json(old('form_mode'));
             if (tabParam) {
                 setTimeout(function() {
                     const tabButton = document.getElementById(tabParam + '-tab');
@@ -249,6 +240,24 @@
                         tabButton.click();
                     }
                 }, 100);
+            }
+
+            if (companyFormMode === 'add_company') {
+                setTimeout(function() {
+                    const modalElement = document.getElementById('addCompanyModal');
+                    if (modalElement) {
+                        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+                    }
+                }, 150);
+            }
+
+            if (companyFormMode === 'edit_company') {
+                setTimeout(function() {
+                    const modalElement = document.getElementById('editCompanyModal');
+                    if (modalElement) {
+                        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+                    }
+                }, 150);
             }
 
             // Generic modal Select2 initializer inside HRMS boundaries
