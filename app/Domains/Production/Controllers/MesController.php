@@ -147,7 +147,7 @@ class MesController extends Controller
         $userId   = Auth::id() ?: 1;
 
         // My operator assignments
-        $myAssignments = ProductionOperatorAssignment::with(['operation.productionOrder.product', 'operation.workCenter'])
+        $myAssignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
             ->orderBy('id', 'desc')
@@ -201,9 +201,9 @@ class MesController extends Controller
     public function operationExecution(Request $request, int $opId)
     {
         $tenantId = require_tenant_id();
-        $op = ProductionOrderOperation::with(['productionOrder.product', 'workCenter', 'machine'])->findOrFail($opId);
+        $op = ProductionOrderOperation::with(['order.product', 'workCenter', 'machine'])->findOrFail($opId);
 
-        $order = $op->productionOrder;
+        $order = $op->order;
         $batches = ProductionBatch::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->get();
         $serials = ProductionSerialNumber::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->get();
 
