@@ -49,6 +49,9 @@ class RoutingOperation extends BaseModel
         'quality_required',
         'is_external',               // Subcontracting ready
         'vendor_id',                 // Future FK → vendors
+        'parallel_group',
+        'is_parallel',
+        'parallel_type',
     ];
 
     protected $casts = [

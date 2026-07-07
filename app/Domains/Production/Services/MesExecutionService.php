@@ -105,6 +105,31 @@ class MesExecutionService
                 $order->actual_start_date = now();
                 $order->save();
             }
+
+            // Transition machine state if machine is used
+            $resolvedMachineId = $machineId ?? $schedOp->machine_id;
+            if ($resolvedMachineId) {
+                app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
+                    $schedOp->schedule->order->tenant_id,
+                    $resolvedMachineId,
+                    'Running',
+                    'Production Started',
+                    $operatorId
+                );
+            }
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
+                'production_order_id'            => $schedOp->production_order_id,
+                'production_order_operation_id'  => $schedOp->production_order_operation_id,
+                'machine_id'                     => $resolvedMachineId,
+                'operator_id'                    => $operatorId,
+                'event_type'                     => 'Operation Started',
+                'title'                          => 'Operation Started',
+                'description'                    => "Operation {$schedOp->orderOperation->name} has started on the shop floor.",
+                'severity'                       => 'info',
+                'event_source'                   => 'MesExecutionService',
+                'triggered_by'                   => $operatorId,
+            ]);
         });
     }
 
@@ -130,6 +155,34 @@ class MesExecutionService
                 $orderOp->status = ProductionOrderOperation::STATUS_PAUSED;
                 $orderOp->save();
             }
+
+            $machineId = $schedOp->machine_id;
+            if ($machineId) {
+                $reason = $remarks ?? 'Operation Paused';
+                $state = 'Waiting Operator';
+                if (str_contains(strtolower($reason), 'material')) {
+                    $state = 'Waiting Material';
+                } elseif (str_contains(strtolower($reason), 'breakdown') || str_contains(strtolower($reason), 'failure')) {
+                    $state = 'Breakdown';
+                }
+                app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
+                    $schedOp->schedule->order->tenant_id,
+                    $machineId,
+                    $state,
+                    $reason
+                );
+            }
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
+                'production_order_id'            => $schedOp->production_order_id,
+                'production_order_operation_id'  => $schedOp->production_order_operation_id,
+                'machine_id'                     => $machineId,
+                'event_type'                     => 'Operation Paused',
+                'title'                          => 'Operation Paused',
+                'description'                    => "Operation paused. Reason: {$remarks}",
+                'severity'                       => 'warning',
+                'event_source'                   => 'MesExecutionService',
+            ]);
         });
     }
 
@@ -154,6 +207,27 @@ class MesExecutionService
                 $orderOp->status = ProductionOrderOperation::STATUS_RUNNING;
                 $orderOp->save();
             }
+
+            $machineId = $schedOp->machine_id;
+            if ($machineId) {
+                app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
+                    $schedOp->schedule->order->tenant_id,
+                    $machineId,
+                    'Running',
+                    'Operation Resumed'
+                );
+            }
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
+                'production_order_id'            => $schedOp->production_order_id,
+                'production_order_operation_id'  => $schedOp->production_order_operation_id,
+                'machine_id'                     => $machineId,
+                'event_type'                     => 'Operation Resumed',
+                'title'                          => 'Operation Resumed',
+                'description'                    => "Operation has been resumed.",
+                'severity'                       => 'info',
+                'event_source'                   => 'MesExecutionService',
+            ]);
         });
     }
 
@@ -252,6 +326,29 @@ class MesExecutionService
             if ($allDone) {
                 $this->completeSchedule($schedOp->schedule, $operatorId);
             }
+
+            $machineId = $schedOp->machine_id;
+            if ($machineId) {
+                app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
+                    $schedOp->schedule->order->tenant_id,
+                    $machineId,
+                    'Idle',
+                    'Operation Completed',
+                    $operatorId
+                );
+            }
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
+                'production_order_id'            => $schedOp->production_order_id,
+                'production_order_operation_id'  => $schedOp->production_order_operation_id,
+                'machine_id'                     => $machineId,
+                'event_type'                     => 'Operation Completed',
+                'title'                          => 'Operation Completed',
+                'description'                    => "Operation has been completed successfully.",
+                'severity'                       => 'success',
+                'event_source'                   => 'MesExecutionService',
+                'triggered_by'                   => $operatorId,
+            ]);
         });
     }
 

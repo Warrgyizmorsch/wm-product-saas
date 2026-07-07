@@ -69,17 +69,32 @@ class SchedulingService
             ]);
 
             $operations = $order->operations()->orderBy('sequence')->get();
-            $cursor     = $startDate->copy();
+            $scheduledData = [];
 
             foreach ($operations as $op) {
                 $times      = $this->calculateOperationTimes($op, $order->quantity_ordered);
                 $duration   = $times['total_minutes'];
 
-                // Find optimal machine & slot
-                $alloc = $this->findNextAvailableMachine($op->routing_operation_id ?? 0, $cursor, $duration, $tenantId, true);
+                // Calculate earliest start based on predecessors
+                $predecessors = collect($scheduledData)->filter(function($prev) use ($op) {
+                    if ($prev['sequence'] >= $op->sequence) {
+                        return false;
+                    }
+                    if ($op->is_parallel && $op->parallel_group !== null && $prev['parallel_group'] === $op->parallel_group) {
+                        return false;
+                    }
+                    return true;
+                });
 
-                $plannedStart  = $alloc['start'] ?? $cursor->copy();
-                $plannedFinish = $alloc['finish'] ?? $cursor->copy()->addMinutes((int) ceil($duration));
+                $earliestStart = $predecessors->isEmpty()
+                    ? $startDate->copy()
+                    : $predecessors->max('planned_finish')->copy();
+
+                // Find optimal machine & slot
+                $alloc = $this->findNextAvailableMachine($op->routing_operation_id ?? 0, $earliestStart, $duration, $tenantId, true);
+
+                $plannedStart  = $alloc['start'] ?? $earliestStart->copy();
+                $plannedFinish = $alloc['finish'] ?? $earliestStart->copy()->addMinutes((int) ceil($duration));
                 $warnings      = $alloc['warnings'] ?? [];
                 $machineId     = $alloc['machine_id'] ?? null;
                 $priority      = $alloc['priority'] ?? 1;
@@ -105,13 +120,28 @@ class SchedulingService
                     'resource_id'                   => $machineId ? 'Machine_' . $machineId : 'WorkCenter_' . $op->work_center_id,
                 ]);
 
-                // Next operation starts after this one finishes
-                $cursor = $plannedFinish->copy();
+                $scheduledData[] = [
+                    'sequence'       => $op->sequence,
+                    'parallel_group' => $op->parallel_group,
+                    'is_parallel'    => $op->is_parallel,
+                    'planned_start'  => $plannedStart,
+                    'planned_finish' => $plannedFinish,
+                ];
             }
 
             // Stash Overall Capacity Utilization
             $schedule->update([
                 'capacity_utilization' => $this->calculateOverallUtilization($schedule),
+            ]);
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type'          => 'Schedule Created',
+                'title'               => 'Production Schedule Created',
+                'description'         => "Schedule {$schedule->schedule_number} created via forward scheduling.",
+                'severity'            => 'info',
+                'event_source'        => 'SchedulingService',
+                'triggered_by'        => auth()->id(),
             ]);
 
             return $schedule;
@@ -144,18 +174,33 @@ class SchedulingService
 
             // For backward scheduling, schedule operations in reverse order
             $operations = $order->operations()->orderByDesc('sequence')->get();
-            $cursor     = $dueDate->copy();
             $records    = [];
+            $scheduledData = [];
 
             foreach ($operations as $op) {
                 $times    = $this->calculateOperationTimes($op, $order->quantity_ordered);
                 $duration = $times['total_minutes'];
 
-                // Find slot searching backwards
-                $alloc = $this->findNextAvailableMachine($op->routing_operation_id ?? 0, $cursor, $duration, $tenantId, false);
+                // Calculate latest finish cursor based on successors
+                $successors = collect($scheduledData)->filter(function($succ) use ($op) {
+                    if ($succ['sequence'] <= $op->sequence) {
+                        return false;
+                    }
+                    if ($op->is_parallel && $op->parallel_group !== null && $succ['parallel_group'] === $op->parallel_group) {
+                        return false;
+                    }
+                    return true;
+                });
 
-                $plannedStart  = $alloc['start'] ?? $cursor->copy()->subMinutes((int) ceil($duration));
-                $plannedFinish = $alloc['finish'] ?? $cursor->copy();
+                $latestFinish = $successors->isEmpty()
+                    ? $dueDate->copy()
+                    : $successors->min('planned_start')->copy();
+
+                // Find slot searching backwards
+                $alloc = $this->findNextAvailableMachine($op->routing_operation_id ?? 0, $latestFinish, $duration, $tenantId, false);
+
+                $plannedStart  = $alloc['start'] ?? $latestFinish->copy()->subMinutes((int) ceil($duration));
+                $plannedFinish = $alloc['finish'] ?? $latestFinish->copy();
                 $warnings      = $alloc['warnings'] ?? [];
                 $machineId     = $alloc['machine_id'] ?? null;
                 $priority      = $alloc['priority'] ?? 1;
@@ -179,8 +224,13 @@ class SchedulingService
                     'resource_id'                   => $machineId ? 'Machine_' . $machineId : 'WorkCenter_' . $op->work_center_id,
                 ];
 
-                // Previous operation in sequence must finish before this one starts
-                $cursor = $plannedStart->copy();
+                $scheduledData[] = [
+                    'sequence'       => $op->sequence,
+                    'parallel_group' => $op->parallel_group,
+                    'is_parallel'    => $op->is_parallel,
+                    'planned_start'  => $plannedStart,
+                    'planned_finish' => $plannedFinish,
+                ];
             }
 
             // Write in correct sequence
@@ -195,6 +245,16 @@ class SchedulingService
 
             $schedule->update([
                 'capacity_utilization' => $this->calculateOverallUtilization($schedule),
+            ]);
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+                'production_order_id' => $order->id,
+                'event_type'          => 'Schedule Created',
+                'title'               => 'Production Schedule Created',
+                'description'         => "Schedule {$schedule->schedule_number} created via backward scheduling.",
+                'severity'            => 'info',
+                'event_source'        => 'SchedulingService',
+                'triggered_by'        => auth()->id(),
             ]);
 
             return $schedule;
@@ -213,34 +273,77 @@ class SchedulingService
         return DB::transaction(function () use ($scheduleId, $newStartDate) {
             $schedule = ProductionSchedule::findOrFail($scheduleId);
             $ops      = $schedule->operations()->orderBy('sequence')->get();
-            $cursor   = $newStartDate->copy();
+            $scheduledData = [];
 
             foreach ($ops as $op) {
+                // Find order operation to check parallel group info
+                $orderOp = ProductionOrderOperation::find($op->production_order_operation_id);
+                $isParallel = $orderOp ? $orderOp->is_parallel : false;
+                $parallelGroup = $orderOp ? $orderOp->parallel_group : null;
+
                 if ($op->locked) {
-                    // Do not move locked operations
-                    $cursor = $op->planned_finish->copy();
+                    $scheduledData[] = [
+                        'sequence'       => $op->sequence,
+                        'parallel_group' => $parallelGroup,
+                        'is_parallel'    => $isParallel,
+                        'planned_start'  => $op->planned_start->copy(),
+                        'planned_finish' => $op->planned_finish->copy(),
+                    ];
                     continue;
                 }
 
-                // Recalculate optimal slot
-                $routingOpId = ProductionOrderOperation::find($op->production_order_operation_id)->routing_operation_id ?? 0;
-                $alloc = $this->findNextAvailableMachine($routingOpId, $cursor, $op->planned_duration_minutes, $schedule->tenant_id, true);
+                // Calculate earliest start based on predecessors in scheduledData
+                $predecessors = collect($scheduledData)->filter(function($prev) use ($op, $isParallel, $parallelGroup) {
+                    if ($prev['sequence'] >= $op->sequence) {
+                        return false;
+                    }
+                    if ($isParallel && $parallelGroup !== null && $prev['parallel_group'] === $parallelGroup) {
+                        return false;
+                    }
+                    return true;
+                });
+
+                $earliestStart = $predecessors->isEmpty()
+                    ? $newStartDate->copy()
+                    : $predecessors->max('planned_finish')->copy();
+
+                $routingOpId = $orderOp ? $orderOp->routing_operation_id : 0;
+                $alloc = $this->findNextAvailableMachine($routingOpId, $earliestStart, $op->planned_duration_minutes, $schedule->tenant_id, true);
+
+                $plannedStart  = $alloc['start'] ?? $earliestStart->copy();
+                $plannedFinish = $alloc['finish'] ?? $earliestStart->copy()->addMinutes((int) ceil($op->planned_duration_minutes));
 
                 $op->update([
                     'machine_id'     => $alloc['machine_id'] ?? $op->machine_id,
-                    'planned_start'  => $alloc['start'] ?? $cursor->copy(),
-                    'planned_finish' => $alloc['finish'] ?? $cursor->copy()->addMinutes((int) ceil($op->planned_duration_minutes)),
+                    'planned_start'  => $plannedStart,
+                    'planned_finish' => $plannedFinish,
                     'warnings'       => $alloc['warnings'] ?? [],
                     'priority'       => $alloc['priority'] ?? 1,
                     'resource_id'    => ($alloc['machine_id'] ?? null) ? 'Machine_' . $alloc['machine_id'] : $op->resource_id,
                 ]);
 
-                $cursor = $op->planned_finish->copy();
+                $scheduledData[] = [
+                    'sequence'       => $op->sequence,
+                    'parallel_group' => $parallelGroup,
+                    'is_parallel'    => $isParallel,
+                    'planned_start'  => $plannedStart,
+                    'planned_finish' => $plannedFinish,
+                ];
             }
 
             $schedule->update([
                 'generated_by'         => 'reschedule',
                 'capacity_utilization' => $this->calculateOverallUtilization($schedule),
+            ]);
+
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($schedule->tenant_id, [
+                'production_order_id' => $schedule->production_order_id,
+                'event_type'          => 'Schedule Rescheduled',
+                'title'               => 'Production Schedule Rescheduled',
+                'description'         => "Schedule {$schedule->schedule_number} has been rescheduled.",
+                'severity'            => 'info',
+                'event_source'        => 'SchedulingService',
+                'triggered_by'        => auth()->id(),
             ]);
 
             return $schedule;
