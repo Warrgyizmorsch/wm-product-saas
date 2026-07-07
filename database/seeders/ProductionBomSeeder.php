@@ -33,6 +33,14 @@ class ProductionBomSeeder extends Seeder
         DB::table('routings')->truncate();
         DB::table('production_machines')->truncate();
         DB::table('production_work_centers')->truncate();
+        
+        // Truncate inventory tracking & stocks tables to prevent orphan rows due to ForeignKey constraints disablement
+        DB::table('product_warehouse_stocks')->truncate();
+        DB::table('stock_transactions')->truncate();
+        DB::table('serial_numbers')->truncate();
+        DB::table('batches')->truncate();
+        DB::table('stock_reservations')->truncate();
+        
         DB::table('products')->truncate();
         Schema::enableForeignKeyConstraints();
 
