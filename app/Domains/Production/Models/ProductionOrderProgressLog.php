@@ -22,6 +22,8 @@ class ProductionOrderProgressLog extends BaseModel
         'recorded_by',
         'recorded_at',
         'machine_id',
+        'start_time',
+        'stop_time',
         'remarks',
     ];
 
@@ -31,7 +33,9 @@ class ProductionOrderProgressLog extends BaseModel
         'quantity_scrapped'    => 'float',
         'setup_minutes_logged' => 'float',
         'run_minutes_logged'   => 'float',
-        'recorded_at'          => 'datetime',
+        'recorded_at' => 'datetime',
+        'start_time'  => 'datetime',
+        'stop_time'   => 'datetime',
     ];
 
     public function order(): BelongsTo

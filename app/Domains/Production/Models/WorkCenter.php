@@ -6,6 +6,7 @@ use App\Core\Database\BaseModel;
 use App\Models\Concerns\Loggable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -32,6 +33,7 @@ class WorkCenter extends BaseModel
         'status',
         'parent_id',
         'type',
+        'production_calendar_id',
     ];
 
     protected $casts = [
@@ -57,6 +59,21 @@ class WorkCenter extends BaseModel
     public function machines(): HasMany
     {
         return $this->hasMany(Machine::class, 'work_center_id');
+    }
+
+    public function calendar(): BelongsTo
+    {
+        return $this->belongsTo(ProductionCalendar::class, 'production_calendar_id');
+    }
+
+    public function shifts(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            ProductionShift::class,
+            'production_work_center_shifts',
+            'work_center_id',
+            'shift_id'
+        );
     }
 
     public function activeMachines(): HasMany

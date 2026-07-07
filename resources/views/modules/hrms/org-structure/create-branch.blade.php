@@ -5,10 +5,52 @@
 @section('breadcrumb', 'HRMS / Org Structure / Branches / Create')
 
 @section('page-actions')
-    <a href="{{ route('hrms.org.index', ['tab' => 'branches']) }}" class="btn btn-light">
-        <i class="feather-arrow-left me-2"></i>Back to Org Structure
-    </a>
+    <x-ui.button href="{{ route('hrms.org.index', ['tab' => 'branches']) }}" variant="light" icon="feather-arrow-left">
+        Back to Org Structure
+    </x-ui.button>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    if (window.hrmsThemedValidationInstalled) return;
+    window.hrmsThemedValidationInstalled = true;
+    function fieldLabel(field) { return (field.closest('.odoo-form-group')?.querySelector('.odoo-form-label')?.textContent || 'This field').replace('*', '').trim().toLowerCase(); }
+    function fieldAnchor(field) { return field.tagName === 'SELECT' && field.nextElementSibling?.classList.contains('select2-container') ? field.nextElementSibling : field; }
+    function showError(field) {
+        field.classList.add('is-invalid');
+        field.setAttribute('aria-invalid', 'true');
+        const anchor = fieldAnchor(field);
+        let error = anchor.nextElementSibling;
+        if (!error || !error.classList.contains('hrms-client-validation-error')) {
+            error = document.createElement('div');
+            error.className = 'invalid-feedback d-block fs-11 mt-1 hrms-client-validation-error';
+            anchor.insertAdjacentElement('afterend', error);
+        }
+        error.textContent = field.validity.valueMissing ? (field.tagName === 'SELECT' ? `Please select ${fieldLabel(field)}.` : `Please enter ${fieldLabel(field)}.`) : (field.validationMessage || 'Please enter a valid value.');
+    }
+    function clearError(field) { field.classList.remove('is-invalid'); field.removeAttribute('aria-invalid'); const error = fieldAnchor(field).nextElementSibling; if (error?.classList.contains('hrms-client-validation-error')) error.remove(); }
+    function requiredFields(form) { return Array.from(form.querySelectorAll('[required]')).filter(field => !field.disabled && field.type !== 'hidden'); }
+    function validate(field) { if (field.checkValidity()) { clearError(field); return true; } showError(field); return false; }
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('form').forEach(function (form) {
+            if (form.dataset.hrmsThemedValidation === '1' || !form.querySelector('[required]')) return;
+            form.dataset.hrmsThemedValidation = '1';
+            form.setAttribute('novalidate', 'novalidate');
+            requiredFields(form).forEach(field => { field.addEventListener('input', () => validate(field)); field.addEventListener('change', () => validate(field)); });
+            form.addEventListener('submit', function (event) {
+                const invalid = requiredFields(form).find(field => !validate(field));
+                if (!invalid) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                fieldAnchor(invalid).scrollIntoView({ behavior: 'smooth', block: 'center' });
+                invalid.focus({ preventScroll: true });
+            });
+        });
+    });
+})();
+</script>
+@endpush
 
 @section('content')
     <div class="row">
@@ -22,114 +64,69 @@
                                 <h5 class="fw-bold mb-0 me-4">
                                     <span class="d-block mb-2">Branch Information:</span>
                                 </h5>
-                                <button type="submit" class="btn btn-lg btn-light-brand">Add New</button>
+                                <x-ui.button type="submit" variant="light-brand" size="lg">Add New</x-ui.button>
                             </div>
 
                             <div class="row g-4">
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="name">Branch Name: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-map-pin"></i></div>
-                                        <input type="text" class="form-control" id="name" name="name" placeholder="Enter Branch Name" required>
-                                    </div>
+                                    <x-ui.odoo-form-ui type="input" label="Branch Name" name="name" id="name" placeholder="Enter Branch Name" :required="true" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="code">Branch Code: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-hash"></i></div>
-                                        <input type="text" class="form-control" id="code" name="code" placeholder="Enter Branch Code" required>
-                                    </div>
+                                    <x-ui.odoo-form-ui type="input" label="Branch Code" name="code" id="code" placeholder="Enter Branch Code" :required="true" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="business_unit_id">Parent Business Unit: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-briefcase"></i></div>
-                                        <select class="form-control" id="business_unit_id" name="business_unit_id" required>
-                                            <option value="">Select Business Unit</option>
-                                            @foreach($businessUnits as $buUnit)
-                                                <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
+                                    <x-ui.odoo-form-ui type="select" label="Parent Business Unit" name="business_unit_id" id="business_unit_id" :required="true">
+                                        <option value="">Select Business Unit</option>
+                                        @foreach($businessUnits as $buUnit)
+                                            <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="manager_employee_id">Branch Manager: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-user"></i></div>
-                                        <select class="form-control" id="manager_employee_id" name="manager_employee_id">
-                                            <option value="">Select Manager</option>
-                                            @foreach($employees as $employee)
-                                                <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
+                                    <x-ui.odoo-form-ui type="select" label="Branch Manager" name="manager_employee_id" id="manager_employee_id">
+                                        <option value="">Select Manager</option>
+                                        @foreach($employees as $employee)
+                                            <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="phone">Phone: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-phone"></i></div>
-                                        <input type="text" class="form-control" id="phone" name="phone" placeholder="Enter Phone Number">
-                                    </div>
+                                    <x-ui.odoo-form-ui type="input" label="Phone" name="phone" id="phone" placeholder="Enter Phone Number" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="email">Email: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-mail"></i></div>
-                                        <input type="email" class="form-control" id="email" name="email" placeholder="Enter Email Address">
-                                    </div>
+                                    <x-ui.odoo-form-ui type="input" label="Email" name="email" id="email" inputType="email" placeholder="Enter Email Address" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="country">Country: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-globe"></i></div>
-                                        <input type="text" class="form-control" id="country" name="country" placeholder="Enter Country">
-                                    </div>
+                                    <x-ui.odoo-form-ui type="input" label="Country" name="country" id="country" placeholder="Enter Country" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="state">State: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-map"></i></div>
-                                        <input type="text" class="form-control" id="state" name="state" placeholder="Enter State">
-                                    </div>
+                                    <x-ui.odoo-form-ui type="input" label="State" name="state" id="state" placeholder="Enter State" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="city">City: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-map"></i></div>
-                                        <input type="text" class="form-control" id="city" name="city" placeholder="Enter City">
-                                    </div>
+                                    <x-ui.odoo-form-ui type="input" label="City" name="city" id="city" placeholder="Enter City" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="postal_code">Postal Code: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-hash"></i></div>
-                                        <input type="text" class="form-control" id="postal_code" name="postal_code" placeholder="Enter Postal Code">
-                                    </div>
+                                    <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" id="postal_code" placeholder="Enter Postal Code" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <label class="form-label fw-semibold" for="status">Status: </label>
-                                    <div class="input-group">
-                                        <div class="input-group-text"><i class="feather-check-circle"></i></div>
-                                        <select class="form-control" id="status" name="status" required>
-                                            <option value="1">Active</option>
-                                            <option value="0">Inactive</option>
-                                        </select>
-                                    </div>
+                                    <x-ui.odoo-form-ui type="select" label="Status" name="status" id="status" :required="true">
+                                        <option value="1">Active</option>
+                                        <option value="0">Inactive</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-12">
-                                    <label class="form-label fw-semibold" for="address">Address: </label>
-                                    <textarea class="form-control" id="address" name="address" placeholder="Enter Address details..." rows="3"></textarea>
+                                    <x-ui.odoo-form-ui type="textarea" label="Address" name="address" id="address" placeholder="Enter Address details..." rows="3" />
                                 </div>
                             </div>
                         </form>

@@ -54,15 +54,30 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
-                                    <div class="d-flex justify-content-end gap-1">
-                                        <x-ui.icon-btn variant="soft-primary" icon="feather-chevron-down" class="toggle-structure-details" data-target="#structure-details-{{ $structure->id }}" title="Show Components" />
-                                        <x-ui.icon-btn variant="primary" icon="feather-edit" class="edit-structure-btn" data-structure="{{ base64_encode($structure->toJson()) }}" title="Edit" />
-                                        <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this structure slab?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete" />
-                                        </form>
-                                    </div>
+                                    <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this structure slab?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <div class="hstack gap-2 justify-content-end">
+                                            <a href="javascript:void(0)" class="action-dropdown-btn toggle-structure-details text-secondary p-2" data-target="#structure-details-{{ $structure->id }}" title="Show Components" data-bs-toggle="tooltip">
+                                                <i class="feather feather-chevron-down"></i>
+                                            </a>
+                                            <x-ui.action-dropdown>
+                                                <li>
+                                                    <a class="dropdown-item edit-structure-btn" href="javascript:void(0)" data-structure="{{ base64_encode($structure->toJson()) }}">
+                                                        <i class="feather feather-edit-3 me-3"></i>
+                                                        <span>Edit</span>
+                                                    </a>
+                                                </li>
+                                                <li class="dropdown-divider"></li>
+                                                <li>
+                                                    <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
+                                                        <i class="feather feather-trash-2 me-3"></i>
+                                                        <span>Delete</span>
+                                                    </button>
+                                                </li>
+                                            </x-ui.action-dropdown>
+                                        </div>
+                                    </form>
                                 </td>
                             </tr>
                             <tr id="structure-details-{{ $structure->id }}" class="table-light d-none">
@@ -146,27 +161,27 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6 col-12">
-                            <x-ui.input label="Structure/Slab Name" name="name" placeholder="e.g. Slab 0 - 6 Lakhs" required />
+                            <x-ui.odoo-form-ui type="input" label="Structure/Slab Name" name="name" placeholder="e.g. Slab 0 - 6 Lakhs" :required="true" :errorText="$errors->first('name')" />
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.select label="Legal Entity (Company)" name="company_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Legal Entity (Company)" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">Apply to All Companies</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.input label="Min Yearly CTC (₹)" name="min_ctc" type="number" placeholder="0" min="0" required />
+                            <x-ui.odoo-form-ui type="input" label="Min Yearly CTC (₹)" name="min_ctc" inputType="number" placeholder="0" min="0" :required="true" :errorText="$errors->first('min_ctc')" />
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.input label="Max Yearly CTC (₹)" name="max_ctc" type="number" placeholder="600000" min="0" required />
+                            <x-ui.odoo-form-ui type="input" label="Max Yearly CTC (₹)" name="max_ctc" inputType="number" placeholder="600000" min="0" :required="true" :errorText="$errors->first('max_ctc')" />
                         </div>
                         <div class="col-md-12 col-12">
-                            <x-ui.select label="Status" name="status" data-select2-selector="default" required>
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                     </div>
 
@@ -198,23 +213,27 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <select name="components[{{ $comp->id }}][calculation_type]" 
-                                                        class="form-select form-select-sm add-calc-type-select" 
-                                                        data-comp-id="{{ $comp->id }}" 
+                                                <x-ui.odoo-form-ui type="select"
+                                                        name="components[{{ $comp->id }}][calculation_type]"
+                                                        class="add-calc-type-select"
+                                                        data-comp-id="{{ $comp->id }}"
                                                         onchange="handleCalcTypeChange('add', {{ $comp->id }})">
                                                     <option value="not_included">Not Included</option>
                                                     <option value="fixed">Fixed Amount</option>
                                                     <option value="percentage_of_ctc">Percentage of CTC</option>
                                                     <option value="percentage_of_basic">Percentage of Basic</option>
                                                     <option value="balancing">Balancing / Remainder</option>
-                                                </select>
+                                                </x-ui.odoo-form-ui>
                                             </td>
                                             <td>
-                                                <input type="number" step="0.01" 
-                                                       name="components[{{ $comp->id }}][value]" 
-                                                       class="form-control form-control-sm add-value-input" 
-                                                       id="add-value-{{ $comp->id }}" 
-                                                       placeholder="0.00" disabled>
+                                                <x-ui.odoo-form-ui type="input"
+                                                       inputType="number"
+                                                       step="0.01"
+                                                       name="components[{{ $comp->id }}][value]"
+                                                       class="add-value-input"
+                                                       id="add-value-{{ $comp->id }}"
+                                                       placeholder="0.00"
+                                                       :disabled="true" />
                                             </td>
                                         </tr>
                                     @empty
@@ -251,27 +270,27 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6 col-12">
-                            <x-ui.input label="Structure/Slab Name" name="name" id="edit_name" required />
+                            <x-ui.odoo-form-ui type="input" label="Structure/Slab Name" name="name" id="edit_name" :required="true" :errorText="$errors->first('name')" />
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.select label="Legal Entity (Company)" name="company_id" id="edit_company_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Legal Entity (Company)" name="company_id" id="edit_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">Apply to All Companies</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.input label="Min Yearly CTC (₹)" name="min_ctc" id="edit_min_ctc" type="number" required />
+                            <x-ui.odoo-form-ui type="input" label="Min Yearly CTC (₹)" name="min_ctc" id="edit_min_ctc" inputType="number" :required="true" :errorText="$errors->first('min_ctc')" />
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.input label="Max Yearly CTC (₹)" name="max_ctc" id="edit_max_ctc" type="number" required />
+                            <x-ui.odoo-form-ui type="input" label="Max Yearly CTC (₹)" name="max_ctc" id="edit_max_ctc" inputType="number" :required="true" :errorText="$errors->first('max_ctc')" />
                         </div>
                         <div class="col-md-12 col-12">
-                            <x-ui.select label="Status" name="status" id="edit_status" data-select2-selector="default" required>
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                     </div>
 
@@ -303,9 +322,10 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <select name="components[{{ $comp->id }}][calculation_type]" 
-                                                        class="form-select form-select-sm edit-calc-type-select" 
-                                                        data-comp-id="{{ $comp->id }}" 
+                                                <x-ui.odoo-form-ui type="select"
+                                                        name="components[{{ $comp->id }}][calculation_type]"
+                                                        class="edit-calc-type-select"
+                                                        data-comp-id="{{ $comp->id }}"
                                                         id="edit-calc-type-{{ $comp->id }}"
                                                         onchange="handleCalcTypeChange('edit', {{ $comp->id }})">
                                                     <option value="not_included">Not Included</option>
@@ -313,14 +333,17 @@
                                                     <option value="percentage_of_ctc">Percentage of CTC</option>
                                                     <option value="percentage_of_basic">Percentage of Basic</option>
                                                     <option value="balancing">Balancing / Remainder</option>
-                                                </select>
+                                                </x-ui.odoo-form-ui>
                                             </td>
                                             <td>
-                                                <input type="number" step="0.01" 
-                                                       name="components[{{ $comp->id }}][value]" 
-                                                       class="form-control form-control-sm edit-value-input" 
-                                                       id="edit-value-{{ $comp->id }}" 
-                                                       placeholder="0.00" disabled>
+                                                <x-ui.odoo-form-ui type="input"
+                                                       inputType="number"
+                                                       step="0.01"
+                                                       name="components[{{ $comp->id }}][value]"
+                                                       class="edit-value-input"
+                                                       id="edit-value-{{ $comp->id }}"
+                                                       placeholder="0.00"
+                                                       :disabled="true" />
                                             </td>
                                         </tr>
                                     @endforeach
@@ -344,7 +367,7 @@
         <label for="sim_ctc" class="form-label fw-semibold text-dark">Enter Yearly CTC (₹)</label>
         <div class="input-group">
             <span class="input-group-text bg-light text-dark fw-bold">₹</span>
-            <input type="number" id="sim_ctc" class="form-control" placeholder="e.g. 600000" onkeyup="calculateSimulator()" onchange="calculateSimulator()">
+            <x-ui.odoo-form-ui type="input" inputType="number" id="sim_ctc" class="ps-2" placeholder="e.g. 600000" onkeyup="calculateSimulator()" onchange="calculateSimulator()" />
         </div>
         <small class="text-muted d-block mt-1">Slabs will automatically match based on range limits.</small>
     </div>

@@ -40,6 +40,8 @@
                 ['label' => 'Routing', 'route' => 'production.routing.index'],
                 ['label' => 'Planning', 'route' => 'production.plans.index'],
                 ['label' => 'Production Orders', 'route' => 'production.orders.index'],
+                ['label' => 'Scheduling', 'route' => 'production.schedules.index'],
+                ['label' => 'Shop Floor (MES)', 'route' => 'production.mes.dashboard'],
                 'Quality',
                 ['label' => 'Track Status', 'route' => 'production.track-status'],
             ]],

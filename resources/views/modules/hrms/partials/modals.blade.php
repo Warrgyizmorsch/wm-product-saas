@@ -7,6 +7,57 @@
     $salaryComponents = $salaryComponents ?? \App\Domains\HRMS\Models\SalaryComponent::all();
 @endphp
 
+<style>
+    .hrms-entity-form .hrms-section-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 10px 0 14px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+    .hrms-entity-form .hrms-section-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #e5e7eb;
+    }
+    .hrms-entity-form .hrms-logo-panel {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #f8fafc;
+        padding: 16px;
+        height: 100%;
+    }
+
+    /* Override flex label width for cleaner alignment on long labels inside specific modals */
+    #addBuModal .odoo-form-label,
+    #editBuModal .odoo-form-label,
+    #addDeptModal .odoo-form-label,
+    #editDeptModal .odoo-form-label,
+    #addDesigModal .odoo-form-label,
+    #editDesigModal .odoo-form-label,
+    #addBranchModal .odoo-form-label,
+    #editBranchModal .odoo-form-label,
+    #addSalaryStructureModal .odoo-form-label,
+    #editSalaryStructureModal .odoo-form-label {
+        width: 170px !important;
+    }
+
+    /* Stack labels vertically above inputs for address fields in Branch modals */
+    .branch-address-field .odoo-form-group {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+    .branch-address-field .odoo-form-label {
+        width: 100% !important;
+        margin-bottom: 5px !important;
+    }
+</style>
+
 <!-- ============================================ -->
 <!--            LEGAL ENTITIES MODALS             -->
 <!-- ============================================ -->
@@ -70,9 +121,160 @@
     </div>
 </div>
 
+@once
+    @push('scripts')
+        <script>
+            (function () {
+                if (window.hrmsThemedValidationInstalled) {
+                    return;
+                }
+
+                window.hrmsThemedValidationInstalled = true;
+
+                function getFieldLabel(field) {
+                    const group = field.closest('.odoo-form-group');
+                    const label = group ? group.querySelector('.odoo-form-label') : null;
+                    return label ? label.textContent.replace('*', '').trim() : 'This field';
+                }
+
+                function getValidationMessage(field) {
+                    const label = getFieldLabel(field);
+
+                    if (field.validity.valueMissing) {
+                        if (field.tagName === 'SELECT') {
+                            return `Please select ${label.toLowerCase()}.`;
+                        }
+
+                        return `Please enter ${label.toLowerCase()}.`;
+                    }
+
+                    return field.validationMessage || 'Please enter a valid value.';
+                }
+
+                function getErrorAnchor(field) {
+                    if (field.tagName === 'SELECT' && field.nextElementSibling && field.nextElementSibling.classList.contains('select2-container')) {
+                        return field.nextElementSibling;
+                    }
+
+                    const radioWrap = field.closest('.odoo-form-group')?.querySelector('.flex-grow-1');
+                    if (field.type === 'radio' && radioWrap) {
+                        return radioWrap;
+                    }
+
+                    return field;
+                }
+
+                function findErrorElement(field) {
+                    const anchor = getErrorAnchor(field);
+                    const next = anchor.nextElementSibling;
+
+                    if (next && next.classList.contains('hrms-client-validation-error')) {
+                        return next;
+                    }
+
+                    return null;
+                }
+
+                function showFieldError(field) {
+                    field.classList.add('is-invalid');
+                    field.setAttribute('aria-invalid', 'true');
+
+                    const anchor = getErrorAnchor(field);
+                    let error = findErrorElement(field);
+
+                    if (!error) {
+                        error = document.createElement('div');
+                        error.className = 'invalid-feedback d-block fs-11 mt-1 hrms-client-validation-error';
+                        anchor.insertAdjacentElement('afterend', error);
+                    }
+
+                    error.textContent = getValidationMessage(field);
+                }
+
+                function clearFieldError(field) {
+                    field.classList.remove('is-invalid');
+                    field.removeAttribute('aria-invalid');
+
+                    const error = findErrorElement(field);
+                    if (error) {
+                        error.remove();
+                    }
+                }
+
+                function getRequiredFields(form) {
+                    return Array.from(form.querySelectorAll('[required]')).filter(function (field) {
+                        return !field.disabled && field.type !== 'hidden';
+                    });
+                }
+
+                function validateField(field) {
+                    if (field.checkValidity()) {
+                        clearFieldError(field);
+                        return true;
+                    }
+
+                    showFieldError(field);
+                    return false;
+                }
+
+                function focusField(field) {
+                    if (field.tagName === 'SELECT' && field.nextElementSibling && field.nextElementSibling.classList.contains('select2-container')) {
+                        field.nextElementSibling.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        field.nextElementSibling.querySelector('.select2-selection')?.focus();
+                        return;
+                    }
+
+                    field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    field.focus({ preventScroll: true });
+                }
+
+                function bindHrmsValidation(root) {
+                    root.querySelectorAll('form').forEach(function (form) {
+                        if (form.dataset.hrmsThemedValidation === '1' || !form.querySelector('[required]')) {
+                            return;
+                        }
+
+                        form.dataset.hrmsThemedValidation = '1';
+                        form.setAttribute('novalidate', 'novalidate');
+
+                        getRequiredFields(form).forEach(function (field) {
+                            field.addEventListener('input', function () {
+                                validateField(field);
+                            });
+                            field.addEventListener('change', function () {
+                                validateField(field);
+                            });
+                        });
+
+                        form.addEventListener('submit', function (event) {
+                            const invalidField = getRequiredFields(form).find(function (field) {
+                                return !validateField(field);
+                            });
+
+                            if (invalidField) {
+                                event.preventDefault();
+                                event.stopImmediatePropagation();
+                                focusField(invalidField);
+                            }
+                        });
+                    });
+                }
+
+                document.addEventListener('DOMContentLoaded', function () {
+                    bindHrmsValidation(document);
+                });
+
+                document.addEventListener('shown.bs.modal', function (event) {
+                    bindHrmsValidation(event.target);
+                });
+            })();
+        </script>
+    @endpush
+@endonce
+
 <!-- Add Company Modal -->
 <div class="modal fade" id="addCompanyModal" tabindex="-1" aria-labelledby="addCompanyModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="addCompanyModalLabel"><i class="feather-plus me-2 text-primary"></i>Add Legal Entity</h5>
@@ -80,79 +282,99 @@
             </div>
             <form action="{{ route('hrms.company.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
-                <div class="modal-body p-4">
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">Logo: </label>
-                        <div class="d-flex gap-4 align-items-center">
-                            <div class="wd-100 ht-100 position-relative overflow-hidden border border-gray-200 rounded">
-                                <img src="{{ asset('assets/images/avatar/1.png') }}" class="add-upload-pic img-fluid rounded h-100 w-100" id="add_logo_preview" alt="">
-                                <div class="position-absolute start-50 top-50 end-0 translate-middle h-100 w-100 hstack align-items-center justify-content-center c-pointer add-upload-button upload-button" style="background: rgba(0,0,0,0.3); color: white;">
-                                    <i class="feather feather-camera" aria-hidden="true"></i>
+                <input type="hidden" name="form_mode" value="add_company">
+                <div class="modal-body p-4 hrms-entity-form">
+                    <div class="row g-4 align-items-stretch mb-2">
+                        <div class="col-lg-3">
+                            <div class="hrms-logo-panel">
+                                <label class="form-label fw-semibold mb-3">Logo:</label>
+                                <div class="d-flex gap-3 align-items-center">
+                                    <div class="wd-100 ht-100 position-relative overflow-hidden border border-gray-200 rounded bg-white">
+                                        <img src="{{ asset('assets/images/avatar/1.png') }}" class="add-upload-pic img-fluid rounded h-100 w-100" id="add_logo_preview" alt="">
+                                        <div class="position-absolute start-50 top-50 end-0 translate-middle h-100 w-100 hstack align-items-center justify-content-center c-pointer add-upload-button upload-button" style="background: rgba(0,0,0,0.3); color: white;">
+                                            <i class="feather feather-camera" aria-hidden="true"></i>
+                                        </div>
+                                        <input class="add-file-upload" type="file" name="logo" accept="image/*" style="display: none;">
+                                    </div>
+                                    <div class="d-flex flex-column gap-1">
+                                        <div class="fs-11 text-gray-500"># Avatar size 150x150</div>
+                                        <div class="fs-11 text-gray-500"># Max upload size 2mb</div>
+                                        <div class="fs-11 text-gray-500"># Allowed: png, jpg, jpeg</div>
+                                    </div>
                                 </div>
-                                <input class="add-file-upload" type="file" name="logo" accept="image/*" style="display: none;">
                             </div>
-                            <div class="d-flex flex-column gap-1">
-                                <div class="fs-11 text-gray-500"># Avatar size 150x150</div>
-                                <div class="fs-11 text-gray-500"># Max upload size 2mb</div>
-                                <div class="fs-11 text-gray-500"># Allowed: png, jpg, jpeg</div>
+                        </div>
+
+                        <div class="col-lg-9">
+                            <div class="hrms-section-title">Entity identity</div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Company Name" name="company_name" :required="true" placeholder="Enter Company Name" :errorText="$errors->first('company_name')" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Legal Name" name="legal_name" :required="true" placeholder="Enter Legal Name" :errorText="$errors->first('legal_name')" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Currency" name="currency" :required="true" placeholder="e.g. INR, USD" :errorText="$errors->first('currency')" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Timezone" name="time_zone" :required="true" placeholder="e.g. Asia/Kolkata" :errorText="$errors->first('time_zone')" />
+                                </div>
                             </div>
                         </div>
                     </div>
 
+                    <div class="hrms-section-title">Registration details</div>
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <x-ui.input label="Company Name" name="company_name" :required="true" placeholder="Enter Company Name" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="GST Number" name="gst_number" placeholder="Enter GST Number" :errorText="$errors->first('gst_number')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Legal Name" name="legal_name" :required="true" placeholder="Enter Legal Name" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" placeholder="Enter PAN Number" :errorText="$errors->first('pan_number')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="GST Number" name="gst_number" placeholder="Enter GST Number" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="CIN Number" name="cin_number" placeholder="Enter CIN Number" :errorText="$errors->first('cin_number')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="PAN Number" name="pan_number" placeholder="Enter PAN Number" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Registration Number" name="registration_number" placeholder="Enter Registration Number" :errorText="$errors->first('registration_number')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="CIN Number" name="cin_number" placeholder="Enter CIN Number" />
+                    </div>
+
+                    <div class="hrms-section-title">Contact and status</div>
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Email" name="email" inputType="email" placeholder="Enter Email Address" :errorText="$errors->first('email')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Registration Number" name="registration_number" placeholder="Enter Registration Number" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Phone" name="phone" placeholder="Enter Phone Number" :errorText="$errors->first('phone')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Email" name="email" type="email" placeholder="Enter Email Address" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Website" name="website" placeholder="Enter Website URL" :errorText="$errors->first('website')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Phone" name="phone" placeholder="Enter Phone Number" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Website" name="website" placeholder="Enter Website URL" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Currency" name="currency" placeholder="e.g. INR, USD" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Timezone" name="time_zone" placeholder="e.g. Asia/Kolkata" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.select label="Status" name="status" data-select2-selector="default">
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="Country" name="country" placeholder="Country" />
+                    </div>
+
+                    <div class="hrms-section-title">Location</div>
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Country" name="country" placeholder="Country" :errorText="$errors->first('country')" />
                         </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="State" name="state" placeholder="State" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" :errorText="$errors->first('state')" />
                         </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="City" name="city" placeholder="City" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" :errorText="$errors->first('city')" />
                         </div>
-                        <div class="col-md-12">
-                            <x-ui.input label="Postal Code" name="postal_code" placeholder="Postal Code" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" placeholder="Postal Code" :errorText="$errors->first('postal_code')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Address" name="address" rows="3" placeholder="Address Details" />
+                            <x-ui.odoo-form-ui type="textarea" label="Address" name="address" rows="3" placeholder="Address Details" :errorText="$errors->first('address')" />
                         </div>
                     </div>
                 </div>
@@ -167,85 +389,106 @@
 
 <!-- Edit Company Modal -->
 <div class="modal fade" id="editCompanyModal" tabindex="-1" aria-labelledby="editCompanyModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="editCompanyModalLabel"><i class="feather-edit me-2 text-primary"></i>Edit Legal Entity</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="company_edit_form" method="POST" enctype="multipart/form-data">
+            <form id="company_edit_form" method="POST" action="{{ old('form_mode') === 'edit_company' && old('edit_company_id') ? route('hrms.company.update', ['company' => old('edit_company_id')]) : '' }}" enctype="multipart/form-data">
                 @csrf
-                <div class="modal-body p-4">
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">Logo: </label>
-                        <div class="d-flex gap-4 align-items-center">
-                            <div class="wd-100 ht-100 position-relative overflow-hidden border border-gray-200 rounded">
-                                <img src="" class="edit-upload-pic img-fluid rounded h-100 w-100" id="edit_logo_preview" alt="">
-                                <div class="position-absolute start-50 top-50 end-0 translate-middle h-100 w-100 hstack align-items-center justify-content-center c-pointer edit-upload-button upload-button" style="background: rgba(0,0,0,0.3); color: white;">
-                                    <i class="feather feather-camera" aria-hidden="true"></i>
+                <input type="hidden" name="form_mode" value="edit_company">
+                <input type="hidden" name="edit_company_id" id="edit_company_id" value="{{ old('edit_company_id') }}">
+                <div class="modal-body p-4 hrms-entity-form">
+                    <div class="row g-4 align-items-stretch mb-2">
+                        <div class="col-lg-3">
+                            <div class="hrms-logo-panel">
+                                <label class="form-label fw-semibold mb-3">Logo:</label>
+                                <div class="d-flex gap-3 align-items-center">
+                                    <div class="wd-100 ht-100 position-relative overflow-hidden border border-gray-200 rounded bg-white">
+                                        <img src="" class="edit-upload-pic img-fluid rounded h-100 w-100" id="edit_logo_preview" alt="">
+                                        <div class="position-absolute start-50 top-50 end-0 translate-middle h-100 w-100 hstack align-items-center justify-content-center c-pointer edit-upload-button upload-button" style="background: rgba(0,0,0,0.3); color: white;">
+                                            <i class="feather feather-camera" aria-hidden="true"></i>
+                                        </div>
+                                        <input class="edit-file-upload" type="file" name="logo" accept="image/*" style="display: none;">
+                                    </div>
+                                    <div class="d-flex flex-column gap-1">
+                                        <div class="fs-11 text-gray-500"># Upload new logo to replace</div>
+                                    </div>
                                 </div>
-                                <input class="edit-file-upload" type="file" name="logo" accept="image/*" style="display: none;">
                             </div>
-                            <div class="d-flex flex-column gap-1">
-                                <div class="fs-11 text-gray-500"># Upload new logo to replace</div>
+                        </div>
+
+                        <div class="col-lg-9">
+                            <div class="hrms-section-title">Entity identity</div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Company Name" name="company_name" id="edit_company_name" :required="true" :errorText="$errors->first('company_name')" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Legal Name" name="legal_name" id="edit_legal_name" :required="true" :errorText="$errors->first('legal_name')" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Currency" name="currency" id="edit_currency" :required="true" :errorText="$errors->first('currency')" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Timezone" name="time_zone" id="edit_timezone" :required="true" :errorText="$errors->first('time_zone')" />
+                                </div>
                             </div>
                         </div>
                     </div>
 
+                    <div class="hrms-section-title">Registration details</div>
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <x-ui.input label="Company Name" name="company_name" id="edit_company_name" :required="true" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="GST Number" name="gst_number" id="edit_gst_number" :errorText="$errors->first('gst_number')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Legal Name" name="legal_name" id="edit_legal_name" :required="true" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" id="edit_pan_number" :errorText="$errors->first('pan_number')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="GST Number" name="gst_number" id="edit_gst_number" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="CIN Number" name="cin_number" id="edit_cin_number" :errorText="$errors->first('cin_number')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="PAN Number" name="pan_number" id="edit_pan_number" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Registration Number" name="registration_number" id="edit_registration_number" :errorText="$errors->first('registration_number')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="CIN Number" name="cin_number" id="edit_cin_number" />
+                    </div>
+
+                    <div class="hrms-section-title">Contact and status</div>
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Email" name="email" id="edit_email" inputType="email" :errorText="$errors->first('email')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Registration Number" name="registration_number" id="edit_registration_number" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Phone" name="phone" id="edit_phone" :errorText="$errors->first('phone')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Email" name="email" id="edit_email" type="email" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Website" name="website" id="edit_website" :errorText="$errors->first('website')" />
                         </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Phone" name="phone" id="edit_phone" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Website" name="website" id="edit_website" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Currency" name="currency" id="edit_currency" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.input label="Timezone" name="time_zone" id="edit_timezone" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.select label="Status" name="status" id="edit_status" data-select2-selector="default">
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="Country" name="country" id="edit_country" />
+                    </div>
+
+                    <div class="hrms-section-title">Location</div>
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Country" name="country" id="edit_country" :errorText="$errors->first('country')" />
                         </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="State" name="state" id="edit_state" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="State" name="state" id="edit_state" :errorText="$errors->first('state')" />
                         </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="City" name="city" id="edit_city" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="City" name="city" id="edit_city" :errorText="$errors->first('city')" />
                         </div>
-                        <div class="col-md-12">
-                            <x-ui.input label="Postal Code" name="postal_code" id="edit_postal_code" />
+                        <div class="col-lg-6">
+                            <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" id="edit_postal_code" :errorText="$errors->first('postal_code')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Address" name="address" id="edit_address" rows="3" />
+                            <x-ui.odoo-form-ui type="textarea" label="Address" name="address" id="edit_address" rows="3" :errorText="$errors->first('address')" />
                         </div>
                     </div>
                 </div>
@@ -265,7 +508,7 @@
 
 <!-- View BU Modal -->
 <div class="modal fade" id="viewBuModal" tabindex="-1" aria-labelledby="viewBuModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-soft-primary text-primary py-3">
                 <h5 class="modal-title fw-bold" id="viewBuModalLabel"><i class="feather-info me-2"></i>Business Unit Details</h5>
@@ -310,7 +553,7 @@
 
 <!-- Add BU Modal -->
 <div class="modal fade" id="addBuModal" tabindex="-1" aria-labelledby="addBuModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="addBuModalLabel"><i class="feather-plus me-2 text-primary"></i>Add Business Unit</h5>
@@ -320,28 +563,28 @@
                 @csrf
                 <div class="modal-body p-4">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <x-ui.input label="Business Unit Name" name="name" :required="true" placeholder="Enter Unit Name" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Business Unit Name" name="name" :required="true" placeholder="Enter Unit Name" :errorText="$errors->first('name')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.input label="Business Unit Code" name="code" :required="true" placeholder="Enter Code" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Business Unit Code" name="code" :required="true" placeholder="Enter Code" :errorText="$errors->first('code')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Company" name="company_id" :required="true" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Company" name="company_id" :required="true" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">Select Parent Company</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Status" name="status" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Description" name="description" rows="3" placeholder="Enter description details" />
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="3" placeholder="Enter description details" :errorText="$errors->first('description')" />
                         </div>
                     </div>
                 </div>
@@ -356,7 +599,7 @@
 
 <!-- Edit BU Modal -->
 <div class="modal fade" id="editBuModal" tabindex="-1" aria-labelledby="editBuModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="editBuModalLabel"><i class="feather-edit me-2 text-primary"></i>Edit Business Unit</h5>
@@ -366,27 +609,27 @@
                 @csrf
                 <div class="modal-body p-4">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <x-ui.input label="Business Unit Name" name="name" id="edit_bu_name" :required="true" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Business Unit Name" name="name" id="edit_bu_name" :required="true" :errorText="$errors->first('name')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.input label="Business Unit Code" name="code" id="edit_bu_code" :required="true" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Business Unit Code" name="code" id="edit_bu_code" :required="true" :errorText="$errors->first('code')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Company" name="company_id" id="edit_bu_company_id" :required="true" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Company" name="company_id" id="edit_bu_company_id" :required="true" select2-selector="default" :errorText="$errors->first('company_id')">
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Status" name="status" id="edit_bu_status" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_bu_status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Description" name="description" id="edit_bu_description" rows="3" />
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_bu_description" rows="3" :errorText="$errors->first('description')" />
                         </div>
                     </div>
                 </div>
@@ -473,61 +716,61 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <x-ui.input label="Branch Name" name="name" :required="true" placeholder="Enter Branch Name" />
+                            <x-ui.odoo-form-ui type="input" label="Branch Name" name="name" :required="true" placeholder="Enter Branch Name" :errorText="$errors->first('name')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input label="Branch Code" name="code" :required="true" placeholder="Enter Code" />
+                            <x-ui.odoo-form-ui type="input" label="Branch Code" name="code" :required="true" placeholder="Enter Code" :errorText="$errors->first('code')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">Select Company (Required if no Business Unit)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6">
-                            <x-ui.select label="Parent Business Unit" name="business_unit_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Parent Business Unit" name="business_unit_id" select2-selector="default" :errorText="$errors->first('business_unit_id')">
                                 <option value="">Select Business Unit (Optional)</option>
                                 @foreach($businessUnits as $buUnit)
                                     <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6">
-                            <x-ui.select label="Branch Manager" name="manager_employee_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Branch Manager" name="manager_employee_id" select2-selector="default" :errorText="$errors->first('manager_employee_id')">
                                 <option value="">Select Manager (Optional)</option>
                                 @foreach($employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input label="Phone" name="phone" placeholder="Enter Phone" />
+                            <x-ui.odoo-form-ui type="input" label="Phone" name="phone" placeholder="Enter Phone" :errorText="$errors->first('phone')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input label="Email" name="email" type="email" placeholder="Enter Email" />
-                        </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="Country" name="country" placeholder="Country" />
-                        </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="State" name="state" placeholder="State" />
-                        </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="City" name="city" placeholder="City" />
+                            <x-ui.odoo-form-ui type="input" label="Email" name="email" inputType="email" placeholder="Enter Email" :errorText="$errors->first('email')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input label="Postal Code" name="postal_code" placeholder="Postal Code" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.select label="Status" name="status" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-md-3 branch-address-field">
+                            <x-ui.odoo-form-ui type="input" label="Country" name="country" placeholder="Country" :errorText="$errors->first('country')" />
+                        </div>
+                        <div class="col-md-3 branch-address-field">
+                            <x-ui.odoo-form-ui type="input" label="State" name="state" placeholder="State" :errorText="$errors->first('state')" />
+                        </div>
+                        <div class="col-md-3 branch-address-field">
+                            <x-ui.odoo-form-ui type="input" label="City" name="city" placeholder="City" :errorText="$errors->first('city')" />
+                        </div>
+                        <div class="col-md-3 branch-address-field">
+                            <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" placeholder="Postal Code" :errorText="$errors->first('postal_code')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Address" name="address" rows="3" placeholder="Address Details" />
+                            <x-ui.odoo-form-ui type="textarea" label="Address" name="address" rows="3" placeholder="Address Details" :errorText="$errors->first('address')" />
                         </div>
                     </div>
                 </div>
@@ -553,61 +796,61 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <x-ui.input label="Branch Name" name="name" id="edit_branch_name" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="Branch Name" name="name" id="edit_branch_name" :required="true" :errorText="$errors->first('name')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input label="Branch Code" name="code" id="edit_branch_code" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="Branch Code" name="code" id="edit_branch_code" :required="true" :errorText="$errors->first('code')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" id="edit_branch_company_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" id="edit_branch_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">Select Company (Required if no Business Unit)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6">
-                            <x-ui.select label="Parent Business Unit" name="business_unit_id" id="edit_branch_bu_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Parent Business Unit" name="business_unit_id" id="edit_branch_bu_id" select2-selector="default" :errorText="$errors->first('business_unit_id')">
                                 <option value="">Select Business Unit (Optional)</option>
                                 @foreach($businessUnits as $buUnit)
                                     <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6">
-                            <x-ui.select label="Branch Manager" name="manager_employee_id" id="edit_branch_manager_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Branch Manager" name="manager_employee_id" id="edit_branch_manager_id" select2-selector="default" :errorText="$errors->first('manager_employee_id')">
                                 <option value="">Select Manager (Optional)</option>
                                 @foreach($employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input label="Phone" name="phone" id="edit_branch_phone" />
+                            <x-ui.odoo-form-ui type="input" label="Phone" name="phone" id="edit_branch_phone" :errorText="$errors->first('phone')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input label="Email" name="email" id="edit_branch_email" type="email" />
-                        </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="Country" name="country" id="edit_branch_country" />
-                        </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="State" name="state" id="edit_branch_state" />
-                        </div>
-                        <div class="col-md-4">
-                            <x-ui.input label="City" name="city" id="edit_branch_city" />
+                            <x-ui.odoo-form-ui type="input" label="Email" name="email" id="edit_branch_email" inputType="email" :errorText="$errors->first('email')" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.input label="Postal Code" name="postal_code" id="edit_branch_postal_code" />
-                        </div>
-                        <div class="col-md-6">
-                            <x-ui.select label="Status" name="status" id="edit_branch_status" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_branch_status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-md-3 branch-address-field">
+                            <x-ui.odoo-form-ui type="input" label="Country" name="country" id="edit_branch_country" :errorText="$errors->first('country')" />
+                        </div>
+                        <div class="col-md-3 branch-address-field">
+                            <x-ui.odoo-form-ui type="input" label="State" name="state" id="edit_branch_state" :errorText="$errors->first('state')" />
+                        </div>
+                        <div class="col-md-3 branch-address-field">
+                            <x-ui.odoo-form-ui type="input" label="City" name="city" id="edit_branch_city" :errorText="$errors->first('city')" />
+                        </div>
+                        <div class="col-md-3 branch-address-field">
+                            <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" id="edit_branch_postal_code" :errorText="$errors->first('postal_code')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Address" name="address" id="edit_branch_address" rows="3" />
+                            <x-ui.odoo-form-ui type="textarea" label="Address" name="address" id="edit_branch_address" rows="3" :errorText="$errors->first('address')" />
                         </div>
                     </div>
                 </div>
@@ -672,7 +915,7 @@
 
 <!-- Add Dept Modal -->
 <div class="modal fade" id="addDeptModal" tabindex="-1" aria-labelledby="addDeptModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="addDeptModalLabel"><i class="feather-plus me-2 text-primary"></i>Add Department</h5>
@@ -682,52 +925,52 @@
                 @csrf
                 <div class="modal-body p-4">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <x-ui.input label="Department Name" name="name" :required="true" placeholder="Enter Department Name" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Department Name" name="name" :required="true" placeholder="Enter Department Name" :errorText="$errors->first('name')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.input label="Department Code" name="code" :required="true" placeholder="Enter Code" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Department Code" name="code" :required="true" placeholder="Enter Code" :errorText="$errors->first('code')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">Select Company (Required if no Branch/Business Unit)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Business Unit" name="business_unit_id" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Business Unit" name="business_unit_id" select2-selector="default" :errorText="$errors->first('business_unit_id')">
                                 <option value="">Select Business Unit (Optional)</option>
                                 @foreach($businessUnits as $buUnit)
                                     <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Branch" name="branch_id" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Branch" name="branch_id" select2-selector="default" :errorText="$errors->first('branch_id')">
                                 <option value="">Select Branch (Optional)</option>
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Department Head" name="head_employee_id" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Department Head" name="head_employee_id" select2-selector="default" :errorText="$errors->first('head_employee_id')">
                                 <option value="">Select Department Head (Optional)</option>
                                 @foreach($employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Status" name="status" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Description" name="description" rows="3" placeholder="Enter description details" />
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="3" placeholder="Enter description details" :errorText="$errors->first('description')" />
                         </div>
                     </div>
                 </div>
@@ -742,7 +985,7 @@
 
 <!-- Edit Dept Modal -->
 <div class="modal fade" id="editDeptModal" tabindex="-1" aria-labelledby="editDeptModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="editDeptModalLabel"><i class="feather-edit me-2 text-primary"></i>Edit Department</h5>
@@ -752,52 +995,52 @@
                 @csrf
                 <div class="modal-body p-4">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <x-ui.input label="Department Name" name="name" id="edit_dept_name" :required="true" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Department Name" name="name" id="edit_dept_name" :required="true" :errorText="$errors->first('name')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.input label="Department Code" name="code" id="edit_dept_code" :required="true" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Department Code" name="code" id="edit_dept_code" :required="true" :errorText="$errors->first('code')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" id="edit_dept_company_id" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" id="edit_dept_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">Select Company (Required if no Branch/Business Unit)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Business Unit" name="business_unit_id" id="edit_dept_bu_id" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Business Unit" name="business_unit_id" id="edit_dept_bu_id" select2-selector="default" :errorText="$errors->first('business_unit_id')">
                                 <option value="">Select Business Unit (Optional)</option>
                                 @foreach($businessUnits as $buUnit)
                                     <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Branch" name="branch_id" id="edit_dept_branch_id" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Branch" name="branch_id" id="edit_dept_branch_id" select2-selector="default" :errorText="$errors->first('branch_id')">
                                 <option value="">Select Branch (Optional)</option>
                                 @foreach($branches as $branch)
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Department Head" name="head_employee_id" id="edit_dept_head_id" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Department Head" name="head_employee_id" id="edit_dept_head_id" select2-selector="default" :errorText="$errors->first('head_employee_id')">
                                 <option value="">Select Department Head (Optional)</option>
                                 @foreach($employees as $employee)
                                     <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Status" name="status" id="edit_dept_status" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_dept_status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Description" name="description" id="edit_dept_description" rows="3" />
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_dept_description" rows="3" :errorText="$errors->first('description')" />
                         </div>
                     </div>
                 </div>
@@ -858,7 +1101,7 @@
 
 <!-- Add Desig Modal -->
 <div class="modal fade" id="addDesigModal" tabindex="-1" aria-labelledby="addDesigModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="addDesigModalLabel"><i class="feather-plus me-2 text-primary"></i>Add Designation</h5>
@@ -868,28 +1111,28 @@
                 @csrf
                 <div class="modal-body p-4">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <x-ui.input label="Designation Name" name="name" :required="true" placeholder="Enter Designation Name" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Designation Name" name="name" :required="true" placeholder="Enter Designation Name" :errorText="$errors->first('name')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.input label="Grade Level" name="level" placeholder="Enter Grade Level (e.g. L1, L2)" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Grade Level" name="level" placeholder="Enter Grade Level (e.g. L1, L2)" :errorText="$errors->first('level')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Department" name="department_id" :required="true" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Department" name="department_id" :required="true" select2-selector="default" :errorText="$errors->first('department_id')">
                                 <option value="">Select Department</option>
                                 @foreach($departments as $dept)
                                     <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Status" name="status" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Description" name="description" rows="3" placeholder="Enter description details" />
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="3" placeholder="Enter description details" :errorText="$errors->first('description')" />
                         </div>
                     </div>
                 </div>
@@ -903,8 +1146,9 @@
 </div>
 
 <!-- Edit Desig Modal -->
+<!-- Edit Desig Modal -->
 <div class="modal fade" id="editDesigModal" tabindex="-1" aria-labelledby="editDesigModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold" id="editDesigModalLabel"><i class="feather-edit me-2 text-primary"></i>Edit Designation</h5>
@@ -914,28 +1158,28 @@
                 @csrf
                 <div class="modal-body p-4">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <x-ui.input label="Designation Name" name="name" id="edit_desig_name" :required="true" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Designation Name" name="name" id="edit_desig_name" :required="true" :errorText="$errors->first('name')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.input label="Grade Level" name="level" id="edit_desig_level" />
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="input" label="Grade Level" name="level" id="edit_desig_level" :errorText="$errors->first('level')" />
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Parent Department" name="department_id" id="edit_desig_dept_id" :required="true" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Parent Department" name="department_id" id="edit_desig_dept_id" :required="true" select2-selector="default" :errorText="$errors->first('department_id')">
                                 <option value="">Select Department</option>
                                 @foreach($departments as $dept)
                                     <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
-                        <div class="col-12">
-                            <x-ui.select label="Status" name="status" id="edit_desig_status" data-select2-selector="default">
+                        <div class="col-md-6">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_desig_status" select2-selector="default" :errorText="$errors->first('status')">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Description" name="description" id="edit_desig_description" rows="3" />
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_desig_description" rows="3" :errorText="$errors->first('description')" />
                         </div>
                     </div>
                 </div>
@@ -961,34 +1205,34 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.input label="Component Name" name="name" :required="true" placeholder="Enter Component Name (e.g. Basic Salary)" />
+                            <x-ui.odoo-form-ui type="input" label="Component Name" name="name" :required="true" placeholder="Enter Component Name (e.g. Basic Salary)" :errorText="$errors->first('name')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.input label="Code" name="code" :required="true" placeholder="Enter Component Code (e.g. BASIC)" />
+                            <x-ui.odoo-form-ui type="input" label="Code" name="code" :required="true" placeholder="Enter Component Code (e.g. BASIC)" :errorText="$errors->first('code')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.select label="Type" name="type" :required="true" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Type" name="type" :required="true" select2-selector="default" :errorText="$errors->first('type')">
                                 <option value="earning">Earning</option>
                                 <option value="deduction">Deduction</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <input type="hidden" name="calculation_type" value="fixed">
                         <div class="col-12">
-                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">All Entities (Global)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.select label="Status" name="status" data-select2-selector="status">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="status" :errorText="$errors->first('status')">
                                 <option value="1" data-bg="bg-success" selected>Active</option>
                                 <option value="0" data-bg="bg-danger">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Description" name="description" rows="3" placeholder="Enter description details" />
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="3" placeholder="Enter description details" :errorText="$errors->first('description')" />
                         </div>
                     </div>
                 </div>
@@ -1014,34 +1258,34 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.input label="Component Name" name="name" id="edit_sc_name" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="Component Name" name="name" id="edit_sc_name" :required="true" :errorText="$errors->first('name')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.input label="Code" name="code" id="edit_sc_code" :required="true" />
+                            <x-ui.odoo-form-ui type="input" label="Code" name="code" id="edit_sc_code" :required="true" :errorText="$errors->first('code')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.select label="Type" name="type" id="edit_sc_type" :required="true" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Type" name="type" id="edit_sc_type" :required="true" select2-selector="default" :errorText="$errors->first('type')">
                                 <option value="earning">Earning</option>
                                 <option value="deduction">Deduction</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <input type="hidden" name="calculation_type" id="edit_sc_calculation_type" value="fixed">
                         <div class="col-12">
-                            <x-ui.select label="Parent Company / Legal Entity" name="company_id" id="edit_sc_company_id" data-select2-selector="default">
+                            <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" id="edit_sc_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
                                 <option value="">All Entities (Global)</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.select label="Status" name="status" id="edit_sc_status" data-select2-selector="status">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_sc_status" select2-selector="status" :errorText="$errors->first('status')">
                                 <option value="1" data-bg="bg-success">Active</option>
                                 <option value="0" data-bg="bg-danger">Inactive</option>
-                            </x-ui.select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         <div class="col-12">
-                            <x-ui.textarea label="Description" name="description" id="edit_sc_description" rows="3" />
+                            <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_sc_description" rows="3" :errorText="$errors->first('description')" />
                         </div>
                     </div>
                 </div>

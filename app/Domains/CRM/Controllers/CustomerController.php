@@ -3,6 +3,7 @@
 namespace App\Domains\CRM\Controllers;
 
 use App\Core\Tenant\TenantContext;
+use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Services\CustomerService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +20,8 @@ class CustomerController extends Controller
 
     public function index(): View
     {
+        $this->authorize('viewAny', Customer::class);
+
         return view('modules.crm.customers.index', [
             'summary' => $this->customers->summary(),
             'customers' => $this->customers->latestActive(),
@@ -27,11 +30,15 @@ class CustomerController extends Controller
 
     public function create(): View
     {
+        $this->authorize('create', Customer::class);
+
         return view('modules.crm.customers.create');
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Customer::class);
+
         $tenantId = tenant_id() ?? app(TenantContext::class)->id();
 
         $validated = $request->validate([

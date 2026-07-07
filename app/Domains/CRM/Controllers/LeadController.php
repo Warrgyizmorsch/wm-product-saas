@@ -21,6 +21,8 @@ class LeadController extends Controller
      */
     public function index(QuotationService $quotationService)
     {
+        $this->authorize('viewAny', Lead::class);
+
         // Direct DB fetch
         $leads = Lead::latest()->get();
 
@@ -48,6 +50,8 @@ class LeadController extends Controller
      */
     public function trackStatus()
     {
+        $this->authorize('viewAny', Lead::class);
+
         return view('modules.crm.leads.track-status');
     }
 
@@ -56,6 +60,8 @@ class LeadController extends Controller
      */
     public function create()
     {
+        $this->authorize('create', Lead::class);
+
         $lead = new Lead();
         $users = User::orderBy('name')->get();
         $products = Product::whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
@@ -68,6 +74,9 @@ class LeadController extends Controller
     public function show(Lead $lead)
     {
         $lead->load(['followups', 'histories.user', 'leadDocuments']);
+        $this->authorize('view', $lead);
+
+        $lead->load(['followups', 'histories.user']);
         $users = User::orderBy('name')->get();
 
         // Step 1: Get the linked customer using email/phone
@@ -117,6 +126,8 @@ class LeadController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', Lead::class);
+
         $rules = [
             'lead_owner_id' => 'nullable|exists:users,id',
             'company_name' => 'required|string|max:255',
@@ -224,6 +235,8 @@ class LeadController extends Controller
      */
     public function edit(Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         $users = User::orderBy('name')->get();
         $products = Product::whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
         return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
@@ -234,6 +247,8 @@ class LeadController extends Controller
      */
     public function update(Request $request, Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         $rules = [
             'lead_owner_id' => 'nullable|exists:users,id',
             'company_name' => 'required|string|max:255',
@@ -335,6 +350,8 @@ class LeadController extends Controller
      */
     public function updateStatus(Request $request, Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         $validated = $request->validate([
             'status' => 'required|string|in:New,Follow-up Scheduled,Contacted,Qualified,Converted,Lost',
         ]);
@@ -401,6 +418,8 @@ class LeadController extends Controller
      */
     public function updateOwner(Request $request, Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         $validated = $request->validate([
             'lead_owner_id' => 'nullable|exists:users,id',
         ]);
@@ -423,6 +442,7 @@ class LeadController extends Controller
             Storage::disk('public')->delete($document->file_path);
             $document->delete();
         });
+        $this->authorize('delete', $lead);
 
         $lead->delete();
         return redirect()->route('crm.leads.index')->with('success', 'Lead successfully deleted from Database!');
@@ -519,6 +539,8 @@ class LeadController extends Controller
      */
     public function convertToQuotation(Lead $lead)
     {
+        $this->authorize('update', $lead);
+
         // 1. Ensure the customer record is created for this lead as inactive
         $existingCustomer = null;
         if ($lead->email) {

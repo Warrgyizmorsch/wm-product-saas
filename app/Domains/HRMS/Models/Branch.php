@@ -27,7 +27,7 @@ class Branch extends Model
     ];
 
     /**
-     * Branch belongs to a Company (when business unit is skipped).
+     * Branch belongs to a Company.
      */
     public function company()
     {
