@@ -19,13 +19,10 @@
             </form>
         @endif
 
-        @if ($order->status === 'Confirmed')
-            <form action="{{ route('sales.orders.ship', $order->id) }}" method="POST" class="d-inline d-print-none">
-                @csrf
-                <button type="submit" class="btn btn-primary">
-                    <i class="feather-truck me-2"></i>Mark as Shipped
-                </button>
-            </form>
+        @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
+            <a href="{{ route('sales.deliveries.create', ['sales_order_id' => $order->id]) }}" class="btn btn-primary d-print-none">
+                <i class="feather-truck me-2"></i>Create Delivery
+            </a>
         @endif
 
         @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
@@ -103,6 +100,7 @@
                     @php
                         $badgeClass = 'bg-soft-secondary text-secondary';
                         if ($order->status === 'Confirmed') $badgeClass = 'bg-soft-info text-info';
+                        elseif ($order->status === 'Partially Shipped') $badgeClass = 'bg-soft-warning text-warning';
                         elseif ($order->status === 'Shipped') $badgeClass = 'bg-soft-success text-success';
                         elseif ($order->status === 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
                     @endphp
@@ -155,7 +153,8 @@
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>
                             <th class="ps-3" style="width: 5%;">#</th>
-                            <th style="width: 35%;">Product Details</th>
+                            <th style="width: 25%;">Product Details</th>
+                            <th style="width: 15%;">Warehouse</th>
                             <th class="text-center" style="width: 10%;">Qty</th>
                             <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
                             <th class="text-end" style="width: 10%;">Tax Rate</th>
@@ -175,6 +174,9 @@
                                     @if($item->description)
                                         <small class="text-muted d-block mt-0.5">{{ $item->description }}</small>
                                     @endif
+                                </td>
+                                <td>
+                                    {{ $item->warehouse?->name ?? '—' }}
                                 </td>
                                 <td class="text-center">{{ $item->quantity }}</td>
                                 <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
@@ -257,6 +259,51 @@
             </div>
         </div>
     </div>
+
+    <!-- Associated Delivery Orders (Fulfillment List) -->
+    @php
+        $deliveries = \App\Domains\Sales\Models\DeliveryOrder::where('sales_order_id', $order->id)->latest()->get();
+    @endphp
+    @if ($deliveries->isNotEmpty())
+        <div class="card border-0 shadow-sm mt-4 d-print-none">
+            <div class="card-body p-4">
+                <h5 class="fw-bold text-dark mb-3"><i class="feather-truck me-2 text-primary"></i>Fulfillment History (Delivery Orders)</h5>
+                <div class="table-responsive">
+                    <table class="table odoo-table align-middle bg-white rounded border">
+                        <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                            <tr>
+                                <th class="ps-3">Delivery Number</th>
+                                <th>Date</th>
+                                <th>Carrier</th>
+                                <th>Tracking Number</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-end pe-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="fs-13 text-dark">
+                            @foreach ($deliveries as $do)
+                                @php
+                                    $doBadge = 'bg-soft-secondary text-secondary';
+                                    if ($do->status === 'Shipped') $doBadge = 'bg-soft-success text-success';
+                                    elseif ($do->status === 'Cancelled') $doBadge = 'bg-soft-danger text-danger';
+                                @endphp
+                                <tr>
+                                    <td class="ps-3 fw-bold"><a href="{{ route('sales.deliveries.show', $do->id) }}" class="text-primary">{{ $do->delivery_number }}</a></td>
+                                    <td>{{ $do->delivery_date->format('d/m/Y') }}</td>
+                                    <td>{{ $do->carrier ?: '—' }}</td>
+                                    <td>{{ $do->tracking_number ?: '—' }}</td>
+                                    <td class="text-center"><span class="badge {{ $doBadge }} px-2 py-0.5">{{ $do->status }}</span></td>
+                                    <td class="text-end pe-3">
+                                        <a href="{{ route('sales.deliveries.show', $do->id) }}" class="btn btn-xs btn-outline-primary fw-bold">View Delivery</a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @endif
 @endsection
 
 @push('styles')

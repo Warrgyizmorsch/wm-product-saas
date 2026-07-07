@@ -64,17 +64,14 @@
                     <i class="feather-arrow-left me-1"></i> Back
                 </a>
 
-                <!-- More Actions 3-Dot Dropdown -->
-                <div class="dropdown d-inline-block">
-                    <button class="btn btn-xs btn-outline-secondary fw-bold py-1 px-2 rounded bg-white text-dark border-secondary d-inline-flex align-items-center justify-content-center" type="button" id="headerMoreActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 11px; height: 25px; width: 25px;">
-                        <i class="feather-more-horizontal fs-12"></i>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="headerMoreActionsDropdown" style="font-size: 12px; min-width: 140px; border-radius: 4px;">
-                        <li>
-                            <a class="dropdown-item py-2" href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}">Edit Lead</a>
-                        </li>
-                    </ul>
-                </div>
+                <!-- More Actions 3-Dot Dropdown using common component -->
+                <x-ui.action-dropdown id="leadProfileActionsDropdown">
+                    <li>
+                        <a class="dropdown-item py-2" href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}">
+                            <i class="feather-edit me-1.5 text-muted"></i> Edit Lead
+                        </a>
+                    </li>
+                </x-ui.action-dropdown>
                 
                 <!-- Pagination Arrows -->
                 <div class="d-flex align-items-center ms-1 border rounded px-1 py-0.5 bg-white">
@@ -127,6 +124,9 @@
                         <li class="nav-item">
                             <a href="#sectionRequirements" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Requirements</a>
                         </li>
+                        <li class="nav-item">
+                            <a href="#sectionDocuments" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Lead Documents</a>
+                        </li>
                         @if ($activeQuotation && $activeQuotation->getRevisionHistory()->count() > 1)
                             <li class="nav-item">
                                 <a href="#sectionQuotationHistory" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">Quotation Revision History</a>
@@ -172,179 +172,105 @@
                 <div class="pt-2 px-3 pb-3 tab-content" id="zohoLeadTabsContent">
                     
                     <!-- ==================== TAB 1: OVERVIEW PANE ==================== -->
-                    <div class="tab-pane fade show {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') ? 'active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
+                    <div class="tab-pane fade show {{ !request()->has('create_quotation') && !request()->has('edit_quotation') && !request()->has('view_quotation') && old('form_type') !== 'quotation_create' && old('form_type') !== 'quotation_edit' ? 'active' : '' }}" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab">
                         
-                        @if (request()->has('edit_lead'))
+                        @if (request()->has('edit_lead') || old('form_type') === 'lead_edit')
                             <!-- ==================== STATE: EDIT LEAD FORM ==================== -->
-                            <form action="{{ route('crm.leads.update', $lead->id) }}" method="POST">
-                                @csrf
-                                @method('PUT')
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
-                                    <h5 class="fw-bold text-dark mb-0">Edit Lead details</h5>
-                                    <div class="d-flex gap-2">
-                                        <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-sm btn-light border fs-12">Cancel</a>
-                                        <button type="submit" class="btn btn-sm btn-primary py-1.5 px-3 fw-bold fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Changes</button>
-                                    </div>
-                                </div>
-
-                                <div class="row g-4 fs-13 text-dark">
-                                    <div class="col-md-6 border-end">
-                                        <h6 class="fw-bold text-primary mb-3">Company & Contact Info</h6>
+                            <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
+                                <div class="card-body p-3">
+                                    <form action="{{ route('crm.leads.update', $lead->id) }}" method="POST" class="odoo-sheet" novalidate>
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="form_type" value="lead_edit">
                                         
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Company Name <span class="text-danger">*</span></label>
-                                            <div class="flex-grow-1">
-                                                <input type="text" name="company_name" value="{{ old('company_name', $lead->company_name) }}" class="odoo-form-control" required placeholder="e.g. Acme Corporation">
+                                        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2 flex-wrap gap-2">
+                                            <h5 class="fw-bold text-dark mb-0">Edit Lead details</h5>
+                                            <div class="d-flex gap-2">
+                                                <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-sm btn-light border fs-12">Cancel</a>
+                                                <button type="submit" class="btn btn-sm btn-primary py-1.5 px-3 fw-bold fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Changes</button>
                                             </div>
                                         </div>
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Contact Person</label>
-                                            <div class="flex-grow-1">
-                                                <input type="text" name="contact_person" value="{{ old('contact_person', $lead->contact_person) }}" class="odoo-form-control" placeholder="Contact Representative">
-                                            </div>
-                                        </div>
+                                        <div class="row g-4 fs-13 text-dark">
+                                            <div class="col-md-6 border-end">
+                                                <h6 class="fw-bold text-primary mb-3">Company & Contact Info</h6>
+                                                
+                                                <x-ui.odoo-form-ui type="input" label="Call Date" name="call_date" id="lead_call_date_picker" :value="old('call_date', $lead->call_date ? $lead->call_date->format('Y-m-d h:i A') : '')" required="true" :errorText="$errors->first('call_date')" />
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Email Address</label>
-                                            <div class="flex-grow-1">
-                                                <input type="email" name="email" value="{{ old('email', $lead->email) }}" class="odoo-form-control" placeholder="email@address.com">
-                                            </div>
-                                        </div>
+                                                <x-ui.odoo-form-ui type="input" label="Company Name" name="company_name" :value="old('company_name', $lead->company_name)" required="true" placeholder="Company Name" :errorText="$errors->first('company_name')" />
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Phone Number</label>
-                                            <div class="flex-grow-1">
-                                                <input type="text" name="phone" value="{{ old('phone', $lead->phone) }}" class="odoo-form-control" placeholder="+00 000 000 0000">
-                                            </div>
-                                        </div>
+                                                <x-ui.odoo-form-ui type="input" label="Contact Person" name="contact_person" :value="old('contact_person', $lead->contact_person)" placeholder="Contact Representative" :errorText="$errors->first('contact_person')" />
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Lead Owner</label>
-                                            <div class="flex-grow-1">
-                                                <select name="lead_owner_id" class="odoo-form-control form-select-sm">
+                                                <x-ui.odoo-form-ui type="input" label="Email Address" name="email" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" :errorText="$errors->first('email')" />
+
+                                                <x-ui.odoo-form-ui type="input" label="Phone Number" name="phone" :value="old('phone', $lead->phone)" placeholder="Phone/Mobile" :errorText="$errors->first('phone')" />
+
+                                                <x-ui.odoo-form-ui type="select" label="Lead Owner" name="lead_owner_id" :errorText="$errors->first('lead_owner_id')">
                                                     <option value="">Unassigned</option>
                                                     @foreach($users as $user)
                                                         <option value="{{ $user->id }}" @selected(old('lead_owner_id', $lead->lead_owner_id) == $user->id)>{{ $user->name }}</option>
                                                     @endforeach
-                                                </select>
+                                                </x-ui.odoo-form-ui>
+                                                
+                                                <h6 class="fw-bold text-primary mb-3 mt-4">Location Details</h6>
+
+                                                <x-ui.odoo-form-ui type="textarea" label="Street Address" name="address" rows="3" placeholder="Street address..." :errorText="$errors->first('address')">{{ old('address', $lead->address) }}</x-ui.odoo-form-ui>
+
+                                                <x-ui.odoo-form-ui type="input" label="Country" name="country" :value="old('country', $lead->country)" placeholder="Country" :errorText="$errors->first('country')" />
+
+                                                <x-ui.odoo-form-ui type="input" label="State" name="state" :value="old('state', $lead->state)" placeholder="State" :errorText="$errors->first('state')" />
+
+                                                <x-ui.odoo-form-ui type="input" label="City" name="city" :value="old('city', $lead->city)" placeholder="City" :errorText="$errors->first('city')" />
                                             </div>
-                                        </div>
-                                        
-                                        <h6 class="fw-bold text-primary mb-3 mt-4">Location Details</h6>
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Street Address</label>
-                                            <div class="flex-grow-1">
-                                                <textarea name="address" rows="2" class="odoo-form-control" placeholder="Street address...">{{ old('address', $lead->address) }}</textarea>
-                                            </div>
-                                        </div>
+                                            <div class="col-md-6">
+                                                <h6 class="fw-bold text-primary mb-3">Requirements & Pricing</h6>
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">City / State / Country</label>
-                                            <div class="flex-grow-1 d-flex gap-2">
-                                                <input type="text" name="city" value="{{ old('city', $lead->city) }}" class="odoo-form-control" placeholder="City">
-                                                <input type="text" name="state" value="{{ old('state', $lead->state) }}" class="odoo-form-control" placeholder="State">
-                                                <input type="text" name="country" value="{{ old('country', $lead->country) }}" class="odoo-form-control" placeholder="Country">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-md-6">
-                                        <h6 class="fw-bold text-primary mb-3">Requirements & Pricing</h6>
-
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Product Interest</label>
-                                            <div class="flex-grow-1">
-                                                <select name="product_id" class="odoo-form-control odoo-select2 erp-premium-select" data-master="product" style="width:100%;">
+                                                <x-ui.odoo-form-ui type="select" label="Product Interest" name="product_id" searchable="true" class="erp-premium-select" data-master="product" :errorText="$errors->first('product_id')">
                                                     <option value="">-- Select a Product --</option>
                                                     <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ Add New Product</option>
                                                     @foreach($products as $prod)
-                                                        <option value="{{ $prod->id }}" {{ old('product_id', $lead->product_id) == $prod->id ? 'selected' : '' }}>
-                                                            {{ $prod->name }} ({{ $prod->sku }})
+                                                        <option value="{{ $prod->id }}" @selected(old('product_id', $lead->product_id) == $prod->id)>
+                                                            {{ $prod->name }} @if($prod->sku) ({{ $prod->sku }}) @endif
                                                         </option>
                                                     @endforeach
-                                                </select>
-                                            </div>
-                                        </div>
+                                                </x-ui.odoo-form-ui>
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Expected Revenue (₹)</label>
-                                            <div class="flex-grow-1">
-                                                <input type="number" name="expected_amount" value="{{ old('expected_amount', $lead->expected_amount) }}" min="0" step="0.01" class="odoo-form-control" placeholder="Expected Revenue (₹)">
-                                            </div>
-                                        </div>
+                                                <x-ui.odoo-form-ui type="input" label="Expected Revenue (₹)" name="expected_amount" inputType="number" :value="old('expected_amount', $lead->expected_amount)" min="0" step="0.01" placeholder="Expected Revenue (₹)" :errorText="$errors->first('expected_amount')" />
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Expected Sale Date</label>
-                                            <div class="flex-grow-1">
-                                                <input type="date" name="expected_sale_date" value="{{ old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '') }}" class="odoo-form-control">
-                                            </div>
-                                        </div>
+                                                <x-ui.odoo-form-ui type="input" label="Expected Sale Date" name="expected_sale_date" inputType="date" :value="old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '')" :errorText="$errors->first('expected_sale_date')" />
 
-                                        <h6 class="fw-bold text-primary mb-3 mt-4">Segmentation & Sources</h6>
+                                                <x-ui.odoo-form-ui type="textarea" label="Requirements" name="requirement" rows="4" placeholder="Describe requirements..." :errorText="$errors->first('requirement')">{{ old('requirement', $lead->requirement) }}</x-ui.odoo-form-ui>
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Lead Source</label>
-                                            <div class="flex-grow-1">
-                                                <select name="source" class="odoo-form-control form-select-sm">
+                                                <h6 class="fw-bold text-primary mb-3 mt-4">Segmentation & Sources</h6>
+
+                                                <x-ui.odoo-form-ui type="select" label="Lead Source" name="source" :errorText="$errors->first('source')">
                                                     <option value="Select an Option">Select an Option</option>
                                                     @foreach (['Cold Call', 'Employee Referral', 'Partner', 'Web Search', 'Advertisement', 'Trade Show'] as $srcOption)
                                                         <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ $srcOption }}</option>
                                                     @endforeach
-                                                </select>
-                                            </div>
-                                        </div>
+                                                </x-ui.odoo-form-ui>
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Priority</label>
-                                            <div class="flex-grow-1">
-                                                <select name="priority" class="odoo-form-control form-select-sm">
+                                                <x-ui.odoo-form-ui type="select" label="Priority" name="priority" :errorText="$errors->first('priority')">
                                                     <option value="Select an Option">Select an Option</option>
                                                     @foreach (['Low', 'Medium', 'High'] as $prioOption)
                                                         <option value="{{ $prioOption }}" @selected(old('priority', $lead->priority) === $prioOption)>{{ $prioOption }}</option>
                                                     @endforeach
-                                                </select>
-                                            </div>
-                                        </div>
+                                                </x-ui.odoo-form-ui>
 
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Segment</label>
-                                            <div class="flex-grow-1">
-                                                <select name="segment" class="odoo-form-control form-select-sm">
+                                                <x-ui.odoo-form-ui type="select" label="Segment" name="segment" :errorText="$errors->first('segment')">
                                                     <option value="Select an Option">Select an Option</option>
                                                     @foreach (['SMB', 'Mid-Market', 'Enterprise'] as $segOption)
                                                         <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ $segOption }}</option>
                                                     @endforeach
-                                                </select>
+                                                </x-ui.odoo-form-ui>
+
+                                                <x-ui.odoo-form-ui type="input" label="Industry Type" name="industry_type" :value="old('industry_type', $lead->industry_type)" placeholder="Industry/Vertical" :errorText="$errors->first('industry_type')" />
                                             </div>
                                         </div>
-
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Industry Type</label>
-                                            <div class="flex-grow-1">
-                                                <input type="text" name="industry_type" value="{{ old('industry_type', $lead->industry_type) }}" class="odoo-form-control" placeholder="Industry/Vertical">
-                                            </div>
-                                        </div>
-
-                                        <div class="odoo-form-group mb-3">
-                                            <label class="odoo-form-label">Initial Call Date</label>
-                                            <div class="flex-grow-1">
-                                                <div class="input-group input-group-sm">
-                                                    <span class="input-group-text bg-light border-0 border-bottom rounded-0"><i class="feather-calendar fs-11 text-muted"></i></span>
-                                                    <input type="text" class="form-control odoo-form-control" name="call_date" id="lead_call_date_picker" value="{{ old('call_date', $lead->call_date ? $lead->call_date->format('Y-m-d h:i A') : '') }}" placeholder="Call Schedule">
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="mt-4">
-                                            <label class="form-label fw-bold text-muted text-uppercase mb-1" style="font-size: 10px;">Requirement Description</label>
-                                            <textarea name="requirement" rows="4" class="form-control text-dark" style="border: 1px solid #ced4da; padding: 6px; border-radius: 4px;" placeholder="Details about initial inquiry, product scope, business size, etc...">{{ old('requirement', $lead->requirement) }}</textarea>
-                                        </div>
-                                    </div>
+                                    </form>
                                 </div>
-                            </form>
+                            </div>
                         @else
                             <!-- ==================== DEFAULT VIEW: ZOHO CRM FIELD CONTAINER ==================== -->
                             <!-- 2. Detailed Fields Section -->
@@ -504,6 +430,8 @@
                                         @endif
                                     </div>
                                 </div>
+
+                               
                             </div>
                             
                             <!-- Static Notes Display Card -->
@@ -533,6 +461,43 @@
                                     @endif
                                 </div>
                             </div>
+                             <!-- Lead Documents Card -->
+                                <div class="card border shadow-sm mb-3" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;" id="sectionDocuments">
+                                    <div class="card-body p-3">
+                                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                            <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-folder me-2 text-primary"></i>Lead Documents</h6>
+                                            <form action="{{ route('crm.leads.documents.upload', $lead->id) }}" method="POST" enctype="multipart/form-data" class="m-0 p-0">
+                                                @csrf
+                                                <button type="button" class="btn btn-xs btn-primary fw-bold" id="leadDocUploadBtn" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-upload me-1"></i> Upload</button>
+                                                <input type="file" name="documents[]" id="leadDocInput" multiple hidden>
+                                            </form>
+                                        </div>
+
+                                        @if($lead->leadDocuments->isEmpty())
+                                            <div class="text-muted fs-12">No documents uploaded yet for this lead.</div>
+                                        @else
+                                            <div class="list-group list-group-flush">
+                                                @foreach($lead->leadDocuments as $document)
+                                                    <div class="list-group-item px-0 py-2 d-flex align-items-center justify-content-between border-bottom">
+                                                        <div>
+                                                            <div class="fw-semibold text-dark">{{ $document->file_name }}</div>
+                                                            <div class="text-muted fs-11">{{ strtoupper($document->file_type) }} · {{ round($document->size / 1024, 2) }} KB</div>
+                                                        </div>
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <x-ui.icon-btn href="{{ route('crm.leads.documents.view', $document->id) }}" variant="soft-info" size="sm" icon="feather-eye" title="View document" target="_blank" />
+                                                            <x-ui.icon-btn href="{{ route('crm.leads.documents.download', $document->id) }}" variant="soft-success" size="sm" icon="feather-download" title="Download document" />
+                                                            <form action="{{ route('crm.leads.documents.delete', $document->id) }}" method="POST" class="m-0 p-0">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="Delete document" onclick="return confirm('Delete this document?')" />
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
                         @endif
                     </div> <!-- End TAB 1: OVERVIEW PANE -->
 
@@ -733,15 +698,30 @@
                     </div> <!-- End TAB 2: TIMELINE PANE -->
 
                     <!-- ==================== TAB 3: QUOTATION PANE ==================== -->
-                    @if ($activeQuotation || request()->has('create_quotation'))
-                        <div class="tab-pane fade show {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') ? 'active' : '' }}" id="quotation-pane" role="tabpanel" aria-labelledby="quotation-tab">
+                    @if ($activeQuotation || request()->has('create_quotation') || old('form_type') === 'quotation_create' || old('form_type') === 'quotation_edit')
+                        <div class="tab-pane fade show {{ request()->has('create_quotation') || request()->has('edit_quotation') || request()->has('view_quotation') || old('form_type') === 'quotation_create' || old('form_type') === 'quotation_edit' ? 'active' : '' }}" id="quotation-pane" role="tabpanel" aria-labelledby="quotation-tab">
                             <div class="py-1">
                                 
-                                @if (request()->has('create_quotation'))
+                                @if (request()->has('create_quotation') || old('form_type') === 'quotation_create')
                                     <!-- CREATE QUOTATION FORM -->
-                                    <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm">
+                                    <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm" novalidate>
                                         @csrf
                                         <input type="hidden" name="lead_id" value="{{ $lead->id }}">
+                                        <input type="hidden" name="form_type" value="quotation_create">
+                                        
+                                        @if ($errors->any() && old('form_type') === 'quotation_create')
+                                            <div class="alert alert-danger py-2 px-3 mb-3 fs-12 shadow-sm border-0 bg-soft-danger text-danger" style="border-radius: 4px;">
+                                                <ul class="mb-0 ps-3">
+                                                    @foreach ($errors->all() as $error)
+                                                        @if (str_contains($error, 'items.'))
+                                                            <li>{{ str_replace(['items.', '.product_id', '.quantity', '.unit_price', 'product id'], ['Item Line #', ' Product', ' Quantity', ' Price', 'Product'], $error) }}</li>
+                                                        @else
+                                                            <li>{{ $error }}</li>
+                                                        @endif
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @endif
                                         
                                         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                                             <h5 class="fw-bold text-dark mb-0">New Quotation</h5>
@@ -754,23 +734,25 @@
                                                 <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display"
                                                     :value="$lead->contact_person ?: ($lead->company_name ?: 'N/A')"
                                                     readonly="true"
-                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
+                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;"
+                                                    :errorText="$errors->first('customer_id')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $lead->email)" />
-                                                <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $lead->phone)" />
+                                                <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $lead->email)" :errorText="$errors->first('email')" />
+                                                <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $lead->phone)" :errorText="$errors->first('phone')" />
                                             </div>
                                             <div class="col-md-6">
                                                 <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
                                                     :value="old('quotation_number', $nextQuotationNumber)" readonly="true"
-                                                    style="font-weight: bold; color: #495057;" />
+                                                    style="font-weight: bold; color: #495057;"
+                                                    :errorText="$errors->first('quotation_number')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Date" name="quotation_date"
-                                                    :value="old('quotation_date', date('Y-m-d'))" />
+                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Date" name="quotation_date"
+                                                    :value="old('quotation_date', date('Y-m-d'))" :errorText="$errors->first('quotation_date')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Expiration" name="expiration_date"
-                                                    :value="old('expiration_date', date('Y-m-d', strtotime('+30 days')))" />
+                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration" name="expiry_date"
+                                                    :value="old('expiry_date', date('Y-m-d', strtotime('+30 days')))" :errorText="$errors->first('expiry_date')" />
 
-                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
+                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true" :errorText="$errors->first('status')">
                                                     <option value="Draft" @selected(old('status') === 'Draft')>Draft</option>
                                                     <option value="Pending Approval" @selected(old('status') === 'Pending Approval')>Send for Approval</option>
                                                 </x-ui.odoo-form-ui>
@@ -805,38 +787,32 @@
                                         </div>
 
                                         <!-- Subtotal / Discount / Totals -->
-                                        <div class="row mt-4 pt-3 border-top text-dark fs-13">
-                                            <div class="col-md-8">
-                                                <div class="pe-md-4">
-                                                    <div class="mb-3">
-                                                        <label class="fw-semibold text-muted mb-1 fs-12">Terms & Conditions</label>
-                                                        <textarea name="terms_conditions" class="form-control" rows="3" placeholder="Define payment terms, delivery schedules, etc." style="border-radius: 4px; font-size: 13px;">{{ old('terms_conditions') }}</textarea>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="fw-semibold text-muted mb-1 fs-12">Notes</label>
-                                                        <textarea name="notes" class="form-control" rows="2" placeholder="Internal remarks or custom notes..." style="border-radius: 4px; font-size: 13px;">{{ old('notes') }}</textarea>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">Untaxed Amount:</span>
-                                                    <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
-                                                </div>
-                                                <div class="d-flex justify-content-between py-1 border-bottom">
-                                                    <span class="text-muted fw-semibold">Taxes:</span>
-                                                    <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
-                                                </div>
-                                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                    <span class="text-muted fw-semibold">Discount (₹):</span>
-                                                    <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('discount', 0) }}" min="0" step="0.01">
-                                                </div>
-                                                <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
-                                                    <span class="text-dark fw-bold">Total:</span>
-                                                    <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                         <div class="row mt-4 pt-3 border-top text-dark fs-13">
+                                             <div class="col-md-8">
+                                                 <div class="pe-md-4">
+                                                     <x-ui.odoo-form-ui type="textarea" label="Terms & Conditions" name="terms_conditions" rows="3" placeholder="Define payment terms, delivery schedules, etc." :errorText="$errors->first('terms_conditions')">{{ old('terms_conditions') }}</x-ui.odoo-form-ui>
+                                                     <x-ui.odoo-form-ui type="textarea" label="Notes" name="notes" rows="2" placeholder="Internal remarks or custom notes..." :errorText="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
+                                                 </div>
+                                             </div>
+                                             <div class="col-md-4">
+                                                 <div class="d-flex justify-content-between py-1 border-bottom">
+                                                     <span class="text-muted fw-semibold">Untaxed Amount:</span>
+                                                     <span class="fw-bold text-dark" id="calcSubtotal">₹0.00</span>
+                                                 </div>
+                                                 <div class="d-flex justify-content-between py-1 border-bottom">
+                                                     <span class="text-muted fw-semibold">Taxes:</span>
+                                                     <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
+                                                 </div>
+                                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                                                     <span class="text-muted fw-semibold me-2">Discount (₹):</span>
+                                                     <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', 0)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
+                                                 </div>
+                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
+                                                     <span class="text-dark fw-bold">Total:</span>
+                                                     <span class="fw-extrabold text-primary" id="calcTotal">₹0.00</span>
+                                                 </div>
+                                             </div>
+                                         </div>
 
                                         <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
                                             <a href="{{ route('crm.leads.show', $lead->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
@@ -844,12 +820,27 @@
                                         </div>
                                     </form>
 
-                                @elseif (request()->has('edit_quotation') && $activeQuotation)
+                                @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation)
                                     <!-- EDIT QUOTATION FORM -->
-                                    <form action="{{ route('crm.quotations.update', $activeQuotation->id) }}" method="POST" id="quotationForm">
+                                    <form action="{{ route('crm.quotations.update', $activeQuotation->id) }}" method="POST" id="quotationForm" novalidate>
                                         @csrf
                                         @method('PUT')
                                         <input type="hidden" name="lead_id" value="{{ $lead->id }}">
+                                        <input type="hidden" name="form_type" value="quotation_edit">
+                                        
+                                        @if ($errors->any() && old('form_type') === 'quotation_edit')
+                                            <div class="alert alert-danger py-2 px-3 mb-3 fs-12 shadow-sm border-0 bg-soft-danger text-danger" style="border-radius: 4px;">
+                                                <ul class="mb-0 ps-3">
+                                                    @foreach ($errors->all() as $error)
+                                                        @if (str_contains($error, 'items.'))
+                                                            <li>{{ str_replace(['items.', '.product_id', '.quantity', '.unit_price', 'product id'], ['Item Line #', ' Product', ' Quantity', ' Price', 'Product'], $error) }}</li>
+                                                        @else
+                                                            <li>{{ $error }}</li>
+                                                        @endif
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @endif
 
                                         <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                                             <h5 class="fw-bold text-dark mb-0">Edit Quotation: {{ $activeQuotation->quotation_number }}</h5>
@@ -862,23 +853,25 @@
                                                 <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display"
                                                     :value="$lead->contact_person ?: ($lead->company_name ?: 'N/A')"
                                                     readonly="true"
-                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
+                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;"
+                                                    :errorText="$errors->first('customer_id')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $activeQuotation->email ?: $lead->email)" />
-                                                <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $activeQuotation->phone ?: $lead->phone)" />
+                                                <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $activeQuotation->email ?: $lead->email)" :errorText="$errors->first('email')" />
+                                                <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $activeQuotation->phone ?: $lead->phone)" :errorText="$errors->first('phone')" />
                                             </div>
                                             <div class="col-md-6">
                                                 <x-ui.odoo-form-ui type="input" label="Quotation Number" name="quotation_number"
                                                     :value="$activeQuotation->quotation_number" readonly="true"
-                                                    style="font-weight: bold; color: #495057;" />
+                                                    style="font-weight: bold; color: #495057;"
+                                                    :errorText="$errors->first('quotation_number')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Date" name="quotation_date"
-                                                    :value="old('quotation_date', $activeQuotation->quotation_date->format('Y-m-d'))" />
+                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Date" name="quotation_date"
+                                                    :value="old('quotation_date', $activeQuotation->quotation_date->format('Y-m-d'))" :errorText="$errors->first('quotation_date')" />
 
-                                                <x-ui.odoo-form-ui type="input" label="Expiration" name="expiration_date"
-                                                    :value="old('expiration_date', $activeQuotation->expiration_date ? $activeQuotation->expiration_date->format('Y-m-d') : '')" />
+                                                <x-ui.odoo-form-ui type="input" inputType="date" label="Expiration" name="expiry_date"
+                                                    :value="old('expiry_date', $activeQuotation->expiry_date ? $activeQuotation->expiry_date->format('Y-m-d') : '')" :errorText="$errors->first('expiry_date')" />
 
-                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true">
+                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" :required="true" :errorText="$errors->first('status')">
                                                      @if ($activeQuotation->status === 'Draft')
                                                          <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>Draft</option>
                                                          <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval')>Send for Approval</option>
@@ -934,14 +927,8 @@
                                         <div class="row mt-4 pt-3 border-top text-dark fs-13">
                                             <div class="col-md-8">
                                                 <div class="pe-md-4">
-                                                    <div class="mb-3">
-                                                        <label class="fw-semibold text-muted mb-1 fs-12">Terms & Conditions</label>
-                                                        <textarea name="terms_conditions" class="form-control" rows="3" placeholder="Define payment terms, delivery schedules, etc." style="border-radius: 4px; font-size: 13px;">{{ old('terms_conditions', $activeQuotation->terms_conditions) }}</textarea>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="fw-semibold text-muted mb-1 fs-12">Notes</label>
-                                                        <textarea name="notes" class="form-control" rows="2" placeholder="Internal remarks or custom notes..." style="border-radius: 4px; font-size: 13px;">{{ old('notes', $activeQuotation->notes) }}</textarea>
-                                                    </div>
+                                                    <x-ui.odoo-form-ui type="textarea" label="Terms & Conditions" name="terms_conditions" rows="3" placeholder="Define payment terms, delivery schedules, etc." :errorText="$errors->first('terms_conditions')">{{ old('terms_conditions', $activeQuotation->terms_conditions) }}</x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="textarea" label="Notes" name="notes" rows="2" placeholder="Internal remarks or custom notes..." :errorText="$errors->first('notes')">{{ old('notes', $activeQuotation->notes) }}</x-ui.odoo-form-ui>
                                                 </div>
                                             </div>
                                             <div class="col-md-4">
@@ -954,8 +941,8 @@
                                                     <span class="fw-bold text-dark" id="calcTax">₹0.00</span>
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                                    <span class="text-muted fw-semibold">Discount (₹):</span>
-                                                    <input type="number" name="discount" id="discountInput" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-radius: 4px;" value="{{ old('discount', $activeQuotation->discount) }}" min="0" step="0.01">
+                                                    <span class="text-muted fw-semibold me-2">Discount (₹):</span>
+                                                    <x-ui.odoo-form-ui type="input" name="discount" id="discountInput" inputType="number" :value="old('discount', $activeQuotation->discount)" min="0" step="0.01" class="text-end fw-bold" :errorText="$errors->first('discount')" />
                                                 </div>
                                                 <div class="d-flex justify-content-between py-2 fs-15 border-bottom bg-light-50 px-2 rounded mt-1.5">
                                                     <span class="text-dark fw-bold">Total:</span>
@@ -1693,6 +1680,18 @@
 @endpush
 
 @push('scripts')
+    @if ($errors->any())
+        <script>
+            (function() {
+                var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};
+                @if (old('form_type') === 'quotation_create' || old('form_type') === 'quotation_edit')
+                    localStorage.setItem(activeTabKey, 'quotation-tab');
+                @else
+                    localStorage.setItem(activeTabKey, 'overview-tab');
+                @endif
+            })();
+        </script>
+    @endif
     <!-- Select2 & Quotation Rows logic -->
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
@@ -1763,6 +1762,7 @@
             // Scroll behavior for related lists links
             $('#zohoSidebarLinks a').on('click', function(e) {
                 var targetId = $(this).attr('href');
+
                 if (targetId.startsWith('#')) {
                     var targetEl = $(targetId);
                     if (targetEl.length) {
@@ -1773,7 +1773,7 @@
                         $(this).addClass('active');
 
                         var needTabSwitch = false;
-                        if (targetId === '#sectionLeadInfo' || targetId === '#sectionAddressInfo' || targetId === '#sectionRequirements' || targetId === '#sectionNotes') {
+                        if (targetId === '#sectionLeadInfo' || targetId === '#sectionAddressInfo' || targetId === '#sectionRequirements' || targetId === '#sectionNotes' || targetId === '#sectionDocuments') {
                             if (!$('#overview-tab').hasClass('active')) {
                                 scrollTargetOnTabShown = targetEl;
                                 $('#overview-tab').tab('show');
@@ -1867,6 +1867,19 @@
                 width: "100%"
             });
 
+            const leadDocUploadBtn = $('#leadDocUploadBtn');
+            const leadDocInput = $('#leadDocInput');
+
+            leadDocUploadBtn.on('click', function() {
+                leadDocInput.trigger('click');
+            });
+
+            leadDocInput.on('change', function() {
+                if (this.files.length > 0) {
+                    $(this).closest('form').submit();
+                }
+            });
+
             $('#quotationStatusSelect').on('change', function() {
                 $(this).closest('form').submit();
             });
@@ -1901,7 +1914,7 @@
                 return `
                     <tr class="item-row" data-row-id="${index}">
                         <td class="ps-3">
-                            <select name="items[${index}][product_id]" class="form-select item-name-input erp-premium-select" data-master="product" required>
+                            <select name="items[${index}][product_id]" class="odoo-table-select odoo-select2 item-name-input erp-premium-select" required data-master="product">
                                 ${buildProductOptions(selectedId)}
                             </select>
                             <div class="description-container mt-2" id="desc-container-${index}" style="display: none;">
@@ -1933,9 +1946,9 @@
             }
 
             // Check if activeQuotation items exist (edit state) or prefill from conversion
-            const hasCreateQ = @json(request()->has('create_quotation'));
-            const hasEditQ = @json(request()->has('edit_quotation'));
-            const existingItems = hasEditQ ? @json(isset($activeQuotation) ? $activeQuotation->items : []) : [];
+            const hasCreateQ = @json(request()->has('create_quotation') || old('form_type') === 'quotation_create');
+            const hasEditQ = @json(request()->has('edit_quotation') || old('form_type') === 'quotation_edit');
+            const existingItems = @json(old('items') ?: (isset($activeQuotation) ? $activeQuotation->items : []));
             const prefillProductId = @json($lead->product_id);
             const prefillAmount = @json($lead->expected_amount);
 
@@ -2003,6 +2016,30 @@
                     theme: "bootstrap-5",
                     width: "100%"
                 });
+
+                // Check validation errors and show message under the inputs
+                const validationErrors = @json($errors->toArray());
+                const errorKey = `items.${rowIndex}.product_id`;
+                if (validationErrors[errorKey]) {
+                    newRow.find('.item-name-input').addClass('is-invalid');
+                    newRow.find('.item-name-input').closest('td').append(`
+                        <div class="invalid-feedback d-block mt-1">${validationErrors[errorKey][0]}</div>
+                    `);
+                }
+                const qtyErrorKey = `items.${rowIndex}.quantity`;
+                if (validationErrors[qtyErrorKey]) {
+                    newRow.find('.qty-input').addClass('is-invalid');
+                    newRow.find('.qty-input').closest('td').append(`
+                        <div class="invalid-feedback d-block mt-1 text-end">${validationErrors[qtyErrorKey][0]}</div>
+                    `);
+                }
+                const priceErrorKey = `items.${rowIndex}.unit_price`;
+                if (validationErrors[priceErrorKey]) {
+                    newRow.find('.price-input').addClass('is-invalid');
+                    newRow.find('.price-input').closest('td').append(`
+                        <div class="invalid-feedback d-block mt-1 text-end">${validationErrors[priceErrorKey][0]}</div>
+                    `);
+                }
 
                 // Prefill details
                 let isPrefilling = false;

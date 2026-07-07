@@ -63,6 +63,32 @@
         </select>
     </td>
 
+    {{-- Batch Number (if tracked) --}}
+    @if($product->track_batch)
+    <td class="py-2 align-middle">
+        <input type="text"
+               name="{{ $nameBase }}[batch_number]"
+               class="odoo-table-input batch-input"
+               data-row="{{ $rowIdx }}"
+               value=""
+               placeholder="Batch Number"
+               style="max-width:140px;">
+    </td>
+    @endif
+
+    {{-- Serial Numbers (if tracked) --}}
+    @if($product->track_serial_number)
+    <td class="py-2 align-middle">
+        <input type="text"
+               name="{{ $nameBase }}[serial_numbers]"
+               class="odoo-table-input serials-input"
+               data-row="{{ $rowIdx }}"
+               value=""
+               placeholder="S/Ns (comma separated)"
+               style="min-width:180px;">
+    </td>
+    @endif
+
     {{-- Opening Qty --}}
     <td class="py-2 align-middle">
         <input type="number"

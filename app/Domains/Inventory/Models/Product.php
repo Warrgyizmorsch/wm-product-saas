@@ -54,6 +54,7 @@ class Product extends BaseModel
         'weight_unit',
         'track_serial_number',
         'track_batch',
+        'inventory_valuation_method',
         'image_path',
     ];
 
@@ -83,6 +84,26 @@ class Product extends BaseModel
     public function variants(): HasMany
     {
         return $this->hasMany(Product::class, 'parent_id');
+    }
+
+    public function stockTransactions(): HasMany
+    {
+        return $this->hasMany(StockTransaction::class, 'product_id')->orderBy('created_at', 'desc');
+    }
+
+    public function serialNumbers(): HasMany
+    {
+        return $this->hasMany(SerialNumber::class, 'product_id');
+    }
+
+    public function batches(): HasMany
+    {
+        return $this->hasMany(Batch::class, 'product_id');
+    }
+
+    public function stockReservations(): HasMany
+    {
+        return $this->hasMany(StockReservation::class, 'product_id');
     }
 
     public function uom(): BelongsTo

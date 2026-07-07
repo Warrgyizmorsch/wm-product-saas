@@ -98,6 +98,17 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
+                            @if($product->item_type === 'Goods')
+                                <x-ui.odoo-form-ui type="select" label="Material Type" name="type" required="true">
+                                    <option value="finished_good" {{ old('type', $product->type) === 'finished_good' ? 'selected' : '' }}>Finished Good (Standard Sales/Assembly)</option>
+                                    <option value="semi_finished" {{ old('type', $product->type) === 'semi_finished' ? 'selected' : '' }}>Semi-Finished Good (Assembly Components)</option>
+                                    <option value="raw_material" {{ old('type', $product->type) === 'raw_material' ? 'selected' : '' }}>Raw Material (Purchase Only)</option>
+                                    <option value="component" {{ old('type', $product->type) === 'component' ? 'selected' : '' }}>Component (Spare / Standard Part)</option>
+                                </x-ui.odoo-form-ui>
+                            @else
+                                <input type="hidden" name="type" value="service">
+                            @endif
+
                             <x-ui.odoo-form-ui type="select" label="Status" name="status" required="true">
                                 <option value="active" {{ $product->status === 'active' ? 'selected' : '' }}>Active</option>
                                 <option value="inactive" {{ $product->status === 'inactive' ? 'selected' : '' }}>Inactive</option>
@@ -192,8 +203,8 @@
                         </div>
                     </div>
 
-                    <!-- Inventory tracking section (Only relevant for Goods & Single variation) -->
-                    @if($product->item_type === 'Goods' && $product->variation_type === 'Single')
+                    <!-- Inventory tracking section (Only relevant for Goods) -->
+                    @if($product->item_type === 'Goods')
                         <div id="inventorySection" class="border-top pt-4 mt-4">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-box me-2"></i>Inventory Tracking & Settings</h6>
                             
@@ -206,6 +217,11 @@
                                     </x-ui.odoo-form-ui>
 
                                     <x-ui.odoo-form-ui type="input" label="Reorder Point" name="reorder_point" value="{{ $product->reorder_point }}" inputType="number" placeholder="Alert limit when stock falls below" />
+
+                                    <x-ui.odoo-form-ui type="select" label="Inventory Valuation Method" name="inventory_valuation_method" required="true">
+                                        <option value="FIFO" {{ ($product->inventory_valuation_method ?? 'FIFO') === 'FIFO' ? 'selected' : '' }}>FIFO (First-In, First-Out)</option>
+                                        <option value="Weighted Average" {{ ($product->inventory_valuation_method ?? '') === 'Weighted Average' ? 'selected' : '' }}>Weighted Average</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-lg-6">
@@ -227,6 +243,7 @@
                         </div>
 
                         <!-- Opening Stock by Warehouse -->
+                        @if($product->variation_type === 'Single')
                         <div id="warehouseStocksSection" class="border-top pt-4 mt-4">
                             <h6 class="fw-bold text-primary mb-3"><i class="feather-home me-2"></i>Update Warehouse Stock</h6>
                             <div class="table-responsive">
@@ -260,6 +277,7 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
+                        @endif
                     @endif
 
                     <!-- Additional Notes -->

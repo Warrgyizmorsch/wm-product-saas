@@ -32,6 +32,15 @@ Route::prefix('crm')
         Route::delete('leads/{lead}', [LeadController::class, 'destroy'])
             ->name('leads.destroy');
 
+        Route::post('leads/{lead}/documents', [LeadController::class, 'uploadDocuments'])
+            ->name('leads.documents.upload');
+        Route::get('lead-documents/{document}', [LeadController::class, 'viewDocument'])
+            ->name('leads.documents.view');
+        Route::get('lead-documents/{document}/download', [LeadController::class, 'downloadDocument'])
+            ->name('leads.documents.download');
+        Route::delete('lead-documents/{document}', [LeadController::class, 'deleteDocument'])
+            ->name('leads.documents.delete');
+
         // Follow-ups
         Route::post('leads/{lead}/followups', [LeadFollowupController::class, 'store'])
             ->name('leads.followups.store');

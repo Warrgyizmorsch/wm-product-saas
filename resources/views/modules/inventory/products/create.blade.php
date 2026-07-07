@@ -133,6 +133,14 @@
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
+                            <x-ui.odoo-form-ui type="select" label="Material Type" name="type" required="true">
+                                <option value="finished_good" {{ old('type') === 'finished_good' ? 'selected' : '' }}>Finished Good (Standard Sales/Assembly)</option>
+                                <option value="semi_finished" {{ old('type') === 'semi_finished' ? 'selected' : '' }}>Semi-Finished Good (Assembly Components)</option>
+                                <option value="raw_material" {{ old('type') === 'raw_material' ? 'selected' : '' }}>Raw Material (Purchase Only)</option>
+                                <option value="component" {{ old('type', 'component') === 'component' ? 'selected' : '' }}>Component (Spare / Standard Part)</option>
+                                <option value="service" {{ old('type') === 'service' ? 'selected' : '' }} style="display:none;">Service</option>
+                            </x-ui.odoo-form-ui>
+
                             <x-ui.odoo-form-ui type="input" label="Brand" name="brand" placeholder="e.g. Apple, Nike" />
                             
                             <x-ui.odoo-form-ui type="input" label="Manufacturer" name="manufacturer" placeholder="Manufacturer Name" />
@@ -233,6 +241,11 @@
                                 </x-ui.odoo-form-ui>
 
                                 <x-ui.odoo-form-ui type="input" label="Reorder Point" name="reorder_point" inputType="number" placeholder="Alert limit when stock falls below" />
+
+                                <x-ui.odoo-form-ui type="select" label="Inventory Valuation Method" name="inventory_valuation_method" required="true">
+                                    <option value="FIFO" selected>FIFO (First-In, First-Out)</option>
+                                    <option value="Weighted Average">Weighted Average</option>
+                                </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="col-lg-6">
@@ -398,12 +411,16 @@
                     // Hide preferred vendor and dimensions for services
                     $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').slideUp();
                     $('input[name="length"]').closest('.border-top').slideUp();
+                    // Hide Material Type and set default to service for services
+                    $('select[name="type"]').val('service').trigger('change').closest('.odoo-form-group').slideUp();
                 } else {
                     hsnLabel.html('HSN Code');
                     $('input[name="hsn_sac"]').attr('placeholder', 'e.g. 8471 (HSN)');
                     // Show preferred vendor and dimensions for goods
                     $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').slideDown();
                     $('input[name="length"]').closest('.border-top').slideDown();
+                    // Show Material Type for goods
+                    $('select[name="type"]').closest('.odoo-form-group').slideDown();
                 }
 
                 if (itemType === 'Service') {

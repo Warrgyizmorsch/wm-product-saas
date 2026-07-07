@@ -77,6 +77,16 @@
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="min-width:190px;">
                             Warehouse
                         </th>
+                        @if($product->track_batch)
+                        <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="width:160px;">
+                            Batch Number
+                        </th>
+                        @endif
+                        @if($product->track_serial_number)
+                        <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="min-width:200px;">
+                            Serial Numbers
+                        </th>
+                        @endif
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="width:160px;">
                             Opening Qty
                             @if($product->uom)
@@ -221,6 +231,20 @@
                 @endforeach
             </select>
         </td>
+        @if($product->track_batch)
+        <td class="py-2 align-middle">
+            <input type="text" name="__batch_name__"
+                   class="odoo-table-input batch-input" data-row="__IDX__"
+                   value="" placeholder="Batch #" style="max-width:140px;">
+        </td>
+        @endif
+        @if($product->track_serial_number)
+        <td class="py-2 align-middle">
+            <input type="text" name="__serials_name__"
+                   class="odoo-table-input serials-input" data-row="__IDX__"
+                   value="" placeholder="S/Ns (comma separated)" style="min-width:180px;">
+        </td>
+        @endif
         <td class="py-2 align-middle">
             <input type="number" name="__qty_name__"
                    class="odoo-table-input qty-input" data-row="__IDX__"
@@ -322,8 +346,12 @@
 
         const qtyInput  = row.querySelector('.qty-input');
         const costInput = row.querySelector('.cost-input');
+        const batchInput = row.querySelector('.batch-input');
+        const serialsInput = row.querySelector('.serials-input');
         if (qtyInput)  qtyInput.name  = nameBase + '[quantity]';
         if (costInput) costInput.name = nameBase + '[unit_cost]';
+        if (batchInput) batchInput.name = nameBase + '[batch_number]';
+        if (serialsInput) serialsInput.name = nameBase + '[serial_numbers]';
     }
 
     /* ── Add New Row ────────────────────────────────────────────────────── */
