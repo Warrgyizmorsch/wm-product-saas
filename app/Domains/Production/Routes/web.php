@@ -7,6 +7,10 @@ use App\Domains\Production\Controllers\MachineController;
 use App\Domains\Production\Controllers\RoutingController;
 use App\Domains\Production\Controllers\ProductionPlanController;
 use App\Domains\Production\Controllers\ProductionOrderController;
+use App\Domains\Production\Controllers\ProductionScheduleController;
+use App\Domains\Production\Controllers\MesController;
+use App\Domains\Production\Controllers\MachineDashboardController;
+use App\Domains\Production\Controllers\WorkCenterDashboardController;
 
 Route::prefix('production')
     ->as('production.')
@@ -68,4 +72,27 @@ Route::prefix('production')
         Route::post('orders/{order}/close',    [ProductionOrderController::class, 'close'])->name('orders.close');
         Route::post('orders/{order}/cancel',   [ProductionOrderController::class, 'cancel'])->name('orders.cancel');
         Route::resource('orders', ProductionOrderController::class);
+
+        // ── Production Scheduling ─────────────────────────────────────────────
+        // Static named routes must be registered before the resource to avoid conflicts
+        Route::get('schedules/calendar',          [ProductionScheduleController::class, 'calendarView'])->name('schedules.calendar');
+        Route::get('schedules/work-center-view',  [ProductionScheduleController::class, 'workCenterView'])->name('schedules.work-center-view');
+        Route::post('schedules/{schedule}/release',  [ProductionScheduleController::class, 'release'])->name('schedules.release');
+        Route::post('schedules/{schedule}/cancel',   [ProductionScheduleController::class, 'cancel'])->name('schedules.cancel');
+        Route::resource('schedules', ProductionScheduleController::class)->except(['edit', 'update']);
+
+        // ── MES / Shop Floor ──────────────────────────────────────────────────
+        Route::get('mes',                    [MesController::class, 'dashboard'])->name('mes.dashboard');
+        Route::post('mes/{op}/start',        [MesController::class, 'start'])->name('mes.start');
+        Route::post('mes/{op}/pause',        [MesController::class, 'pause'])->name('mes.pause');
+        Route::post('mes/{op}/resume',       [MesController::class, 'resume'])->name('mes.resume');
+        Route::post('mes/{op}/complete',     [MesController::class, 'complete'])->name('mes.complete');
+        Route::post('mes/{op}/hold',         [MesController::class, 'hold'])->name('mes.hold');
+        Route::post('mes/{op}/cancel',       [MesController::class, 'cancel'])->name('mes.cancel');
+
+        // ── MES Machine & Work Center Dashboards ──────────────────────────────
+        Route::get('mes/machines',           [MachineDashboardController::class, 'index'])->name('mes.machines.index');
+        Route::get('mes/machines/{id}',      [MachineDashboardController::class, 'show'])->name('mes.machines.show');
+        Route::get('mes/work-centers',       [WorkCenterDashboardController::class, 'index'])->name('mes.work-centers.index');
+        Route::get('mes/work-centers/{id}',  [WorkCenterDashboardController::class, 'show'])->name('mes.work-centers.show');
     });

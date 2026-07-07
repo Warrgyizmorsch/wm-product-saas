@@ -8,6 +8,8 @@ use App\Domains\Production\Models\ProductionOrderReservation;
 use App\Domains\Production\Models\ProductionPlan;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\Routing;
+use App\Domains\Production\Models\ProductionSchedule;
+use App\Domains\Production\Models\ProductionScheduleOperation;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -281,6 +283,17 @@ class ProductionOrderService
 
             // Cancel all operations
             $order->operations()->update(['status' => ProductionOrderOperation::STATUS_CANCELLED]);
+
+            // Cancel associated schedule and operations
+            $schedules = ProductionSchedule::withoutGlobalScopes()->where('production_order_id', $order->id)->get();
+            foreach ($schedules as $schedule) {
+                $schedule->update([
+                    'status'       => ProductionSchedule::STATUS_CANCELLED,
+                    'cancelled_at' => now(),
+                    'cancelled_by' => $userId ?: 1,
+                ]);
+                $schedule->operations()->update(['status' => ProductionScheduleOperation::STATUS_CANCELLED]);
+            }
 
             // Release plan back if applicable
             if ($order->production_plan_id) {
