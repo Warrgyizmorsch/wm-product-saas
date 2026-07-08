@@ -5,7 +5,7 @@ namespace App\Domains\Production\Controllers;
 use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionAlertConfiguration;
 use App\Domains\Production\Services\AlertService;
-use Illuminate\Http\Request;
+use App\Domains\Production\Requests\UpdateAlertConfigurationRequest;
 
 class AlertController extends Controller
 {
@@ -43,17 +43,13 @@ class AlertController extends Controller
         return view('modules.production.intelligence.alerts', compact('alerts'));
     }
 
-    public function update(Request $request, int $id)
+    public function update(UpdateAlertConfigurationRequest $request, int $id)
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
         $alert = ProductionAlertConfiguration::where('tenant_id', $tenantId)->findOrFail($id);
 
-        $request->validate([
-            'threshold' => 'required|numeric',
-            'severity'  => 'required|string|in:info,warning,critical',
-            'active'    => 'nullable|boolean',
-        ]);
+        $data = $request->validated();
 
         $alert->update([
             'threshold' => $request->input('threshold'),

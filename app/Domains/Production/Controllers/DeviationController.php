@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionDeviation;
 use App\Domains\Production\Services\DeviationService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\StoreDeviationRequest;
 
 class DeviationController extends Controller
 {
@@ -21,21 +21,17 @@ class DeviationController extends Controller
         $deviations = ProductionDeviation::where('tenant_id', $tenantId)
             ->with(['approver'])
             ->orderBy('id', 'desc')
-            ->get();
+            ->paginate(15)
+            ->withQueryString();
 
         return view('modules.production.quality.deviations.index', compact('deviations'));
     }
 
-    public function store(Request $request)
+    public function store(StoreDeviationRequest $request)
     {
         $this->authorize('manage', ProductionDeviation::class);
         $tenantId = require_tenant_id();
-        $data = $request->validate([
-            'type'        => 'required|string|in:temporary,permanent,customer_waiver',
-            'description' => 'required|string',
-            'expiration_date' => 'nullable|date',
-            'expiration_quantity' => 'nullable|numeric',
-        ]);
+        $data = $request->validated();
 
         $this->deviationService->createDeviation($tenantId, $data);
 

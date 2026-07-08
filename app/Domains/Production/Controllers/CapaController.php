@@ -8,7 +8,8 @@ use App\Domains\Production\Models\ProductionNcr;
 use App\Domains\Production\Services\CapaService;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\StoreCapaRequest;
+use App\Domains\Production\Requests\CapaRcaRequest;
 
 class CapaController extends Controller
 {
@@ -16,14 +17,37 @@ class CapaController extends Controller
         private readonly CapaService $capaService
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('view', ProductionCapa::class);
         $tenantId = require_tenant_id();
-        $capas = ProductionCapa::where('tenant_id', $tenantId)
-            ->with(['ncr', 'owner'])
-            ->orderBy('id', 'desc')
-            ->get();
+
+        $query = ProductionCapa::where('tenant_id', $tenantId)
+            ->with(['ncr.order', 'owner']);
+
+        if ($request->filled('search')) {
+            $search = '%' . $request->input('search') . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('capa_number', 'like', $search)
+                  ->orWhere('corrective_action', 'like', $search);
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $sortBy = $request->input('sort_by', 'id');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        if (!in_array($sortBy, ['id', 'capa_number', 'status', 'target_date'])) {
+            $sortBy = 'id';
+        }
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
+        $capas = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
 
         return view('modules.production.quality.capas.index', compact('capas'));
     }
@@ -38,21 +62,15 @@ class CapaController extends Controller
         return view('modules.production.quality.capas.create', compact('ncrs', 'users'));
     }
 
-    public function store(Request $request)
+    public function store(StoreCapaRequest $request)
     {
         $this->authorize('manage', ProductionCapa::class);
         $tenantId = require_tenant_id();
-        $data = $request->validate([
-            'ncr_id'            => 'nullable|exists:production_ncrs,id',
-            'action_owner_id'   => 'required|exists:users,id',
-            'corrective_action' => 'required|string',
-            'preventive_action' => 'nullable|string',
-            'target_date'       => 'required|date',
-        ]);
+        $data = $request->validated();
 
         $capa = $this->capaService->createCapa($tenantId, $data);
 
-        return redirect()->route('production.quality.capas.show', $capa->id)
+        return redirect()->route('production.capas.show', $capa->id)
             ->with('success', 'CAPA registered.');
     }
 
@@ -65,13 +83,9 @@ class CapaController extends Controller
         return view('modules.production.quality.capas.show', compact('capa'));
     }
 
-    public function saveRca(Request $request, int $id)
+    public function saveRca(CapaRcaRequest $request, int $id)
     {
         $this->authorize('manage', ProductionCapa::class);
-        $request->validate([
-            'five_whys' => 'required|array',
-            'fishbone'  => 'required|array',
-        ]);
 
         $this->capaService->recordRca($id, $request->input('five_whys'), $request->input('fishbone'));
 

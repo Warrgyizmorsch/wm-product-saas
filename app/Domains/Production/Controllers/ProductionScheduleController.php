@@ -11,7 +11,6 @@ use App\Domains\Production\Requests\StoreProductionScheduleRequest;
 use App\Domains\Production\Services\SchedulingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 
 class ProductionScheduleController extends Controller
 {

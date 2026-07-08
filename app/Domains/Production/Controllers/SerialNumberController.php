@@ -5,7 +5,8 @@ namespace App\Domains\Production\Controllers;
 use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionSerialNumber;
 use App\Domains\Production\Services\SerialNumberService;
-use Illuminate\Http\Request;
+use App\Domains\Production\Requests\GenerateSerialNumberRequest;
+use App\Domains\Production\Requests\ManualAssignSerialNumberRequest;
 
 class SerialNumberController extends Controller
 {
@@ -13,19 +14,12 @@ class SerialNumberController extends Controller
         private readonly SerialNumberService $serialService
     ) {}
 
-    public function generate(Request $request)
+    public function generate(GenerateSerialNumberRequest $request)
     {
         $this->authorize('manage', ProductionSerialNumber::class);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'production_order_id' => 'required|integer',
-            'product_id'          => 'required|integer',
-            'quantity'            => 'required|integer|min:1',
-            'prefix'              => 'required|string|max:50',
-            'start_num'           => 'required|integer|min:1',
-            'batch_id'            => 'nullable|integer',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->serialService->generateSerials(
@@ -44,17 +38,12 @@ class SerialNumberController extends Controller
         }
     }
 
-    public function manualAssign(Request $request)
+    public function manualAssign(ManualAssignSerialNumberRequest $request)
     {
         $this->authorize('manage', ProductionSerialNumber::class);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'production_order_id' => 'required|integer',
-            'product_id'          => 'required|integer',
-            'serial_number'       => 'required|string|max:100',
-            'batch_id'            => 'nullable|integer',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->serialService->manualAssign(

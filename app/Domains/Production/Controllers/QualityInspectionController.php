@@ -7,7 +7,8 @@ use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionQualityPlan;
 use App\Domains\Production\Services\QualityInspectionService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\StoreQualityInspectionRequest;
+use App\Domains\Production\Requests\QualityInspectionResultsRequest;
 
 class QualityInspectionController extends Controller
 {
@@ -15,14 +16,40 @@ class QualityInspectionController extends Controller
         private readonly QualityInspectionService $inspectionService
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('view', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
-        $inspections = ProductionQualityInspection::where('tenant_id', $tenantId)
-            ->with(['plan', 'order'])
-            ->orderBy('id', 'desc')
-            ->get();
+
+        $query = ProductionQualityInspection::where('tenant_id', $tenantId)
+            ->with(['plan', 'order']);
+
+        if ($request->filled('search')) {
+            $search = '%' . $request->input('search') . '%';
+            $query->whereHas('plan', function($pq) use ($search) {
+                $pq->where('name', 'like', $search);
+            });
+        }
+
+        if ($request->filled('stage')) {
+            $query->where('stage', $request->input('stage'));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $sortBy = $request->input('sort_by', 'id');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        if (!in_array($sortBy, ['id', 'stage', 'status', 'result'])) {
+            $sortBy = 'id';
+        }
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
+        $inspections = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
 
         return view('modules.production.quality.inspections.index', compact('inspections'));
     }
@@ -36,20 +63,15 @@ class QualityInspectionController extends Controller
         return view('modules.production.quality.inspections.create', compact('plans'));
     }
 
-    public function store(Request $request)
+    public function store(StoreQualityInspectionRequest $request)
     {
         $this->authorize('manage', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
-        $data = $request->validate([
-            'quality_plan_id'               => 'required|exists:production_quality_plans,id',
-            'stage'                         => 'required|string|in:incoming,in_process,final',
-            'production_order_id'           => 'nullable|integer',
-            'production_order_operation_id' => 'nullable|integer',
-        ]);
+        $data = $request->validated();
 
         $inspection = $this->inspectionService->createInspection($tenantId, $data);
 
-        return redirect()->route('production.quality.inspections.show', $inspection->id)
+        return redirect()->route('production.inspections.show', $inspection->id)
             ->with('success', 'Quality checklist generated.');
     }
 
@@ -64,12 +86,9 @@ class QualityInspectionController extends Controller
         return view('modules.production.quality.inspections.show', compact('inspection'));
     }
 
-    public function saveResults(Request $request, int $id)
+    public function saveResults(QualityInspectionResultsRequest $request, int $id)
     {
         $this->authorize('manage', ProductionQualityInspection::class);
-        $request->validate([
-            'results' => 'required|array',
-        ]);
 
         $this->inspectionService->recordResults($id, $request->input('results'));
 

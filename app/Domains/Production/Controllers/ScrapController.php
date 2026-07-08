@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionScrapDisposal;
 use App\Domains\Production\Services\ScrapService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\StoreScrapRequest;
 
 class ScrapController extends Controller
 {
@@ -21,22 +21,17 @@ class ScrapController extends Controller
         $scraps = ProductionScrapDisposal::where('tenant_id', $tenantId)
             ->with(['ncr', 'disposer'])
             ->orderBy('id', 'desc')
-            ->get();
+            ->paginate(15)
+            ->withQueryString();
 
         return view('modules.production.quality.scrap.index', compact('scraps'));
     }
 
-    public function store(Request $request)
+    public function store(StoreScrapRequest $request)
     {
         $this->authorize('manage', ProductionScrapDisposal::class);
         $tenantId = require_tenant_id();
-        $data = $request->validate([
-            'category'    => 'required|string|in:raw_material,finished_good,scrap_metal,chemical',
-            'reason_code' => 'required|string',
-            'quantity'    => 'required|numeric|min:0.01',
-            'cost'        => 'nullable|numeric|min:0',
-            'ncr_id'      => 'nullable|exists:production_ncrs,id',
-        ]);
+        $data = $request->validated();
 
         $this->scrapService->createScrapDisposal($tenantId, $data);
 

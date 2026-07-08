@@ -7,7 +7,7 @@ use App\Domains\Production\Models\ProductionSchedule;
 use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Services\MesExecutionService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\MesCompleteOperationRequest;
 use InvalidArgumentException;
 use App\Domains\Production\Models\ProductionOperatorAssignment;
 use App\Domains\Production\Models\ProductionOrderOperation;
@@ -106,18 +106,11 @@ class MesController extends Controller
         }
     }
 
-    public function complete(Request $request, int $op)
+    public function complete(MesCompleteOperationRequest $request, int $op)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
-        $data = $request->validate([
-            'quantity_produced' => 'required|numeric|min:0',
-            'quantity_rejected' => 'nullable|numeric|min:0',
-            'quantity_scrapped' => 'nullable|numeric|min:0',
-            'setup_minutes'     => 'nullable|numeric|min:0',
-            'run_minutes'       => 'nullable|numeric|min:0',
-            'remarks'           => 'nullable|string|max:1000',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->mesService->completeOperation($op, $data, auth()->id());

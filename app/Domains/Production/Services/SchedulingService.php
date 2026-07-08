@@ -23,7 +23,17 @@ class SchedulingService
     ) {}
 
     /**
-     * Public gateway for generating schedule. Calls forward/backward engines.
+     * Public gateway for generating a production schedule.
+     *
+     * Dispatches to the forward or backward scheduling engine based on $type.
+     * Throws InvalidArgumentException for unsupported scheduling strategies.
+     *
+     * @param  ProductionOrder $order  The production order to schedule.
+     * @param  Carbon          $date   Start date (forward) or due date (backward).
+     * @param  string          $type   Scheduling strategy: 'forward' or 'backward'.
+     * @return ProductionSchedule
+     *
+     * @throws \InvalidArgumentException When $type is not supported.
      */
     public function generateSchedule(
         ProductionOrder $order,
@@ -44,7 +54,15 @@ class SchedulingService
     }
 
     /**
-     * Generate Forward Schedule: Allocates resources sequentially from a start date.
+     * Generate Forward Schedule.
+     *
+     * Allocates routing operations sequentially from the given start date.
+     * Respects: shift windows, holiday calendars, parallel operations, alternate machines.
+     * Deletes any existing draft/scheduled plans for the same order before generating.
+     *
+     * @param  ProductionOrder $order      The order whose routing operations will be scheduled.
+     * @param  Carbon          $startDate  Scheduling starts no earlier than this date.
+     * @return ProductionSchedule          The persisted schedule with all operations attached.
      */
     public function generateForwardSchedule(ProductionOrder $order, Carbon $startDate): ProductionSchedule
     {
@@ -149,7 +167,15 @@ class SchedulingService
     }
 
     /**
-     * Generate Backward Schedule: Allocates resources backwards from a due date.
+     * Generate Backward Schedule.
+     *
+     * Allocates routing operations in reverse-sequence from the given due date, ensuring
+     * the last operation finishes on or before $dueDate. Predecessor/successor logic is
+     * inverted compared to forward scheduling.
+     *
+     * @param  ProductionOrder $order    The order whose routing operations will be scheduled.
+     * @param  Carbon          $dueDate  All operations must complete by this date.
+     * @return ProductionSchedule        The persisted schedule with operations in correct sequence.
      */
     public function generateBackwardSchedule(ProductionOrder $order, Carbon $dueDate): ProductionSchedule
     {
@@ -262,7 +288,18 @@ class SchedulingService
     }
 
     /**
-     * Reschedule: Repositions operations from new start date, preserving locked operations.
+     * Reschedule an existing ProductionSchedule.
+     *
+     * Repositions all unlocked operations from $newStartDate forward, preserving the
+     * start times of any operations where `locked = true`. Only 'forward' reschedule
+     * is supported in this release.
+     *
+     * @param  int    $scheduleId   ID of the ProductionSchedule to reschedule.
+     * @param  Carbon $newStartDate New earliest start date for unlocked operations.
+     * @param  string $type         Reschedule direction; only 'forward' is supported.
+     * @return ProductionSchedule   The updated schedule with recalculated operation times.
+     *
+     * @throws \InvalidArgumentException When $type is not 'forward'.
      */
     public function reschedule(int $scheduleId, Carbon $newStartDate, string $type = 'forward'): ProductionSchedule
     {
@@ -351,7 +388,18 @@ class SchedulingService
     }
 
     /**
-     * Find best available slot based on calendar, shifts, and machine bookings.
+     * Find the next available time slot for a resource.
+     *
+     * Searches shift windows, respects holiday calendars, and avoids overlapping
+     * with existing bookings on the same machine or work center. Falls back to
+     * unlimited capacity scheduling if no finite slot is found within 365 days.
+     *
+     * @param  int   $workCenterId     Work center to schedule against.
+     * @param  int|null $machineId     Specific machine to book; null means work-center-level.
+     * @param  Carbon   $from          Earliest acceptable start.
+     * @param  float    $durationMinutes Operation duration in minutes.
+     * @param  bool     $forward       True = search forward from $from; false = search backward.
+     * @return array{start: Carbon, finish: Carbon, warnings: array}
      */
     public function calculateAvailableSlot(
         int $workCenterId,
@@ -498,7 +546,18 @@ class SchedulingService
     }
 
     /**
-     * Resolves alternate machines and picks the one with the earliest available slot.
+     * Find the optimal machine for a routing operation.
+     *
+     * Evaluates the primary machine and all configured alternate machines.
+     * Returns the candidate with the earliest available slot. If an alternate
+     * machine is selected, a ALTERNATE_MACHINE_USED warning is appended.
+     *
+     * @param  int   $routingOpId     ID of the RoutingOperation that defines the machine constraints.
+     * @param  Carbon $from           Earliest acceptable start time.
+     * @param  float  $durationMinutes Duration in minutes.
+     * @param  int    $tenantId        Tenant scope for machine validation.
+     * @param  bool   $forward         Scheduling direction.
+     * @return array{machine_id: int|null, start: Carbon, finish: Carbon, warnings: array, priority: int}
      */
     public function findNextAvailableMachine(
         int $routingOpId,
@@ -655,7 +714,14 @@ class SchedulingService
     }
 
     /**
-     * Conflict detector.
+     * Detect scheduling conflicts for a tenant.
+     *
+     * Identifies machine-level time overlaps: two operations assigned to the same
+     * machine where the earlier operation's planned_finish exceeds the next
+     * operation's planned_start.
+     *
+     * @param  int   $tenantId
+     * @return string[]  Human-readable conflict descriptions.
      */
     public function detectConflicts(int $tenantId): array
     {
@@ -685,13 +751,24 @@ class SchedulingService
     }
 
     /**
-     * Overload detector.
+     * Detect capacity overloads for a tenant.
+     *
+     * Groups active scheduled operations by (work_center_id, date) and compares
+     * the total planned minutes against the work center's calculated capacity.
+     * Returns a list of human-readable overload messages for affected work centers.
+     *
+     * NOTE: This method performs in-memory grouping after loading all active ops.
+     * For large tenants, consider refactoring to a DB-level aggregation query.
+     *
+     * @param  int   $tenantId
+     * @return string[]  Human-readable overload descriptions.
      */
     public function detectOverloads(int $tenantId): array
     {
         $overloads = [];
         $ops = ProductionScheduleOperation::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
+            ->with(['workCenter'])
             ->whereHas('schedule', fn($q) => $q->where('tenant_id', $tenantId)->whereIn('status', ['scheduled', 'released', 'in_progress']))
             ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
             ->get();
@@ -700,16 +777,18 @@ class SchedulingService
         foreach ($grouped as $key => $wcOps) {
             [$wcId, $dateStr] = explode('_', $key);
             $date = Carbon::parse($dateStr);
+            
+            $firstOp = $wcOps->first();
+            $wc = $firstOp ? $firstOp->workCenter : null;
+            if (!$wc) {
+                continue;
+            }
+
             $capacity = $this->calculateCapacity((int)$wcId, $date);
 
             $scheduledMinutes = $wcOps->sum('planned_duration_minutes');
             if ($scheduledMinutes > $capacity) {
-                $wc = WorkCenter::withoutGlobalScopes()
-                    ->where('tenant_id', $tenantId)
-                    ->find($wcId);
-                if ($wc) {
-                    $overloads[] = "Work Center [{$wc->name}] overloaded on {$dateStr}: Scheduled {$scheduledMinutes} minutes, Capacity is {$capacity} minutes.";
-                }
+                $overloads[] = "Work Center [{$wc->name}] overloaded on {$dateStr}: Scheduled {$scheduledMinutes} minutes, Capacity is {$capacity} minutes.";
             }
         }
 

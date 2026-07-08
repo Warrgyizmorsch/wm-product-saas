@@ -37,27 +37,6 @@
     @php
         $sortBy = request('sort_by', 'bom_number');
         $sortOrder = request('sort_order', 'asc');
-        
-        // Sort the collection based on request parameters
-        if ($sortBy === 'bom_name') {
-            $sortedBoms = $sortOrder === 'desc' 
-                ? $boms->sortByDesc('bom_name') 
-                : $boms->sortBy('bom_name');
-        } elseif ($sortBy === 'base_quantity') {
-            $sortedBoms = $sortOrder === 'desc' 
-                ? $boms->sortByDesc('base_quantity') 
-                : $boms->sortBy('base_quantity');
-        } else { // default: bom_number
-            $sortedBoms = $sortOrder === 'desc' 
-                ? $boms->sortByDesc('bom_number') 
-                : $boms->sortBy('bom_number');
-        }
-
-        $currentPage = (int) request('page', 1);
-        $perPage = 10;
-        $totalResults = $sortedBoms->count();
-        $totalPages = (int) ceil($totalResults / $perPage);
-        $paginatedBoms = $sortedBoms->slice(($currentPage - 1) * $perPage, $perPage);
     @endphp
 
     <div class="erp-single-panel">
@@ -160,7 +139,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($paginatedBoms as $bom)
+                    @forelse($boms as $bom)
                         <tr>
                             <td class="text-center">
                                 <input type="checkbox" class="form-check-input">
@@ -325,7 +304,8 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <!-- Pagination Component -->
-        <x-ui.pagination :currentPage="$currentPage" :totalPages="$totalPages" :totalResults="$totalResults" :perPage="$perPage" />
+        <div class="mt-4">
+            {{ $boms->links() }}
+        </div>
     </div>
 @endsection

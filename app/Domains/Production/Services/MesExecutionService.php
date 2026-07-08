@@ -24,6 +24,14 @@ class MesExecutionService
      * Side effects:
      * - Sets actual_start on ProductionScheduleOperation.
      * - Updates ProductionOrderOperation status to running.
+     * - Transitions machine state to 'Running' and logs a production event.
+     *
+     * @param  int      $scheduleOpId  ID of the ProductionScheduleOperation to start.
+     * @param  int|null $machineId     Override machine (must match tenant & work center).
+     * @param  int|null $operatorId    Operator who started the operation.
+     * @return void
+     *
+     * @throws InvalidArgumentException When state transition is not allowed.
      */
     public function startOperation(int $scheduleOpId, ?int $machineId, ?int $operatorId): void
     {
@@ -136,6 +144,15 @@ class MesExecutionService
 
     /**
      * Pause a running operation.
+     *
+     * Intelligently transitions the assigned machine to a contextual 'waiting' state
+     * based on pause remarks (e.g., 'material' → Waiting Material, 'breakdown' → Breakdown).
+     *
+     * @param  int         $scheduleOpId  ID of the running ProductionScheduleOperation.
+     * @param  string|null $remarks       Optional reason for pause (used to determine machine state).
+     * @return void
+     *
+     * @throws InvalidArgumentException When operation is not in 'running' status.
      */
     public function pauseOperation(int $scheduleOpId, ?string $remarks = null): void
     {
@@ -189,6 +206,14 @@ class MesExecutionService
 
     /**
      * Resume a paused operation.
+     *
+     * Restores the operation to 'running' status and transitions
+     * the assigned machine back to 'Running' state.
+     *
+     * @param  int  $scheduleOpId  ID of the paused ProductionScheduleOperation.
+     * @return void
+     *
+     * @throws InvalidArgumentException When operation is not in 'paused' status.
      */
     public function resumeOperation(int $scheduleOpId): void
     {
@@ -237,9 +262,17 @@ class MesExecutionService
      *
      * Side effects:
      * - Populates actual_finish on ProductionScheduleOperation.
-     * - Creates ProductionOrderProgressLog.
-     * - Marks next operation as ready (if exists).
-     * - Auto-completes schedule and order if this was the last operation.
+     * - Creates ProductionOrderProgressLog entry with qty_good, qty_scrap, qty_rework.
+     * - Marks the next sequential operation as 'ready' (if exists and not yet ready).
+     * - Auto-completes the ProductionSchedule if this was the last operation.
+     * - Auto-completes the ProductionOrder if all operations are done.
+     *
+     * @param  int      $scheduleOpId  ID of the running/paused operation to complete.
+     * @param  array    $data          Completion data: qty_good, qty_scrap, qty_rework, remarks.
+     * @param  int|null $operatorId    Operator who completed the operation.
+     * @return void
+     *
+     * @throws InvalidArgumentException When operation is not in 'running' or 'paused' status.
      */
     public function completeOperation(int $scheduleOpId, array $data, ?int $operatorId): void
     {

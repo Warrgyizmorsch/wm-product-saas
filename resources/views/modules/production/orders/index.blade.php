@@ -23,34 +23,12 @@
 @section('content')
 <div class="erp-single-panel">
     {{-- Alerts --}}
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-success text-white me-3">
-                    <i class="feather-check-circle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                    <p class="fs-12 mb-0">{{ session('success') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+    @if (session('success'))
+        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
     @endif
 
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                    <p class="fs-12 mb-0">{{ session('error') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+    @if (session('error'))
+        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
     @endif
 
     {{-- KPI Status Summary --}}

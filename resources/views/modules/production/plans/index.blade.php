@@ -21,7 +21,7 @@
 @endsection
 
 @section('content')
-<div class="erp-single-panel bg-white">
+<div class="erp-single-panel">
     <!-- KPI Status Summary -->
     <div class="row g-3 mb-4">
         <div class="col">
@@ -61,61 +61,91 @@
             </div>
         </div>
     </div>
-        <!-- Success & Error Messages -->
-        @if (session('success'))
-            <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                <p class="fs-12 mb-0">{{ session('success') }}</p>
-            </x-ui.alert>
-            <div class="mb-4"></div>
-        @endif
+    {{-- Toast alerts --}}
+    @if (session('success'))
+        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
+    @endif
 
-        @if (session('error'))
-            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                <p class="fs-12 mb-0">{{ session('error') }}</p>
-            </x-ui.alert>
-            <div class="mb-4"></div>
-        @endif
+    @if (session('error'))
+        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
+    @endif
 
-        <!-- Filters Section -->
-        <form method="GET" action="{{ route('production.plans.index') }}" class="mb-4 pb-3 border-bottom">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <x-ui.input name="search" placeholder="Search plan number, name or product..." value="{{ request('search') }}" />
-                </div>
-                <div class="col-md-3">
-                    <x-ui.select name="status" :options="[
-                        '' => 'All Statuses',
-                        'draft' => 'Draft',
-                        'pending_approval' => 'Pending Approval',
-                        'approved' => 'Approved',
-                        'mrp_generated' => 'MRP Generated',
-                        'released' => 'Released to Shop Floor',
-                        'completed' => 'Completed',
-                        'closed' => 'Closed / Archived',
-                        'cancelled' => 'Cancelled'
-                    ]" selected="{{ request('status') }}" data-select2-selector="default" />
-                </div>
-                <div class="col-md-3">
-                    <div class="d-flex gap-2">
-                        <x-ui.input type="date" name="start_date" placeholder="Start Date" value="{{ request('start_date') }}" />
-                        <x-ui.input type="date" name="end_date" placeholder="End Date" value="{{ request('end_date') }}" />
+    <!-- Toolbar: Sort, Filters -->
+    <div class="d-flex align-items-center mb-3">
+        <h5 class="fw-bold text-dark mb-0">Plans List</h5>
+        <div class="d-flex gap-2 ms-auto">
+            <!-- Sort dropdown -->
+            @php
+                $sortBy = request('sort_by', 'id');
+                $sortOrder = request('sort_order', 'desc');
+            @endphp
+            <x-ui.sort-dropdown label="Sort">
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <span>Newest First</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <span>Oldest First</span>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'plan_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'plan_number' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <span>Plan Number (Asc)</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'plan_number', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'plan_number' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <span>Plan Number (Desc)</span>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <span>Plan Name (A-Z)</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <span>Plan Name (Z-A)</span>
+                </a>
+            </x-ui.sort-dropdown>
+
+            <!-- Custom Filter Component -->
+            <form method="GET" action="{{ route('production.plans.index') }}" class="d-inline">
+                <x-ui.filter label="Filter" offset="0, 5">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                        <x-ui.input name="search" placeholder="Search plan number, name or product..." value="{{ request('search') }}" />
                     </div>
-                </div>
-                <div class="col-md-2 d-flex align-items-start">
-                    <div class="d-grid w-100">
-                        <button type="submit" class="btn btn-secondary h-40">
-                            <i class="feather-filter me-2"></i>Filter
-                        </button>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                        <x-ui.select name="status" :options="[
+                            '' => 'All Statuses',
+                            'draft' => 'Draft',
+                            'pending_approval' => 'Pending Approval',
+                            'approved' => 'Approved',
+                            'mrp_generated' => 'MRP Generated',
+                            'released' => 'Released to Shop Floor',
+                            'completed' => 'Completed',
+                            'closed' => 'Closed / Archived',
+                            'cancelled' => 'Cancelled'
+                        ]" selected="{{ request('status') }}" data-select2-selector="default" />
                     </div>
-                </div>
-            </div>
-        </form>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date Range</label>
+                        <div class="d-flex gap-2">
+                            <x-ui.input type="date" name="start_date" placeholder="Start Date" value="{{ request('start_date') }}" />
+                            <x-ui.input type="date" name="end_date" placeholder="End Date" value="{{ request('end_date') }}" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-end mt-4">
+                        <a href="{{ route('production.plans.index') }}" class="btn btn-sm btn-light border">Reset</a>
+                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                    </div>
+                </x-ui.filter>
+            </form>
+        </div>
+    </div>
 
         <!-- Plans Table -->
-        <div class="table-responsive">
-            <table class="erp-thin-table">
+        <x-ui.odoo-form-ui type="table">
                 <thead>
                     <tr>
                         <th style="width: 12%">Plan Number</th>
@@ -192,8 +222,7 @@
                         </tr>
                     @endforelse
                 </tbody>
-            </table>
-        </div>
+            </x-ui.odoo-form-ui>
 
     <div class="mt-4">
         {{ $plans->links() }}

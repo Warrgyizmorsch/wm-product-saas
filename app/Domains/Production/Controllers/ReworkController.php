@@ -7,6 +7,7 @@ use App\Domains\Production\Models\ProductionReworkOrder;
 use App\Domains\Production\Models\ProductionReworkOperation;
 use App\Domains\Production\Services\ReworkService;
 use Illuminate\Http\Request;
+use App\Domains\Production\Requests\CompleteReworkOperationRequest;
 
 class ReworkController extends Controller
 {
@@ -14,14 +15,36 @@ class ReworkController extends Controller
         private readonly ReworkService $reworkService
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('view', ProductionReworkOrder::class);
         $tenantId = require_tenant_id();
-        $reworks = ProductionReworkOrder::where('tenant_id', $tenantId)
-            ->with(['ncr', 'originalOrder'])
-            ->orderBy('id', 'desc')
-            ->get();
+
+        $query = ProductionReworkOrder::where('tenant_id', $tenantId)
+            ->with(['ncr', 'originalOrder']);
+
+        if ($request->filled('search')) {
+            $search = '%' . $request->input('search') . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('rework_number', 'like', $search);
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $sortBy = $request->input('sort_by', 'id');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        if (!in_array($sortBy, ['id', 'rework_number', 'status', 'cost_estimate', 'actual_cost'])) {
+            $sortBy = 'id';
+        }
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
+        $reworks = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
 
         return view('modules.production.quality.rework.index', compact('reworks'));
     }
@@ -45,12 +68,10 @@ class ReworkController extends Controller
         return redirect()->back()->with('success', 'Rework operation started.');
     }
 
-    public function completeOp(Request $request, int $id)
+    public function completeOp(CompleteReworkOperationRequest $request, int $id)
     {
         $this->authorize('manage', ProductionReworkOrder::class);
-        $data = $request->validate([
-            'setup_time_actual' => 'nullable|numeric',
-        ]);
+        $data = $request->validated();
 
         $this->reworkService->completeOperation($id, $data);
 
