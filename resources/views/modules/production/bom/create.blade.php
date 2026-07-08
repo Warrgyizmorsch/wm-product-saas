@@ -127,7 +127,7 @@
                                 <x-ui.odoo-form-ui type="select" label="Routing Reference" name="routing_id" id="routing_id" x-model="selectedRoutingId" :error-text="$errors->first('routing_id')" alpineError="errors.routing_id">
                                     <option value="">No Routing Reference</option>
                                     @foreach($routings as $rt)
-                                        <option value="{{ $rt->id }}">{{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})</option>
+                                        <option value="{{ $rt->id }}" data-product-id="{{ $rt->product_id }}">{{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
@@ -457,15 +457,68 @@
                         this.addItem();
                     }
 
+                    // Store all routing options in memory on init
+                    const allRoutings = [];
+                    $('#routing_id option').each(function() {
+                        const val = $(this).val();
+                        if (val) {
+                            allRoutings.push({
+                                id: val,
+                                text: $(this).text(),
+                                productId: $(this).attr('data-product-id')
+                            });
+                        }
+                    });
+
+                    // Function to filter routing options based on selected product (visible only)
+                    const filterRoutings = (productId) => {
+                        const $routingSelect = $('#routing_id');
+                        const currentVal = $routingSelect.val();
+
+                        $routingSelect.empty();
+                        $routingSelect.append($('<option value="">No Routing Reference</option>'));
+
+                        let selectedValStillValid = false;
+
+                        allRoutings.forEach(rt => {
+                            if (productId && rt.productId == productId) {
+                                const $opt = $('<option></option>')
+                                    .val(rt.id)
+                                    .text(rt.text)
+                                    .attr('data-product-id', rt.productId);
+                                $routingSelect.append($opt);
+                                if (rt.id == currentVal) {
+                                    selectedValStillValid = true;
+                                }
+                            }
+                        });
+
+                        if (selectedValStillValid && currentVal) {
+                            $routingSelect.val(currentVal);
+                        } else {
+                            $routingSelect.val('');
+                        }
+
+                        if ($routingSelect.data('select2')) {
+                            $routingSelect.trigger('change');
+                        }
+                    };
+
+                    // Initial filter on load
+                    const initialProductId = $('#product_id').val();
+                    filterRoutings(initialProductId);
+
                     // Hook select2 change event for routing reference
                     $('#routing_id').on('change.select2', (e) => {
                         this.selectedRoutingId = e.target.value;
                         this.loadOperations();
                     });
 
-                    // Hook select2 change event for parent product_id to disable it in row selections
+                    // Hook select2 change event for parent product_id to disable it in row selections and filter routings
                     $('#product_id').on('change.select2 change', (e) => {
                         var parentProductId = e.target.value;
+                        filterRoutings(parentProductId);
+
                         $('.odoo-table-select[name*="[material_id]"]').each(function() {
                             var $select = $(this);
                             $select.find('option').each(function() {
