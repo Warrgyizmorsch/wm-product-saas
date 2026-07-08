@@ -13,6 +13,7 @@ use App\Domains\Production\Models\ProductionOperatorAssignment;
 use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Models\ProductionSerialNumber;
+use App\Domains\Production\Models\ProductionShift;
 
 class MesController extends Controller
 {
@@ -64,8 +65,11 @@ class MesController extends Controller
             ->orderBy('planned_start')
             ->get();
 
+        // Shifts assigned/active
+        $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
+
         return view('modules.production.mes.dashboard', compact(
-            'running', 'ready', 'upcoming', 'completedToday', 'paused'
+            'running', 'ready', 'upcoming', 'completedToday', 'paused', 'shifts'
         ));
     }
 

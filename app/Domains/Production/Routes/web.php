@@ -31,6 +31,10 @@ use App\Domains\Production\Controllers\ReworkController;
 use App\Domains\Production\Controllers\ScrapController;
 use App\Domains\Production\Controllers\DeviationController;
 use App\Domains\Production\Controllers\QualityDashboardController;
+use App\Domains\Production\Controllers\ShiftController;
+use App\Domains\Production\Controllers\CalendarController;
+use App\Domains\Production\Controllers\QualityPlanController;
+use App\Domains\Production\Controllers\OperatorSkillController;
 
 Route::prefix('production')
     ->as('production.')
@@ -100,6 +104,14 @@ Route::prefix('production')
         Route::post('schedules/{schedule}/release',  [ProductionScheduleController::class, 'release'])->name('schedules.release');
         Route::post('schedules/{schedule}/cancel',   [ProductionScheduleController::class, 'cancel'])->name('schedules.cancel');
         Route::resource('schedules', ProductionScheduleController::class)->except(['edit', 'update']);
+
+        // ── Shifts & Calendars ────────────────────────────────────────────────
+        Route::resource('shifts', ShiftController::class);
+        Route::resource('calendars', CalendarController::class);
+
+        // ── Quality Plans & Operator Skills ───────────────────────────────────
+        Route::resource('quality-plans', QualityPlanController::class);
+        Route::resource('operator-skills', OperatorSkillController::class);
 
         // ── MES / Shop Floor ──────────────────────────────────────────────────
         Route::get('mes',                    [MesController::class, 'dashboard'])->name('mes.dashboard');
