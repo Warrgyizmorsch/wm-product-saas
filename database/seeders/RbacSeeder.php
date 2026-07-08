@@ -148,6 +148,7 @@ class RbacSeeder extends Seeder
             ['name' => 'platform.tenants.manage', 'module' => 'platform', 'entity' => 'tenants', 'action' => 'manage'],
             ['name' => 'access.roles.manage', 'module' => 'access', 'entity' => 'roles', 'action' => 'manage'],
             ['name' => 'access.permissions.manage', 'module' => 'access', 'entity' => 'permissions', 'action' => 'manage'],
+            ['name' => 'access.users.manage', 'module' => 'access', 'entity' => 'users', 'action' => 'manage'],
             ['name' => 'production.work_center.manage', 'module' => 'production', 'entity' => 'work_center', 'action' => 'manage'],
             ['name' => 'production.machine.manage', 'module' => 'production', 'entity' => 'machine', 'action' => 'manage'],
             ['name' => 'production.routing.create', 'module' => 'production', 'entity' => 'routing', 'action' => 'create'],

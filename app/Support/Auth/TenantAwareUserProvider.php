@@ -2,7 +2,7 @@
 
 namespace App\Support\Auth;
 
-use App\Core\Tenant\TenantContext;
+use App\Core\Tenant\TenantResolver;
 use App\Services\Access\AccessService;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Contracts\Auth\Authenticatable as UserContract;
@@ -45,7 +45,14 @@ class TenantAwareUserProvider extends EloquentUserProvider
             return null;
         }
 
-        $currentTenantId = app(TenantContext::class)->id();
+        // TenantContext is populated by the app's `tenant` middleware, but
+        // that middleware is not guaranteed to run before Laravel resolves
+        // the session's authenticated user — the framework's own auth
+        // middleware is priority-ordered ahead of any unlisted custom
+        // middleware regardless of route-group nesting, so TenantContext
+        // can still be empty at this point. Resolve directly from the
+        // current request instead of depending on that ordering.
+        $currentTenantId = app(TenantResolver::class)->resolve(request())?->id;
 
         if ($user->tenant_id !== null
             && $currentTenantId !== null

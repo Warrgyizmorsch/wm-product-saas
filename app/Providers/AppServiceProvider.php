@@ -143,5 +143,16 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Sales\Models\DeliveryOrder::class,
             \App\Domains\Sales\Policies\DeliveryOrderPolicy::class
         );
+
+        // ── Access (RBAC admin) Policies ──────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Models\User::class,
+            \App\Domains\Access\Policies\UserPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Models\Access\Role::class,
+            \App\Domains\Access\Policies\RolePolicy::class
+        );
     }
 }

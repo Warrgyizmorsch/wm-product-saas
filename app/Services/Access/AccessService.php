@@ -3,6 +3,7 @@
 namespace App\Services\Access;
 
 use App\Models\Access\Permission;
+use App\Models\Access\Role;
 use App\Models\Access\RolePermission;
 use App\Models\Access\UserPermissionOverride;
 use App\Models\Access\UserRole;
@@ -54,6 +55,38 @@ class AccessService
         }
 
         return $this->allowsLegacyProductionPermission($user, $permissionName);
+    }
+
+    /**
+     * Effective role IDs for a user in a tenant context — the same
+     * legacy-role_id + UserRole merge that allows() uses internally,
+     * exposed so admin screens can show which concrete roles are actually
+     * driving a user's grants without duplicating the merge logic.
+     *
+     * @return Collection<int, int>
+     */
+    public function effectiveRoleIds(User $user, ?int $tenantId = null): Collection
+    {
+        return $this->roleIdsFor($user, $tenantId ?? $user->tenant_id);
+    }
+
+    /**
+     * Whether $user currently holds the role with this slug, in the given
+     * tenant context. This is an identity check, not a scoped-permission
+     * check — allows() has no way to express "is the *target* Role being
+     * edited a system role", so callers that need that (e.g. restricting
+     * who may edit a system role's permissions) check role membership here
+     * directly instead.
+     */
+    public function hasRole(User $user, string $roleSlug, ?int $tenantId = null): bool
+    {
+        $roleIds = $this->roleIdsFor($user, $tenantId ?? $user->tenant_id);
+
+        if ($roleIds->isEmpty()) {
+            return false;
+        }
+
+        return Role::query()->whereIn('id', $roleIds)->where('slug', $roleSlug)->exists();
     }
 
     /**
