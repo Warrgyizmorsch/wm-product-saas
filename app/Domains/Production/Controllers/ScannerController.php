@@ -41,7 +41,7 @@ class ScannerController extends Controller
             $entity = $this->codeService->resolveEntity(
                 $code,
                 $tenantId,
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('device_identifier')
             );
 

@@ -22,6 +22,23 @@ class AccessService
      */
     public function allows(User $user, string $permissionName, array $context = []): bool
     {
+        // ── Admin and Tenant Owner Override ──
+        if ($user->role === 'admin' || $user->role === 'super_admin' || $user->role === 'tenant_owner' || $user->role === 'company_admin') {
+            return true;
+        }
+
+        $tenantId = $context['tenant_id'] ?? $user->tenant_id;
+        $roleIds = $this->roleIdsFor($user, $tenantId);
+        if ($roleIds->isNotEmpty()) {
+            $isAdminRole = Role::query()
+                ->whereIn('id', $roleIds)
+                ->whereIn('slug', ['super_admin', 'tenant_owner', 'company_admin', 'admin'])
+                ->exists();
+            if ($isAdminRole) {
+                return true;
+            }
+        }
+
         $permission = Permission::query()
             ->where('name', $permissionName)
             ->first();
@@ -168,7 +185,7 @@ class AccessService
             return false;
         }
 
-        $legacyRole = $user->role ?? null;
+        $legacyRole = $user->role ?: ($user->primaryRole->slug ?? null);
 
         return $legacyRole !== null && in_array($legacyRole, $allowedRoles, true);
     }

@@ -31,7 +31,7 @@ class MachineStateController extends Controller
                 (int)$request->input('machine_id'),
                 $request->input('state'),
                 $request->input('reason'),
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('remarks')
             );
 

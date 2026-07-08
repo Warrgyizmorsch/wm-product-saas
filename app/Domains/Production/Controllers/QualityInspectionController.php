@@ -17,6 +17,7 @@ class QualityInspectionController extends Controller
 
     public function index()
     {
+        $this->authorize('view', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
         $inspections = ProductionQualityInspection::where('tenant_id', $tenantId)
             ->with(['plan', 'order'])
@@ -28,6 +29,7 @@ class QualityInspectionController extends Controller
 
     public function create()
     {
+        $this->authorize('manage', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
         $plans = ProductionQualityPlan::where('tenant_id', $tenantId)->get();
 
@@ -36,6 +38,7 @@ class QualityInspectionController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('manage', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
         $data = $request->validate([
             'quality_plan_id'               => 'required|exists:production_quality_plans,id',
@@ -52,6 +55,7 @@ class QualityInspectionController extends Controller
 
     public function show(int $id)
     {
+        $this->authorize('view', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
         $inspection = ProductionQualityInspection::where('tenant_id', $tenantId)
             ->with(['plan.parameters', 'results.parameter'])
@@ -62,6 +66,7 @@ class QualityInspectionController extends Controller
 
     public function saveResults(Request $request, int $id)
     {
+        $this->authorize('manage', ProductionQualityInspection::class);
         $request->validate([
             'results' => 'required|array',
         ]);
@@ -73,7 +78,8 @@ class QualityInspectionController extends Controller
 
     public function approve(Request $request, int $id)
     {
-        $userId = Auth::id() ?: 1;
+        $this->authorize('approve', ProductionQualityInspection::class);
+        $userId = auth()->id();
         $signature = $request->input('esignature') ?: 'SIGNED';
 
         $this->inspectionService->approveInspection($id, $userId, $signature);

@@ -691,6 +691,7 @@ class SchedulingService
     {
         $overloads = [];
         $ops = ProductionScheduleOperation::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
             ->whereHas('schedule', fn($q) => $q->where('tenant_id', $tenantId)->whereIn('status', ['scheduled', 'released', 'in_progress']))
             ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
             ->get();
@@ -703,8 +704,12 @@ class SchedulingService
 
             $scheduledMinutes = $wcOps->sum('planned_duration_minutes');
             if ($scheduledMinutes > $capacity) {
-                $wc = WorkCenter::withoutGlobalScopes()->find($wcId);
-                $overloads[] = "Work Center [{$wc->name}] overloaded on {$dateStr}: Scheduled {$scheduledMinutes} minutes, Capacity is {$capacity} minutes.";
+                $wc = WorkCenter::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->find($wcId);
+                if ($wc) {
+                    $overloads[] = "Work Center [{$wc->name}] overloaded on {$dateStr}: Scheduled {$scheduledMinutes} minutes, Capacity is {$capacity} minutes.";
+                }
             }
         }
 

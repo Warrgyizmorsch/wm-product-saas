@@ -24,4 +24,20 @@ class ProductionLotTrace extends BaseModel
     protected $casts = [
         'quantity' => 'decimal:4',
     ];
+
+    /**
+     * Get the parent source model (Batch, Serial, Order, or Lot).
+     */
+    public function source(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo('source');
+    }
+
+    /**
+     * Get the parent target model (Batch, Serial, Order, or Lot).
+     */
+    public function target(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo('target');
+    }
 }

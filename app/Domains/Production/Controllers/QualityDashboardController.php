@@ -14,6 +14,7 @@ class QualityDashboardController extends Controller
 {
     public function index()
     {
+        $this->authorize('view', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
 
         // 1. First Pass Yield (FPY)

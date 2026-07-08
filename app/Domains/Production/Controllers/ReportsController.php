@@ -16,6 +16,7 @@ class ReportsController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
         $machines = Machine::where('tenant_id', $tenantId)->get();
         $workCenters = WorkCenter::where('tenant_id', $tenantId)->get();
@@ -25,6 +26,7 @@ class ReportsController extends Controller
 
     public function show(Request $request, string $type)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
         $filters = $request->only(['date_start', 'date_end', 'machine_id', 'work_center_id']);
 

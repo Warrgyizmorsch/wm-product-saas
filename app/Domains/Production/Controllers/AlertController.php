@@ -15,6 +15,7 @@ class AlertController extends Controller
 
     public function index()
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
 
         // 1. Ensure sensible default configurations exist
@@ -44,6 +45,7 @@ class AlertController extends Controller
 
     public function update(Request $request, int $id)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
         $alert = ProductionAlertConfiguration::where('tenant_id', $tenantId)->findOrFail($id);
 

@@ -16,6 +16,7 @@ class DeviationController extends Controller
 
     public function index()
     {
+        $this->authorize('view', ProductionDeviation::class);
         $tenantId = require_tenant_id();
         $deviations = ProductionDeviation::where('tenant_id', $tenantId)
             ->with(['approver'])
@@ -27,6 +28,7 @@ class DeviationController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('manage', ProductionDeviation::class);
         $tenantId = require_tenant_id();
         $data = $request->validate([
             'type'        => 'required|string|in:temporary,permanent,customer_waiver',
@@ -42,7 +44,8 @@ class DeviationController extends Controller
 
     public function approve(Request $request, int $id)
     {
-        $userId = Auth::id() ?: 1;
+        $this->authorize('approve', ProductionDeviation::class);
+        $userId = auth()->id();
         $signature = $request->input('esignature') ?: 'DEV-APPROVE-SIGN';
 
         $this->deviationService->approveDeviation($id, $userId, $signature);

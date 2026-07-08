@@ -16,6 +16,7 @@ class ReworkController extends Controller
 
     public function index()
     {
+        $this->authorize('view', ProductionReworkOrder::class);
         $tenantId = require_tenant_id();
         $reworks = ProductionReworkOrder::where('tenant_id', $tenantId)
             ->with(['ncr', 'originalOrder'])
@@ -27,6 +28,7 @@ class ReworkController extends Controller
 
     public function show(int $id)
     {
+        $this->authorize('view', ProductionReworkOrder::class);
         $tenantId = require_tenant_id();
         $rework = ProductionReworkOrder::where('tenant_id', $tenantId)
             ->with(['ncr', 'originalOrder', 'operations.workCenter', 'operations.machine'])
@@ -37,6 +39,7 @@ class ReworkController extends Controller
 
     public function startOp(Request $request, int $id)
     {
+        $this->authorize('manage', ProductionReworkOrder::class);
         $this->reworkService->startOperation($id);
 
         return redirect()->back()->with('success', 'Rework operation started.');
@@ -44,6 +47,7 @@ class ReworkController extends Controller
 
     public function completeOp(Request $request, int $id)
     {
+        $this->authorize('manage', ProductionReworkOrder::class);
         $data = $request->validate([
             'setup_time_actual' => 'nullable|numeric',
         ]);

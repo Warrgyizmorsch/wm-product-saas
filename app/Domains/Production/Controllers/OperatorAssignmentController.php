@@ -30,7 +30,7 @@ class OperatorAssignmentController extends Controller
                 $tenantId,
                 (int)$request->input('production_order_operation_id'),
                 (int)$request->input('user_id'),
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('remarks')
             );
 
@@ -55,7 +55,7 @@ class OperatorAssignmentController extends Controller
                 $tenantId,
                 $assignment,
                 (int)$request->input('user_id'),
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('remarks')
             );
 
@@ -72,7 +72,7 @@ class OperatorAssignmentController extends Controller
         $this->authorize('manageOwnAssignment', ProductionOperatorAssignment::findOrFail($assignment));
 
         try {
-            $this->assignmentService->accept($tenantId, $assignment, Auth::id() ?: 1, $request->input('remarks'));
+            $this->assignmentService->accept($tenantId, $assignment, auth()->id(), $request->input('remarks'));
             return redirect()->back()->with('success', 'Assignment accepted.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -86,7 +86,7 @@ class OperatorAssignmentController extends Controller
         $this->authorize('manageOwnAssignment', ProductionOperatorAssignment::findOrFail($assignment));
 
         try {
-            $this->assignmentService->reject($tenantId, $assignment, Auth::id() ?: 1, $request->input('remarks'));
+            $this->assignmentService->reject($tenantId, $assignment, auth()->id(), $request->input('remarks'));
             return redirect()->back()->with('success', 'Assignment rejected.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());

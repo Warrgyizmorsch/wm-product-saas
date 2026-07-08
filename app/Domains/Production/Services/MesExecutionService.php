@@ -60,6 +60,7 @@ class MesExecutionService
 
                 // Check machine is not double-booked (another running op on same machine)
                 $conflict = ProductionScheduleOperation::withoutGlobalScopes()
+                    ->where('tenant_id', $schedOp->schedule->order->tenant_id)
                     ->where('machine_id', $resolvedMachineId)
                     ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
                     ->where('id', '!=', $scheduleOpId)

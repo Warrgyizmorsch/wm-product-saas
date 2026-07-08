@@ -33,7 +33,7 @@ class DowntimeController extends Controller
                 (int)$request->input('machine_id'),
                 $request->input('category'),
                 $request->input('reason'),
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->only(['production_order_id', 'production_order_operation_id', 'remarks'])
             );
 
@@ -56,7 +56,7 @@ class DowntimeController extends Controller
             $this->downtimeService->endDowntime(
                 $tenantId,
                 $id,
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('remarks')
             );
 

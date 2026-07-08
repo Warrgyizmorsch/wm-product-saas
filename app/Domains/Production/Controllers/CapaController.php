@@ -18,6 +18,7 @@ class CapaController extends Controller
 
     public function index()
     {
+        $this->authorize('view', ProductionCapa::class);
         $tenantId = require_tenant_id();
         $capas = ProductionCapa::where('tenant_id', $tenantId)
             ->with(['ncr', 'owner'])
@@ -29,6 +30,7 @@ class CapaController extends Controller
 
     public function create()
     {
+        $this->authorize('manage', ProductionCapa::class);
         $tenantId = require_tenant_id();
         $ncrs = ProductionNcr::where('tenant_id', $tenantId)->get();
         $users = User::where('tenant_id', $tenantId)->get();
@@ -38,6 +40,7 @@ class CapaController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('manage', ProductionCapa::class);
         $tenantId = require_tenant_id();
         $data = $request->validate([
             'ncr_id'            => 'nullable|exists:production_ncrs,id',
@@ -55,6 +58,7 @@ class CapaController extends Controller
 
     public function show(int $id)
     {
+        $this->authorize('view', ProductionCapa::class);
         $tenantId = require_tenant_id();
         $capa = ProductionCapa::where('tenant_id', $tenantId)->with(['ncr', 'owner'])->findOrFail($id);
 
@@ -63,6 +67,7 @@ class CapaController extends Controller
 
     public function saveRca(Request $request, int $id)
     {
+        $this->authorize('manage', ProductionCapa::class);
         $request->validate([
             'five_whys' => 'required|array',
             'fishbone'  => 'required|array',
@@ -75,7 +80,8 @@ class CapaController extends Controller
 
     public function close(Request $request, int $id)
     {
-        $userId = Auth::id() ?: 1;
+        $this->authorize('approve', ProductionCapa::class);
+        $userId = auth()->id();
         $review = $request->input('effectiveness_review') ?: 'Verified effective.';
         $signature = $request->input('esignature') ?: 'CAPA-CLOSE-SIGN';
 

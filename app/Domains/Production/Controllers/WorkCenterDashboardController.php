@@ -11,6 +11,7 @@ class WorkCenterDashboardController extends Controller
 {
     public function index()
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $workCenters = WorkCenter::active()
             ->with(['machines'])
             ->orderBy('name')
@@ -37,6 +38,7 @@ class WorkCenterDashboardController extends Controller
 
     public function show(int $id)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $workCenter = WorkCenter::with('machines')->findOrFail($id);
 
         // Ordered execution queue for this work center

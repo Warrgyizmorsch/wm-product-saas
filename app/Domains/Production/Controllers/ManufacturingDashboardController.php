@@ -20,8 +20,9 @@ class ManufacturingDashboardController extends Controller
 
     public function executiveDashboard(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
-        $userId   = Auth::id() ?: 1;
+        $userId   = auth()->id();
 
         $filters = $request->only(['date_start', 'date_end', 'work_center_id', 'machine_id']);
         
@@ -47,6 +48,7 @@ class ManufacturingDashboardController extends Controller
 
     public function workCenterDashboard(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
         $workCenters = WorkCenter::where('tenant_id', $tenantId)->get();
 
@@ -60,8 +62,9 @@ class ManufacturingDashboardController extends Controller
 
     public function savePreferences(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
-        $userId   = Auth::id() ?: 1;
+        $userId   = auth()->id();
 
         $request->validate([
             'dashboard_type' => 'required|string',

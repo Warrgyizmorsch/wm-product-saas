@@ -16,6 +16,7 @@ class ScrapController extends Controller
 
     public function index()
     {
+        $this->authorize('view', ProductionScrapDisposal::class);
         $tenantId = require_tenant_id();
         $scraps = ProductionScrapDisposal::where('tenant_id', $tenantId)
             ->with(['ncr', 'disposer'])
@@ -27,12 +28,14 @@ class ScrapController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('manage', ProductionScrapDisposal::class);
         $tenantId = require_tenant_id();
         $data = $request->validate([
             'category'    => 'required|string|in:raw_material,finished_good,scrap_metal,chemical',
             'reason_code' => 'required|string',
             'quantity'    => 'required|numeric|min:0.01',
             'cost'        => 'nullable|numeric|min:0',
+            'ncr_id'      => 'nullable|exists:production_ncrs,id',
         ]);
 
         $this->scrapService->createScrapDisposal($tenantId, $data);
@@ -42,7 +45,8 @@ class ScrapController extends Controller
 
     public function approve(Request $request, int $id)
     {
-        $userId = Auth::id() ?: 1;
+        $this->authorize('approve', ProductionScrapDisposal::class);
+        $userId = auth()->id();
         $this->scrapService->approveDisposal($id, $userId);
 
         return redirect()->back()->with('success', 'Scrap disposal approved.');

@@ -18,6 +18,7 @@ class NcrController extends Controller
 
     public function index()
     {
+        $this->authorize('view', ProductionNcr::class);
         $tenantId = require_tenant_id();
         $ncrs = ProductionNcr::where('tenant_id', $tenantId)
             ->with(['order', 'inspection'])
@@ -29,6 +30,7 @@ class NcrController extends Controller
 
     public function create()
     {
+        $this->authorize('manage', ProductionNcr::class);
         $tenantId = require_tenant_id();
         $orders = ProductionOrder::where('tenant_id', $tenantId)->get();
 
@@ -37,6 +39,7 @@ class NcrController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('manage', ProductionNcr::class);
         $tenantId = require_tenant_id();
         $data = $request->validate([
             'category'            => 'required|string|in:material,process,machine,human_error',
@@ -52,6 +55,7 @@ class NcrController extends Controller
 
     public function show(int $id)
     {
+        $this->authorize('view', ProductionNcr::class);
         $tenantId = require_tenant_id();
         $ncr = ProductionNcr::where('tenant_id', $tenantId)
             ->with(['order', 'inspection', 'reworkOrder', 'scrapDisposal'])
@@ -64,6 +68,11 @@ class NcrController extends Controller
 
     public function disposition(Request $request, int $id)
     {
+        $this->authorize('manage', ProductionNcr::class);
+        $request->validate([
+            'disposition_type' => 'required|string|in:rework,scrap,use_as_is',
+        ]);
+
         $type = $request->input('disposition_type'); // rework | scrap | use_as_is
         
         $data = $request->only([
@@ -83,7 +92,8 @@ class NcrController extends Controller
 
     public function close(Request $request, int $id)
     {
-        $userId = Auth::id() ?: 1;
+        $this->authorize('approve', ProductionNcr::class);
+        $userId = auth()->id();
         $signature = $request->input('esignature') ?: 'NCR-CLOSE-SIGN';
 
         $this->ncrService->closeNcr($id, $userId, $signature);

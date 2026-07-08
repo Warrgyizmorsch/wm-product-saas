@@ -25,8 +25,9 @@ class MesController extends Controller
      */
     public function dashboard(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId  = require_tenant_id();
-        $userId    = Auth::id();
+        $userId    = auth()->id();
 
         // Running operations in this tenant
         $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
@@ -74,7 +75,7 @@ class MesController extends Controller
 
         try {
             $machineId = $request->input('machine_id') ? (int) $request->input('machine_id') : null;
-            $this->mesService->startOperation($op, $machineId, Auth::id() ?: 1);
+            $this->mesService->startOperation($op, $machineId, auth()->id());
             return redirect()->back()->with('success', 'Operation started successfully.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -119,7 +120,7 @@ class MesController extends Controller
         ]);
 
         try {
-            $this->mesService->completeOperation($op, $data, Auth::id() ?: 1);
+            $this->mesService->completeOperation($op, $data, auth()->id());
             return redirect()->back()->with('success', 'Operation completed and progress logged.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -155,8 +156,9 @@ class MesController extends Controller
      */
     public function operatorDashboard(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
-        $userId   = Auth::id() ?: 1;
+        $userId   = auth()->id();
 
         // My operator assignments
         $myAssignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])
@@ -195,8 +197,9 @@ class MesController extends Controller
      */
     public function myOperations(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
-        $userId   = Auth::id() ?: 1;
+        $userId   = auth()->id();
 
         $assignments = ProductionOperatorAssignment::with(['operation.productionOrder.product', 'operation.workCenter'])
             ->where('tenant_id', $tenantId)
@@ -212,6 +215,7 @@ class MesController extends Controller
      */
     public function operationExecution(Request $request, int $opId)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
         $op = ProductionOrderOperation::with(['order.product', 'workCenter', 'machine'])->findOrFail($opId);
 
