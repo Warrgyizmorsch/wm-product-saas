@@ -30,7 +30,6 @@ class SalaryStructureController extends Controller
                     '--force' => true
                 ]);
             }
-            
             // Ensure pay_groups table exists
             if (!\Illuminate\Support\Facades\Schema::hasTable('pay_groups')) {
                 try {
@@ -48,6 +47,9 @@ class SalaryStructureController extends Controller
                         $table->text('description')->nullable();
                         $table->boolean('status')->default(true);
                         $table->timestamps();
+
+                        $table->foreign('organization_id')->references('id')->on('organizations')->cascadeOnDelete();
+                        $table->foreign('company_id')->references('id')->on('companies')->cascadeOnDelete();
                     });
                 }
             }
@@ -56,13 +58,13 @@ class SalaryStructureController extends Controller
             if (\Illuminate\Support\Facades\Schema::hasTable('salary_components') && !\Illuminate\Support\Facades\Schema::hasColumn('salary_components', 'pay_group_id')) {
                 \Illuminate\Support\Facades\Schema::table('salary_components', function (\Illuminate\Database\Schema\Blueprint $table) {
                     $table->unsignedBigInteger('pay_group_id')->nullable()->after('company_id');
-                    $table->foreign('pay_group_id')->references('id')->on('pay_groups')->nullOnDelete();
+                    $table->foreign('pay_group_id')->references('id')->on('pay_groups')->cascadeOnDelete();
                 });
             }
             if (\Illuminate\Support\Facades\Schema::hasTable('salary_structures') && !\Illuminate\Support\Facades\Schema::hasColumn('salary_structures', 'pay_group_id')) {
                 \Illuminate\Support\Facades\Schema::table('salary_structures', function (\Illuminate\Database\Schema\Blueprint $table) {
                     $table->unsignedBigInteger('pay_group_id')->nullable()->after('company_id');
-                    $table->foreign('pay_group_id')->references('id')->on('pay_groups')->nullOnDelete();
+                    $table->foreign('pay_group_id')->references('id')->on('pay_groups')->cascadeOnDelete();
                 });
             }
 
@@ -427,13 +429,8 @@ class SalaryStructureController extends Controller
 
     public function destroyPayGroup(PayGroup $payGroup)
     {
-        // Nullify components and structures linked to this pay group
-        $payGroup->components()->update(['pay_group_id' => null]);
-        $payGroup->structures()->update(['pay_group_id' => null]);
-
         $payGroup->delete();
 
         return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay Group deleted successfully.');
     }
 }
-
