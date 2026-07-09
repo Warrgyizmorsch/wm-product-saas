@@ -5,7 +5,7 @@
 @section('breadcrumb', __('projects.title') . ' / ' . $project->project_code . ' / ' . __('projects.activity'))
 
 @section('page-actions')
-    <a href="{{ route('projects.show', $project->id) }}" class="btn btn-light">
+    <a href="{{ route('projects.show', $project) }}" class="btn btn-light">
         <i class="feather-arrow-left me-2"></i>{{ __('projects.back_to_project') }}
     </a>
 @endsection

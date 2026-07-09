@@ -98,7 +98,7 @@ class ProjectsAuthorizationTest extends TestCase
 
         $project = Project::withoutGlobalScopes()->where('name', 'ERP Development')->firstOrFail();
 
-        $response->assertRedirect(route('projects.show', $project->id));
+        $response->assertRedirect(route('projects.show', $project));
 
         $this->assertSame('PRJ-0001', $project->project_code);
         $this->assertSame($this->tenant->id, $project->tenant_id);
@@ -121,16 +121,16 @@ class ProjectsAuthorizationTest extends TestCase
         // Draft -> Completed is not an allowed transition
         $invalid = $this->actingAs($this->tenantOwner)
             ->withHeader('X-Tenant', 'test-tenant')
-            ->put(route('projects.update', $project->id), $this->validProjectPayload(['status' => 'Completed']));
+            ->put(route('projects.update', $project), $this->validProjectPayload(['status' => 'Completed']));
 
         $invalid->assertSessionHasErrors('status');
 
         // Draft -> Active is allowed
         $valid = $this->actingAs($this->tenantOwner)
             ->withHeader('X-Tenant', 'test-tenant')
-            ->put(route('projects.update', $project->id), $this->validProjectPayload(['status' => 'Active']));
+            ->put(route('projects.update', $project), $this->validProjectPayload(['status' => 'Active']));
 
-        $valid->assertRedirect(route('projects.show', $project->id));
+        $valid->assertRedirect(route('projects.show', $project));
 
         $this->assertSame('Active', $project->fresh()->status);
         $this->assertDatabaseHas('project_activity_logs', [
@@ -160,7 +160,7 @@ class ProjectsAuthorizationTest extends TestCase
 
         $response = $this->actingAs($this->otherTenantOwner)
             ->withHeader('X-Tenant', 'other-tenant')
-            ->get(route('projects.show', $project->id));
+            ->get(route('projects.show', $project));
 
         $response->assertNotFound();
     }
@@ -176,7 +176,7 @@ class ProjectsAuthorizationTest extends TestCase
 
         $response = $this->actingAs($this->tenantOwner)
             ->withHeader('X-Tenant', 'test-tenant')
-            ->delete(route('projects.destroy', $project->id));
+            ->delete(route('projects.destroy', $project));
 
         $response->assertRedirect(route('projects.index'));
         $this->assertSoftDeleted($project);

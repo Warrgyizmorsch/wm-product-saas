@@ -93,7 +93,7 @@ class ProjectsLocaleTest extends TestCase
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
             ->withSession(['locale' => 'hi'])
-            ->get(route('projects.show', $project->id));
+            ->get(route('projects.show', $project));
 
         $response->assertOk();
         $response->assertSee('उच्च'); // High (translated priority)

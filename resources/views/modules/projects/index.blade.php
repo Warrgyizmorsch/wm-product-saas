@@ -154,7 +154,7 @@
                                 <input type="checkbox" class="form-check-input">
                             </td>
                             <td>
-                                <a href="{{ route('projects.show', $project->id) }}" class="fw-bold text-primary hover-primary">
+                                <a href="{{ route('projects.show', $project) }}" class="fw-bold text-primary hover-primary">
                                     {{ $project->project_code }}
                                 </a>
                             </td>
@@ -184,15 +184,15 @@
                             <td>{{ $project->start_date?->format('d/m/Y') ?: '—' }}</td>
                             <td>{{ $project->end_date?->format('d/m/Y') ?: '—' }}</td>
                             <td class="text-end">
-                                <x-ui.action-dropdown :viewUrl="route('projects.show', $project->id)">
+                                <x-ui.action-dropdown :viewUrl="route('projects.show', $project)">
                                     <li>
-                                        <a href="{{ route('projects.edit', $project->id) }}" class="dropdown-item">
+                                        <a href="{{ route('projects.edit', $project) }}" class="dropdown-item">
                                             <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('projects.edit') }}
                                         </a>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <form method="POST" action="{{ route('projects.destroy', $project->id) }}" onsubmit="return confirm('{{ __('projects.confirm_delete') }}');">
+                                        <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirm('{{ __('projects.confirm_delete') }}');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="dropdown-item text-danger">

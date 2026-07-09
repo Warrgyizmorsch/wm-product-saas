@@ -52,7 +52,7 @@
                                         </x-ui.dropdown-item>
                                     </li>
                                     <li>
-                                        <form action="{{ route('projects.members.toggle-active', [$project->id, $member->id]) }}" method="POST"
+                                        <form action="{{ route('projects.members.toggle-active', [$project, $member->id]) }}" method="POST"
                                               onsubmit="return confirm('{{ __('projects.confirm_toggle_active') }}');">
                                             @csrf
                                             @method('PATCH')
@@ -63,7 +63,7 @@
                                         </form>
                                     </li>
                                     <li>
-                                        <form action="{{ route('projects.members.destroy', [$project->id, $member->id]) }}" method="POST"
+                                        <form action="{{ route('projects.members.destroy', [$project, $member->id]) }}" method="POST"
                                               onsubmit="return confirm('{{ __('projects.confirm_remove_member') }}');">
                                             @csrf
                                             @method('DELETE')
@@ -94,7 +94,7 @@
     @endphp
 
     <x-ui.modal id="modalAddMember" title="{{ __('projects.add_member') }}" :centered="true"
-        :formAction="route('projects.members.store', $project->id)" formMethod="POST"
+        :formAction="route('projects.members.store', $project)" formMethod="POST"
         submitText="{{ __('projects.add_member') }}" closeText="{{ __('projects.cancel') }}">
         <input type="hidden" name="_member_form" value="add">
 
@@ -127,7 +127,7 @@
         @endphp
 
         <x-ui.modal id="modalEditMember{{ $member->id }}" title="{{ __('projects.edit_member') }}" :centered="true"
-            :formAction="route('projects.members.update', [$project->id, $member->id])" formMethod="PUT"
+            :formAction="route('projects.members.update', [$project, $member->id])" formMethod="PUT"
             submitText="{{ __('projects.edit_member') }}" closeText="{{ __('projects.cancel') }}">
             <input type="hidden" name="_member_form" value="edit">
             <input type="hidden" name="_member_id" value="{{ $member->id }}">

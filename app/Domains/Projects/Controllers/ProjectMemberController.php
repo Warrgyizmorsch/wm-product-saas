@@ -17,24 +17,22 @@ class ProjectMemberController extends Controller
     ) {
     }
 
-    public function store(StoreProjectMemberRequest $request, int $project): RedirectResponse
+    public function store(StoreProjectMemberRequest $request, Project $project): RedirectResponse
     {
-        $project = Project::findOrFail($project);
-
         $this->authorize('manage', [ProjectMember::class, $project]);
 
         $this->members->add($project, $request->validated());
 
         return redirect()
-            ->route('projects.show', $project->id)
+            ->route('projects.show', $project)
             ->with('success', __('projects.member_added'));
     }
 
-    public function update(UpdateProjectMemberRequest $request, int $project, int $member): RedirectResponse
+    public function update(UpdateProjectMemberRequest $request, Project $project, int $member): RedirectResponse
     {
         $member = $this->members->find($member);
 
-        if (!$member) {
+        if (!$member || $member->project_id !== $project->id) {
             abort(404, __('projects.member_not_found'));
         }
 
@@ -43,15 +41,15 @@ class ProjectMemberController extends Controller
         $this->members->update($member, $request->validated());
 
         return redirect()
-            ->route('projects.show', $member->project_id)
+            ->route('projects.show', $project)
             ->with('success', __('projects.member_updated'));
     }
 
-    public function toggleActive(int $project, int $member): RedirectResponse
+    public function toggleActive(Project $project, int $member): RedirectResponse
     {
         $member = $this->members->find($member);
 
-        if (!$member) {
+        if (!$member || $member->project_id !== $project->id) {
             abort(404, __('projects.member_not_found'));
         }
 
@@ -61,25 +59,24 @@ class ProjectMemberController extends Controller
         $this->members->setActive($member, !$wasActive);
 
         return redirect()
-            ->route('projects.show', $member->project_id)
+            ->route('projects.show', $project)
             ->with('success', $wasActive ? __('projects.member_deactivated') : __('projects.member_activated'));
     }
 
-    public function destroy(int $project, int $member): RedirectResponse
+    public function destroy(Project $project, int $member): RedirectResponse
     {
         $member = $this->members->find($member);
 
-        if (!$member) {
+        if (!$member || $member->project_id !== $project->id) {
             abort(404, __('projects.member_not_found'));
         }
 
         $this->authorize('delete', $member);
 
-        $projectId = $member->project_id;
         $this->members->remove($member);
 
         return redirect()
-            ->route('projects.show', $projectId)
+            ->route('projects.show', $project)
             ->with('success', __('projects.member_removed'));
     }
 }

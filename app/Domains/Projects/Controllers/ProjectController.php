@@ -52,17 +52,13 @@ class ProjectController extends Controller
         $project = $this->projects->create($request->validated());
 
         return redirect()
-            ->route('projects.show', $project->id)
+            ->route('projects.show', $project)
             ->with('success', 'Project successfully created!');
     }
 
-    public function show(int $id): View
+    public function show(Project $project): View
     {
-        $project = $this->projects->find($id);
-
-        if (!$project) {
-            abort(404, 'Project not found.');
-        }
+        $project->load(['customer', 'owner', 'manager']);
 
         $this->authorize('view', $project);
 
@@ -79,14 +75,8 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function edit(int $id): View
+    public function edit(Project $project): View
     {
-        $project = $this->projects->find($id);
-
-        if (!$project) {
-            abort(404, 'Project not found.');
-        }
-
         $this->authorize('update', $project);
 
         return view('modules.projects.edit', [
@@ -96,31 +86,19 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function update(UpdateProjectRequest $request, int $id): RedirectResponse
+    public function update(UpdateProjectRequest $request, Project $project): RedirectResponse
     {
-        $project = $this->projects->find($id);
-
-        if (!$project) {
-            abort(404, 'Project not found.');
-        }
-
         $this->authorize('update', $project);
 
         $project = $this->projects->update($project, $request->validated());
 
         return redirect()
-            ->route('projects.show', $project->id)
+            ->route('projects.show', $project)
             ->with('success', 'Project successfully updated!');
     }
 
-    public function destroy(int $id): RedirectResponse
+    public function destroy(Project $project): RedirectResponse
     {
-        $project = $this->projects->find($id);
-
-        if (!$project) {
-            abort(404, 'Project not found.');
-        }
-
         $this->authorize('delete', $project);
 
         $this->projects->delete($project);

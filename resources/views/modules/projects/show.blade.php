@@ -6,10 +6,10 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <a href="{{ route('projects.edit', $project->id) }}" class="btn btn-light">
+        <a href="{{ route('projects.edit', $project) }}" class="btn btn-light">
             <i class="feather-edit-2 me-2"></i>{{ __('projects.edit') }}
         </a>
-        <form action="{{ route('projects.destroy', $project->id) }}" method="POST"
+        <form action="{{ route('projects.destroy', $project) }}" method="POST"
               onsubmit="return confirm('{{ __('projects.confirm_delete') }}');">
             @csrf
             @method('DELETE')
@@ -115,7 +115,7 @@
         <div class="col-xl-4">
             @include('modules.projects._activity-feed', [
                 'activities' => $activities,
-                'viewAllUrl' => route('projects.activity', $project->id),
+                'viewAllUrl' => route('projects.activity', $project),
             ])
         </div>
     </div>
