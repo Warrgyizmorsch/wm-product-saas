@@ -5,8 +5,6 @@
 @section('breadcrumb', __('projects.title'))
 
 @push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
         .erp-single-panel {
             display: flex !important;
@@ -20,11 +18,6 @@
             overflow: visible !important;
         }
     </style>
-@endpush
-
-@push('scripts')
-    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
 @endpush
 
 @section('page-actions')

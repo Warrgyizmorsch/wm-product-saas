@@ -4,9 +4,11 @@ namespace App\Domains\Projects\Controllers;
 
 use App\Domains\CRM\Models\Customer;
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Models\ProjectMember;
 use App\Domains\Projects\Requests\StoreProjectRequest;
 use App\Domains\Projects\Requests\UpdateProjectRequest;
 use App\Domains\Projects\Services\ActivityLogService;
+use App\Domains\Projects\Services\ProjectMemberService;
 use App\Domains\Projects\Services\ProjectService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -19,6 +21,7 @@ class ProjectController extends Controller
     public function __construct(
         private readonly ProjectService $projects,
         private readonly ActivityLogService $activity,
+        private readonly ProjectMemberService $members,
     ) {
     }
 
@@ -63,9 +66,16 @@ class ProjectController extends Controller
 
         $this->authorize('view', $project);
 
+        $canManageMembers = auth()->user()->can('manage', [ProjectMember::class, $project]);
+
         return view('modules.projects.show', [
-            'project'    => $project,
-            'activities' => $this->activity->forProject($project),
+            'project'          => $project,
+            'activities'       => $this->activity->forProject($project),
+            'members'          => $this->members->list($project),
+            'canManageMembers' => $canManageMembers,
+            'tenantUsers'      => $canManageMembers
+                ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
+                : collect(),
         ]);
     }
 

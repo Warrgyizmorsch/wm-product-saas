@@ -195,6 +195,7 @@ class RbacSeeder extends Seeder
             ['name' => 'projects.projects.create', 'module' => 'projects', 'entity' => 'projects', 'action' => 'create'],
             ['name' => 'projects.projects.update', 'module' => 'projects', 'entity' => 'projects', 'action' => 'update'],
             ['name' => 'projects.projects.delete', 'module' => 'projects', 'entity' => 'projects', 'action' => 'delete'],
+            ['name' => 'projects.members.manage', 'module' => 'projects', 'entity' => 'members', 'action' => 'manage'],
         ];
 
         $permissions = [];

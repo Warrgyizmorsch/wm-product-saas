@@ -10,16 +10,6 @@
     </a>
 @endsection
 
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
-@endpush
-
-@push('scripts')
-    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
-@endpush
-
 @section('content')
     <div class="erp-single-panel">
         @if ($errors->any())
