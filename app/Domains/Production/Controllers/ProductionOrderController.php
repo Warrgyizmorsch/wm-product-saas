@@ -92,6 +92,8 @@ class ProductionOrderController extends Controller
 
     public function createFromPlan(int $planId)
     {
+        Gate::authorize('create', ProductionOrder::class);
+
         try {
             $order = $this->orderService->createFromPlan($planId, Auth::id());
             return redirect()

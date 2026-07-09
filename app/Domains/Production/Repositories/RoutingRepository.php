@@ -37,6 +37,35 @@ class RoutingRepository implements RoutingRepositoryInterface
         return $query->orderBy('routing_number')->get();
     }
 
+    public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = Routing::query()
+            ->with(['product', 'creator'])
+            ->withCount('operations');
+
+        if (!empty($filters['product_id'])) {
+            $query->where('product_id', $filters['product_id']);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search): void {
+                $q->where('routing_number', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%")
+                  ->orWhereHas('product', function ($pq) use ($search): void {
+                      $pq->where('name', 'like', "%{$search}%")
+                         ->orWhere('sku', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        return $query->orderBy('routing_number')->paginate($perPage);
+    }
+
     public function find(int $id): ?Routing
     {
         return Routing::find($id);

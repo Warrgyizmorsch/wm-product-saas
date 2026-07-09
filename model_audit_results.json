@@ -1,0 +1,1468 @@
+{
+    "Machine": {
+        "table": "production_machines",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "work_center_id",
+            "name",
+            "code",
+            "machine_type",
+            "manufacturer",
+            "model_number",
+            "capacity",
+            "status",
+            "installation_date",
+            "maintenance_status",
+            "current_state",
+            "current_state_reason"
+        ],
+        "casts": {
+            "id": "int",
+            "capacity": "float",
+            "installation_date": "date",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operations": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionAlertConfiguration": {
+        "table": "production_alert_configurations",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "alert_type",
+            "threshold",
+            "severity",
+            "active"
+        ],
+        "casts": {
+            "id": "int",
+            "threshold": "float",
+            "active": "boolean"
+        },
+        "relations": []
+    },
+    "ProductionBatch": {
+        "table": "production_batches",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "batch_number",
+            "production_order_id",
+            "product_id",
+            "planned_quantity",
+            "actual_quantity",
+            "manufactured_at",
+            "expiry_date",
+            "status",
+            "remarks",
+            "barcode",
+            "qr_code"
+        ],
+        "casts": {
+            "id": "int",
+            "planned_quantity": "decimal:4",
+            "actual_quantity": "decimal:4",
+            "manufactured_at": "datetime",
+            "expiry_date": "date",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "serials": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "parentGenealogies": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "childGenealogies": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionBatchGenealogy": {
+        "table": "production_batch_genealogies",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "parent_batch_id",
+            "child_batch_id",
+            "type",
+            "quantity"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity": "decimal:4"
+        },
+        "relations": {
+            "parentBatch": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "childBatch": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionBom": {
+        "table": "production_boms",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "bom_number",
+            "bom_name",
+            "bom_type",
+            "usage_context",
+            "product_id",
+            "base_quantity",
+            "base_uom_id",
+            "version",
+            "revision",
+            "revision_reason",
+            "routing_id",
+            "effective_date",
+            "expiry_date",
+            "status",
+            "notes",
+            "created_by",
+            "approved_by",
+            "approved_at"
+        ],
+        "casts": {
+            "id": "int",
+            "effective_date": "date",
+            "expiry_date": "date",
+            "approved_at": "datetime",
+            "revision": "integer",
+            "base_quantity": "float"
+        },
+        "relations": {
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "baseUom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "routing": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "items": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "approvals": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "creator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "approver": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionBomApproval": {
+        "table": "production_bom_approvals",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "bom_id",
+            "user_id",
+            "action",
+            "comments"
+        ],
+        "casts": {
+            "id": "int"
+        },
+        "relations": {
+            "bom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionBomItem": {
+        "table": "production_bom_items",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "bom_id",
+            "material_id",
+            "child_bom_id",
+            "quantity",
+            "uom_id",
+            "material_scrap_percentage",
+            "is_alternative",
+            "alternative_group",
+            "priority",
+            "sequence",
+            "effective_from",
+            "effective_to",
+            "notes"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity": "float",
+            "material_scrap_percentage": "float",
+            "is_alternative": "boolean",
+            "priority": "integer",
+            "sequence": "integer",
+            "effective_from": "date",
+            "effective_to": "date",
+            "child_bom_id": "integer"
+        },
+        "relations": {
+            "bom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "childBom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "material": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "uom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionCalendar": {
+        "table": "production_calendars",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "name",
+            "working_days",
+            "is_default"
+        ],
+        "casts": {
+            "id": "int",
+            "working_days": "array",
+            "is_default": "boolean"
+        },
+        "relations": {
+            "holidays": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionCalendarHoliday": {
+        "table": "production_calendar_holidays",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_calendar_id",
+            "name",
+            "holiday_date",
+            "holiday_type"
+        ],
+        "casts": {
+            "id": "int",
+            "holiday_date": "date"
+        },
+        "relations": {
+            "calendar": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionCapa": {
+        "table": "production_capas",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "capa_number",
+            "ncr_id",
+            "status",
+            "root_cause_category",
+            "rca_analysis_json",
+            "corrective_action",
+            "preventive_action",
+            "action_owner_id",
+            "target_date",
+            "verification_notes",
+            "effectiveness_review",
+            "esignature_closed",
+            "closed_at",
+            "closed_by"
+        ],
+        "casts": {
+            "id": "int",
+            "rca_analysis_json": "array",
+            "target_date": "date",
+            "closed_at": "datetime",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "ncr": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "owner": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "closer": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionDashboardPreference": {
+        "table": "production_dashboard_preferences",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "user_id",
+            "dashboard_type",
+            "widgets",
+            "default_filters",
+            "layout"
+        ],
+        "casts": {
+            "id": "int",
+            "widgets": "array",
+            "default_filters": "array"
+        },
+        "relations": {
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionDeviation": {
+        "table": "production_deviations",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "deviation_number",
+            "type",
+            "description",
+            "expiration_date",
+            "expiration_quantity",
+            "status",
+            "approved_by",
+            "approved_at",
+            "esignature"
+        ],
+        "casts": {
+            "id": "int",
+            "expiration_date": "date",
+            "expiration_quantity": "float",
+            "approved_at": "datetime",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "approver": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionEventTimeline": {
+        "table": "production_event_timelines",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "production_order_operation_id",
+            "production_batch_id",
+            "production_serial_number_id",
+            "machine_id",
+            "operator_id",
+            "event_type",
+            "title",
+            "description",
+            "severity",
+            "event_source",
+            "event_time",
+            "triggered_by",
+            "metadata"
+        ],
+        "casts": {
+            "id": "int",
+            "event_time": "datetime",
+            "metadata": "json"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "batch": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "serialNumber": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "triggerUser": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionKpiTarget": {
+        "table": "production_kpi_targets",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "kpi_name",
+            "target_value"
+        ],
+        "casts": {
+            "id": "int",
+            "target_value": "float"
+        },
+        "relations": []
+    },
+    "ProductionLotTrace": {
+        "table": "production_lot_traces",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "source_type",
+            "source_id",
+            "target_type",
+            "target_id",
+            "quantity",
+            "remarks"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity": "decimal:4"
+        },
+        "relations": {
+            "source": "Illuminate\\Database\\Eloquent\\Relations\\MorphTo",
+            "target": "Illuminate\\Database\\Eloquent\\Relations\\MorphTo"
+        }
+    },
+    "ProductionMachineDowntime": {
+        "table": "production_machine_downtimes",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "machine_id",
+            "work_center_id",
+            "production_order_id",
+            "production_order_operation_id",
+            "reason",
+            "category",
+            "start_time",
+            "end_time",
+            "duration_minutes",
+            "created_by",
+            "approved_by",
+            "remarks",
+            "status"
+        ],
+        "casts": {
+            "id": "int",
+            "start_time": "datetime",
+            "end_time": "datetime",
+            "duration_minutes": "decimal:2"
+        },
+        "relations": {
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "creator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "approver": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionMachineStateHistory": {
+        "table": "production_machine_state_histories",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "machine_id",
+            "state",
+            "reason",
+            "started_at",
+            "ended_at",
+            "duration_seconds",
+            "changed_by",
+            "remarks"
+        ],
+        "casts": {
+            "id": "int",
+            "started_at": "datetime",
+            "ended_at": "datetime",
+            "duration_seconds": "integer"
+        },
+        "relations": {
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "changer": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionNcr": {
+        "table": "production_ncrs",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "ncr_number",
+            "category",
+            "status",
+            "disposition_type",
+            "quality_inspection_id",
+            "production_order_id",
+            "production_order_operation_id",
+            "machine_id",
+            "operator_id",
+            "batch_id",
+            "serial_number_id",
+            "description",
+            "esignature_closed",
+            "closed_at",
+            "closed_by"
+        ],
+        "casts": {
+            "id": "int",
+            "closed_at": "datetime",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "inspection": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "closer": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "reworkOrder": "Illuminate\\Database\\Eloquent\\Relations\\HasOne",
+            "scrapDisposal": "Illuminate\\Database\\Eloquent\\Relations\\HasOne"
+        }
+    },
+    "ProductionOperatorAssignment": {
+        "table": "production_operator_assignments",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_operation_id",
+            "user_id",
+            "assigned_by",
+            "assigned_at",
+            "accepted_at",
+            "completed_at",
+            "status",
+            "remarks"
+        ],
+        "casts": {
+            "id": "int",
+            "assigned_at": "datetime",
+            "accepted_at": "datetime",
+            "completed_at": "datetime"
+        },
+        "relations": {
+            "operation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "assigner": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "logs": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionOperatorAssignmentLog": {
+        "table": "production_operator_assignment_logs",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "operator_assignment_id",
+            "previous_operator_id",
+            "new_operator_id",
+            "action",
+            "remarks",
+            "changed_by"
+        ],
+        "casts": {
+            "id": "int"
+        },
+        "relations": {
+            "assignment": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "previousOperator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "newOperator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "changer": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionOperatorSkill": {
+        "table": "production_operator_skills",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "user_id",
+            "skill_code",
+            "work_center_id",
+            "machine_id",
+            "active"
+        ],
+        "casts": {
+            "id": "int",
+            "active": "boolean"
+        },
+        "relations": {
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionOrder": {
+        "table": "production_orders",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "order_number",
+            "production_plan_id",
+            "product_id",
+            "bom_id",
+            "routing_id",
+            "quantity_ordered",
+            "quantity_produced",
+            "quantity_rejected",
+            "quantity_scrapped",
+            "start_date",
+            "end_date",
+            "actual_start_date",
+            "actual_end_date",
+            "status",
+            "description",
+            "created_by",
+            "released_by",
+            "completed_by",
+            "closed_by",
+            "released_at",
+            "completed_at",
+            "closed_at",
+            "production_mode",
+            "barcode",
+            "qr_code",
+            "sales_order_id",
+            "sales_order_item_id"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity_ordered": "float",
+            "quantity_produced": "float",
+            "quantity_rejected": "float",
+            "quantity_scrapped": "float",
+            "start_date": "date",
+            "end_date": "date",
+            "actual_start_date": "datetime",
+            "actual_end_date": "datetime",
+            "released_at": "datetime",
+            "completed_at": "datetime",
+            "closed_at": "datetime",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "plan": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "bom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "routing": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "creator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "releaser": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "completer": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "closer": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operations": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "reservations": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "issues": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "progressLogs": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "receipts": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "scraps": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "reworks": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "batches": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "serialNumbers": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionOrderIssue": {
+        "table": "production_order_issues",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "reservation_id",
+            "product_id",
+            "quantity_issued",
+            "issue_type",
+            "issued_by",
+            "issued_at",
+            "remarks"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity_issued": "float",
+            "issued_at": "datetime"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "reservation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionOrderOperation": {
+        "table": "production_order_operations",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "routing_operation_id",
+            "previous_operation_id",
+            "sequence",
+            "operation_number",
+            "name",
+            "work_center_id",
+            "machine_id",
+            "status",
+            "setup_time_planned",
+            "processing_time_planned",
+            "total_time_planned",
+            "setup_time_actual",
+            "processing_time_actual",
+            "actual_start_time",
+            "actual_end_time",
+            "quantity_produced",
+            "quantity_rejected",
+            "quantity_scrapped",
+            "machine_used_id",
+            "operator_id",
+            "parallel_group",
+            "is_parallel",
+            "parallel_type"
+        ],
+        "casts": {
+            "id": "int",
+            "sequence": "integer",
+            "setup_time_planned": "float",
+            "processing_time_planned": "float",
+            "total_time_planned": "float",
+            "setup_time_actual": "float",
+            "processing_time_actual": "float",
+            "actual_start_time": "datetime",
+            "actual_end_time": "datetime",
+            "quantity_produced": "float",
+            "quantity_rejected": "float",
+            "quantity_scrapped": "float"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "routingOperation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "previousOperation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machineUsed": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "progressLogs": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionOrderProgressLog": {
+        "table": "production_order_progress_logs",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "operation_id",
+            "quantity_produced",
+            "quantity_rejected",
+            "quantity_scrapped",
+            "setup_minutes_logged",
+            "run_minutes_logged",
+            "recorded_by",
+            "recorded_at",
+            "machine_id",
+            "start_time",
+            "stop_time",
+            "remarks"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity_produced": "float",
+            "quantity_rejected": "float",
+            "quantity_scrapped": "float",
+            "setup_minutes_logged": "float",
+            "run_minutes_logged": "float",
+            "recorded_at": "datetime",
+            "start_time": "datetime",
+            "stop_time": "datetime"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionOrderReceipt": {
+        "table": "production_order_receipts",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "product_id",
+            "quantity_received",
+            "quality_status",
+            "received_by",
+            "received_at",
+            "remarks"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity_received": "float",
+            "received_at": "datetime"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionOrderReservation": {
+        "table": "production_order_reservations",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "bom_item_id",
+            "product_id",
+            "quantity_planned",
+            "quantity_reserved",
+            "quantity_issued",
+            "uom_id"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity_planned": "float",
+            "quantity_reserved": "float",
+            "quantity_issued": "float"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "bomItem": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "uom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "issues": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionOrderRework": {
+        "table": "production_order_reworks",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "production_order_operation_id",
+            "quantity",
+            "reason",
+            "status",
+            "recorded_by",
+            "recorded_at"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity": "float",
+            "recorded_at": "datetime"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionOrderScrap": {
+        "table": "production_order_scraps",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "production_order_operation_id",
+            "product_id",
+            "quantity",
+            "reason",
+            "recorded_by",
+            "recorded_at"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity": "float",
+            "recorded_at": "datetime"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionPlan": {
+        "table": "production_plans",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "plan_number",
+            "name",
+            "product_id",
+            "bom_id",
+            "routing_id",
+            "quantity",
+            "start_date",
+            "end_date",
+            "status",
+            "description",
+            "created_by",
+            "approved_by",
+            "approved_at"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity": "float",
+            "start_date": "date",
+            "end_date": "date",
+            "approved_at": "datetime",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "bom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "routing": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "creator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "approver": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "requirements": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "operations": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionPlanOperation": {
+        "table": "production_plan_operations",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_plan_id",
+            "routing_operation_id",
+            "sequence",
+            "operation_number",
+            "name",
+            "work_center_id",
+            "machine_id",
+            "setup_time_minutes",
+            "processing_time_minutes",
+            "total_time_minutes"
+        ],
+        "casts": {
+            "id": "int",
+            "sequence": "integer",
+            "setup_time_minutes": "float",
+            "processing_time_minutes": "float",
+            "total_time_minutes": "float"
+        },
+        "relations": {
+            "plan": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "routingOperation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionPlanRequirement": {
+        "table": "production_plan_requirements",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_plan_id",
+            "bom_item_id",
+            "product_id",
+            "bom_level",
+            "required_quantity",
+            "available_quantity",
+            "reserved_quantity",
+            "shortage_quantity",
+            "uom_id",
+            "source_item_id",
+            "status"
+        ],
+        "casts": {
+            "id": "int",
+            "bom_level": "integer",
+            "required_quantity": "float",
+            "available_quantity": "float",
+            "reserved_quantity": "float",
+            "shortage_quantity": "float"
+        },
+        "relations": {
+            "plan": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "bomItem": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "uom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "sourceItem": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionQualityInspection": {
+        "table": "production_quality_inspections",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "quality_plan_id",
+            "stage",
+            "status",
+            "result",
+            "production_order_id",
+            "production_order_operation_id",
+            "machine_id",
+            "operator_id",
+            "batch_id",
+            "serial_number_id",
+            "audited_by",
+            "audited_at",
+            "esignature",
+            "attachments_json"
+        ],
+        "casts": {
+            "id": "int",
+            "attachments_json": "array",
+            "audited_at": "datetime",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "plan": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "auditor": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "results": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionQualityInspectionResult": {
+        "table": "production_quality_inspection_results",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "quality_inspection_id",
+            "quality_plan_parameter_id",
+            "recorded_value_numeric",
+            "recorded_value_text",
+            "recorded_value_pass",
+            "result"
+        ],
+        "casts": {
+            "id": "int",
+            "recorded_value_numeric": "float",
+            "recorded_value_pass": "boolean"
+        },
+        "relations": {
+            "inspection": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "parameter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionQualityPlan": {
+        "table": "production_quality_plans",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "name",
+            "version",
+            "status",
+            "type",
+            "product_id",
+            "product_category_id",
+            "work_center_id",
+            "created_by",
+            "approved_by",
+            "approved_at",
+            "esignature"
+        ],
+        "casts": {
+            "id": "int",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "parameters": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "creator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "approver": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionQualityPlanParameter": {
+        "table": "production_quality_plan_parameters",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "quality_plan_id",
+            "name",
+            "type",
+            "min_value",
+            "max_value",
+            "unit_of_measure",
+            "sampling_type",
+            "sampling_value",
+            "is_mandatory"
+        ],
+        "casts": {
+            "id": "int",
+            "min_value": "float",
+            "max_value": "float",
+            "sampling_value": "float",
+            "is_mandatory": "boolean"
+        },
+        "relations": {
+            "plan": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionReworkOperation": {
+        "table": "production_rework_operations",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "rework_order_id",
+            "sequence",
+            "name",
+            "work_center_id",
+            "machine_id",
+            "status",
+            "setup_time_actual",
+            "processing_time_actual",
+            "actual_start",
+            "actual_end"
+        ],
+        "casts": {
+            "id": "int",
+            "sequence": "integer",
+            "setup_time_actual": "float",
+            "processing_time_actual": "float",
+            "actual_start": "datetime",
+            "actual_end": "datetime"
+        },
+        "relations": {
+            "reworkOrder": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionReworkOrder": {
+        "table": "production_rework_orders",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "rework_number",
+            "ncr_id",
+            "original_production_order_id",
+            "status",
+            "cost_estimate",
+            "actual_cost",
+            "labor_hours_actual",
+            "machine_hours_actual"
+        ],
+        "casts": {
+            "id": "int",
+            "cost_estimate": "float",
+            "actual_cost": "float",
+            "labor_hours_actual": "float",
+            "machine_hours_actual": "float",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "ncr": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "originalOrder": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operations": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionScanLog": {
+        "table": "production_scan_logs",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "entity_type",
+            "entity_id",
+            "scan_type",
+            "scanned_by",
+            "device_identifier",
+            "scanned_at"
+        ],
+        "casts": {
+            "id": "int",
+            "scanned_at": "datetime"
+        },
+        "relations": {
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionSchedule": {
+        "table": "production_schedules",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "schedule_number",
+            "production_order_id",
+            "scheduling_type",
+            "status",
+            "scheduled_at",
+            "released_at",
+            "completed_at",
+            "cancelled_at",
+            "created_by",
+            "released_by",
+            "completed_by",
+            "cancelled_by",
+            "notes",
+            "generated_by",
+            "capacity_utilization"
+        ],
+        "casts": {
+            "id": "int",
+            "scheduled_at": "datetime",
+            "released_at": "datetime",
+            "completed_at": "datetime",
+            "cancelled_at": "datetime",
+            "capacity_utilization": "float",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "creator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "releasedBy": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "completedBy": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "cancelledBy": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operations": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "ProductionScheduleOperation": {
+        "table": "production_schedule_operations",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_schedule_id",
+            "production_order_id",
+            "production_order_operation_id",
+            "work_center_id",
+            "machine_id",
+            "sequence",
+            "priority",
+            "planned_start",
+            "planned_finish",
+            "planned_duration_minutes",
+            "actual_start",
+            "actual_finish",
+            "status",
+            "shift_code",
+            "quality_checkpoint_status",
+            "maintenance_hold_status",
+            "lane",
+            "resource_id",
+            "warnings",
+            "locked",
+            "actual_machine_id"
+        ],
+        "casts": {
+            "id": "int",
+            "planned_start": "datetime",
+            "planned_finish": "datetime",
+            "actual_start": "datetime",
+            "actual_finish": "datetime",
+            "planned_duration_minutes": "float",
+            "sequence": "integer",
+            "priority": "integer",
+            "warnings": "array",
+            "locked": "boolean"
+        },
+        "relations": {
+            "schedule": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "orderOperation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "actualMachine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionScrapDisposal": {
+        "table": "production_scrap_disposals",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "ncr_id",
+            "category",
+            "reason_code",
+            "quantity",
+            "cost",
+            "status",
+            "disposed_at",
+            "disposed_by"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity": "float",
+            "cost": "float",
+            "disposed_at": "datetime",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "ncr": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "disposer": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionSerialNumber": {
+        "table": "production_serial_numbers",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "production_order_id",
+            "batch_id",
+            "product_id",
+            "serial_number",
+            "manufactured_at",
+            "status",
+            "barcode",
+            "qr_code"
+        ],
+        "casts": {
+            "id": "int",
+            "manufactured_at": "datetime"
+        },
+        "relations": {
+            "order": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "batch": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "ProductionShift": {
+        "table": "production_shifts",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "name",
+            "code",
+            "start_time",
+            "end_time",
+            "break_minutes",
+            "overtime_allowed",
+            "active"
+        ],
+        "casts": {
+            "id": "int",
+            "break_minutes": "integer",
+            "overtime_allowed": "boolean",
+            "active": "boolean"
+        },
+        "relations": {
+            "workCenters": "Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany"
+        }
+    },
+    "Routing": {
+        "table": "routings",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "routing_number",
+            "name",
+            "product_id",
+            "version",
+            "revision",
+            "is_default",
+            "effective_from",
+            "effective_to",
+            "status",
+            "description",
+            "created_by",
+            "approved_by",
+            "approved_at"
+        ],
+        "casts": {
+            "id": "int",
+            "effective_from": "date",
+            "effective_to": "date",
+            "approved_at": "datetime",
+            "revision": "integer",
+            "is_default": "boolean",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "product": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "operations": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "approvals": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "boms": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "creator": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "approver": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "RoutingApproval": {
+        "table": "production_routing_approvals",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "routing_id",
+            "user_id",
+            "action",
+            "comments"
+        ],
+        "casts": {
+            "id": "int"
+        },
+        "relations": {
+            "routing": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "user": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "RoutingOperation": {
+        "table": "production_routing_operations",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "routing_id",
+            "sequence",
+            "operation_number",
+            "name",
+            "description",
+            "operation_type",
+            "work_center_id",
+            "machine_id",
+            "setup_time_minutes",
+            "processing_time_minutes",
+            "wait_time_minutes",
+            "expected_yield_percentage",
+            "labor_cost_rate",
+            "machine_cost_rate",
+            "instructions",
+            "quality_required",
+            "is_external",
+            "vendor_id",
+            "parallel_group",
+            "is_parallel",
+            "parallel_type"
+        ],
+        "casts": {
+            "id": "int",
+            "sequence": "integer",
+            "setup_time_minutes": "float",
+            "processing_time_minutes": "float",
+            "wait_time_minutes": "float",
+            "expected_yield_percentage": "float",
+            "labor_cost_rate": "float",
+            "machine_cost_rate": "float",
+            "quality_required": "boolean",
+            "is_external": "boolean",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "routing": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "workCenter": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "materials": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "alternateMachines": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    },
+    "RoutingOperationAlternateMachine": {
+        "table": "production_routing_operation_alternate_machines",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "routing_operation_id",
+            "machine_id",
+            "priority"
+        ],
+        "casts": {
+            "id": "int",
+            "priority": "integer"
+        },
+        "relations": {
+            "routingOperation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "machine": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "RoutingOperationMaterial": {
+        "table": "production_routing_operation_materials",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "routing_operation_id",
+            "material_id",
+            "quantity",
+            "uom_id",
+            "consumption_type",
+            "sequence"
+        ],
+        "casts": {
+            "id": "int",
+            "quantity": "float",
+            "sequence": "integer"
+        },
+        "relations": {
+            "routingOperation": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "material": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "uom": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo"
+        }
+    },
+    "WorkCenter": {
+        "table": "production_work_centers",
+        "parent": "App\\Core\\Database\\BaseModel",
+        "fillable": [
+            "tenant_id",
+            "name",
+            "code",
+            "work_center_type",
+            "description",
+            "department_name",
+            "location",
+            "capacity_per_hour",
+            "efficiency_percentage",
+            "cost_per_hour",
+            "overhead_rate",
+            "status",
+            "parent_id",
+            "type",
+            "production_calendar_id"
+        ],
+        "casts": {
+            "id": "int",
+            "capacity_per_hour": "float",
+            "efficiency_percentage": "float",
+            "cost_per_hour": "float",
+            "overhead_rate": "float",
+            "parent_id": "integer",
+            "deleted_at": "datetime"
+        },
+        "relations": {
+            "parent": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "children": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "machines": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "calendar": "Illuminate\\Database\\Eloquent\\Relations\\BelongsTo",
+            "shifts": "Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany",
+            "activeMachines": "Illuminate\\Database\\Eloquent\\Relations\\HasMany",
+            "operations": "Illuminate\\Database\\Eloquent\\Relations\\HasMany"
+        }
+    }
+}

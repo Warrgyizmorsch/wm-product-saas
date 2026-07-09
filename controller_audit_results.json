@@ -1,0 +1,1390 @@
+{
+    "AlertController": {
+        "class": "App\\Domains\\Production\\Controllers\\AlertController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "AnalyticsController": {
+        "class": "App\\Domains\\Production\\Controllers\\AnalyticsController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "historical": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "AndonController": {
+        "class": "App\\Domains\\Production\\Controllers\\AndonController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "BatchProductionController": {
+        "class": "App\\Domains\\Production\\Controllers\\BatchProductionController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "split": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "merge": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "CalendarController": {
+        "class": "App\\Domains\\Production\\Controllers\\CalendarController",
+        "methods": {
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": true
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": true
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    },
+    "CapaController": {
+        "class": "App\\Domains\\Production\\Controllers\\CapaController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "saveRca": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "close": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "DeviationController": {
+        "class": "App\\Domains\\Production\\Controllers\\DeviationController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "approve": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "DowntimeController": {
+        "class": "App\\Domains\\Production\\Controllers\\DowntimeController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "start": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "end": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "LotTraceabilityController": {
+        "class": "App\\Domains\\Production\\Controllers\\LotTraceabilityController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "search": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "MachineController": {
+        "class": "App\\Domains\\Production\\Controllers\\MachineController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "byWorkCenter": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    },
+    "MachineDashboardController": {
+        "class": "App\\Domains\\Production\\Controllers\\MachineDashboardController",
+        "methods": {
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    },
+    "MachineStateController": {
+        "class": "App\\Domains\\Production\\Controllers\\MachineStateController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "overrideState": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "ManufacturingDashboardController": {
+        "class": "App\\Domains\\Production\\Controllers\\ManufacturingDashboardController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "executiveDashboard": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "workCenterDashboard": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "savePreferences": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "MesController": {
+        "class": "App\\Domains\\Production\\Controllers\\MesController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "dashboard": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "start": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "pause": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "resume": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "complete": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "hold": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "cancel": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "operatorDashboard": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "myOperations": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "operationExecution": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "NcrController": {
+        "class": "App\\Domains\\Production\\Controllers\\NcrController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "disposition": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "close": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "OperatorAssignmentController": {
+        "class": "App\\Domains\\Production\\Controllers\\OperatorAssignmentController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "assign": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "reassign": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "accept": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "reject": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "OperatorSkillController": {
+        "class": "App\\Domains\\Production\\Controllers\\OperatorSkillController",
+        "methods": {
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    },
+    "ProductionBomController": {
+        "class": "App\\Domains\\Production\\Controllers\\ProductionBomController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "checkChildBom": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "createRevision": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "submitApproval": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "approve": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "reject": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "cancel": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "duplicateVersion": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "ProductionOrderController": {
+        "class": "App\\Domains\\Production\\Controllers\\ProductionOrderController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "createFromPlan": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "release": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "complete": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "close": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "cancel": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "issueMaterial": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "returnMaterial": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "logProgress": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "logScrap": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "logRework": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "receiveFg": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "ProductionPlanController": {
+        "class": "App\\Domains\\Production\\Controllers\\ProductionPlanController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "submitApproval": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "approve": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "reject": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "release": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "complete": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "close": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "cancel": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "runMrp": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "getEngineeringOptions": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "ProductionScheduleController": {
+        "class": "App\\Domains\\Production\\Controllers\\ProductionScheduleController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "release": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "cancel": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "calendarView": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "workCenterView": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "ProductionTimelineController": {
+        "class": "App\\Domains\\Production\\Controllers\\ProductionTimelineController",
+        "methods": {
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "QualityDashboardController": {
+        "class": "App\\Domains\\Production\\Controllers\\QualityDashboardController",
+        "methods": {
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    },
+    "QualityInspectionController": {
+        "class": "App\\Domains\\Production\\Controllers\\QualityInspectionController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "saveResults": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "approve": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "QualityPlanController": {
+        "class": "App\\Domains\\Production\\Controllers\\QualityPlanController",
+        "methods": {
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": true
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": true
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": true
+            }
+        }
+    },
+    "ReportsController": {
+        "class": "App\\Domains\\Production\\Controllers\\ReportsController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "ReworkController": {
+        "class": "App\\Domains\\Production\\Controllers\\ReworkController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "startOp": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "completeOp": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "RoutingController": {
+        "class": "App\\Domains\\Production\\Controllers\\RoutingController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "submitApproval": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "approve": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "reject": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "cancel": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "duplicateVersion": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "getOperationsForAjax": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    },
+    "ScannerController": {
+        "class": "App\\Domains\\Production\\Controllers\\ScannerController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "scan": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "ScrapController": {
+        "class": "App\\Domains\\Production\\Controllers\\ScrapController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "approve": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "SerialNumberController": {
+        "class": "App\\Domains\\Production\\Controllers\\SerialNumberController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "generate": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "manualAssign": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            }
+        }
+    },
+    "ShiftController": {
+        "class": "App\\Domains\\Production\\Controllers\\ShiftController",
+        "methods": {
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    },
+    "WorkCenterController": {
+        "class": "App\\Domains\\Production\\Controllers\\WorkCenterController",
+        "methods": {
+            "__construct": {
+                "routed": false,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "index": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "create": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "store": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "edit": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "update": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": true,
+                "has_transaction": false
+            },
+            "destroy": {
+                "routed": true,
+                "has_auth": true,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    },
+    "WorkCenterDashboardController": {
+        "class": "App\\Domains\\Production\\Controllers\\WorkCenterDashboardController",
+        "methods": {
+            "index": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            },
+            "show": {
+                "routed": true,
+                "has_auth": false,
+                "has_validation": false,
+                "has_transaction": false
+            }
+        }
+    }
+}

@@ -29,7 +29,7 @@ class MachineController extends Controller
         Gate::authorize('viewAny', Machine::class);
 
         $filters      = $request->only(['work_center_id', 'status', 'search']);
-        $machines     = $this->repository->getAll($filters);
+        $machines     = $this->repository->paginateAll($filters, 15)->withQueryString();
         $workCenters  = $this->workCenterRepository->getActiveWorkCenters();
         $statuses     = config('production.machine_statuses', []);
 

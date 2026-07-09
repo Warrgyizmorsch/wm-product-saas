@@ -137,5 +137,8 @@
                 </tbody>
             </table>
         </div>
+        <div class="mt-4">
+            {{ $machines->links() }}
+        </div>
     </div>
 @endsection

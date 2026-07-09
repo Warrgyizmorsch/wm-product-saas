@@ -9,6 +9,8 @@ interface RoutingRepositoryInterface
 {
     public function getAll(array $filters = []): Collection;
 
+    public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator;
+
     public function find(int $id): ?Routing;
 
     public function getRoutingWithOperations(int $id): ?Routing;

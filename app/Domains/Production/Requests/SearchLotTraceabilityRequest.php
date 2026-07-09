@@ -8,7 +8,7 @@ class SearchLotTraceabilityRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute');
     }
 
     public function rules(): array

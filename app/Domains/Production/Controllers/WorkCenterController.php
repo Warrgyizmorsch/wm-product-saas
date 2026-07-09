@@ -26,7 +26,7 @@ class WorkCenterController extends Controller
         Gate::authorize('viewAny', WorkCenter::class);
 
         $filters     = $request->only(['status', 'work_center_type', 'search']);
-        $workCenters = $this->repository->getAll($filters);
+        $workCenters = $this->repository->paginateAll($filters, 15)->withQueryString();
 
         $workCenterTypes = config('production.work_center_types', []);
 
