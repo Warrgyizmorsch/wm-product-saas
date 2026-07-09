@@ -43,6 +43,18 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Repositories\RoutingRepositoryInterface::class,
             \App\Domains\Production\Repositories\RoutingRepository::class
         );
+
+        // ── Projects: Project ─────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ProjectRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ProjectRepository::class
+        );
+
+        // ── Projects: Activity Log ────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ActivityLogRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ActivityLogRepository::class
+        );
     }
 
     public function boot(): void
@@ -173,6 +185,12 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Sales\Models\DeliveryOrder::class,
             \App\Domains\Sales\Policies\DeliveryOrderPolicy::class
+        );
+
+        // ── Projects Policies ─────────────────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\Project::class,
+            \App\Domains\Projects\Policies\ProjectPolicy::class
         );
 
         // ── Access (RBAC admin) Policies ──────────────────────────────────────
