@@ -15,10 +15,10 @@ class AdvancedMesPolicy
     /**
      * Determine if the user can assign operators or manage batches/serials.
      */
-    public function manage(User $user): bool
+    public function manage(User $user, ?int $targetTenantId = null): bool
     {
         return $this->access->allows($user, 'production.mes.execute', [
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $targetTenantId ?? $user->tenant_id,
         ]);
     }
 
@@ -35,7 +35,7 @@ class AdvancedMesPolicy
      */
     public function manageOwnAssignment(User $user, ProductionOperatorAssignment $assignment): bool
     {
-        return $assignment->tenant_id === $user->tenant_id
-            && ($assignment->user_id === $user->id || $this->manage($user));
+        return ($assignment->user_id === $user->id && $assignment->tenant_id === $user->tenant_id)
+            || $this->manage($user, $assignment->tenant_id);
     }
 }

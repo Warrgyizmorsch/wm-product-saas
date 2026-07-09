@@ -24,28 +24,24 @@ class ProductionBomPolicy
 
     public function update(User $user, ProductionBom $bom): bool
     {
-        return $bom->tenant_id === $user->tenant_id
-            && $bom->status === 'draft'
-            && $user->hasProductionPermission('production.bom.update');
+        return $bom->status === 'draft'
+            && $user->hasProductionPermission('production.bom.update', $bom->tenant_id);
     }
 
     public function delete(User $user, ProductionBom $bom): bool
     {
-        return $bom->tenant_id === $user->tenant_id
-            && $bom->status === 'draft'
-            && $user->hasProductionPermission('production.bom.update');
+        return $bom->status === 'draft'
+            && $user->hasProductionPermission('production.bom.update', $bom->tenant_id);
     }
 
     public function approve(User $user, ProductionBom $bom): bool
     {
-        return $bom->tenant_id === $user->tenant_id
-            && $bom->status === 'pending_approval'
-            && $user->hasProductionPermission('production.bom.approve');
+        return $bom->status === 'pending_approval'
+            && $user->hasProductionPermission('production.bom.approve', $bom->tenant_id);
     }
 
     public function cancel(User $user, ProductionBom $bom): bool
     {
-        return $bom->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.bom.approve');
+        return $user->hasProductionPermission('production.bom.approve', $bom->tenant_id);
     }
 }

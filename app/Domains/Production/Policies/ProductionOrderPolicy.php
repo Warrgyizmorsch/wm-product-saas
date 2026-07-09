@@ -25,73 +25,63 @@ class ProductionOrderPolicy
 
     public function update(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && !$order->isFrozen()
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return !$order->isFrozen()
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function delete(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $order->isDraft()
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return $order->isDraft()
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function release(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $order->isDraft()
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return $order->isDraft()
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function issue(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && ($order->isReleased() || $order->isInProgress())
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return ($order->isReleased() || $order->isInProgress())
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function return(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && ($order->isReleased() || $order->isInProgress())
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return ($order->isReleased() || $order->isInProgress())
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function logProgress(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && ($order->isReleased() || $order->isInProgress())
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return ($order->isReleased() || $order->isInProgress())
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function receiveFg(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && ($order->isInProgress() || $order->isReleased())
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return ($order->isInProgress() || $order->isReleased())
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function complete(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $order->isInProgress()
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return $order->isInProgress()
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function close(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $order->isCompleted()
-            && ($user->hasProductionPermission('production.order.update') || $user->role === 'admin');
+        return $order->isCompleted()
+            && ($user->hasProductionPermission('production.order.update', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 
     public function cancel(User $user, ProductionOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && !$order->isClosed()
+        return !$order->isClosed()
             && !$order->isCompleted()
             && !$order->isCancelled()
-            && ($user->hasProductionPermission('production.order.cancel') || $user->role === 'admin');
+            && ($user->hasProductionPermission('production.order.cancel', $order->tenant_id) || ($user->role === 'admin' && $user->tenant_id === $order->tenant_id));
     }
 }

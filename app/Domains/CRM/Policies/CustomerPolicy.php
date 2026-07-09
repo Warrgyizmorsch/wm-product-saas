@@ -21,10 +21,9 @@ class CustomerPolicy
 
     public function view(User $user, Customer $customer): bool
     {
-        return $customer->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.customers.view', [
-                'tenant_id' => $customer->tenant_id,
-            ]);
+        return $this->access->allows($user, 'crm.customers.view', [
+            'tenant_id' => $customer->tenant_id,
+        ]);
     }
 
     public function create(User $user): bool
@@ -36,17 +35,15 @@ class CustomerPolicy
 
     public function update(User $user, Customer $customer): bool
     {
-        return $customer->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.customers.update', [
-                'tenant_id' => $customer->tenant_id,
-            ]);
+        return $this->access->allows($user, 'crm.customers.update', [
+            'tenant_id' => $customer->tenant_id,
+        ]);
     }
 
     public function delete(User $user, Customer $customer): bool
     {
-        return $customer->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.customers.delete', [
-                'tenant_id' => $customer->tenant_id,
-            ]);
+        return $this->access->allows($user, 'crm.customers.delete', [
+            'tenant_id' => $customer->tenant_id,
+        ]);
     }
 }

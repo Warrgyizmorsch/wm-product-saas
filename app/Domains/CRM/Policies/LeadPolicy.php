@@ -21,11 +21,10 @@ class LeadPolicy
 
     public function view(User $user, Lead $lead): bool
     {
-        return $lead->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.leads.view', [
-                'tenant_id' => $lead->tenant_id,
-                'owner_id' => $lead->lead_owner_id,
-            ]);
+        return $this->access->allows($user, 'crm.leads.view', [
+            'tenant_id' => $lead->tenant_id,
+            'owner_id' => $lead->lead_owner_id,
+        ]);
     }
 
     public function create(User $user): bool
@@ -37,19 +36,17 @@ class LeadPolicy
 
     public function update(User $user, Lead $lead): bool
     {
-        return $lead->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.leads.update', [
-                'tenant_id' => $lead->tenant_id,
-                'owner_id' => $lead->lead_owner_id,
-            ]);
+        return $this->access->allows($user, 'crm.leads.update', [
+            'tenant_id' => $lead->tenant_id,
+            'owner_id' => $lead->lead_owner_id,
+        ]);
     }
 
     public function delete(User $user, Lead $lead): bool
     {
-        return $lead->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.leads.delete', [
-                'tenant_id' => $lead->tenant_id,
-                'owner_id' => $lead->lead_owner_id,
-            ]);
+        return $this->access->allows($user, 'crm.leads.delete', [
+            'tenant_id' => $lead->tenant_id,
+            'owner_id' => $lead->lead_owner_id,
+        ]);
     }
 }

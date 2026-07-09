@@ -21,11 +21,10 @@ class SalesOrderPolicy
 
     public function view(User $user, SalesOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'sales.orders.view', [
-                'tenant_id' => $order->tenant_id,
-                'owner_id' => $order->sales_person_id,
-            ]);
+        return $this->access->allows($user, 'sales.orders.view', [
+            'tenant_id' => $order->tenant_id,
+            'owner_id' => $order->sales_person_id,
+        ]);
     }
 
     public function create(User $user): bool
@@ -37,37 +36,33 @@ class SalesOrderPolicy
 
     public function update(User $user, SalesOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'sales.orders.update', [
-                'tenant_id' => $order->tenant_id,
-                'owner_id' => $order->sales_person_id,
-            ]);
+        return $this->access->allows($user, 'sales.orders.update', [
+            'tenant_id' => $order->tenant_id,
+            'owner_id' => $order->sales_person_id,
+        ]);
     }
 
     public function delete(User $user, SalesOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'sales.orders.delete', [
-                'tenant_id' => $order->tenant_id,
-                'owner_id' => $order->sales_person_id,
-            ]);
+        return $this->access->allows($user, 'sales.orders.delete', [
+            'tenant_id' => $order->tenant_id,
+            'owner_id' => $order->sales_person_id,
+        ]);
     }
 
     public function confirm(User $user, SalesOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'sales.orders.confirm', [
-                'tenant_id' => $order->tenant_id,
-                'owner_id' => $order->sales_person_id,
-            ]);
+        return $this->access->allows($user, 'sales.orders.confirm', [
+            'tenant_id' => $order->tenant_id,
+            'owner_id' => $order->sales_person_id,
+        ]);
     }
 
     public function cancel(User $user, SalesOrder $order): bool
     {
-        return $order->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'sales.orders.cancel', [
-                'tenant_id' => $order->tenant_id,
-                'owner_id' => $order->sales_person_id,
-            ]);
+        return $this->access->allows($user, 'sales.orders.cancel', [
+            'tenant_id' => $order->tenant_id,
+            'owner_id' => $order->sales_person_id,
+        ]);
     }
 }

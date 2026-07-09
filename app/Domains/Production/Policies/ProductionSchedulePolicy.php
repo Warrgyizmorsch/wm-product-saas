@@ -24,19 +24,16 @@ class ProductionSchedulePolicy
 
     public function delete(User $user, ProductionSchedule $schedule): bool
     {
-        return $schedule->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.schedule.manage');
+        return $user->hasProductionPermission('production.schedule.manage', $schedule->tenant_id);
     }
 
     public function release(User $user, ProductionSchedule $schedule): bool
     {
-        return $schedule->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.schedule.manage');
+        return $user->hasProductionPermission('production.schedule.manage', $schedule->tenant_id);
     }
 
     public function cancel(User $user, ProductionSchedule $schedule): bool
     {
-        return $schedule->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.schedule.manage');
+        return $user->hasProductionPermission('production.schedule.manage', $schedule->tenant_id);
     }
 }

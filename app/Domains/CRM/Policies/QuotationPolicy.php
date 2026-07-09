@@ -21,11 +21,10 @@ class QuotationPolicy
 
     public function view(User $user, Quotation $quotation): bool
     {
-        return $quotation->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.quotations.view', [
-                'tenant_id' => $quotation->tenant_id,
-                'owner_id' => $quotation->sales_person_id,
-            ]);
+        return $this->access->allows($user, 'crm.quotations.view', [
+            'tenant_id' => $quotation->tenant_id,
+            'owner_id' => $quotation->sales_person_id,
+        ]);
     }
 
     public function create(User $user): bool
@@ -37,27 +36,24 @@ class QuotationPolicy
 
     public function update(User $user, Quotation $quotation): bool
     {
-        return $quotation->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.quotations.update', [
-                'tenant_id' => $quotation->tenant_id,
-                'owner_id' => $quotation->sales_person_id,
-            ]);
+        return $this->access->allows($user, 'crm.quotations.update', [
+            'tenant_id' => $quotation->tenant_id,
+            'owner_id' => $quotation->sales_person_id,
+        ]);
     }
 
     public function approve(User $user, Quotation $quotation): bool
     {
-        return $quotation->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.quotations.approve', [
-                'tenant_id' => $quotation->tenant_id,
-            ]);
+        return $this->access->allows($user, 'crm.quotations.approve', [
+            'tenant_id' => $quotation->tenant_id,
+        ]);
     }
 
     public function delete(User $user, Quotation $quotation): bool
     {
-        return $quotation->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'crm.quotations.delete', [
-                'tenant_id' => $quotation->tenant_id,
-                'owner_id' => $quotation->sales_person_id,
-            ]);
+        return $this->access->allows($user, 'crm.quotations.delete', [
+            'tenant_id' => $quotation->tenant_id,
+            'owner_id' => $quotation->sales_person_id,
+        ]);
     }
 }

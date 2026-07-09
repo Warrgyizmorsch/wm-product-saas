@@ -28,17 +28,15 @@ class WarehousePolicy
 
     public function update(User $user, Warehouse $warehouse): bool
     {
-        return $warehouse->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'inventory.warehouses.manage', [
-                'tenant_id' => $warehouse->tenant_id,
-            ]);
+        return $this->access->allows($user, 'inventory.warehouses.manage', [
+            'tenant_id' => $warehouse->tenant_id,
+        ]);
     }
 
     public function delete(User $user, Warehouse $warehouse): bool
     {
-        return $warehouse->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'inventory.warehouses.manage', [
-                'tenant_id' => $warehouse->tenant_id,
-            ]);
+        return $this->access->allows($user, 'inventory.warehouses.manage', [
+            'tenant_id' => $warehouse->tenant_id,
+        ]);
     }
 }

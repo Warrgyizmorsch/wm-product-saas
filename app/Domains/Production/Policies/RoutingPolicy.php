@@ -24,50 +24,43 @@ class RoutingPolicy
 
     public function update(User $user, Routing $routing): bool
     {
-        return $routing->tenant_id === $user->tenant_id
-            && $routing->isEditable()
-            && $user->hasProductionPermission('production.routing.update');
+        return $routing->isEditable()
+            && $user->hasProductionPermission('production.routing.update', $routing->tenant_id);
     }
 
     public function delete(User $user, Routing $routing): bool
     {
-        return $routing->tenant_id === $user->tenant_id
-            && $routing->isDraft()
-            && $user->hasProductionPermission('production.routing.update');
+        return $routing->isDraft()
+            && $user->hasProductionPermission('production.routing.update', $routing->tenant_id);
     }
 
     public function submit(User $user, Routing $routing): bool
     {
-        return $routing->tenant_id === $user->tenant_id
-            && $routing->isDraft()
-            && $user->hasProductionPermission('production.routing.update');
+        return $routing->isDraft()
+            && $user->hasProductionPermission('production.routing.update', $routing->tenant_id);
     }
 
     public function approve(User $user, Routing $routing): bool
     {
-        return $routing->tenant_id === $user->tenant_id
-            && $routing->isPendingApproval()
-            && $user->hasProductionPermission('production.routing.approve');
+        return $routing->isPendingApproval()
+            && $user->hasProductionPermission('production.routing.approve', $routing->tenant_id);
     }
 
     public function reject(User $user, Routing $routing): bool
     {
-        return $routing->tenant_id === $user->tenant_id
-            && $routing->isPendingApproval()
-            && $user->hasProductionPermission('production.routing.approve');
+        return $routing->isPendingApproval()
+            && $user->hasProductionPermission('production.routing.approve', $routing->tenant_id);
     }
 
     public function cancel(User $user, Routing $routing): bool
     {
-        return $routing->tenant_id === $user->tenant_id
-            && !$routing->isCancelled()
+        return !$routing->isCancelled()
             && !$routing->isHistorical()
-            && $user->hasProductionPermission('production.routing.cancel');
+            && $user->hasProductionPermission('production.routing.cancel', $routing->tenant_id);
     }
 
     public function duplicate(User $user, Routing $routing): bool
     {
-        return $routing->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.routing.create');
+        return $user->hasProductionPermission('production.routing.create', $routing->tenant_id);
     }
 }

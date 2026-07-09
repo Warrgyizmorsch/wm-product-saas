@@ -24,13 +24,11 @@ class MachinePolicy
 
     public function update(User $user, Machine $machine): bool
     {
-        return $machine->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.machine.manage');
+        return $user->hasProductionPermission('production.machine.manage', $machine->tenant_id);
     }
 
     public function delete(User $user, Machine $machine): bool
     {
-        return $machine->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.machine.manage');
+        return $user->hasProductionPermission('production.machine.manage', $machine->tenant_id);
     }
 }

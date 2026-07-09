@@ -24,13 +24,11 @@ class WorkCenterPolicy
 
     public function update(User $user, WorkCenter $workCenter): bool
     {
-        return $workCenter->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.work_center.manage');
+        return $user->hasProductionPermission('production.work_center.manage', $workCenter->tenant_id);
     }
 
     public function delete(User $user, WorkCenter $workCenter): bool
     {
-        return $workCenter->tenant_id === $user->tenant_id
-            && $user->hasProductionPermission('production.work_center.manage');
+        return $user->hasProductionPermission('production.work_center.manage', $workCenter->tenant_id);
     }
 }

@@ -21,10 +21,9 @@ class DeliveryOrderPolicy
 
     public function view(User $user, DeliveryOrder $delivery): bool
     {
-        return $delivery->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'sales.deliveries.view', [
-                'tenant_id' => $delivery->tenant_id,
-            ]);
+        return $this->access->allows($user, 'sales.deliveries.view', [
+            'tenant_id' => $delivery->tenant_id,
+        ]);
     }
 
     public function create(User $user): bool
@@ -36,17 +35,15 @@ class DeliveryOrderPolicy
 
     public function ship(User $user, DeliveryOrder $delivery): bool
     {
-        return $delivery->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'sales.deliveries.ship', [
-                'tenant_id' => $delivery->tenant_id,
-            ]);
+        return $this->access->allows($user, 'sales.deliveries.ship', [
+            'tenant_id' => $delivery->tenant_id,
+        ]);
     }
 
     public function cancel(User $user, DeliveryOrder $delivery): bool
     {
-        return $delivery->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'sales.deliveries.cancel', [
-                'tenant_id' => $delivery->tenant_id,
-            ]);
+        return $this->access->allows($user, 'sales.deliveries.cancel', [
+            'tenant_id' => $delivery->tenant_id,
+        ]);
     }
 }
