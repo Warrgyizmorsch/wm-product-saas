@@ -61,7 +61,7 @@ class ProjectMemberService
     {
         if ($this->members->findForProjectAndUser($project->id, $userId)) {
             throw ValidationException::withMessages([
-                'user_id' => 'This user is already a member of this project.',
+                'user_id' => __('projects.member_duplicate'),
             ]);
         }
     }

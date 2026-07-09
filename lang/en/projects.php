@@ -99,4 +99,11 @@ return [
     'deactivate' => 'Deactivate',
     'activate' => 'Activate',
     'remove' => 'Remove',
+    'member_added' => 'Project member added.',
+    'member_updated' => 'Project member updated.',
+    'member_deactivated' => 'Project member deactivated.',
+    'member_activated' => 'Project member activated.',
+    'member_removed' => 'Project member removed.',
+    'member_not_found' => 'Project member not found.',
+    'member_duplicate' => 'This user is already a member of this project.',
 ];

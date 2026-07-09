@@ -27,7 +27,7 @@ class ProjectMemberController extends Controller
 
         return redirect()
             ->route('projects.show', $project->id)
-            ->with('success', 'Project member added.');
+            ->with('success', __('projects.member_added'));
     }
 
     public function update(UpdateProjectMemberRequest $request, int $project, int $member): RedirectResponse
@@ -35,7 +35,7 @@ class ProjectMemberController extends Controller
         $member = $this->members->find($member);
 
         if (!$member) {
-            abort(404, 'Project member not found.');
+            abort(404, __('projects.member_not_found'));
         }
 
         $this->authorize('update', $member);
@@ -44,7 +44,7 @@ class ProjectMemberController extends Controller
 
         return redirect()
             ->route('projects.show', $member->project_id)
-            ->with('success', 'Project member updated.');
+            ->with('success', __('projects.member_updated'));
     }
 
     public function toggleActive(int $project, int $member): RedirectResponse
@@ -52,7 +52,7 @@ class ProjectMemberController extends Controller
         $member = $this->members->find($member);
 
         if (!$member) {
-            abort(404, 'Project member not found.');
+            abort(404, __('projects.member_not_found'));
         }
 
         $this->authorize('update', $member);
@@ -62,7 +62,7 @@ class ProjectMemberController extends Controller
 
         return redirect()
             ->route('projects.show', $member->project_id)
-            ->with('success', $wasActive ? 'Project member deactivated.' : 'Project member activated.');
+            ->with('success', $wasActive ? __('projects.member_deactivated') : __('projects.member_activated'));
     }
 
     public function destroy(int $project, int $member): RedirectResponse
@@ -70,7 +70,7 @@ class ProjectMemberController extends Controller
         $member = $this->members->find($member);
 
         if (!$member) {
-            abort(404, 'Project member not found.');
+            abort(404, __('projects.member_not_found'));
         }
 
         $this->authorize('delete', $member);
@@ -80,6 +80,6 @@ class ProjectMemberController extends Controller
 
         return redirect()
             ->route('projects.show', $projectId)
-            ->with('success', 'Project member removed.');
+            ->with('success', __('projects.member_removed'));
     }
 }
