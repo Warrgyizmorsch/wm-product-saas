@@ -11,7 +11,6 @@ use App\Domains\Production\Requests\StoreProductionScheduleRequest;
 use App\Domains\Production\Services\SchedulingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 
 class ProductionScheduleController extends Controller
 {
@@ -157,7 +156,7 @@ class ProductionScheduleController extends Controller
             $schedule->update([
                 'status'      => ProductionSchedule::STATUS_RELEASED,
                 'released_at' => now(),
-                'released_by' => Auth::id() ?: 1,
+                'released_by' => auth()->id(),
             ]);
 
             return redirect()->back()->with('success', "Schedule [{$schedule->schedule_number}] released to shop floor.");
@@ -179,7 +178,7 @@ class ProductionScheduleController extends Controller
         $schedule->update([
             'status'       => ProductionSchedule::STATUS_CANCELLED,
             'cancelled_at' => now(),
-            'cancelled_by' => Auth::id() ?: 1,
+            'cancelled_by' => auth()->id(),
         ]);
 
         return redirect()->back()->with('success', "Schedule [{$schedule->schedule_number}] cancelled.");

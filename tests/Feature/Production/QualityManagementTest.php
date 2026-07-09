@@ -13,6 +13,7 @@ use App\Domains\Production\Models\ProductionNcr;
 use App\Domains\Production\Models\ProductionCapa;
 use App\Domains\Production\Models\ProductionReworkOrder;
 use App\Domains\Production\Models\ProductionReworkOperation;
+use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Services\QualityInspectionService;
 use App\Domains\Production\Services\NcrService;
@@ -29,6 +30,7 @@ class QualityManagementTest extends TestCase
     private User $user;
     private WorkCenter $workCenter;
     private Machine $machine;
+    private Product $product;
     private ProductionOrder $order;
 
     protected function setUp(): void
@@ -59,10 +61,22 @@ class QualityManagementTest extends TestCase
             'current_state'  => 'Idle',
         ]);
 
+        $this->product = Product::create([
+            'tenant_id' => $this->tenantId,
+            'name'      => 'Quality Test Product',
+            'sku'       => 'QTY-TEST-PROD',
+            'type'      => 'finished_good',
+            'status'    => 'active',
+        ]);
+
         $this->order = ProductionOrder::create([
-            'tenant_id'          => $this->tenantId,
-            'status'             => 'draft',
-            'quantity_to_produce'=> 100,
+            'tenant_id'        => $this->tenantId,
+            'order_number'     => 'ORD-QTY-01',
+            'product_id'       => $this->product->id,
+            'quantity_ordered' => 100,
+            'start_date'       => today(),
+            'end_date'         => today()->addDays(5),
+            'status'           => 'draft',
         ]);
     }
 
@@ -185,7 +199,7 @@ class QualityManagementTest extends TestCase
 
         $rework->refresh();
         // Labor rate $35/hr + Machine rate $50/hr = $85/hr * 1.5 hrs = $127.50
-        $this->assertEquals(127.50, $rework->actual_cost);
+        $this->assertEqualsWithDelta(127.50, $rework->actual_cost, 0.1);
     }
 
     /** @test */

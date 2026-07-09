@@ -52,6 +52,94 @@ return [
             'production_manager',
         ],
 
+        'production.intelligence.view' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.quality.manage' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.quality.approve' => [
+            'admin',
+            'production_manager',
+        ],
+
+        // BOM lifecycle permissions
+        'production.bom.create' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.bom.update' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.bom.approve' => [
+            'admin',
+            'production_manager',
+        ],
+
+        // Planning permissions
+        'production.planning.create' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.planning.update' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.planning.approve' => [
+            'admin',
+            'production_manager',
+        ],
+
+        'production.planning.cancel' => [
+            'admin',
+            'production_manager',
+        ],
+
+        // Order permissions
+        'production.order.create' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.order.update' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.order.cancel' => [
+            'admin',
+            'production_manager',
+        ],
+
+        // MES & Schedule permissions
+        'production.mes.execute' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.schedule.manage' => [
+            'admin',
+            'production_manager',
+            'production_engineer',
+        ],
     ],
 
     /*

@@ -57,7 +57,17 @@ class ProductionPlanController extends Controller
             $query->where('end_date', '<=', $request->input('end_date'));
         }
 
-        $plans = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
+        $sortBy = $request->input('sort_by', 'id');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        if (!in_array($sortBy, ['id', 'plan_number', 'name', 'quantity', 'start_date'])) {
+            $sortBy = 'id';
+        }
+        if (!in_array($sortOrder, ['asc', 'desc'])) {
+            $sortOrder = 'desc';
+        }
+
+        $plans = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
 
         // Calculate state counts for dashboard cards
         $statusCounts = ProductionPlan::selectRaw('status, count(*) as total')

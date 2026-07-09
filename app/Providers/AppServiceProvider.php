@@ -97,6 +97,37 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Models\ProductionSerialNumber::class,
             \App\Domains\Production\Policies\AdvancedMesPolicy::class
         );
+
+        // Quality Management Policies
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionQualityPlan::class,
+            \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionQualityInspection::class,
+            \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionNcr::class,
+            \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionCapa::class,
+            \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionReworkOrder::class,
+            \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionScrapDisposal::class,
+            \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionDeviation::class,
+            \App\Domains\Production\Policies\QualityManagementPolicy::class
+        );
+
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\CRM\Models\Lead::class,
             \App\Domains\CRM\Policies\LeadPolicy::class

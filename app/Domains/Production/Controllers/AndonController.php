@@ -15,6 +15,7 @@ class AndonController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
 
         // 1. Get Live Andon state from refresh service

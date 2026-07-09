@@ -4,8 +4,8 @@ namespace App\Domains\Production\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\Production\Services\DowntimeService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\StartDowntimeRequest;
+use App\Domains\Production\Requests\EndDowntimeRequest;
 
 class DowntimeController extends Controller
 {
@@ -13,19 +13,12 @@ class DowntimeController extends Controller
         private readonly DowntimeService $downtimeService
     ) {}
 
-    public function start(Request $request)
+    public function start(StartDowntimeRequest $request)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'machine_id'                     => 'required|integer',
-            'category'                       => 'required|string|in:Breakdown,Preventive Maintenance,Corrective Maintenance,Setup,Tool Change,Power Failure,Material Shortage,Operator Shortage,Quality Hold,Engineering Hold,Cleaning,Calibration,Other',
-            'reason'                         => 'required|string|max:255',
-            'production_order_id'            => 'nullable|integer',
-            'production_order_operation_id'  => 'nullable|integer',
-            'remarks'                        => 'nullable|string|max:1000',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->downtimeService->startDowntime(
@@ -33,7 +26,7 @@ class DowntimeController extends Controller
                 (int)$request->input('machine_id'),
                 $request->input('category'),
                 $request->input('reason'),
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->only(['production_order_id', 'production_order_operation_id', 'remarks'])
             );
 
@@ -43,20 +36,18 @@ class DowntimeController extends Controller
         }
     }
 
-    public function end(Request $request, int $id)
+    public function end(EndDowntimeRequest $request, int $id)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'remarks' => 'nullable|string|max:1000',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->downtimeService->endDowntime(
                 $tenantId,
                 $id,
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('remarks')
             );
 

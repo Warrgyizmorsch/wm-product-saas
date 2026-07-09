@@ -4,8 +4,7 @@ namespace App\Domains\Production\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\Production\Services\MachineStateService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\OverrideMachineStateRequest;
 
 class MachineStateController extends Controller
 {
@@ -13,17 +12,12 @@ class MachineStateController extends Controller
         private readonly MachineStateService $stateService
     ) {}
 
-    public function overrideState(Request $request)
+    public function overrideState(OverrideMachineStateRequest $request)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'machine_id' => 'required|integer',
-            'state'      => 'required|string|in:Idle,Running,Setup,Waiting Material,Waiting Operator,Maintenance,Breakdown,Offline,Unknown',
-            'reason'     => 'nullable|string|max:255',
-            'remarks'    => 'nullable|string|max:1000',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->stateService->transitionState(
@@ -31,7 +25,7 @@ class MachineStateController extends Controller
                 (int)$request->input('machine_id'),
                 $request->input('state'),
                 $request->input('reason'),
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('remarks')
             );
 

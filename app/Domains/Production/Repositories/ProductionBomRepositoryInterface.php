@@ -9,6 +9,8 @@ interface ProductionBomRepositoryInterface
 {
     public function getAll(array $filters = []): Collection;
 
+    public function paginateAll(array $filters = [], int $perPage = 10): \Illuminate\Contracts\Pagination\LengthAwarePaginator;
+
     public function find(int $id): ?ProductionBom;
 
     public function create(array $data): ProductionBom;

@@ -13,6 +13,7 @@ class ProductionTimelineController extends Controller
 {
     public function index(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
 
         $query = ProductionEventTimeline::with(['order', 'operation', 'batch', 'serialNumber', 'machine', 'operator', 'triggerUser'])

@@ -33,9 +33,9 @@ class ProductionBomController extends Controller
     {
         $this->authorize('viewAny', ProductionBom::class);
 
-        $filters = $request->only(['product_id', 'status', 'search']);
-        $boms = $this->bomRepository->getAll($filters);
-        
+        $filters = $request->only(['product_id', 'status', 'search', 'sort_by', 'sort_order']);
+        $boms = $this->bomRepository->paginateAll($filters, 10)->withQueryString();
+
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
 
         return view('modules.production.bom.index', compact('boms', 'products'));

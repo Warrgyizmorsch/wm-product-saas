@@ -338,11 +338,41 @@
             </div>
         @endif
 
-        {{-- Shift Placeholder --}}
-        <div class="card border-0 bg-light">
-            <div class="card-body py-3 text-center">
-                <i class="feather-sun me-2 text-muted"></i>
-                <span class="text-muted fs-12"><strong>Shift Management</strong> — Coming Soon. Future releases will show current shift, next shift changeover, and shift-based scheduling.</span>
+        {{-- Shifts Integration --}}
+        <div class="card border-0 bg-light shadow-sm">
+            <div class="card-body py-4">
+                <div class="d-flex align-items-center mb-3">
+                    <h6 class="fw-bold text-dark mb-0"><i class="feather-sun me-2 text-warning"></i>Active Production Shifts</h6>
+                    <a href="{{ route('production.shifts.index') }}" class="btn btn-xs btn-outline-primary ms-auto">
+                        <i class="feather-settings me-1"></i>Manage Shifts
+                    </a>
+                </div>
+                @if($shifts->count() > 0)
+                    <div class="row g-3">
+                        @foreach($shifts as $sf)
+                            <div class="col-md-3">
+                                <div class="bg-white p-3 rounded border">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <span class="font-monospace fw-bold text-primary">{{ $sf->code }}</span>
+                                        @if($sf->active)
+                                            <span class="badge bg-soft-success text-success fs-10">Active</span>
+                                        @endif
+                                    </div>
+                                    <h6 class="fw-semibold text-dark mb-1 fs-13">{{ $sf->name }}</h6>
+                                    <div class="text-muted fs-11">
+                                        <i class="feather-clock me-1"></i>{{ substr($sf->start_time, 0, 5) }} - {{ substr($sf->end_time, 0, 5) }}
+                                        <span class="mx-1">·</span>
+                                        <span>Break: {{ $sf->break_minutes }}m</span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center py-2 text-muted fs-12">
+                        <span>No shifts configured yet. Configured shifts will dynamically manage work center capacity and schedule timings. <a href="{{ route('production.shifts.create') }}" class="text-primary fw-semibold">Click here to add your first Shift</a>.</span>
+                    </div>
+                @endif
             </div>
         </div>
     </div>

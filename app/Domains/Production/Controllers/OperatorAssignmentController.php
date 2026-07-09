@@ -6,7 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionOperatorAssignment;
 use App\Domains\Production\Services\OperatorAssignmentService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\OperatorAssignRequest;
+use App\Domains\Production\Requests\OperatorReassignRequest;
 
 class OperatorAssignmentController extends Controller
 {
@@ -14,23 +15,19 @@ class OperatorAssignmentController extends Controller
         private readonly OperatorAssignmentService $assignmentService
     ) {}
 
-    public function assign(Request $request)
+    public function assign(OperatorAssignRequest $request)
     {
         $this->authorize('manage', ProductionOperatorAssignment::class);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'production_order_operation_id' => 'required|integer',
-            'user_id'                       => 'required|integer',
-            'remarks'                       => 'nullable|string|max:1000',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->assignmentService->assign(
                 $tenantId,
                 (int)$request->input('production_order_operation_id'),
                 (int)$request->input('user_id'),
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('remarks')
             );
 
@@ -40,22 +37,19 @@ class OperatorAssignmentController extends Controller
         }
     }
 
-    public function reassign(Request $request, int $assignment)
+    public function reassign(OperatorReassignRequest $request, int $assignment)
     {
         $this->authorize('manage', ProductionOperatorAssignment::class);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'user_id' => 'required|integer',
-            'remarks' => 'nullable|string|max:1000',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->assignmentService->reassign(
                 $tenantId,
                 $assignment,
                 (int)$request->input('user_id'),
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('remarks')
             );
 
@@ -72,7 +66,7 @@ class OperatorAssignmentController extends Controller
         $this->authorize('manageOwnAssignment', ProductionOperatorAssignment::findOrFail($assignment));
 
         try {
-            $this->assignmentService->accept($tenantId, $assignment, Auth::id() ?: 1, $request->input('remarks'));
+            $this->assignmentService->accept($tenantId, $assignment, auth()->id(), $request->input('remarks'));
             return redirect()->back()->with('success', 'Assignment accepted.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -86,7 +80,7 @@ class OperatorAssignmentController extends Controller
         $this->authorize('manageOwnAssignment', ProductionOperatorAssignment::findOrFail($assignment));
 
         try {
-            $this->assignmentService->reject($tenantId, $assignment, Auth::id() ?: 1, $request->input('remarks'));
+            $this->assignmentService->reject($tenantId, $assignment, auth()->id(), $request->input('remarks'));
             return redirect()->back()->with('success', 'Assignment rejected.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());

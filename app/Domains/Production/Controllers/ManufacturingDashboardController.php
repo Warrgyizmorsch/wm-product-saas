@@ -8,7 +8,7 @@ use App\Domains\Production\Services\DashboardPreferenceService;
 use App\Domains\Production\Services\KpiCalculationService;
 use App\Domains\Production\Models\WorkCenter;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\SaveDashboardPreferencesRequest;
 
 class ManufacturingDashboardController extends Controller
 {
@@ -20,8 +20,9 @@ class ManufacturingDashboardController extends Controller
 
     public function executiveDashboard(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
-        $userId   = Auth::id() ?: 1;
+        $userId   = auth()->id();
 
         $filters = $request->only(['date_start', 'date_end', 'work_center_id', 'machine_id']);
         
@@ -47,6 +48,7 @@ class ManufacturingDashboardController extends Controller
 
     public function workCenterDashboard(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
         $workCenters = WorkCenter::where('tenant_id', $tenantId)->get();
 
@@ -58,16 +60,13 @@ class ManufacturingDashboardController extends Controller
         return view('modules.production.intelligence.work-centers', compact('wcSummaries', 'workCenters'));
     }
 
-    public function savePreferences(Request $request)
+    public function savePreferences(SaveDashboardPreferencesRequest $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
-        $userId   = Auth::id() ?: 1;
+        $userId   = auth()->id();
 
-        $request->validate([
-            'dashboard_type' => 'required|string',
-            'widgets'        => 'required|array',
-            'layout'         => 'nullable|string',
-        ]);
+        $data = $request->validated();
 
         $this->preferenceService->savePreferences($tenantId, $userId, $request->input('dashboard_type'), $request->only(['widgets', 'layout', 'default_filters']));
 

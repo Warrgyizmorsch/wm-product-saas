@@ -7,8 +7,7 @@ use App\Domains\Production\Services\CodeService;
 use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionSerialNumber;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Domains\Production\Requests\ScanCodeRequest;
 
 class ScannerController extends Controller
 {
@@ -21,15 +20,12 @@ class ScannerController extends Controller
         return view('modules.production.mes.operator.scanner');
     }
 
-    public function scan(Request $request)
+    public function scan(ScanCodeRequest $request)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'code'              => 'required|string|max:100',
-            'device_identifier' => 'nullable|string|max:100',
-        ]);
+        $data = $request->validated();
 
         $code = trim($request->input('code'));
 
@@ -41,7 +37,7 @@ class ScannerController extends Controller
             $entity = $this->codeService->resolveEntity(
                 $code,
                 $tenantId,
-                Auth::id() ?: 1,
+                auth()->id(),
                 $request->input('device_identifier')
             );
 

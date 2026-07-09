@@ -16,6 +16,7 @@ class AnalyticsController extends Controller
 
     public function historical(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.intelligence.view'), 403);
         $tenantId = require_tenant_id();
 
         $filters = $request->only(['date_start', 'date_end', 'machine_id', 'work_center_id']);

@@ -11,6 +11,7 @@ class MachineDashboardController extends Controller
 {
     public function index()
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $machines = Machine::with('workCenter')
             ->active()
             ->orderBy('name')
@@ -29,6 +30,7 @@ class MachineDashboardController extends Controller
 
     public function show(int $id)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $machine = Machine::with('workCenter')->findOrFail($id);
 
         $currentOp = ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation', 'workCenter'])

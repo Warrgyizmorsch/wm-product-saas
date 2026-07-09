@@ -8,6 +8,7 @@ use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionSerialNumber;
 use App\Domains\Production\Services\LotTraceabilityService;
 use Illuminate\Http\Request;
+use App\Domains\Production\Requests\SearchLotTraceabilityRequest;
 
 class LotTraceabilityController extends Controller
 {
@@ -20,13 +21,10 @@ class LotTraceabilityController extends Controller
         return view('modules.production.mes.operator.traceability');
     }
 
-    public function search(Request $request)
+    public function search(SearchLotTraceabilityRequest $request)
     {
         $tenantId = require_tenant_id();
-        $request->validate([
-            'type' => 'required|string|in:batch,serial,order',
-            'code' => 'required|string|max:100',
-        ]);
+        $data = $request->validated();
 
         $type = $request->input('type');
         $code = trim($request->input('code'));

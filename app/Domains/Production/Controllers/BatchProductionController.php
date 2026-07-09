@@ -5,7 +5,9 @@ namespace App\Domains\Production\Controllers;
 use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionBatch;
 use App\Domains\Production\Services\BatchProductionService;
-use Illuminate\Http\Request;
+use App\Domains\Production\Requests\CreateBatchRequest;
+use App\Domains\Production\Requests\SplitBatchRequest;
+use App\Domains\Production\Requests\MergeBatchesRequest;
 
 class BatchProductionController extends Controller
 {
@@ -13,18 +15,12 @@ class BatchProductionController extends Controller
         private readonly BatchProductionService $batchService
     ) {}
 
-    public function create(Request $request)
+    public function create(CreateBatchRequest $request)
     {
         $this->authorize('manage', ProductionBatch::class);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'production_order_id' => 'required|integer',
-            'product_id'          => 'required|integer',
-            'planned_quantity'    => 'required|numeric|min:0.0001',
-            'expiry_date'         => 'nullable|date',
-            'remarks'             => 'nullable|string|max:1000',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->batchService->createBatch(
@@ -43,17 +39,12 @@ class BatchProductionController extends Controller
         }
     }
 
-    public function split(Request $request)
+    public function split(SplitBatchRequest $request)
     {
         $this->authorize('manage', ProductionBatch::class);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'parent_batch_id' => 'required|integer',
-            'splits'          => 'required|array|min:1',
-            'splits.*.planned_quantity' => 'required|numeric|min:0.0001',
-            'splits.*.remarks'          => 'nullable|string|max:255',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->batchService->splitBatch(
@@ -68,17 +59,12 @@ class BatchProductionController extends Controller
         }
     }
 
-    public function merge(Request $request)
+    public function merge(MergeBatchesRequest $request)
     {
         $this->authorize('manage', ProductionBatch::class);
 
         $tenantId = require_tenant_id();
-        $request->validate([
-            'parent_batch_ids'        => 'required|array|min:2',
-            'parent_batch_ids.*'      => 'integer',
-            'target_planned_quantity' => 'required|numeric|min:0.0001',
-            'remarks'                 => 'nullable|string|max:1000',
-        ]);
+        $data = $request->validated();
 
         try {
             $this->batchService->mergeBatches(
