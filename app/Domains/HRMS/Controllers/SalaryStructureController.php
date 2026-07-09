@@ -138,7 +138,6 @@ class SalaryStructureController extends Controller
             'calculation_type' => 'required',
             'default_value' => 'nullable|max:255',
             'description' => 'nullable',
-            'company_id' => 'nullable|integer',
             'pay_group_id' => 'required|integer',
             'status' => 'required',
             'is_adhoc' => 'nullable|integer',
@@ -147,9 +146,11 @@ class SalaryStructureController extends Controller
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
         $isAdhoc = $request->get('is_adhoc', 0) == 1;
 
+        $payGroup = PayGroup::findOrFail($request->pay_group_id);
+
         SalaryComponent::create([
             'organization_id' => 1,
-            'company_id' => $request->company_id,
+            'company_id' => $payGroup->company_id,
             'pay_group_id' => $request->pay_group_id,
             'name' => $request->name,
             'code' => $request->code,
@@ -177,7 +178,6 @@ class SalaryStructureController extends Controller
             'calculation_type' => 'required',
             'default_value' => 'nullable|max:255',
             'description' => 'nullable',
-            'company_id' => 'nullable|integer',
             'pay_group_id' => 'required|integer',
             'status' => 'required',
             'is_adhoc' => 'nullable|integer',
@@ -186,8 +186,10 @@ class SalaryStructureController extends Controller
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
         $isAdhoc = $request->get('is_adhoc', 0) == 1;
 
+        $payGroup = PayGroup::findOrFail($request->pay_group_id);
+
         $salaryComponent->update([
-            'company_id' => $request->company_id,
+            'company_id' => $payGroup->company_id,
             'pay_group_id' => $request->pay_group_id,
             'name' => $request->name,
             'code' => $request->code,
@@ -221,7 +223,6 @@ class SalaryStructureController extends Controller
 
         $request->validate([
             'name' => 'required|max:255',
-            'company_id' => 'nullable|integer',
             'pay_group_id' => 'required|integer',
             'min_ctc' => 'required|numeric|min:0',
             'max_ctc' => 'required|numeric|gte:min_ctc',
@@ -230,8 +231,11 @@ class SalaryStructureController extends Controller
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
+        $payGroup = PayGroup::findOrFail($request->pay_group_id);
+        $companyId = $payGroup->company_id;
+
         // Validation for overlapping slabs within the same Pay Group
-        $overlap = SalaryStructure::where('company_id', $request->company_id)
+        $overlap = SalaryStructure::where('company_id', $companyId)
             ->where('pay_group_id', $request->pay_group_id)
             ->where(function ($query) use ($request) {
                 $query->whereBetween('min_ctc', [$request->min_ctc, $request->max_ctc])
@@ -248,7 +252,7 @@ class SalaryStructureController extends Controller
         }
 
         $structure = SalaryStructure::create([
-            'company_id' => $request->company_id,
+            'company_id' => $companyId,
             'pay_group_id' => $request->pay_group_id,
             'name' => $request->name,
             'min_ctc' => $request->min_ctc,
@@ -299,7 +303,6 @@ class SalaryStructureController extends Controller
 
         $request->validate([
             'name' => 'required|max:255',
-            'company_id' => 'nullable|integer',
             'pay_group_id' => 'required|integer',
             'min_ctc' => 'required|numeric|min:0',
             'max_ctc' => 'required|numeric|gte:min_ctc',
@@ -308,8 +311,11 @@ class SalaryStructureController extends Controller
 
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
+        $payGroup = PayGroup::findOrFail($request->pay_group_id);
+        $companyId = $payGroup->company_id;
+
         // Validation for overlapping slabs within the same Pay Group (exclude self)
-        $overlap = SalaryStructure::where('company_id', $request->company_id)
+        $overlap = SalaryStructure::where('company_id', $companyId)
             ->where('pay_group_id', $request->pay_group_id)
             ->where('id', '!=', $salaryStructure->id)
             ->where(function ($query) use ($request) {
@@ -327,7 +333,7 @@ class SalaryStructureController extends Controller
         }
 
         $salaryStructure->update([
-            'company_id' => $request->company_id,
+            'company_id' => $companyId,
             'pay_group_id' => $request->pay_group_id,
             'name' => $request->name,
             'min_ctc' => $request->min_ctc,

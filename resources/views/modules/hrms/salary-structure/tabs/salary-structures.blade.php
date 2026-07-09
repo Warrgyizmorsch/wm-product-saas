@@ -1,3 +1,10 @@
+@php
+    $selectedPayGroup = $selectedPayGroup ?? null;
+    $salaryStructures = $salaryStructures ?? collect();
+    $salaryComponents = $salaryComponents ?? collect();
+    $recurringComponents = $recurringComponents ?? $salaryComponents->filter(fn ($component) => !($component->is_adhoc ?? false));
+@endphp
+
 <div class="row g-4">
     <!-- List Table Card -->
     <div class="col-12">
@@ -17,7 +24,6 @@
                         <tr>
                             <th width="60">#</th>
                             <th>Structure Name</th>
-                            <th>Legal Entity</th>
                             <th>Min Yearly CTC</th>
                             <th>Max Yearly CTC</th>
                             <th>Rules Count</th>
@@ -31,9 +37,6 @@
                                 <td>{{ $loop->iteration }}</td>
                                 <td>
                                     <span class="fw-bold text-dark">{{ $structure->name }}</span>
-                                </td>
-                                <td>
-                                    {{ $structure->company ? $structure->company->company_name : 'All Companies' }}
                                 </td>
                                 <td>
                                     <span class="fw-semibold">₹{{ number_format($structure->min_ctc, 2) }}</span>
@@ -163,14 +166,7 @@
                         <div class="col-md-6 col-12">
                             <x-ui.odoo-form-ui type="input" label="Structure/Slab Name" name="name" placeholder="e.g. Slab 0 - 6 Lakhs" :required="true" :errorText="$errors->first('name')" />
                         </div>
-                        <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="select" label="Legal Entity (Company)" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
-                                <option value="">Apply to All Companies</option>
-                                @foreach($companies as $company)
-                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
+                        <input type="hidden" name="company_id" id="add_structure_company_id">
                         <input type="hidden" name="pay_group_id" id="add_structure_pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
                         <div class="col-md-6 col-12">
                             <x-ui.odoo-form-ui type="input" label="Min Yearly CTC (₹)" name="min_ctc" inputType="number" placeholder="0" min="0" :required="true" :errorText="$errors->first('min_ctc')" />
@@ -273,14 +269,7 @@
                         <div class="col-md-6 col-12">
                             <x-ui.odoo-form-ui type="input" label="Structure/Slab Name" name="name" id="edit_name" :required="true" :errorText="$errors->first('name')" />
                         </div>
-                        <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="select" label="Legal Entity (Company)" name="company_id" id="edit_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
-                                <option value="">Apply to All Companies</option>
-                                @foreach($companies as $company)
-                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
+                        <input type="hidden" name="company_id" id="edit_company_id">
                         <input type="hidden" name="pay_group_id" id="edit_structure_pay_group_id">
                         <div class="col-md-6 col-12">
                             <x-ui.odoo-form-ui type="input" label="Min Yearly CTC (₹)" name="min_ctc" id="edit_min_ctc" inputType="number" :required="true" :errorText="$errors->first('min_ctc')" />

@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\HRMS\Controllers\OrgController;
+use App\Domains\HRMS\Controllers\EmployeeController;
 use App\Domains\HRMS\Controllers\SalaryStructureController;
 use App\Domains\HRMS\Controllers\LeaveStructureController;
 use App\Domains\HRMS\Controllers\PenalizationPolicyController;
@@ -25,6 +26,15 @@ Route::prefix('hrms')
         Route::get('/org/designation/create', [OrgController::class, 'createDesignation'])->name('designation.create');
         Route::post('/org/designation/store', [OrgController::class, 'storeDesignation'])->name('designation.store');
         Route::post('/org/designation/update/{designation}', [OrgController::class, 'updateDesignation'])->name('designation.update');
+
+        Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+        Route::post('/employees/store', [EmployeeController::class, 'store'])->name('employees.store');
+        Route::post('/employees/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+        Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
+        Route::post('/employees/{employee}/adhoc-components', [EmployeeController::class, 'storeAdhocComponent'])->name('employees.adhoc-components.store');
+        Route::delete('/employees/adhoc-components/{adhocComponent}', [EmployeeController::class, 'destroyAdhocComponent'])->name('employees.adhoc-components.destroy');
+        Route::post('/employees/{employee}/penalties', [EmployeeController::class, 'storePenalty'])->name('employees.penalties.store');
+        Route::delete('/employees/penalties/{penalty}', [EmployeeController::class, 'destroyPenalty'])->name('employees.penalties.destroy');
 
         Route::get('/salary-structure', [SalaryStructureController::class, 'index'])->name('salary-structure.index');
         Route::post('/salary-structure/component/store', [SalaryStructureController::class, 'storeComponent'])->name('salary-structure.store');

@@ -1,0 +1,629 @@
+<?php
+
+namespace App\Domains\HRMS\Controllers;
+
+use App\Domains\HRMS\Models\Branch;
+use App\Domains\HRMS\Models\BusinessUnit;
+use App\Domains\HRMS\Models\Company;
+use App\Domains\HRMS\Models\Department;
+use App\Domains\HRMS\Models\Designation;
+use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\PayGroup;
+use App\Domains\HRMS\Models\SalaryStructure;
+use App\Domains\HRMS\Models\LeavePlan;
+use App\Domains\HRMS\Models\AttendancePenalty;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+
+class EmployeeController extends Controller
+{
+    public function index(Request $request): View
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $this->ensureEmployeeMasterColumns();
+
+        $filters = [
+            'search' => trim((string) $request->string('search')),
+            'company_id' => $request->integer('company_id') ?: null,
+            'department_id' => $request->integer('department_id') ?: null,
+            'status' => $request->filled('status') ? $request->string('status')->value() : null,
+            'sort' => $request->string('sort')->value() ?: 'name_asc',
+        ];
+
+        $employees = Employee::query()
+            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'attendancePenalty'])
+            ->when($filters['search'], function ($query, string $search): void {
+                $query->where(function ($inner) use ($search): void {
+                    $inner->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%")
+                        ->orWhere('personal_email', 'like', "%{$search}%")
+                        ->orWhere('personal_mobile_number', 'like', "%{$search}%");
+                });
+            })
+            ->when($filters['company_id'], fn ($query, int $companyId) => $query->where('company_id', $companyId))
+            ->when($filters['department_id'], fn ($query, int $departmentId) => $query->where('department_id', $departmentId))
+            ->when($filters['status'] !== null && $filters['status'] !== '', function ($query) use ($filters): void {
+                $query->where('status', $filters['status'] === '1');
+            })
+            ->when($filters['sort'], function ($query, string $sort): void {
+                switch ($sort) {
+                    case 'id_asc':
+                        $query->orderBy('employee_id', 'asc');
+                        break;
+                    case 'id_desc':
+                        $query->orderBy('employee_id', 'desc');
+                        break;
+                    case 'name_desc':
+                        $query->orderBy('full_name', 'desc');
+                        break;
+                    case 'doj_asc':
+                        $query->orderBy('date_of_joining', 'asc');
+                        break;
+                    case 'doj_desc':
+                        $query->orderBy('date_of_joining', 'desc');
+                        break;
+                    case 'salary_asc':
+                        $query->orderBy('current_salary', 'asc');
+                        break;
+                    case 'salary_desc':
+                        $query->orderBy('current_salary', 'desc');
+                        break;
+                    case 'name_asc':
+                    default:
+                        $query->orderBy('full_name', 'asc');
+                        break;
+                }
+            })
+            ->paginate(12)
+            ->withQueryString();
+
+        return view('modules.hrms.employees.index', [
+            'employees' => $employees,
+            'filters' => $filters,
+            'companies' => Company::query()->where('status', true)->orderBy('company_name')->get(),
+            'businessUnits' => BusinessUnit::query()->where('status', true)->orderBy('name')->get(),
+            'branches' => Branch::query()->where('status', true)->orderBy('name')->get(),
+            'departments' => Department::query()->where('status', true)->orderBy('name')->get(),
+            'designations' => Designation::query()->where('status', true)->orderBy('name')->get(),
+            'payGroups' => PayGroup::query()->where('status', true)->orderBy('name')->get(),
+            'salaryStructures' => SalaryStructure::query()->where('status', true)->orderBy('name')->get(),
+            'leavePlans' => LeavePlan::query()->where('status', true)->orderBy('name')->get(),
+            'attendancePenalties' => AttendancePenalty::query()->where('status', true)->orderBy('rule_type')->get(),
+            'employmentTypes' => $this->employmentTypes(),
+            'employeeStages' => $this->employeeStages(),
+            'genders' => $this->genders(),
+            'maritalStatuses' => $this->maritalStatuses(),
+            'bloodGroups' => $this->bloodGroups(),
+            'dietPreferences' => $this->dietPreferences(),
+            'reportingManagers' => Employee::query()->orderBy('full_name')->get(),
+            'shifts' => \App\Domains\Production\Models\ProductionShift::query()->where('active', true)->orderBy('name')->get(),
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $this->ensureEmployeeMasterColumns();
+
+        $validated = $this->validatePayload($request);
+        $validated = $this->normalizeHierarchy($validated);
+        $validated['status'] = $request->input('status', '1') === '1';
+
+        if ($request->hasFile('photo')) {
+            $validated['photo'] = $request->file('photo')->store('employees', 'public');
+        }
+
+        Employee::create($validated);
+
+        return redirect()
+            ->route('hrms.employees.index')
+            ->with('success', 'Employee created successfully.');
+    }
+
+    public function update(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $this->ensureEmployeeMasterColumns();
+
+        $validated = $this->validatePayload($request, $employee);
+        $validated = $this->normalizeHierarchy($validated);
+        $validated['status'] = $request->input('status', '1') === '1';
+
+        if ($request->hasFile('photo')) {
+            $validated['photo'] = $request->file('photo')->store('employees', 'public');
+        } else {
+            unset($validated['photo']);
+        }
+
+        $employee->update($validated);
+
+        return redirect()
+            ->route('hrms.employees.index')
+            ->with('success', 'Employee updated successfully.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validatePayload(Request $request, ?Employee $employee = null): array
+    {
+        return $request->validate([
+            'company_id' => ['required', 'exists:companies,id'],
+            'business_unit_id' => ['nullable', 'exists:business_units,id'],
+            'branch_id' => ['nullable', 'exists:branches,id'],
+            'department_id' => ['required', 'exists:departments,id'],
+            'designation_id' => ['required', 'exists:designations,id'],
+            'pay_group_id' => ['nullable', 'exists:pay_groups,id'],
+            'leave_plan_id' => ['nullable', 'exists:leave_plans,id'],
+            'employee_id' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('employees', 'employee_id')->ignore($employee?->id),
+            ],
+            'full_name' => ['required', 'string', 'max:255'],
+            'nick_name' => ['nullable', 'string', 'max:255'],
+            'blood_group' => ['nullable', Rule::in($this->bloodGroups())],
+            'employee_stage' => ['nullable', 'string', 'max:255'],
+            'job_title' => ['nullable', 'string', 'max:255'],
+            'role' => ['nullable', 'string', 'max:255'],
+            'employment_type' => ['nullable', 'string', 'max:255'],
+            'date_of_joining' => ['required', 'date'],
+            'office' => ['nullable', 'string', 'max:255'],
+            'gender' => ['required', Rule::in($this->genders())],
+            'marital_status' => ['nullable', Rule::in($this->maritalStatuses())],
+            'diet_preference' => ['nullable', Rule::in($this->dietPreferences())],
+            'aadhaar_card_number' => [
+                'nullable',
+                'string',
+                'max:20',
+                Rule::unique('employees', 'aadhaar_card_number')->ignore($employee?->id),
+            ],
+            'pan_card_number' => [
+                'nullable',
+                'string',
+                'max:20',
+                Rule::unique('employees', 'pan_card_number')->ignore($employee?->id),
+            ],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'present_address' => ['nullable', 'string'],
+            'permanent_address' => ['nullable', 'string'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'postal_code' => ['nullable', 'string', 'max:20'],
+            'personal_mobile_number' => ['nullable', 'string', 'max:20'],
+            'home_phone' => ['nullable', 'string', 'max:20'],
+            'personal_email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('employees', 'personal_email')->ignore($employee?->id),
+            ],
+            'experience' => ['nullable', 'numeric', 'min:0'],
+            'source_of_hire' => ['nullable', 'string', 'max:255'],
+            'skill_set' => ['nullable', 'string'],
+            'current_salary' => ['nullable', 'numeric', 'min:0'],
+            'qualification' => ['nullable', 'string', 'max:255'],
+            'reporting_manager_id' => ['nullable', 'integer', 'exists:employees,id'],
+            'date_of_birth' => ['nullable', 'date'],
+            'probation_end_date' => ['nullable', 'date'],
+            'confirmation_date' => ['nullable', 'date'],
+            'shift_id' => ['nullable', 'integer', 'exists:production_shifts,id'],
+            'office_email' => [
+                'nullable',
+                'email',
+                'max:255',
+                Rule::unique('employees', 'office_email')->ignore($employee?->id),
+            ],
+            'bank_name' => ['nullable', 'string', 'max:255'],
+            'account_number' => ['nullable', 'string', 'max:255'],
+            'ifsc_code' => ['nullable', 'string', 'max:50'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_number' => ['nullable', 'string', 'max:50'],
+            'emergency_contact_relation' => ['nullable', 'string', 'max:100'],
+            'status' => ['required', Rule::in(['0', '1'])],
+            'form_mode' => ['nullable', 'string'],
+            'editing_employee_id' => ['nullable', 'integer'],
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<string, mixed>
+     */
+    private function normalizeHierarchy(array $validated): array
+    {
+        $company = Company::query()->findOrFail($validated['company_id']);
+        $businessUnit = !empty($validated['business_unit_id'])
+            ? BusinessUnit::query()->findOrFail($validated['business_unit_id'])
+            : null;
+        $branch = !empty($validated['branch_id'])
+            ? Branch::query()->findOrFail($validated['branch_id'])
+            : null;
+        $department = Department::query()->findOrFail($validated['department_id']);
+        $designation = Designation::query()->findOrFail($validated['designation_id']);
+        $payGroup = !empty($validated['pay_group_id'])
+            ? PayGroup::query()->findOrFail($validated['pay_group_id'])
+            : null;
+        $leavePlan = !empty($validated['leave_plan_id'])
+            ? LeavePlan::query()->findOrFail($validated['leave_plan_id'])
+            : null;
+
+        $departmentCompanyId = $this->resolveDepartmentCompanyId($department);
+
+        if ($businessUnit !== null && (int) $businessUnit->company_id !== (int) $company->id) {
+            $this->failHierarchy('business_unit_id', 'The selected business unit does not belong to the chosen company.');
+        }
+
+        if ($branch !== null) {
+            if ((int) $branch->company_id !== (int) $company->id) {
+                $this->failHierarchy('branch_id', 'The selected branch does not belong to the chosen company.');
+            }
+
+            if ($businessUnit !== null && (int) $branch->business_unit_id !== (int) $businessUnit->id) {
+                $this->failHierarchy('branch_id', 'The selected branch does not belong to the chosen business unit.');
+            }
+        }
+
+        if ($departmentCompanyId !== null && (int) $departmentCompanyId !== (int) $company->id) {
+            $this->failHierarchy('department_id', 'The selected department does not belong to the chosen company.');
+        }
+
+        $departmentBusinessUnitId = $department->business_unit_id
+            ?: ($department->branch?->business_unit_id ?? null);
+
+        if ($departmentBusinessUnitId !== null) {
+            if ($businessUnit === null) {
+                $businessUnit = BusinessUnit::query()->find($departmentBusinessUnitId);
+            } elseif ((int) $departmentBusinessUnitId !== (int) $businessUnit->id) {
+                $this->failHierarchy('department_id', 'The selected department does not belong to the chosen business unit.');
+            }
+        }
+
+        $departmentBranchId = $department->branch_id;
+
+        if ($departmentBranchId !== null) {
+            if ($branch === null) {
+                $branch = Branch::query()->find($departmentBranchId);
+            } elseif ((int) $departmentBranchId !== (int) $branch->id) {
+                $this->failHierarchy('department_id', 'The selected department does not belong to the chosen branch.');
+            }
+        }
+
+        if ((int) $designation->department_id !== (int) $department->id) {
+            $this->failHierarchy('designation_id', 'The selected designation does not belong to the chosen department.');
+        }
+
+        if ($payGroup !== null && (int) $payGroup->company_id !== (int) $company->id) {
+            $this->failHierarchy('pay_group_id', 'The selected pay group does not belong to the chosen company.');
+        }
+
+        if ($leavePlan !== null && (int) $leavePlan->company_id !== (int) $company->id) {
+            $this->failHierarchy('leave_plan_id', 'The selected leave structure does not belong to the chosen company.');
+        }
+
+        $validated['company_id'] = $company->id;
+        $validated['business_unit_id'] = $businessUnit?->id;
+        $validated['branch_id'] = $branch?->id;
+        $validated['pay_group_id'] = $payGroup?->id;
+        $validated['leave_plan_id'] = $leavePlan?->id;
+
+        return $validated;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function employmentTypes(): array
+    {
+        return ['Full Time', 'Part Time', 'Contract', 'Intern', 'Consultant'];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function employeeStages(): array
+    {
+        return ['Draft', 'Probation', 'Confirmed', 'On Notice', 'Relieved'];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function genders(): array
+    {
+        return ['Male', 'Female', 'Other'];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function maritalStatuses(): array
+    {
+        return ['Single', 'Married', 'Divorced', 'Widowed'];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function bloodGroups(): array
+    {
+        return ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function dietPreferences(): array
+    {
+        return ['Veg', 'Non Veg', 'Vegan'];
+    }
+
+    private function failHierarchy(string $field, string $message): never
+    {
+        throw ValidationException::withMessages([
+            $field => $message,
+        ]);
+    }
+
+    private function resolveDepartmentCompanyId(Department $department): ?int
+    {
+        if ($department->company_id !== null) {
+            return (int) $department->company_id;
+        }
+
+        if ($department->branch !== null && $department->branch->company_id !== null) {
+            return (int) $department->branch->company_id;
+        }
+
+        if ($department->businessUnit !== null && $department->businessUnit->company_id !== null) {
+            return (int) $department->businessUnit->company_id;
+        }
+
+        return null;
+    }
+
+    private function ensureEmployeeMasterColumns(): void
+    {
+        try {
+            if (!Schema::hasTable('salary_structures')) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', [
+                    '--path' => 'database/migrations/2026_07_02_160000_create_salary_structures_tables.php',
+                    '--force' => true,
+                ]);
+            }
+
+            if (!Schema::hasTable('pay_groups')) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', [
+                    '--path' => 'database/migrations/2026_07_07_000000_create_pay_groups_table.php',
+                    '--force' => true,
+                ]);
+            }
+
+            if (!Schema::hasTable('leave_plans')) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', [
+                    '--path' => 'database/migrations/2026_07_02_170000_create_leave_structures_tables.php',
+                    '--force' => true,
+                ]);
+            }
+
+            if (!Schema::hasTable('attendance_penalties')) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', [
+                    '--path' => 'database/migrations/2026_07_02_180000_create_attendance_penalties_tables.php',
+                    '--force' => true,
+                ]);
+            }
+        } catch (\Exception $exception) {
+            // Keep the employee directory resilient even if supporting master tables
+            // have not been created yet; validation and scoped options will simply stay empty.
+        }
+
+        if (!Schema::hasTable('employees')) {
+            return;
+        }
+
+        if (Schema::hasTable('pay_groups') && !Schema::hasColumn('employees', 'pay_group_id')) {
+            Schema::table('employees', function ($table): void {
+                $table->unsignedBigInteger('pay_group_id')->nullable()->after('designation_id');
+                $table->foreign('pay_group_id')->references('id')->on('pay_groups')->nullOnDelete();
+            });
+        }
+
+        if (Schema::hasTable('salary_structures') && !Schema::hasColumn('employees', 'salary_structure_id')) {
+            Schema::table('employees', function ($table): void {
+                $table->unsignedBigInteger('salary_structure_id')->nullable()->after('pay_group_id');
+                $table->foreign('salary_structure_id')->references('id')->on('salary_structures')->nullOnDelete();
+            });
+        }
+
+        if (Schema::hasTable('leave_plans') && !Schema::hasColumn('employees', 'leave_plan_id')) {
+            Schema::table('employees', function ($table): void {
+                $table->unsignedBigInteger('leave_plan_id')->nullable()->after('salary_structure_id');
+                $table->foreign('leave_plan_id')->references('id')->on('leave_plans')->nullOnDelete();
+            });
+        }
+
+        if (Schema::hasTable('attendance_penalties') && !Schema::hasColumn('employees', 'attendance_penalty_id')) {
+            Schema::table('employees', function ($table): void {
+                $table->unsignedBigInteger('attendance_penalty_id')->nullable()->after('leave_plan_id');
+                $table->foreign('attendance_penalty_id')->references('id')->on('attendance_penalties')->nullOnDelete();
+            });
+        }
+    }
+
+    public function show(Employee $employee): View
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $this->ensureEmployeeMasterColumns();
+
+        // Dynamically resolve Salary Structure slab based on current_salary and pay_group_id
+        $salaryStructure = null;
+        if ($employee->pay_group_id) {
+            $salaryStructure = \App\Domains\HRMS\Models\SalaryStructure::query()
+                ->where('pay_group_id', $employee->pay_group_id)
+                ->where('min_ctc', '<=', $employee->current_salary)
+                ->where('max_ctc', '>=', $employee->current_salary)
+                ->where('status', true)
+                ->first();
+        }
+
+        // Dynamically resolve company Penalization Policies
+        $attendancePenalties = \App\Domains\HRMS\Models\AttendancePenalty::query()
+            ->where('company_id', $employee->company_id)
+            ->where('status', true)
+            ->get();
+        $attendancePenalty = $attendancePenalties->first();
+
+        // Calculate components breakdown
+        $items = $salaryStructure ? $salaryStructure->items()->with('component')->get() : collect();
+        $ctc = (float) $employee->current_salary;
+        $computedComponents = [];
+        $basicAmount = 0.0;
+
+        foreach ($items as $item) {
+            if (strtolower($item->component->code) === 'basic') {
+                if ($item->calculation_type === 'fixed') {
+                    $basicAmount = (float) $item->value;
+                } elseif ($item->calculation_type === 'percentage_of_ctc') {
+                    $basicAmount = ($item->value / 100) * $ctc;
+                }
+                break;
+            }
+        }
+
+        $totalOtherEarnings = 0.0;
+        $balancingItem = null;
+
+        foreach ($items as $item) {
+            $amount = 0.0;
+            if ($item->calculation_type === 'fixed') {
+                $amount = (float) $item->value;
+            } elseif ($item->calculation_type === 'percentage_of_ctc') {
+                $amount = ($item->value / 100) * $ctc;
+            } elseif ($item->calculation_type === 'percentage_of_basic') {
+                $amount = ($item->value / 100) * $basicAmount;
+            } elseif ($item->calculation_type === 'balancing') {
+                $balancingItem = $item;
+                continue;
+            }
+
+            $computedComponents[$item->id] = [
+                'item' => $item,
+                'amount' => $amount,
+            ];
+
+            if ($item->component->type === 'earning') {
+                $totalOtherEarnings += $amount;
+            }
+        }
+
+        if ($balancingItem) {
+            $balancingAmount = max(0.0, $ctc - $totalOtherEarnings);
+            $computedComponents[$balancingItem->id] = [
+                'item' => $balancingItem,
+                'amount' => $balancingAmount,
+            ];
+        }
+
+        // Load employee penalties and adhoc components
+        $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::query()
+            ->where('employee_id', $employee->id)
+            ->with('component')
+            ->orderBy('payroll_month', 'desc')
+            ->get();
+
+        $penalties = \App\Domains\HRMS\Models\EmployeePenalty::query()
+            ->where('employee_id', $employee->id)
+            ->orderBy('date', 'desc')
+            ->get();
+
+        // Get available adhoc components for dropdown
+        $availableAdhocComponents = \App\Domains\HRMS\Models\SalaryComponent::query()
+            ->where('pay_group_id', $employee->pay_group_id)
+            ->where('is_adhoc', true)
+            ->where('status', true)
+            ->get();
+
+        return view('modules.hrms.employees.show', compact(
+            'employee',
+            'salaryStructure',
+            'attendancePenalty',
+            'attendancePenalties',
+            'computedComponents',
+            'adhocComponents',
+            'penalties',
+            'availableAdhocComponents'
+        ));
+    }
+
+    public function storeAdhocComponent(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'salary_component_id' => 'required|exists:salary_components,id',
+            'amount' => 'required|numeric|min:0',
+            'payroll_month' => 'required|regex:/^\d{4}-\d{2}$/',
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        $validated['employee_id'] = $employee->id;
+        $validated['status'] = 'pending';
+
+        \App\Domains\HRMS\Models\EmployeeAdhocComponent::create($validated);
+
+        return redirect()
+            ->route('hrms.employees.show', $employee->id)
+            ->with('success', 'Adhoc Salary Component added successfully.');
+    }
+
+    public function destroyAdhocComponent(\App\Domains\HRMS\Models\EmployeeAdhocComponent $adhocComponent): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $employeeId = $adhocComponent->employee_id;
+        $adhocComponent->delete();
+
+        return redirect()
+            ->route('hrms.employees.show', $employeeId)
+            ->with('success', 'Adhoc Salary Component deleted successfully.');
+    }
+
+    public function storePenalty(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'date' => 'required|date',
+            'rule_type' => 'required|string|max:255',
+            'penalty_amount' => 'required|numeric|min:0',
+            'payroll_month' => 'required|regex:/^\d{4}-\d{2}$/',
+            'remarks' => 'nullable|string|max:500',
+        ]);
+
+        $validated['employee_id'] = $employee->id;
+        $validated['status'] = 'pending';
+
+        \App\Domains\HRMS\Models\EmployeePenalty::create($validated);
+
+        return redirect()
+            ->route('hrms.employees.show', $employee->id)
+            ->with('success', 'Attendance Penalty instance logged successfully.');
+    }
+
+    public function destroyPenalty(\App\Domains\HRMS\Models\EmployeePenalty $penalty): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $employeeId = $penalty->employee_id;
+        $penalty->delete();
+
+        return redirect()
+            ->route('hrms.employees.show', $employeeId)
+            ->with('success', 'Attendance Penalty instance deleted successfully.');
+    }
+}
