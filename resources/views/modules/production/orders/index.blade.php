@@ -65,42 +65,87 @@
         </div>
     </div>
 
-    {{-- Inline Filters (BOM-style) --}}
-    <form method="GET" action="{{ route('production.orders.index') }}" class="mb-4">
-        <div class="row g-3">
-            <div class="col-md-3 erp-form-input-col">
-                <input type="text" name="search" class="form-control"
-                       placeholder="Order number or product SKU..." value="{{ request('search') }}">
-            </div>
-            <div class="col-md-2 erp-form-input-col">
-                <select name="status" class="form-select" data-select2-selector="default">
-                    <option value="">All Statuses</option>
-                    <option value="draft"       {{ request('status') === 'draft'       ? 'selected' : '' }}>Draft</option>
-                    <option value="released"    {{ request('status') === 'released'    ? 'selected' : '' }}>Released</option>
-                    <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>In Progress</option>
-                    <option value="completed"   {{ request('status') === 'completed'   ? 'selected' : '' }}>Completed</option>
-                    <option value="closed"      {{ request('status') === 'closed'      ? 'selected' : '' }}>Closed</option>
-                    <option value="cancelled"   {{ request('status') === 'cancelled'   ? 'selected' : '' }}>Cancelled</option>
-                </select>
-            </div>
-            <div class="col-md-2 erp-form-input-col">
-                <input type="date" name="start_date" class="form-control" value="{{ request('start_date') }}" placeholder="From Date">
-            </div>
-            <div class="col-md-2 erp-form-input-col">
-                <input type="date" name="end_date" class="form-control" value="{{ request('end_date') }}" placeholder="To Date">
-            </div>
-            <div class="col-md-3 d-flex align-items-end gap-2">
-                <button type="submit" class="btn btn-secondary h-40 px-4">
-                    <i class="feather-filter me-2"></i>Filter
-                </button>
-                <a href="{{ route('production.orders.index') }}" class="btn btn-outline-secondary h-40 px-4">Reset</a>
-            </div>
+    {{-- Toolbar: Title + Sort + Filter --}}
+    @php
+        $sortBy = request('sort_by', 'id');
+        $sortOrder = request('sort_order', 'desc');
+    @endphp
+    <div class="d-flex align-items-center mb-3">
+        <h5 class="fw-bold text-dark mb-0">Production Orders</h5>
+        <div class="d-flex gap-2 ms-auto">
+            {{-- Sort Dropdown --}}
+            <x-ui.sort-dropdown label="Sort">
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'desc']) }}"
+                   class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <span>Newest First</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'id', 'sort_order' => 'asc']) }}"
+                   class="dropdown-item {{ $sortBy === 'id' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <span>Oldest First</span>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'order_number', 'sort_order' => 'asc']) }}"
+                   class="dropdown-item {{ $sortBy === 'order_number' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <span>Order Number (Asc)</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'order_number', 'sort_order' => 'desc']) }}"
+                   class="dropdown-item {{ $sortBy === 'order_number' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <span>Order Number (Desc)</span>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'end_date', 'sort_order' => 'asc']) }}"
+                   class="dropdown-item {{ $sortBy === 'end_date' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <span>Due Date (Earliest)</span>
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'end_date', 'sort_order' => 'desc']) }}"
+                   class="dropdown-item {{ $sortBy === 'end_date' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <span>Due Date (Latest)</span>
+                </a>
+            </x-ui.sort-dropdown>
+
+            {{-- Filter Overlay --}}
+            <form method="GET" action="{{ route('production.orders.index') }}" class="d-inline">
+                <x-ui.filter label="Filter" offset="0, 5">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                        <x-ui.odoo-form-ui type="input" name="search" placeholder="Order number or product SKU..." value="{{ request('search') }}" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                        <x-ui.odoo-form-ui type="select" name="status">
+                            <option value="">All Statuses</option>
+                            <option value="draft" {{ request('status') === 'draft' ? 'selected' : '' }}>Draft</option>
+                            <option value="released" {{ request('status') === 'released' ? 'selected' : '' }}>Released</option>
+                            <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>In Progress</option>
+                            <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>Completed</option>
+                            <option value="closed" {{ request('status') === 'closed' ? 'selected' : '' }}>Closed</option>
+                            <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date Range</label>
+                        <div class="d-flex gap-2">
+                            <x-ui.odoo-form-ui type="input" name="start_date" value="{{ request('start_date') }}" />
+                            <x-ui.odoo-form-ui type="input" name="end_date" value="{{ request('end_date') }}" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-end mt-4">
+                        <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-light border">Reset</a>
+                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                    </div>
+                </x-ui.filter>
+            </form>
         </div>
-    </form>
+    </div>
 
     {{-- Orders Table --}}
     <div class="table-responsive">
-        <table class="erp-thin-table">
+        <x-ui.odoo-form-ui type="table">
             <thead>
                 <tr>
                     <th style="width:3%" class="text-center">
@@ -138,7 +183,7 @@
                         <td class="text-center fw-semibold text-dark">{{ number_format($order->quantity_ordered, 2) }}</td>
                         <td class="text-center fw-bold text-success">{{ number_format($order->quantity_produced, 2) }}</td>
                         <td>
-                            <div class="fs-12 text-dark">{{ $order->start_date->format('Y-m-d') }} → {{ $order->end_date->format('Y-m-d') }}</div>
+                            <div class="fs-12 text-dark">{{ $order->start_date->format('Y-m-d') }} &rarr; {{ $order->end_date->format('Y-m-d') }}</div>
                             @if($order->actual_start_date)
                                 <div class="fs-11 text-info">Started: {{ $order->actual_start_date->format('m-d H:i') }}</div>
                             @endif
@@ -161,13 +206,15 @@
                             @endif
                         </td>
                         <td class="text-end">
-                            <x-ui.icon-btn href="{{ route('production.orders.show', $order->id) }}"
-                                           variant="soft-info" title="View Order" icon="feather-eye" />
-
-                            @if($order->isDraft())
-                                <x-ui.icon-btn href="{{ route('production.orders.edit', $order->id) }}"
-                                               variant="soft-primary" title="Edit Draft" icon="feather-edit" />
-                            @endif
+                            <x-ui.action-dropdown :viewUrl="route('production.orders.show', $order->id)">
+                                @if($order->isDraft())
+                                    <li>
+                                        <a href="{{ route('production.orders.edit', $order->id) }}" class="dropdown-item">
+                                            <i class="feather-edit me-2 text-muted fs-12"></i>Edit Draft
+                                        </a>
+                                    </li>
+                                @endif
+                            </x-ui.action-dropdown>
                         </td>
                     </tr>
                 @empty
@@ -179,7 +226,7 @@
                     </tr>
                 @endforelse
             </tbody>
-        </table>
+        </x-ui.odoo-form-ui>
     </div>
 
     {{-- Pagination --}}

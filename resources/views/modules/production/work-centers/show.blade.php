@@ -21,11 +21,11 @@
     <div class="erp-single-panel bg-white">
         <!-- Success & Error Alerts -->
         @if (session('success'))
-            <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                <p class="fs-12 mb-0">{{ session('success') }}</p>
-            </x-ui.alert>
-            <div class="mb-4"></div>
+            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
+        @endif
+
+        @if (session('error'))
+            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
         @endif
 
         <!-- Profile / Metrics Layout -->
@@ -136,7 +136,7 @@
             </div>
 
             <div class="table-responsive">
-                <table class="erp-thin-table">
+                <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
                             <th style="width: 15%">Machine Code</th>
@@ -146,7 +146,7 @@
                             <th style="width: 12%">Model Number</th>
                             <th style="width: 10%" class="text-end">Capacity/Hour</th>
                             <th style="width: 8%">Status</th>
-                            <th style="width: 5%" class="text-end">Actions</th>
+                                <th style="width: 5%" class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -172,7 +172,13 @@
                                     @endif
                                 </td>
                                 <td class="text-end align-middle">
-                                    <x-ui.icon-btn href="{{ route('production.machines.edit', $machine->id) }}" variant="light" size="sm" icon="feather-edit" title="Edit Machine" />
+                                    <x-ui.action-dropdown>
+                                        <li>
+                                            <a href="{{ route('production.machines.edit', $machine->id) }}" class="dropdown-item">
+                                                <i class="feather-edit me-2 text-muted fs-12"></i>Edit Machine
+                                            </a>
+                                        </li>
+                                    </x-ui.action-dropdown>
                                 </td>
                             </tr>
                         @empty
@@ -183,7 +189,7 @@
                             </tr>
                         @endforelse
                     </tbody>
-                </table>
+                </x-ui.odoo-form-ui>
             </div>
         </div>
     </div>
