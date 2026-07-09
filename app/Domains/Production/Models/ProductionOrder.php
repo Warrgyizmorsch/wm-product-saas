@@ -60,6 +60,8 @@ class ProductionOrder extends BaseModel
         'production_mode',
         'barcode',
         'qr_code',
+        'sales_order_id',
+        'sales_order_item_id',
     ];
 
     protected $casts = [

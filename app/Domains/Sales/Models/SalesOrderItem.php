@@ -23,6 +23,7 @@ class SalesOrderItem extends Model
         'tax_rate',
         'discount',
         'amount',
+        'fulfillment_method',
     ];
 
     protected $casts = [
@@ -48,5 +49,10 @@ class SalesOrderItem extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Inventory\Models\Warehouse::class, 'warehouse_id');
+    }
+
+    public function stockAllocations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SalesOrderAllocation::class, 'sales_order_item_id');
     }
 }

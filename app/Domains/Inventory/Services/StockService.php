@@ -39,6 +39,21 @@ class StockService
         ?string $expiresAt = null
     ): StockReservation {
         return DB::transaction(function () use ($tenantId, $productId, $warehouseId, $qty, $referenceType, $referenceId, $referenceItemId, $expiresAt) {
+            // 0. Calculate actually available stock to reserve (only for physical serial/batch constraints)
+            $stock = ProductWarehouseStock::query()
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('warehouse_id', $warehouseId)
+                ->first();
+
+            $availableToReserve = 0.0;
+            if ($stock) {
+                $availableToReserve = max(0.0, (float)$stock->quantity - (float)$stock->reserved_qty);
+            }
+
+            // General reservation allows reserving the full requested quantity
+            $qtyToReserve = $qty;
+
             // 1. Create or update the active reservation record
             $reservation = StockReservation::query()
                 ->where('tenant_id', $tenantId)
@@ -53,7 +68,7 @@ class StockService
                 ->first();
 
             if ($reservation) {
-                $reservation->increment('reserved_qty', $qty);
+                $reservation->increment('reserved_qty', $qtyToReserve);
             } else {
                 $reservation = StockReservation::create([
                     'tenant_id' => $tenantId,
@@ -62,21 +77,15 @@ class StockService
                     'reference_type' => $referenceType,
                     'reference_id' => $referenceId,
                     'reference_item_id' => $referenceItemId,
-                    'reserved_qty' => $qty,
+                    'reserved_qty' => $qtyToReserve,
                     'status' => 'Active',
                     'expires_at' => $expiresAt ? date('Y-m-d H:i:s', strtotime($expiresAt)) : null,
                 ]);
             }
 
             // 2. Adjust warehouse stock reservations
-            $stock = ProductWarehouseStock::query()
-                ->where('tenant_id', $tenantId)
-                ->where('product_id', $productId)
-                ->where('warehouse_id', $warehouseId)
-                ->first();
-
             if ($stock) {
-                $stock->increment('reserved_qty', $qty);
+                $stock->increment('reserved_qty', $qtyToReserve);
                 $stock->update([
                     'available_qty' => max(0.0, (float)$stock->quantity - (float)$stock->reserved_qty)
                 ]);
@@ -86,21 +95,22 @@ class StockService
                     'product_id' => $productId,
                     'warehouse_id' => $warehouseId,
                     'quantity' => 0.0000,
-                    'reserved_qty' => $qty,
-                    'available_qty' => 0.0000, // quantity is 0
+                    'reserved_qty' => $qtyToReserve,
+                    'available_qty' => 0.0000,
                     'unit_cost' => 0.0000,
                 ]);
             }
 
-            // 3. Mark matching serial numbers as 'Reserved' if tracked
+            // 3. Mark matching serial numbers as 'Reserved' if tracked (capped by available physical serials)
             $product = Product::find($productId);
-            if ($product && $product->track_serial_number) {
+            $qtyToReservePhysical = min($qty, $availableToReserve);
+            if ($product && $product->track_serial_number && $qtyToReservePhysical > 0) {
                 $serials = SerialNumber::query()
                     ->where('tenant_id', $tenantId)
                     ->where('product_id', $productId)
                     ->where('warehouse_id', $warehouseId)
                     ->where('status', 'Available')
-                    ->limit((int)$qty)
+                    ->limit((int)$qtyToReservePhysical)
                     ->get();
 
                 foreach ($serials as $serial) {
@@ -108,8 +118,8 @@ class StockService
                 }
             }
 
-            // 4. Adjust batch availability if batch tracked
-            if ($product && $product->track_batch) {
+            // 4. Adjust batch availability if batch tracked (capped by available physical batch stock)
+            if ($product && $product->track_batch && $qtyToReservePhysical > 0) {
                 $batches = Batch::query()
                     ->where('tenant_id', $tenantId)
                     ->where('product_id', $productId)
@@ -118,7 +128,7 @@ class StockService
                     ->orderBy('expiry_date', 'asc')
                     ->get();
 
-                $remainingToReserve = $qty;
+                $remainingToReserve = $qtyToReservePhysical;
                 foreach ($batches as $batch) {
                     if ($remainingToReserve <= 0) break;
                     $avail = (float)$batch->available_qty;

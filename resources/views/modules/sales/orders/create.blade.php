@@ -94,8 +94,7 @@
                     <x-ui.odoo-form-ui type="table" id="itemsTable">
                         <thead>
                             <tr>
-                                <th style="width: 25%;">Product / Description</th>
-                                <th style="width: 20%;">Warehouse</th>
+                                <th style="width: 45%;">Product / Description</th>
                                 <th class="text-end" style="width: 10%;">Quantity</th>
                                 <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
                                 <th class="text-end" style="width: 10%;">Taxes (%)</th>
@@ -232,7 +231,7 @@
                 return opts;
             }
 
-            function getRowHtml(index, selectedId = '', selectedWarehouseId = '') {
+            function getRowHtml(index, selectedId = '') {
                 return `
                     <tr class="item-row" data-row-id="${index}">
                         <td class="ps-3">
@@ -245,11 +244,6 @@
                             <a href="javascript:void(0)" class="toggle-desc-btn text-primary fs-11 mt-1 d-inline-block" data-row-id="${index}">
                                 <i class="feather-plus me-1"></i>Add Description
                             </a>
-                        </td>
-                        <td>
-                            <select name="items[${index}][warehouse_id]" class="form-select odoo-table-select warehouse-input" required>
-                                ${buildWarehouseOptions(selectedWarehouseId)}
-                            </select>
                         </td>
                         <td>
                             <input type="number" name="items[${index}][quantity]" class="odoo-table-input text-end qty-input" value="1" min="1" required style="width: 80px; margin-left: auto;">
@@ -313,21 +307,18 @@
 
             function addRow(item = null) {
                 const selectedId = item ? (item.product_id || '') : '';
-                const selectedWarehouseId = item ? (item.warehouse_id || '') : '';
-                const newRow = $(getRowHtml(rowIndex, selectedId, selectedWarehouseId));
+                const newRow = $(getRowHtml(rowIndex, selectedId));
                 $('#itemsTable tbody').append(newRow);
 
                 // Initialize select2 if plugin is loaded
                 if (typeof $.fn.select2 === 'function') {
                     newRow.find('.item-name-input').select2({ theme: "bootstrap-5", width: "100%" });
-                    newRow.find('.warehouse-input').select2({ theme: "bootstrap-5", width: "100%" });
                 }
 
                 let isPrefilling = false;
                 if (item) {
                     isPrefilling = true;
                     newRow.find('.item-name-input').val(item.product_id).trigger('change');
-                    newRow.find('.warehouse-input').val(item.warehouse_id).trigger('change');
                     newRow.find('textarea').val(item.description || '');
                     if (item.description) {
                         $('#desc-container-' + rowIndex).show();

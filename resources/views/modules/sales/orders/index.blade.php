@@ -88,13 +88,10 @@
                                                     <i class="feather-check me-1"></i>Confirm
                                                 </button>
                                             </form>
-                                        @elseif ($order->status === 'Confirmed')
-                                            <form action="{{ route('sales.orders.ship', $order->id) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-soft-primary py-1 px-2 fs-11 fw-bold border-0" data-bs-toggle="tooltip" title="Mark Shipped">
-                                                    <i class="feather-truck me-1"></i>Ship
-                                                </button>
-                                            </form>
+                                        @elseif ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
+                                            <a href="{{ route('sales.deliveries.create', ['sales_order_id' => $order->id]) }}" class="btn btn-sm btn-soft-primary py-1 px-2 fs-11 fw-bold border-0" data-bs-toggle="tooltip" title="Create Delivery Order">
+                                                <i class="feather-truck me-1"></i>Ship
+                                            </a>
                                         @endif
 
                                         <a href="{{ route('sales.orders.show', $order->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Sales Order">
