@@ -1247,14 +1247,7 @@
                         <input type="hidden" name="calculation_type" value="fixed">
                         <input type="hidden" name="pay_group_id" id="add_component_pay_group_id" value="{{ isset($selectedPayGroup) && $selectedPayGroup ? $selectedPayGroup->id : '' }}">
                         <input type="hidden" name="is_adhoc" id="add_component_is_adhoc" value="0">
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
-                                <option value="">All Entities (Global)</option>
-                                @foreach($companies as $company)
-                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
+                        <input type="hidden" name="company_id" id="add_sc_company_id">
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="status" :errorText="$errors->first('status')">
                                 <option value="1" data-bg="bg-success" selected>Active</option>
@@ -1302,14 +1295,7 @@
                         <input type="hidden" name="calculation_type" id="edit_sc_calculation_type" value="fixed">
                         <input type="hidden" name="pay_group_id" id="edit_sc_pay_group_id">
                         <input type="hidden" name="is_adhoc" id="edit_sc_is_adhoc" value="0">
-                        <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="Parent Company / Legal Entity" name="company_id" id="edit_sc_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
-                                <option value="">All Entities (Global)</option>
-                                @foreach($companies as $company)
-                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-                                @endforeach
-                            </x-ui.odoo-form-ui>
-                        </div>
+                        <input type="hidden" name="company_id" id="edit_sc_company_id">
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_sc_status" select2-selector="status" :errorText="$errors->first('status')">
                                 <option value="1" data-bg="bg-success">Active</option>

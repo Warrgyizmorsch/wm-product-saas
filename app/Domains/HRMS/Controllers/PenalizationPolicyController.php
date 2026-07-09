@@ -33,7 +33,10 @@ class PenalizationPolicyController extends Controller
         }
 
         $companies = Company::all();
-        $leaveTypes = LeaveType::where('status', true)->get();
+        $leaveTypes = LeaveType::where('status', true)
+            ->get()
+            ->unique('name')
+            ->values();
         
         // Fetch all configuration rules keyed by their rule type for easy reference
         $rules = AttendancePenalty::all()->keyBy('rule_type');
@@ -99,7 +102,7 @@ class PenalizationPolicyController extends Controller
                         'max_occurrence' => $tier['max_occurrence'] !== null && $tier['max_occurrence'] !== '' ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value' => (float) $tier['penalty_value'],
-                        'leave_type_id' => $tier['leave_type_id'] !== null && $tier['leave_type_id'] !== '' ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id' => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
                     ];
                 }
             }
@@ -120,7 +123,7 @@ class PenalizationPolicyController extends Controller
                         'max_occurrence' => $tier['max_occurrence'] !== null && $tier['max_occurrence'] !== '' ? (int) $tier['max_occurrence'] : null,
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value' => (float) $tier['penalty_value'],
-                        'leave_type_id' => $tier['leave_type_id'] !== null && $tier['leave_type_id'] !== '' ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id' => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
                     ];
                 }
             }
@@ -139,7 +142,7 @@ class PenalizationPolicyController extends Controller
                         'hours_threshold' => (float) $tier['hours_threshold'],
                         'penalty_action' => $tier['penalty_action'],
                         'penalty_value' => (float) $tier['penalty_value'],
-                        'leave_type_id' => $tier['leave_type_id'] !== null && $tier['leave_type_id'] !== '' ? (int) $tier['leave_type_id'] : null,
+                        'leave_type_id' => !empty($tier['leave_type_id']) ? (int) $tier['leave_type_id'] : null,
                     ];
                 }
             }

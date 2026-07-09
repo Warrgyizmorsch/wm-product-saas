@@ -67,7 +67,7 @@
         ],
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => ['Chart of Accounts', 'Journals', 'Ledgers', 'Tax Reports']],
-            ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'url' => '#', 'children' => ['Employees', 'Attendance', 'Leave', 'Payroll', ['label' => 'Setting', 'route' => 'hrms.org.index']]],
+            ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'url' => '#', 'children' => [['label' => 'Employees', 'route' => 'hrms.employees.index'], 'Attendance', 'Leave', 'Payroll', ['label' => 'Setting', 'route' => 'hrms.org.index']]],
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],
         __('ui.platform_admin') => [

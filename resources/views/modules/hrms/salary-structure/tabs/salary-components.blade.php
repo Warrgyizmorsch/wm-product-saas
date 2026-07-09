@@ -1,3 +1,10 @@
+@php
+    $selectedPayGroup = $selectedPayGroup ?? null;
+    $salaryComponents = $salaryComponents ?? collect();
+    $recurringComponents = $recurringComponents ?? $salaryComponents->filter(fn ($component) => !($component->is_adhoc ?? false));
+    $adhocComponents = $adhocComponents ?? $salaryComponents->filter(fn ($component) => (bool) ($component->is_adhoc ?? false));
+@endphp
+
 <style>
     #componentSubTabs .nav-link {
         border: 1px solid #e2e8f0;
@@ -53,7 +60,6 @@
                                     <th>Component Name</th>
                                     <th>Code</th>
                                     <th>Type</th>
-                                    <th>Legal Entity</th>
                                     <th>Status</th>
                                     <th width="150" class="text-end">Actions</th>
                                 </tr>
@@ -71,7 +77,6 @@
                                             <x-ui.badge variant="warning" soft>Deduction</x-ui.badge>
                                         @endif
                                     </td>
-                                    <td>{{ $sc->company->company_name ?? 'All Entities' }}</td>
                                     <td>
                                         @if($sc->status)
                                             <x-ui.badge variant="success" soft>Active</x-ui.badge>
@@ -135,7 +140,6 @@
                                     <th>Component Name</th>
                                     <th>Code</th>
                                     <th>Type</th>
-                                    <th>Legal Entity</th>
                                     <th>Status</th>
                                     <th width="150" class="text-end">Actions</th>
                                 </tr>
@@ -153,7 +157,6 @@
                                             <x-ui.badge variant="warning" soft>Deduction</x-ui.badge>
                                         @endif
                                     </td>
-                                    <td>{{ $sc->company->company_name ?? 'All Entities' }}</td>
                                     <td>
                                         @if($sc->status)
                                             <x-ui.badge variant="success" soft>Active</x-ui.badge>
