@@ -28,7 +28,7 @@
         @csrf
         <input type="hidden" name="sales_order_id" value="{{ $salesOrder->id }}">
 
-        <x-ui.odoo-form-ui type="sheet">
+        <x-ui.odoo-form-ui type="sheet" class="erp-single-panel bg-white p-4">
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                 <div>
                     <h5 class="fw-bold text-dark mb-0">New Delivery Order (Fulfillment)</h5>
@@ -92,8 +92,18 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <span class="fw-semibold text-muted">{{ $item->warehouse?->name ?? '—' }}</span>
-                                            <input type="hidden" name="items[{{ $item->id }}][warehouse_id]" value="{{ $item->warehouse_id }}">
+                                            @php
+                                                $firstAlloc = $salesOrder->stockAllocations->where('sales_order_item_id', $item->id)->first();
+                                                $selectedWhId = $firstAlloc ? $firstAlloc->warehouse_id : null;
+                                            @endphp
+                                            <select name="items[{{ $item->id }}][warehouse_id]" class="form-select form-select-sm" style="max-width: 220px;" required>
+                                                <option value="">Select Warehouse...</option>
+                                                @foreach ($warehouses as $wh)
+                                                    <option value="{{ $wh->id }}" {{ $selectedWhId == $wh->id ? 'selected' : '' }}>
+                                                        {{ $wh->name }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
                                         </td>
                                         <td class="text-end fw-semibold">{{ (int)$item->quantity }}</td>
                                         <td class="text-end text-muted">{{ (int)$shipped }}</td>

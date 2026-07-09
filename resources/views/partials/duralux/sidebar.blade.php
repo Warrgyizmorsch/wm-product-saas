@@ -24,9 +24,10 @@
             ]],
              ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
                 ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
-                ['label' => 'Sales Orders'],
-                ['label' => 'Invoices'],
-                ['label' => 'Receipts'],
+                ['label' => 'Sales Orders', 'route' => 'sales.orders.index'],
+                ['label' => 'Invoices', 'route' => 'sales.invoices.index'],
+                ['label' => 'Receipts (Payments)', 'route' => 'sales.payments.index'],
+                ['label' => 'Sales Returns', 'route' => 'sales.returns.index'],
             ]],
             ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [__('ui.projects'), 'Milestones', 'Tasks', 'Timesheets']],
         ],
