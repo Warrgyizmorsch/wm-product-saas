@@ -100,7 +100,7 @@
                 <x-ui.odoo-form-ui type="input" label="Nick Name" name="nick_name" id="{{ $prefix }}_nick_name" :value="$fieldValue('nick_name')" placeholder="Optional short name" :errorText="$errors->first('nick_name')" />
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="Job Title" name="job_title" id="{{ $prefix }}_job_title" :value="$fieldValue('job_title')" placeholder="HR Executive, Developer, etc." :errorText="$errors->first('job_title')" />
+                <x-ui.odoo-form-ui type="input" label="Job Title" name="job_title" id="{{ $prefix }}_job_title" :required="true" :value="$fieldValue('job_title')" placeholder="HR Executive, Developer, etc." :errorText="$errors->first('job_title')" />
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="Role / Function" name="role" id="{{ $prefix }}_role" :value="$fieldValue('role')" placeholder="Role inside the organization" :errorText="$errors->first('role')" />
@@ -149,7 +149,7 @@
                     @endforeach
                 </x-ui.odoo-form-ui>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4" id="{{ $prefix }}_blood_group_wrapper">
                 <x-ui.odoo-form-ui type="select" label="Blood Group" name="blood_group" id="{{ $prefix }}_blood_group" select2-selector="default" :errorText="$errors->first('blood_group')">
                     <option value="">Select Blood Group</option>
                     @foreach($bloodGroups as $bloodGroup)
@@ -196,32 +196,43 @@
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_card_number" id="{{ $prefix }}_pan_card_number" :value="$fieldValue('pan_card_number')" placeholder="Optional PAN number" :errorText="$errors->first('pan_card_number')" />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="Emergency Contact Name" name="emergency_contact_name" id="{{ $prefix }}_emergency_contact_name" :value="$fieldValue('emergency_contact_name')" placeholder="Contact person name" :errorText="$errors->first('emergency_contact_name')" />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="Emergency Contact Number" name="emergency_contact_number" id="{{ $prefix }}_emergency_contact_number" :value="$fieldValue('emergency_contact_number')" placeholder="Contact person phone" :errorText="$errors->first('emergency_contact_number')" />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="Emergency Contact Relation" name="emergency_contact_relation" id="{{ $prefix }}_emergency_contact_relation" :value="$fieldValue('emergency_contact_relation')" placeholder="e.g. Spouse, Father..." :errorText="$errors->first('emergency_contact_relation')" />
             </div>
-            <div class="col-md-6">
+            <div class="col-12">
                 <x-ui.odoo-form-ui type="textarea" label="Present Address" name="present_address" id="{{ $prefix }}_present_address" rows="3" placeholder="Enter present address" :errorText="$errors->first('present_address')">{{ $fieldValue('present_address') }}</x-ui.odoo-form-ui>
             </div>
-            <div class="col-md-6">
+            <div class="col-12 py-1">
+                <div class="odoo-form-group">
+                    <div class="odoo-form-label"></div>
+                    <div class="flex-grow-1">
+                        <div class="form-check m-0 d-flex align-items-center">
+                            <input class="form-check-input" type="checkbox" id="{{ $prefix }}_same_as_present">
+                            <label class="form-check-label fw-bold text-dark ms-2" for="{{ $prefix }}_same_as_present">Permanent Address same as Present Address</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
                 <x-ui.odoo-form-ui type="textarea" label="Permanent Address" name="permanent_address" id="{{ $prefix }}_permanent_address" rows="3" placeholder="Enter permanent address" :errorText="$errors->first('permanent_address')">{{ $fieldValue('permanent_address') }}</x-ui.odoo-form-ui>
             </div>
         </div>
 
         <div class="employee-modal-section-title">Bank Account Details</div>
         <div class="row g-3 mb-4">
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="Bank Name" name="bank_name" id="{{ $prefix }}_bank_name" :value="$fieldValue('bank_name')" placeholder="Enter bank name" :errorText="$errors->first('bank_name')" />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="Account Number" name="account_number" id="{{ $prefix }}_account_number" :value="$fieldValue('account_number')" placeholder="Enter account number" :errorText="$errors->first('account_number')" />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="IFSC Code" name="ifsc_code" id="{{ $prefix }}_ifsc_code" :value="$fieldValue('ifsc_code')" placeholder="Enter bank IFSC code" :errorText="$errors->first('ifsc_code')" />
             </div>
         </div>

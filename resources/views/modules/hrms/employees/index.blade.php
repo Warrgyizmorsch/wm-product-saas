@@ -230,6 +230,11 @@
             max-height: 90vh;
         }
 
+        #create_blood_group_wrapper .odoo-form-label,
+        #edit_blood_group_wrapper .odoo-form-label {
+            width: 100px !important;
+        }
+
         #addEmployeeModal .modal-body,
         #editEmployeeModal .modal-body {
             overflow-y: auto;
@@ -244,8 +249,8 @@
 
         .employee-search-form:focus-within {
             background-color: #fff !important;
-            border-color: rgba(var(--bs-primary-rgb), 0.45) !important;
-            box-shadow: 0 0 0 0.18rem rgba(var(--bs-primary-rgb), 0.12);
+            border-color: var(--bs-primary) !important;
+            box-shadow: 0 0 0 0.18rem rgba(0, 0, 0, 0.05);
         }
 
         .employee-filter-apply-btn {
@@ -255,14 +260,16 @@
             background-color: var(--bs-primary);
             border-color: var(--bs-primary);
             color: #fff;
-            box-shadow: 0 8px 18px rgba(var(--bs-primary-rgb), 0.22);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s ease-in-out;
         }
 
         .employee-filter-apply-btn:hover,
         .employee-filter-apply-btn:focus {
-            background-color: rgba(var(--bs-primary-rgb), 0.92);
-            border-color: rgba(var(--bs-primary-rgb), 0.92);
-            color: #fff;
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            filter: brightness(0.9) !important;
+            color: #fff !important;
         }
 
         .employee-list-card.is-loading {
@@ -794,10 +801,14 @@
                     edit_nick_name: employee.nick_name || '',
                     edit_job_title: employee.job_title || '',
                     edit_role: employee.role || '',
-                    edit_date_of_joining: employee.date_of_joining || '',
+                    edit_date_of_joining: employee.date_of_joining ? employee.date_of_joining.substring(0, 10) : '',
+                    edit_date_of_birth: employee.date_of_birth ? employee.date_of_birth.substring(0, 10) : '',
+                    edit_probation_end_date: employee.probation_end_date ? employee.probation_end_date.substring(0, 10) : '',
+                    edit_confirmation_date: employee.confirmation_date ? employee.confirmation_date.substring(0, 10) : '',
                     edit_office: employee.office || '',
                     edit_personal_mobile_number: employee.personal_mobile_number || '',
                     edit_personal_email: employee.personal_email || '',
+                    edit_office_email: employee.office_email || '',
                     edit_home_phone: employee.home_phone || '',
                     edit_aadhaar_card_number: employee.aadhaar_card_number || '',
                     edit_pan_card_number: employee.pan_card_number || '',
@@ -810,6 +821,12 @@
                     edit_present_address: employee.present_address || '',
                     edit_permanent_address: employee.permanent_address || '',
                     edit_skill_set: employee.skill_set || '',
+                    edit_bank_name: employee.bank_name || '',
+                    edit_account_number: employee.account_number || '',
+                    edit_ifsc_code: employee.ifsc_code || '',
+                    edit_emergency_contact_name: employee.emergency_contact_name || '',
+                    edit_emergency_contact_number: employee.emergency_contact_number || '',
+                    edit_emergency_contact_relation: employee.emergency_contact_relation || '',
                 };
 
                 Object.keys(assignments).forEach(function (id) {
@@ -819,8 +836,24 @@
                     }
                 });
 
+                // Sync address checkbox on edit modal load
+                const editCheckbox = document.getElementById('edit_same_as_present');
+                const editPresent = document.getElementById('edit_present_address');
+                const editPermanent = document.getElementById('edit_permanent_address');
+                if (editCheckbox && editPresent && editPermanent) {
+                    if (editPresent.value && editPresent.value === editPermanent.value) {
+                        editCheckbox.checked = true;
+                        editPermanent.readOnly = true;
+                    } else {
+                        editCheckbox.checked = false;
+                        editPermanent.readOnly = false;
+                    }
+                }
+
                 const selectAssignments = {
                     edit_company_id: employee.company_id || '',
+                    edit_reporting_manager_id: employee.reporting_manager_id || '',
+                    edit_shift_id: employee.shift_id || '',
                     edit_employee_stage: employee.employee_stage || '',
                     edit_employment_type: employee.employment_type || '',
                     edit_gender: employee.gender || '',
@@ -915,6 +948,83 @@
                 editEmployeeModal.addEventListener('shown.bs.modal', function () {
                     initModalSelects(this);
                 });
+            }
+
+            function setupSameAddress(prefix) {
+                const checkbox = document.getElementById(prefix + '_same_as_present');
+                const present = document.getElementById(prefix + '_present_address');
+                const permanent = document.getElementById(prefix + '_permanent_address');
+                if (!checkbox || !present || !permanent) return;
+
+                present.addEventListener('input', function () {
+                    if (checkbox.checked) {
+                        permanent.value = this.value;
+                    }
+                });
+
+                checkbox.addEventListener('change', function () {
+                    if (this.checked) {
+                        permanent.value = present.value;
+                        permanent.readOnly = true;
+                    } else {
+                        permanent.readOnly = false;
+                    }
+                });
+            }
+
+            setupSameAddress('create');
+            setupSameAddress('edit');
+
+            // Initial address checkbox sync on DOM load (for validation redirects)
+            ['create', 'edit'].forEach(function(prefix) {
+                const checkbox = document.getElementById(prefix + '_same_as_present');
+                const present = document.getElementById(prefix + '_present_address');
+                const permanent = document.getElementById(prefix + '_permanent_address');
+                if (checkbox && present && permanent && present.value && present.value === permanent.value) {
+                    checkbox.checked = true;
+                    permanent.readOnly = true;
+                }
+            });
+
+            // Filter form company-department sync
+            const filterForm = document.getElementById('employeeFilterForm');
+            if (filterForm) {
+                const filterCompanySelect = filterForm.querySelector('select[name="company_id"]');
+                const filterDeptSelect = filterForm.querySelector('select[name="department_id"]');
+
+                if (filterCompanySelect && filterDeptSelect) {
+                    const originalSelectedDept = @json($filters['department_id']) || '';
+
+                    function syncFilterDepartments() {
+                        const companyId = filterCompanySelect.value;
+                        const availableDepts = departments.filter(function (dept) {
+                            return !companyId || String(dept.company_id) === String(companyId);
+                        });
+
+                        const currentVal = filterDeptSelect.value || originalSelectedDept;
+                        let options = '<option value="">All Departments</option>';
+                        availableDepts.forEach(function (dept) {
+                            const isSelected = String(dept.id) === String(currentVal);
+                            options += `<option value="${dept.id}" ${isSelected ? 'selected' : ''}>${dept.name}</option>`;
+                        });
+
+                        filterDeptSelect.innerHTML = options;
+
+                        // If selected department is no longer in the list, reset selected value to empty
+                        const hasSelected = availableDepts.some(function (dept) {
+                            return String(dept.id) === String(filterDeptSelect.value);
+                        });
+                        if (!hasSelected && filterDeptSelect.value !== '') {
+                            filterDeptSelect.value = '';
+                        }
+                    }
+
+                    // Attach change listener using jQuery to catch Select2/Normal changes uniformly
+                    $(filterCompanySelect).on('change', syncFilterDepartments);
+
+                    // Initial run to align values on load
+                    syncFilterDepartments();
+                }
             }
 
             initInlineSelects(document.querySelector('.employee-filter-card'));

@@ -5,6 +5,7 @@ use App\Domains\HRMS\Controllers\EmployeeController;
 use App\Domains\HRMS\Controllers\SalaryStructureController;
 use App\Domains\HRMS\Controllers\LeaveStructureController;
 use App\Domains\HRMS\Controllers\PenalizationPolicyController;
+use App\Domains\HRMS\Controllers\RosterController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('hrms')
@@ -26,6 +27,19 @@ Route::prefix('hrms')
         Route::get('/org/designation/create', [OrgController::class, 'createDesignation'])->name('designation.create');
         Route::post('/org/designation/store', [OrgController::class, 'storeDesignation'])->name('designation.store');
         Route::post('/org/designation/update/{designation}', [OrgController::class, 'updateDesignation'])->name('designation.update');
+
+        // Roster Management & Shifts Routing
+        Route::get('/roster', [RosterController::class, 'index'])->name('roster.index');
+        Route::post('/roster/assign', [RosterController::class, 'assign'])->name('roster.assign');
+        Route::post('/roster/update-cell', [RosterController::class, 'updateCell'])->name('roster.update-cell');
+        Route::delete('/roster/clear', [RosterController::class, 'clear'])->name('roster.clear');
+        Route::post('/roster/shift/store', [RosterController::class, 'storeShift'])->name('shift.store');
+        Route::post('/roster/shift/update/{shift}', [RosterController::class, 'updateShift'])->name('shift.update');
+        Route::delete('/roster/shift/delete/{shift}', [RosterController::class, 'destroyShift'])->name('shift.destroy');
+        // Dynamic Document requesting and uploading
+        Route::post('/employees/{employee}/documents/request', [\App\Domains\HRMS\Controllers\EmployeeController::class, 'requestDocument'])->name('employees.documents.request');
+        Route::post('/employees/{employee}/documents/upload', [\App\Domains\HRMS\Controllers\EmployeeController::class, 'uploadDocument'])->name('employees.documents.upload');
+        Route::delete('/employees/documents/{document}', [\App\Domains\HRMS\Controllers\EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
 
         Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
         Route::post('/employees/store', [EmployeeController::class, 'store'])->name('employees.store');

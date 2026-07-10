@@ -14,24 +14,6 @@ class PenalizationPolicyController extends Controller
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
-        // Programmatically run schema updates if they haven't been applied yet
-        try {
-            if (!\Illuminate\Support\Facades\Schema::hasTable('attendance_penalties')) {
-                \Illuminate\Support\Facades\Artisan::call('migrate', [
-                    '--path' => 'database/migrations/2026_07_02_180000_create_attendance_penalties_tables.php',
-                    '--force' => true
-                ]);
-            }
-            if (!\Illuminate\Support\Facades\Schema::hasColumn('attendance_penalties', 'penalty_tiers')) {
-                \Illuminate\Support\Facades\Artisan::call('migrate', [
-                    '--path' => 'database/migrations/2026_07_03_130000_add_penalty_tiers_to_attendance_penalties.php',
-                    '--force' => true
-                ]);
-            }
-        } catch (\Exception $e) {
-            // Silently capture any setup errors
-        }
-
         $companies = Company::all();
         $leaveTypes = LeaveType::where('status', true)
             ->get()

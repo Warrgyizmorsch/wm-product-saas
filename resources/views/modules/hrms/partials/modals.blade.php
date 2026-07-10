@@ -43,7 +43,9 @@
     #addBranchModal .odoo-form-label,
     #editBranchModal .odoo-form-label,
     #addSalaryStructureModal .odoo-form-label,
-    #editSalaryStructureModal .odoo-form-label {
+    #editSalaryStructureModal .odoo-form-label,
+    #addShiftModal .odoo-form-label,
+    #editShiftModal .odoo-form-label {
         width: 170px !important;
     }
 
@@ -1400,6 +1402,159 @@
                 <div class="modal-footer bg-light py-2">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     <button type="submit" class="btn btn-primary">Update Pay Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!--                 SHIFT MODALS                 -->
+<!-- ============================================ -->
+
+<!-- View Shift Modal -->
+<div class="modal fade" id="viewShiftModal" tabindex="-1" aria-labelledby="viewShiftModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-soft-primary text-primary py-3">
+                <h5 class="modal-title fw-bold" id="viewShiftModalLabel"><i class="feather-clock me-2"></i>Shift Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4">
+                    <div class="avatar-text avatar-xl rounded bg-soft-primary text-primary d-flex align-items-center justify-content-center fw-bold fs-20" style="width: 56px; height: 56px; min-width: 56px; min-height: 56px;">
+                        <i class="feather-clock"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-1 fw-bold text-dark" id="modal_view_shift_name"></h4>
+                        <span class="fs-12 text-muted font-monospace" id="modal_view_shift_code"></span>
+                    </div>
+                </div>
+                
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">Start Time</label>
+                        <span class="fs-13 fw-bold text-dark font-monospace" id="modal_view_shift_start"></span>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">End Time</label>
+                        <span class="fs-13 fw-bold text-dark font-monospace" id="modal_view_shift_end"></span>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">Break Duration</label>
+                        <span class="fs-13 fw-bold text-dark" id="modal_view_shift_break"></span>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">Overtime Allowed</label>
+                        <div id="modal_view_shift_overtime"></div>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">Status</label>
+                        <div id="modal_view_shift_status"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Shift Modal -->
+<div class="modal fade" id="addShiftModal" tabindex="-1" aria-labelledby="addShiftModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="addShiftModalLabel"><i class="feather-plus me-2 text-primary"></i>Add Shift</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.shift.store') }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Shift Name" name="name" :required="true" placeholder="e.g. Day Shift, Night Shift" :errorText="$errors->first('name')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Shift Code" name="code" :required="true" placeholder="e.g. DAY, NGT" :errorText="$errors->first('code')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Start Time (HH:MM)" name="start_time" :required="true" placeholder="e.g. 08:00" :errorText="$errors->first('start_time')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="End Time (HH:MM)" name="end_time" :required="true" placeholder="e.g. 16:00" :errorText="$errors->first('end_time')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Break Minutes" name="break_minutes" inputType="number" :required="true" placeholder="e.g. 30, 45" value="0" :errorText="$errors->first('break_minutes')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Overtime Allowed" name="overtime_allowed" select2-selector="default" :errorText="$errors->first('overtime_allowed')">
+                                <option value="1">Yes</option>
+                                <option value="0" selected>No</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="active" select2-selector="default" :errorText="$errors->first('active')">
+                                <option value="1" selected>Active</option>
+                                <option value="0">Inactive</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save Shift</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Shift Modal -->
+<div class="modal fade" id="editShiftModal" tabindex="-1" aria-labelledby="editShiftModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="editShiftModalLabel"><i class="feather-edit me-2 text-primary"></i>Edit Shift</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="shift_edit_form" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Shift Name" name="name" id="edit_shift_name" :required="true" :errorText="$errors->first('name')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Shift Code" name="code" id="edit_shift_code" :required="true" :errorText="$errors->first('code')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Start Time (HH:MM)" name="start_time" id="edit_shift_start" :required="true" :errorText="$errors->first('start_time')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="End Time (HH:MM)" name="end_time" id="edit_shift_end" :required="true" :errorText="$errors->first('end_time')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="Break Minutes" name="break_minutes" id="edit_shift_break" inputType="number" :required="true" :errorText="$errors->first('break_minutes')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Overtime Allowed" name="overtime_allowed" id="edit_shift_overtime" select2-selector="default" :errorText="$errors->first('overtime_allowed')">
+                                <option value="1">Yes</option>
+                                <option value="0">No</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="Status" name="active" id="edit_shift_active" select2-selector="default" :errorText="$errors->first('active')">
+                                <option value="1">Active</option>
+                                <option value="0">Inactive</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Update Shift</button>
                 </div>
             </form>
         </div>
