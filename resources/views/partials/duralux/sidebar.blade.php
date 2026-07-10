@@ -29,7 +29,12 @@
                 ['label' => 'Receipts (Payments)', 'route' => 'sales.payments.index'],
                 ['label' => 'Sales Returns', 'route' => 'sales.returns.index'],
             ]],
-            ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [__('ui.projects'), 'Milestones', 'Tasks', 'Timesheets']],
+            ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
+                ['label' => __('ui.projects'), 'route' => 'projects.index'],
+                'Milestones',
+                'Tasks',
+                'Timesheets',
+            ]],
         ],
         __('ui.supply_chain') => [
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],

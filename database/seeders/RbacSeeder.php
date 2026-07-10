@@ -191,6 +191,10 @@ class RbacSeeder extends Seeder
             ['name' => 'sales.deliveries.create', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'create'],
             ['name' => 'sales.deliveries.ship', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'ship'],
             ['name' => 'sales.deliveries.cancel', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'cancel'],
+            ['name' => 'projects.projects.view', 'module' => 'projects', 'entity' => 'projects', 'action' => 'view'],
+            ['name' => 'projects.projects.create', 'module' => 'projects', 'entity' => 'projects', 'action' => 'create'],
+            ['name' => 'projects.projects.update', 'module' => 'projects', 'entity' => 'projects', 'action' => 'update'],
+            ['name' => 'projects.projects.delete', 'module' => 'projects', 'entity' => 'projects', 'action' => 'delete'],
         ];
 
         $permissions = [];
