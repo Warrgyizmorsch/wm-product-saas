@@ -15,6 +15,11 @@ class Project extends BaseModel
 {
     use BelongsToTenant, HasFactory, SoftDeletes;
 
+    public function getRouteKeyName(): string
+    {
+        return 'project_code';
+    }
+
     public const STATUS_DRAFT = 'Draft';
     public const STATUS_ACTIVE = 'Active';
     public const STATUS_ON_HOLD = 'On Hold';

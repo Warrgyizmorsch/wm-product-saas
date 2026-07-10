@@ -5,20 +5,10 @@
 @section('breadcrumb', __('projects.title') . ' / ' . __('projects.edit'))
 
 @section('page-actions')
-    <a href="{{ route('projects.show', $project->id) }}" class="btn btn-light">
+    <a href="{{ route('projects.show', $project) }}" class="btn btn-light">
         <i class="feather-arrow-left me-2"></i>{{ __('projects.back_to_project') }}
     </a>
 @endsection
-
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
-@endpush
-
-@push('scripts')
-    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
-@endpush
 
 @section('content')
     <div class="erp-single-panel">
@@ -34,7 +24,7 @@
             <div class="mb-4"></div>
         @endif
 
-        <form action="{{ route('projects.update', $project->id) }}" method="POST">
+        <form action="{{ route('projects.update', $project) }}" method="POST">
             @csrf
             @method('PUT')
 
@@ -59,7 +49,7 @@
                     <button type="submit" class="btn btn-primary px-4">
                         <i class="feather-check-circle me-2"></i>{{ __('projects.update_project') }}
                     </button>
-                    <a href="{{ route('projects.show', $project->id) }}" class="btn btn-secondary px-4">{{ __('projects.cancel') }}</a>
+                    <a href="{{ route('projects.show', $project) }}" class="btn btn-secondary px-4">{{ __('projects.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

@@ -2,6 +2,7 @@
 
 use App\Domains\Projects\Controllers\ProjectActivityLogController;
 use App\Domains\Projects\Controllers\ProjectController;
+use App\Domains\Projects\Controllers\ProjectMemberController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('projects')
@@ -15,4 +16,13 @@ Route::prefix('projects')
         Route::delete('{project}', [ProjectController::class, 'destroy'])->name('destroy');
 
         Route::get('{project}/activity', [ProjectActivityLogController::class, 'index'])->name('activity');
+
+        Route::prefix('{project}/members')
+            ->as('members.')
+            ->group(function (): void {
+                Route::post('/', [ProjectMemberController::class, 'store'])->name('store');
+                Route::put('{member}', [ProjectMemberController::class, 'update'])->name('update');
+                Route::patch('{member}/toggle-active', [ProjectMemberController::class, 'toggleActive'])->name('toggle-active');
+                Route::delete('{member}', [ProjectMemberController::class, 'destroy'])->name('destroy');
+            });
     });

@@ -59,6 +59,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Repositories\KpiTargetRepositoryInterface::class,
             \App\Domains\Production\Repositories\KpiTargetRepository::class
         );
+
+        // ── Projects: Project Member ──────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\ProjectMemberRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\ProjectMemberRepository::class
+        );
     }
 
     public function boot(): void
@@ -200,6 +206,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Projects\Models\Project::class,
             \App\Domains\Projects\Policies\ProjectPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\ProjectMember::class,
+            \App\Domains\Projects\Policies\ProjectMemberPolicy::class
         );
 
         // ── Access (RBAC admin) Policies ──────────────────────────────────────

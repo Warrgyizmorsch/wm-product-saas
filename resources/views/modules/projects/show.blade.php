@@ -6,10 +6,10 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <a href="{{ route('projects.edit', $project->id) }}" class="btn btn-light">
+        <a href="{{ route('projects.edit', $project) }}" class="btn btn-light">
             <i class="feather-edit-2 me-2"></i>{{ __('projects.edit') }}
         </a>
-        <form action="{{ route('projects.destroy', $project->id) }}" method="POST"
+        <form action="{{ route('projects.destroy', $project) }}" method="POST"
               onsubmit="return confirm('{{ __('projects.confirm_delete') }}');">
             @csrf
             @method('DELETE')
@@ -24,19 +24,16 @@
 @endsection
 
 @section('content')
-    @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-success text-white me-3">
-                    <i class="feather-check-circle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">{{ __('projects.success') }}</h6>
-                    <p class="fs-12 mb-0">{{ session('success') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+    @if ($errors->any())
+        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+            <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
+            <ul class="mb-0 fs-12 ps-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+        <div class="mb-4"></div>
     @endif
 
     <div class="row g-4">
@@ -118,8 +115,14 @@
         <div class="col-xl-4">
             @include('modules.projects._activity-feed', [
                 'activities' => $activities,
-                'viewAllUrl' => route('projects.activity', $project->id),
+                'viewAllUrl' => route('projects.activity', $project),
             ])
+        </div>
+    </div>
+
+    <div class="row g-4 mt-1">
+        <div class="col-12">
+            @include('modules.projects._members')
         </div>
     </div>
 @endsection
