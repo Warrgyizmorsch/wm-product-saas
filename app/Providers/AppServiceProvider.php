@@ -54,7 +54,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\Projects\Repositories\ActivityLogRepositoryInterface::class,
             \App\Domains\Projects\Repositories\ActivityLogRepository::class
-        // ── Production: KPI Targets ───────────────────────────────────────────
+        );
+            // ── Production: KPI Targets ───────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Production\Repositories\KpiTargetRepositoryInterface::class,
             \App\Domains\Production\Repositories\KpiTargetRepository::class
