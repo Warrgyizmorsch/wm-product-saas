@@ -40,7 +40,7 @@
                             <span class="fs-12 text-muted">Billing for Sales Order: <strong>{{ $salesOrder->sales_order_number }}</strong></span>
                         @endif
                     </div>
-                    <a href="{{ route('sales.orders.show', $salesOrder->id) }}" class="btn btn-sm btn-light border">Cancel</a>
+                    <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
                 </div>
 
                 <div class="row g-4 mb-4 fs-13 text-dark">
@@ -181,8 +181,8 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <a href="{{ route('sales.orders.show', $salesOrder->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
-                    <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12" style="background-color: #1e40af; border-color: #1e40af;">Generate and Save Invoice</button>
+                    <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" size="md" class="border py-2 px-4 fs-12 shadow-sm">Discard</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">Generate and Save Invoice</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

@@ -2,7 +2,8 @@
     $isSalary = request()->routeIs('hrms.salary-structure.index') || request()->query('tab') === 'salary-structure';
     $isLeave = request()->routeIs('hrms.leave-structure.index');
     $isPenalty = request()->routeIs('hrms.penalization-policy.index');
-    $isOrg = !$isSalary && !$isLeave && !$isPenalty;
+    $isRoster = request()->routeIs('hrms.roster.index');
+    $isOrg = !$isSalary && !$isLeave && !$isPenalty && !$isRoster;
 @endphp
 
 <div class="settings-sidebar-panel h-100">
@@ -22,6 +23,10 @@
             <a class="nav-link {{ $isLeave ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="leave-structure-menu" href="{{ route('hrms.leave-structure.index') }}" role="tab" aria-selected="{{ $isLeave ? 'true' : 'false' }}">
                 <i class="feather-calendar me-3 fs-16"></i>
                 <span>Leave Structure</span>
+            </a>
+            <a class="nav-link {{ $isRoster ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="shift-roster-menu" href="{{ route('hrms.roster.index') }}" role="tab" aria-selected="{{ $isRoster ? 'true' : 'false' }}">
+                <i class="feather-clock me-3 fs-16"></i>
+                <span>Shift & Roster</span>
             </a>
             <a class="nav-link {{ $isPenalty ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="penalization-policy-menu" href="{{ route('hrms.penalization-policy.index') }}" role="tab" aria-selected="{{ $isPenalty ? 'true' : 'false' }}">
                 <i class="feather-alert-octagon me-3 fs-16"></i>

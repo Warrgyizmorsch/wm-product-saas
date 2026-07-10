@@ -31,4 +31,18 @@ class ProductionScanLog extends BaseModel
     {
         return $this->belongsTo(User::class, 'scanned_by');
     }
+
+    public function getEntityCode(): string
+    {
+        switch ($this->entity_type) {
+            case 'order':
+                return ProductionOrder::withoutGlobalScopes()->find($this->entity_id)?->order_number ?? '—';
+            case 'batch':
+                return ProductionBatch::withoutGlobalScopes()->find($this->entity_id)?->batch_number ?? '—';
+            case 'serial':
+                return ProductionSerialNumber::withoutGlobalScopes()->find($this->entity_id)?->serial_number ?? '—';
+            default:
+                return '—';
+        }
+    }
 }

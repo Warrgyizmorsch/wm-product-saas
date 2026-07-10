@@ -35,6 +35,8 @@ use App\Domains\Production\Controllers\ShiftController;
 use App\Domains\Production\Controllers\CalendarController;
 use App\Domains\Production\Controllers\QualityPlanController;
 use App\Domains\Production\Controllers\OperatorSkillController;
+use App\Domains\Production\Controllers\KpiTargetController;
+use App\Domains\Production\Controllers\ScanLogController;
 
 Route::prefix('production')
     ->as('production.')
@@ -150,6 +152,9 @@ Route::prefix('production')
         // Barcode / QR Scanning
         Route::get('mes/scanner', [ScannerController::class, 'index'])->name('mes.scanner.index');
         Route::post('mes/scanner/scan', [ScannerController::class, 'scan'])->name('mes.scanner.scan');
+        Route::get('mes/scan-logs/export', [ScanLogController::class, 'export'])->name('scan-logs.export');
+        Route::get('mes/scan-logs/{id}', [ScanLogController::class, 'show'])->name('scan-logs.show');
+        Route::get('mes/scan-logs', [ScanLogController::class, 'index'])->name('scan-logs.index');
 
         // ── MES Machine & Work Center Dashboards ──────────────────────────────
         Route::get('mes/machines',           [MachineDashboardController::class, 'index'])->name('mes.machines.index');
@@ -173,6 +178,7 @@ Route::prefix('production')
         Route::get('intelligence/reports/{type}', [ReportsController::class, 'show'])->name('intelligence.reports.show');
         Route::get('intelligence/alerts', [AlertController::class, 'index'])->name('intelligence.alerts.index');
         Route::post('intelligence/alerts/{id}', [AlertController::class, 'update'])->name('intelligence.alerts.update');
+        Route::resource('kpi-targets', KpiTargetController::class)->only(['index', 'store']);
 
         // ── Phase 4 Quality Management ──────────────────────────────────────
         Route::get('quality/dashboard', [QualityDashboardController::class, 'index'])->name('quality.dashboard');

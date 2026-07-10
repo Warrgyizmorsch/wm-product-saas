@@ -320,6 +320,28 @@
 
 @section('content')
     <style>
+        /* Document Badge Styles */
+        .badge-mandatory {
+            background-color: rgba(239, 68, 68, 0.08) !important;
+            color: #ef4444 !important;
+            font-weight: 600;
+        }
+        .badge-optional {
+            background-color: rgba(100, 116, 139, 0.08) !important;
+            color: #64748b !important;
+            font-weight: 500;
+        }
+        .badge-expiry {
+            background-color: rgba(245, 158, 11, 0.08) !important;
+            color: #f59e0b !important;
+            font-weight: 500;
+        }
+        .badge-no-expiry {
+            background-color: rgba(16, 185, 129, 0.08) !important;
+            color: #10b981 !important;
+            font-weight: 500;
+        }
+
         .erp-pagination {
             display: flex;
             align-items: center;
@@ -655,6 +677,11 @@
                     <i class="feather-alert-triangle"></i> Attendance & Penalties
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="false">
+                    <i class="feather-file-text"></i> Documents
+                </button>
+            </li>
         </ul>
 
         <!-- Tab Content -->
@@ -785,14 +812,6 @@
                                         <div class="info-label">City / Postal Code</div>
                                         <div class="info-value">{{ $employee->city ?: 'N/A' }} {{ $employee->postal_code ? '(' . $employee->postal_code . ')' : '' }}</div>
                                     </div>
-                                    <div class="col-md-6 col-12">
-                                        <div class="info-label">Present Address</div>
-                                        <div class="info-value text-wrap" style="max-width: 100%;">{{ $employee->present_address ?: 'N/A' }}</div>
-                                    </div>
-                                    <div class="col-md-6 col-12">
-                                        <div class="info-label">Permanent Address</div>
-                                        <div class="info-value text-wrap" style="max-width: 100%;">{{ $employee->permanent_address ?: 'N/A' }}</div>
-                                    </div>
                                     <div class="col-md-4 col-12">
                                         <div class="info-label">Emergency Contact Name</div>
                                         <div class="info-value">{{ $employee->emergency_contact_name ?: 'N/A' }}</div>
@@ -804,6 +823,14 @@
                                     <div class="col-md-4 col-12">
                                         <div class="info-label">Emergency Contact Relation</div>
                                         <div class="info-value">{{ $employee->emergency_contact_relation ?: 'N/A' }}</div>
+                                    </div>
+                                    <div class="col-md-6 col-12">
+                                        <div class="info-label">Present Address</div>
+                                        <div class="info-value text-wrap" style="max-width: 100%;">{{ $employee->present_address ?: 'N/A' }}</div>
+                                    </div>
+                                    <div class="col-md-6 col-12">
+                                        <div class="info-label">Permanent Address</div>
+                                        <div class="info-value text-wrap" style="max-width: 100%;">{{ $employee->permanent_address ?: 'N/A' }}</div>
                                     </div>
                                 </div>
                             </div>
@@ -1252,8 +1279,230 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 5. DOCUMENTS TAB -->
+            <div class="tab-pane fade" id="documents-pane" role="tabpanel" aria-labelledby="documents-tab">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card-custom">
+                            <div class="card-custom-header d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+                                <div>
+                                    <h5 class="card-custom-title"><i class="feather-file-text text-primary"></i> Employee Documents Registry</h5>
+                                    <small class="text-muted d-block mt-1">Manage, upload, or request official documents for this employee.</small>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    @if(auth()->user()->hasHrPermission('hr.settings.manage'))
+                                        <x-ui.icon-btn type="button" variant="transparent-dark" size="md" icon="feather-git-pull-request" class="fw-bold text-uppercase" data-bs-toggle="modal" data-bs-target="#requestDocumentModal">
+                                            <span>Request Document</span>
+                                        </x-ui.icon-btn>
+                                    @endif
+                                    <x-ui.button variant="primary" size="sm" class="fw-bold text-uppercase" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" icon="feather-upload-cloud">
+                                        Upload Document
+                                    </x-ui.button>
+                                </div>
+                            </div>
+                            <div class="card-body p-4">
+                                @if(session('error'))
+                                    <div class="alert alert-danger mb-3">{{ session('error') }}</div>
+                                @endif
+                                <div class="table-responsive border rounded bg-white">
+                                    <table class="table table-bordered table-hover mb-0 align-middle text-center">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="text-start" style="width: 250px;">Document Title</th>
+                                                <th>Source / Requested By</th>
+                                                <th>Expiry Date</th>
+                                                <th>File</th>
+                                                <th>Status</th>
+                                                <th style="width: 280px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($employee->documents as $doc)
+                                                <tr>
+                                                    <td class="text-start font-semibold">
+                                                        <div class="text-dark fw-bold fs-13">{{ $doc->name }}</div>
+                                                        @if($doc->description)
+                                                            <div class="text-muted fs-10" style="font-size: 10px;">{{ $doc->description }}</div>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($doc->requestedBy)
+                                                            <span class="text-secondary fw-medium fs-12">Requested by {{ $doc->requestedBy->name }}</span>
+                                                        @else
+                                                            <span class="text-muted fs-11">Direct Upload</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($doc->has_expiry)
+                                                            @if($doc->expiry_date)
+                                                                @php
+                                                                    $isExpired = $doc->expiry_date->isPast();
+                                                                    $isNearExpiry = !$isExpired && $doc->expiry_date->diffInDays(now()) <= 30; // default 30 days alert
+                                                                @endphp
+                                                                @if($isExpired)
+                                                                    <span class="badge badge-mandatory"><i class="feather-alert-circle me-1"></i>Expired ({{ $doc->expiry_date->format('d M, Y') }})</span>
+                                                                @elseif($isNearExpiry)
+                                                                    <span class="badge badge-expiry"><i class="feather-clock me-1"></i>Near Expiry ({{ $doc->expiry_date->format('d M, Y') }})</span>
+                                                                @else
+                                                                    <span class="text-dark fw-semibold">{{ $doc->expiry_date->format('d M, Y') }}</span>
+                                                                @endif
+                                                            @else
+                                                                <span class="text-muted fs-11">Required on Upload</span>
+                                                            @endif
+                                                        @else
+                                                            <span class="text-muted fs-11">No Expiry</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-start">
+                                                        @if($doc->file_path)
+                                                            <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="fw-bold text-primary d-flex align-items-center gap-1 justify-content-center">
+                                                                <i class="feather-download-cloud fs-12"></i>
+                                                                <span style="display:inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ $doc->file_name }}</span>
+                                                            </a>
+                                                            <div class="text-muted text-center" style="font-size: 10px;">{{ number_format($doc->file_size / 1024, 1) }} KB</div>
+                                                        @else
+                                                            <span class="text-muted fs-11 d-block text-center">No File Uploaded</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($doc->status === 'requested')
+                                                            <span class="badge bg-soft-warning text-warning">Pending Upload</span>
+                                                        @elseif($doc->status === 'uploaded')
+                                                            <span class="badge bg-soft-success text-success">Uploaded</span>
+                                                        @else
+                                                            <span class="badge bg-soft-secondary text-secondary">{{ ucfirst($doc->status) }}</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($doc->status === 'requested')
+                                                            <!-- File Upload Form for Pending Request -->
+                                                            <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
+                                                                @csrf
+                                                                <input type="hidden" name="document_id" value="{{ $doc->id }}">
+                                                                <div class="flex-grow-1 text-start">
+                                                                    <input type="file" name="file" class="form-control form-control-sm" required style="font-size: 11px; padding: 0.25rem 0.5rem; height: auto;">
+                                                                    @if($doc->has_expiry)
+                                                                        <div class="mt-1 d-flex align-items-center gap-1">
+                                                                            <span class="text-secondary fs-9 text-uppercase" style="font-size: 8px;">Expiry:</span>
+                                                                            <input type="date" name="expiry_date" class="form-control form-control-sm py-0 px-1" required style="font-size: 10px; height: 20px; width: 120px;">
+                                                                        </div>
+                                                                    @endif
+                                                                </div>
+                                                                <button type="submit" class="btn btn-sm btn-primary py-1 px-2 d-flex align-items-center justify-content-center" style="border-radius: 6px; font-size: 11px; height: 28px;">
+                                                                    <i class="feather-upload-cloud me-1"></i> Upload
+                                                                </button>
+                                                            </form>
+                                                        @else
+                                                            <div class="d-flex justify-content-center gap-2">
+                                                                @if(auth()->user()->hasHrPermission('hr.settings.manage'))
+                                                                    <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this document record?');">
+                                                                        @csrf
+                                                                        @method('DELETE')
+                                                                        <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-1 px-3" style="border-radius: 6px; font-size: 11px;">
+                                                                            <i class="feather-trash-2"></i> Remove Record
+                                                                        </button>
+                                                                    </form>
+                                                                @endif
+                                                            </div>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                            @if($employee->documents->isEmpty())
+                                                <tr>
+                                                    <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                                        <i class="feather-file fs-24 d-block mb-2 text-secondary"></i>
+                                                        No documents uploaded or requested for this employee profile yet.
+                                                    </td>
+                                                </tr>
+                                            @endif
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
+
+        <!-- HR REQUEST DOCUMENT MODAL -->
+        <div class="modal fade" id="requestDocumentModal" tabindex="-1" aria-labelledby="requestDocumentModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold text-dark" id="requestDocumentModalLabel">
+                            <i class="feather-git-pull-request me-2 text-primary" style="font-size: 16px;"></i>Request Document from Employee
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="{{ route('hrms.employees.documents.request', $employee->id) }}" method="POST">
+                        @csrf
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="input" label="Document Name" name="name" :required="true" placeholder="e.g. Previous Experience Certificate, 10th Marksheet" />
+                                </div>
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="textarea" label="Instructions" name="description" placeholder="Explain what details or formatting are required..." />
+                                </div>
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="radio" label="Requires Expiry" name="has_expiry" :required="true">
+                                        <div class="form-check">
+                                            <input type="radio" id="has_expiry_yes" name="has_expiry" value="1" class="form-check-input">
+                                            <label class="form-check-label fs-13" for="has_expiry_yes">Yes</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input type="radio" id="has_expiry_no" name="has_expiry" value="0" class="form-check-input" checked>
+                                            <label class="form-check-label fs-13" for="has_expiry_no">No</label>
+                                        </div>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2 gap-2">
+                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Send Request</button>
+                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- DIRECT UPLOAD DOCUMENT MODAL -->
+        <div class="modal fade" id="uploadDocumentModal" tabindex="-1" aria-labelledby="uploadDocumentModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold text-dark" id="uploadDocumentModalLabel">
+                            <i class="feather-upload-cloud me-2 text-primary" style="font-size: 16px;"></i>Upload New Document
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data">
+                        @csrf
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="input" label="Document Title" name="name" :required="true" placeholder="e.g. Aadhar Card, Offer Letter" />
+                                </div>
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="file" label="Select File" name="file" :required="true" placeholder="Click to upload PDF, JPG, PNG (Max 10MB)..." />
+                                </div>
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" inputType="date" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2 gap-2">
+                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Upload File</button>
+                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
     <!-- ADD ADHOC MODAL -->
     <div class="modal fade" id="addAdhocModal" tabindex="-1" aria-labelledby="addAdhocModalLabel" aria-hidden="true">
@@ -1399,6 +1648,19 @@
                 $('#addAdhocModal').appendTo('body');
                 $('#addPenaltyModal').appendTo('body');
                 $('[id^="leaveRulesModal"]').appendTo('body');
+                $('#requestDocumentModal').appendTo('body');
+                $('#uploadDocumentModal').appendTo('body');
+
+                // Keep active tab on refresh / redirect
+                const urlParams = new URLSearchParams(window.location.search);
+                const activeTab = urlParams.get('tab');
+                if (activeTab) {
+                    const tabEl = document.querySelector(`#${activeTab}-tab`);
+                    if (tabEl) {
+                        const tab = new bootstrap.Tab(tabEl);
+                        tab.show();
+                    }
+                }
 
                 // Policy summary slider navigation
                 function updatePolicySliderButtons() {

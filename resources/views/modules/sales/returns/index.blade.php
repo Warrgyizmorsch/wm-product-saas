@@ -4,6 +4,14 @@
 @section('page-title', 'Sales Returns')
 @section('breadcrumb', 'Sales / Returns')
 
+@section('page-actions')
+    <div class="d-flex gap-2">
+        <a href="{{ route('sales.returns.create') }}" class="btn btn-primary">
+            <i class="feather-plus me-2"></i>Create Return
+        </a>
+    </div>
+@endsection
+
 @section('content')
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
@@ -21,67 +29,68 @@
     @endif
 
     <div class="card border-0 shadow-sm">
-        <div class="card-body p-4">
-            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-                <h5 class="fw-bold text-dark mb-0">Sales Returns (Credit Notes)</h5>
-                <a href="{{ route('sales.returns.create') }}" class="btn btn-sm btn-primary py-1.5 px-3">
-                    <i class="feather-plus me-1"></i>Create Return
-                </a>
-            </div>
-
+        <div class="card-header bg-transparent border-bottom py-3">
+            <h5 class="card-title mb-0 fw-bold text-dark">
+                <i class="feather-rotate-ccw me-2 text-primary"></i>Sales Returns (Credit Notes)
+            </h5>
+        </div>
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table odoo-table align-middle bg-white rounded border">
+                <table class="table table-hover align-middle mb-0">
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>
-                            <th class="ps-3">Return Number</th>
+                            <th class="ps-4">Return Number</th>
                             <th>Date</th>
                             <th>Sales Order</th>
                             <th>Customer</th>
                             <th class="text-end">Refund Amount</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-end pe-3">Actions</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="fs-13 text-dark">
                         @forelse ($returns as $ret)
                             <tr>
-                                <td class="ps-3 fw-bold">
-                                    <a href="{{ route('sales.returns.show', $ret->id) }}" class="text-primary">
+                                <td class="ps-4 fw-bold text-primary">
+                                    <a href="{{ route('sales.returns.show', $ret->id) }}">
                                         {{ $ret->return_number }}
                                     </a>
                                 </td>
                                 <td>{{ date('d/m/Y', strtotime($ret->return_date)) }}</td>
                                 <td>
                                     @if ($ret->salesOrder)
-                                        <a href="{{ route('sales.orders.show', $ret->salesOrder->id) }}" class="text-muted">
+                                        <a href="{{ route('sales.orders.show', $ret->salesOrder->id) }}" class="text-muted fw-semibold">
                                             {{ $ret->salesOrder->sales_order_number }}
                                         </a>
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif
                                 </td>
-                                <td>{{ $ret->salesOrder?->customer?->name ?: '—' }}</td>
-                                <td class="text-end fw-bold text-dark">₹{{ number_format($ret->total_refund_amount, 2) }}</td>
-                                <td class="text-center">
-                                    @if ($ret->status == 'Completed')
-                                        <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11">Completed</span>
-                                    @elseif ($ret->status == 'Approved')
-                                        <span class="badge bg-soft-info text-info px-2 py-0.5 fs-11">Approved</span>
-                                    @elseif ($ret->status == 'Cancelled')
-                                        <span class="badge bg-soft-danger text-danger px-2 py-0.5 fs-11">Cancelled</span>
-                                    @else
-                                        <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11">Draft</span>
-                                    @endif
+                                <td>
+                                    <span class="fw-bold">{{ $ret->salesOrder?->customer?->name ?: '—' }}</span>
                                 </td>
-                                <td class="text-end pe-3">
-                                    <a href="{{ route('sales.returns.show', $ret->id) }}" class="btn btn-sm btn-light border py-1">
-                                        <i class="feather-eye me-1"></i>View
-                                    </a>
+                                <td class="text-end fw-bold text-dark">₹{{ number_format($ret->total_refund_amount, 2) }}</td>
+                                <td>
+                                    @php
+                                        $badgeClass = 'bg-soft-secondary text-secondary';
+                                        if ($ret->status == 'Completed') $badgeClass = 'bg-soft-success text-success';
+                                        elseif ($ret->status == 'Approved') $badgeClass = 'bg-soft-info text-info';
+                                        elseif ($ret->status == 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
+                                    @endphp
+                                    <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $ret->status }}</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-flex justify-content-end gap-2 align-items-center">
+                                        <a href="{{ route('sales.returns.show', $ret->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Return Details">
+                                            <i class="feather feather-eye"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4 fs-12">
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="feather-rotate-ccw fs-1 mb-2 d-block text-gray-300"></i>
                                     No sales returns processed yet.
                                 </td>
                             </tr>

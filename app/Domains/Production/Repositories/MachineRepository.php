@@ -31,6 +31,30 @@ class MachineRepository implements MachineRepositoryInterface
         return $query->orderBy('name')->get();
     }
 
+    public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = Machine::query()->with('workCenter');
+
+        if (!empty($filters['work_center_id'])) {
+            $query->where('work_center_id', $filters['work_center_id']);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search): void {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('machine_type', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->orderBy('name')->paginate($perPage);
+    }
+
     public function find(int $id): ?Machine
     {
         return Machine::with(['workCenter'])->find($id);

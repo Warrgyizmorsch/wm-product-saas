@@ -77,4 +77,14 @@ class ProductionNcr extends BaseModel
     {
         return $this->hasOne(ProductionScrapDisposal::class, 'ncr_id');
     }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(ProductionBatch::class, 'batch_id');
+    }
+
+    public function serialNumber(): BelongsTo
+    {
+        return $this->belongsTo(ProductionSerialNumber::class, 'serial_number_id');
+    }
 }

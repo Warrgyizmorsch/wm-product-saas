@@ -54,12 +54,21 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             \App\Domains\Projects\Repositories\ActivityLogRepositoryInterface::class,
             \App\Domains\Projects\Repositories\ActivityLogRepository::class
+        // ── Production: KPI Targets ───────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Production\Repositories\KpiTargetRepositoryInterface::class,
+            \App\Domains\Production\Repositories\KpiTargetRepository::class
         );
     }
 
     public function boot(): void
     {
         // ── Production Policies ───────────────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Production\Models\ProductionKpiTarget::class,
+            \App\Domains\Production\Policies\KpiTargetPolicy::class
+        );
+
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionBom::class,
             \App\Domains\Production\Policies\ProductionBomPolicy::class

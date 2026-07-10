@@ -25,7 +25,6 @@ class EmployeeController extends Controller
     public function index(Request $request): View
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-        $this->ensureEmployeeMasterColumns();
 
         $filters = [
             'search' => trim((string) $request->string('search')),
@@ -108,7 +107,6 @@ class EmployeeController extends Controller
     public function store(Request $request): RedirectResponse
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-        $this->ensureEmployeeMasterColumns();
 
         $validated = $this->validatePayload($request);
         $validated = $this->normalizeHierarchy($validated);
@@ -128,7 +126,6 @@ class EmployeeController extends Controller
     public function update(Request $request, Employee $employee): RedirectResponse
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-        $this->ensureEmployeeMasterColumns();
 
         $validated = $this->validatePayload($request, $employee);
         $validated = $this->normalizeHierarchy($validated);
@@ -170,7 +167,7 @@ class EmployeeController extends Controller
             'nick_name' => ['nullable', 'string', 'max:255'],
             'blood_group' => ['nullable', Rule::in($this->bloodGroups())],
             'employee_stage' => ['nullable', 'string', 'max:255'],
-            'job_title' => ['nullable', 'string', 'max:255'],
+            'job_title' => ['required', 'string', 'max:255'],
             'role' => ['nullable', 'string', 'max:255'],
             'employment_type' => ['nullable', 'string', 'max:255'],
             'date_of_joining' => ['required', 'date'],
@@ -387,78 +384,9 @@ class EmployeeController extends Controller
         return null;
     }
 
-    private function ensureEmployeeMasterColumns(): void
-    {
-        try {
-            if (!Schema::hasTable('salary_structures')) {
-                \Illuminate\Support\Facades\Artisan::call('migrate', [
-                    '--path' => 'database/migrations/2026_07_02_160000_create_salary_structures_tables.php',
-                    '--force' => true,
-                ]);
-            }
-
-            if (!Schema::hasTable('pay_groups')) {
-                \Illuminate\Support\Facades\Artisan::call('migrate', [
-                    '--path' => 'database/migrations/2026_07_07_000000_create_pay_groups_table.php',
-                    '--force' => true,
-                ]);
-            }
-
-            if (!Schema::hasTable('leave_plans')) {
-                \Illuminate\Support\Facades\Artisan::call('migrate', [
-                    '--path' => 'database/migrations/2026_07_02_170000_create_leave_structures_tables.php',
-                    '--force' => true,
-                ]);
-            }
-
-            if (!Schema::hasTable('attendance_penalties')) {
-                \Illuminate\Support\Facades\Artisan::call('migrate', [
-                    '--path' => 'database/migrations/2026_07_02_180000_create_attendance_penalties_tables.php',
-                    '--force' => true,
-                ]);
-            }
-        } catch (\Exception $exception) {
-            // Keep the employee directory resilient even if supporting master tables
-            // have not been created yet; validation and scoped options will simply stay empty.
-        }
-
-        if (!Schema::hasTable('employees')) {
-            return;
-        }
-
-        if (Schema::hasTable('pay_groups') && !Schema::hasColumn('employees', 'pay_group_id')) {
-            Schema::table('employees', function ($table): void {
-                $table->unsignedBigInteger('pay_group_id')->nullable()->after('designation_id');
-                $table->foreign('pay_group_id')->references('id')->on('pay_groups')->nullOnDelete();
-            });
-        }
-
-        if (Schema::hasTable('salary_structures') && !Schema::hasColumn('employees', 'salary_structure_id')) {
-            Schema::table('employees', function ($table): void {
-                $table->unsignedBigInteger('salary_structure_id')->nullable()->after('pay_group_id');
-                $table->foreign('salary_structure_id')->references('id')->on('salary_structures')->nullOnDelete();
-            });
-        }
-
-        if (Schema::hasTable('leave_plans') && !Schema::hasColumn('employees', 'leave_plan_id')) {
-            Schema::table('employees', function ($table): void {
-                $table->unsignedBigInteger('leave_plan_id')->nullable()->after('salary_structure_id');
-                $table->foreign('leave_plan_id')->references('id')->on('leave_plans')->nullOnDelete();
-            });
-        }
-
-        if (Schema::hasTable('attendance_penalties') && !Schema::hasColumn('employees', 'attendance_penalty_id')) {
-            Schema::table('employees', function ($table): void {
-                $table->unsignedBigInteger('attendance_penalty_id')->nullable()->after('leave_plan_id');
-                $table->foreign('attendance_penalty_id')->references('id')->on('attendance_penalties')->nullOnDelete();
-            });
-        }
-    }
-
     public function show(Employee $employee): View
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-        $this->ensureEmployeeMasterColumns();
 
         // Dynamically resolve Salary Structure slab based on current_salary and pay_group_id
         $salaryStructure = null;
@@ -529,7 +457,9 @@ class EmployeeController extends Controller
             ];
         }
 
-        // Load employee penalties and adhoc components
+        // Load employee penalties, adhoc components, and documents
+        $employee->load('documents.requestedBy');
+
         $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::query()
             ->where('employee_id', $employee->id)
             ->with('component')
@@ -625,5 +555,109 @@ class EmployeeController extends Controller
         return redirect()
             ->route('hrms.employees.show', $employeeId)
             ->with('success', 'Attendance Penalty instance deleted successfully.');
+    }
+
+    public function requestDocument(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+            'has_expiry' => 'nullable|boolean',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+
+        \App\Domains\HRMS\Models\Document::create([
+            'tenant_id' => $tenantId,
+            'documentable_id' => $employee->id,
+            'documentable_type' => Employee::class,
+            'name' => $request->string('name')->value(),
+            'description' => $request->input('description'),
+            'status' => 'requested',
+            'has_expiry' => $request->boolean('has_expiry'),
+            'requested_by_id' => auth()->id(),
+        ]);
+
+        return redirect()->route('hrms.employees.show', [$employee->id, 'tab' => 'documents'])
+            ->with('success', 'Document request created successfully.');
+    }
+
+    public function uploadDocument(Request $request, Employee $employee): RedirectResponse
+    {
+        // Permission check
+        $isHR = auth()->user()->hasHrPermission('hr.settings.manage');
+        $isOwnProfile = auth()->id() === ($employee->user_id ?? null);
+        
+        abort_unless($isHR || $isOwnProfile, 403);
+
+        $request->validate([
+            'document_id' => 'nullable|exists:documents,id',
+            'name' => 'nullable|required_without:document_id|string|max:255',
+            'file' => 'required|file|max:10240', // Max 10MB
+            'expiry_date' => 'nullable|date',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+        $file = $request->file('file');
+
+        if ($request->filled('document_id')) {
+            // Uploading file for an existing request
+            $document = \App\Domains\HRMS\Models\Document::findOrFail($request->integer('document_id'));
+            
+            // Validate expiry if requested configuration demands it
+            if ($document->has_expiry && !$request->filled('expiry_date')) {
+                return back()->withErrors(['expiry_date' => 'Expiry date is required for this requested document.'])->withInput();
+            }
+
+            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+
+            $document->update([
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
+                'file_type' => $file->getClientMimeType(),
+                'file_size' => $file->getSize(),
+                'expiry_date' => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status' => 'uploaded',
+            ]);
+        } else {
+            // Direct upload without previous request
+            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+
+            \App\Domains\HRMS\Models\Document::create([
+                'tenant_id' => $tenantId,
+                'documentable_id' => $employee->id,
+                'documentable_type' => Employee::class,
+                'name' => $request->string('name')->value(),
+                'file_name' => $file->getClientOriginalName(),
+                'file_path' => $path,
+                'file_type' => $file->getClientMimeType(),
+                'file_size' => $file->getSize(),
+                'expiry_date' => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status' => 'uploaded',
+                'has_expiry' => $request->filled('expiry_date'),
+            ]);
+        }
+
+        return redirect()->route('hrms.employees.show', [$employee->id, 'tab' => 'documents'])
+            ->with('success', 'Document uploaded successfully.');
+    }
+
+    public function destroyDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $employeeId = $document->documentable_id;
+
+        // Delete actual file from storage if it exists
+        if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+        }
+
+        $document->delete();
+
+        return redirect()->route('hrms.employees.show', [$employeeId, 'tab' => 'documents'])
+            ->with('success', 'Document record deleted successfully.');
     }
 }

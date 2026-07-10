@@ -61,12 +61,18 @@ class DashboardRefreshService
         $start = Carbon::today();
         $end   = Carbon::today()->endOfDay();
 
-        $metrics = $this->oeeService->calculateForMachine($tenantId, $machineId, $start, $end);
-        $losses  = $this->oeeService->calculateSixBigLosses($tenantId, $machineId, $start, $end);
-
         $machine = DB::table('production_machines')
             ->where('id', $machineId)
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
             ->first();
+
+        if (!$machine) {
+            throw new \InvalidArgumentException('Machine not found or access denied.');
+        }
+
+        $metrics = $this->oeeService->calculateForMachine($tenantId, $machineId, $start, $end);
+        $losses  = $this->oeeService->calculateSixBigLosses($tenantId, $machineId, $start, $end);
 
         return [
             'machine_id'    => $machineId,
@@ -85,6 +91,16 @@ class DashboardRefreshService
     {
         $start = Carbon::today();
         $end   = Carbon::today()->endOfDay();
+
+        $wc = DB::table('production_work_centers')
+            ->where('id', $wcId)
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$wc) {
+            throw new \InvalidArgumentException('Work Center not found or access denied.');
+        }
 
         $metrics = $this->oeeService->calculateForWorkCenter($tenantId, $wcId, $start, $end);
 

@@ -6,23 +6,24 @@
 
 @section('content')
     <div class="card border-0 shadow-sm">
-        <div class="card-body p-4">
-            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-                <h5 class="fw-bold text-dark mb-0">Delivery Orders (Shipments)</h5>
-            </div>
-
+        <div class="card-header bg-transparent border-bottom py-3">
+            <h5 class="card-title mb-0 fw-bold text-dark">
+                <i class="feather-truck me-2 text-primary"></i>Delivery Orders (Shipments)
+            </h5>
+        </div>
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table odoo-table align-middle bg-white rounded border">
+                <table class="table table-hover align-middle mb-0">
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>
-                            <th class="ps-3">Delivery Number</th>
+                            <th class="ps-4">Delivery Number</th>
                             <th>Sales Order</th>
                             <th>Customer</th>
                             <th>Delivery Date</th>
                             <th>Carrier</th>
                             <th>Tracking Number</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-end pe-3">Actions</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="fs-13 text-dark">
@@ -33,21 +34,44 @@
                                 elseif ($do->status === 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
                             @endphp
                             <tr>
-                                <td class="ps-3 fw-bold"><a href="{{ route('sales.deliveries.show', $do->id) }}" class="text-primary">{{ $do->delivery_number }}</a></td>
-                                <td><a href="{{ route('sales.orders.show', $do->sales_order_id) }}" class="text-dark fw-semibold">{{ $do->salesOrder->sales_order_number }}</a></td>
-                                <td>{{ $do->salesOrder->customer?->name ?? '—' }}</td>
+                                <td class="ps-4 fw-bold text-primary">
+                                    <a href="{{ route('sales.deliveries.show', $do->id) }}">{{ $do->delivery_number }}</a>
+                                </td>
+                                <td>
+                                    <a href="{{ route('sales.orders.show', $do->sales_order_id) }}" class="text-dark fw-semibold">{{ $do->salesOrder->sales_order_number }}</a>
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ $do->salesOrder->customer?->name ?? '—' }}</span>
+                                </td>
                                 <td>{{ $do->delivery_date->format('d/m/Y') }}</td>
                                 <td>{{ $do->carrier ?: '—' }}</td>
                                 <td>{{ $do->tracking_number ?: '—' }}</td>
-                                <td class="text-center"><span class="badge {{ $badgeClass }} px-2 py-0.5">{{ $do->status }}</span></td>
-                                <td class="text-end pe-3">
-                                    <a href="{{ route('sales.deliveries.show', $do->id) }}" class="btn btn-xs btn-outline-primary fw-bold">View Details</a>
+                                <td>
+                                    <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $do->status }}</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    @php
+                                        // Check if this specific shipment has already been invoiced
+                                        $invoiced = $do->salesOrder?->invoices->where('delivery_order_id', $do->id)->first();
+                                    @endphp
+                                    <x-ui.action-dropdown :viewUrl="route('sales.deliveries.show', $do->id)">
+                                        <x-ui.dropdown-item href="{{ route('sales.deliveries.show', $do->id) }}" icon="feather-eye">
+                                            View Details
+                                        </x-ui.dropdown-item>
+                                        @if ($do->status === 'Shipped')
+                                            @if (!$invoiced)
+                                                <x-ui.dropdown-item href="{{ route('sales.invoices.create', ['delivery_order_id' => $do->id]) }}" icon="feather-file-text">
+                                                    Create Invoice
+                                                </x-ui.dropdown-item>
+                                            @endif
+                                        @endif
+                                    </x-ui.action-dropdown>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center py-4.5 text-muted">
-                                    <i class="feather-truck fs-2 mb-2 d-block text-gray-300"></i>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="feather-truck fs-1 mb-2 d-block text-gray-300"></i>
                                     No delivery orders found. Create shipments directly from Confirmed Sales Orders.
                                 </td>
                             </tr>

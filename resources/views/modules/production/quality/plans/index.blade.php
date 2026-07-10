@@ -35,24 +35,24 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Plan Scope Type</label>
-                            <select name="type" class="form-select fs-12">
+                            <x-ui.odoo-form-ui type="select" name="type">
                                 <option value="">All Types</option>
                                 <option value="product" @selected(request('type') === 'product')>Product Specific</option>
                                 <option value="product_category" @selected(request('type') === 'product_category')>Category Specific</option>
                                 <option value="process" @selected(request('type') === 'process')>Process General</option>
                                 <option value="work_center" @selected(request('type') === 'work_center')>Work Center Specific</option>
-                            </select>
+                            </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status State</label>
-                            <select name="status" class="form-select fs-12">
+                            <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">All Statuses</option>
                                 <option value="draft" @selected(request('status') === 'draft')>Draft</option>
                                 <option value="submitted" @selected(request('status') === 'submitted')>Submitted</option>
                                 <option value="approved" @selected(request('status') === 'approved')>Approved</option>
                                 <option value="archived" @selected(request('status') === 'archived')>Archived</option>
-                            </select>
+                            </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
@@ -109,14 +109,24 @@
                             @endif
                         </td>
                         <td class="text-end">
-                            <div class="d-flex justify-content-end gap-1">
-                                <a href="{{ route('production.quality-plans.edit', $plan->id) }}" class="btn btn-xs btn-outline-primary py-1"><i class="feather-edit-3 me-1"></i>Edit</a>
-                                <form method="POST" action="{{ route('production.quality-plans.destroy', $plan->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this Quality Plan?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-xs btn-outline-danger py-1"><i class="feather-trash-2"></i></button>
-                                </form>
-                            </div>
+                            <x-ui.action-dropdown>
+                                <li>
+                                    <a href="{{ route('production.quality-plans.edit', $plan->id) }}" class="dropdown-item">
+                                        <i class="feather-edit me-2 text-muted fs-12"></i>Edit Plan
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form method="POST" action="{{ route('production.quality-plans.destroy', $plan->id) }}"
+                                          onsubmit="return confirm('Are you sure you want to delete this Quality Plan?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Permanent
+                                        </button>
+                                    </form>
+                                </li>
+                            </x-ui.action-dropdown>
                         </td>
                     </tr>
                 @empty

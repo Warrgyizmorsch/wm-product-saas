@@ -98,6 +98,20 @@
         .plan-item:hover:not(.active) {
             background-color: #f8fafc !important;
         }
+
+        /* Leave rules configuration inline input fields styling */
+        #leaveRulesModal .odoo-table-input {
+            border-bottom: 1px solid #ced4da !important;
+            padding: 2px 4px !important;
+            display: inline-block !important;
+            height: auto !important;
+            font-weight: bold;
+            color: #212529;
+        }
+        #leaveRulesModal .odoo-table-input:focus {
+            border-bottom: 1px solid var(--bs-primary) !important;
+            background-color: transparent !important;
+        }
     </style>
 
     <div class="settings-container">

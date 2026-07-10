@@ -34,7 +34,7 @@
                         <h5 class="fw-bold text-dark mb-0">Record Customer Return</h5>
                         <span class="fs-12 text-muted">Create a sales return to credit customer and return items back to inventory.</span>
                     </div>
-                    <a href="{{ route('sales.returns.index') }}" class="btn btn-sm btn-light border">Cancel</a>
+                    <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
                 </div>
 
                 <div class="row g-4 mb-4 fs-13 text-dark">
@@ -85,8 +85,8 @@
                 </div>
 
                 <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                    <a href="{{ route('sales.returns.index') }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
-                    <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Return Draft</button>
+                    <x-ui.button href="{{ route('sales.returns.index') }}" variant="light" size="md" class="border py-2 px-4 fs-12 shadow-sm">Discard</x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">Save Return Draft</x-ui.button>
                 </div>
             </x-ui.odoo-form-ui>
         </form>
@@ -94,24 +94,27 @@
 @endsection
 
 @push('scripts')
+    @php
+        $salesOrdersData = $salesOrders->map(function($so) {
+            return [
+                'id' => $so->id,
+                'items' => $so->items->map(function($item) {
+                    return [
+                        'product_id' => $item->product_id,
+                        'item_name' => $item->item_name,
+                        'quantity' => $item->quantity,
+                        'unit_price' => $item->unit_price,
+                        'warehouse_id' => $item->warehouse_id,
+                        'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
+                    ];
+                })->values()->toArray()
+            ];
+        })->values()->toArray();
+    @endphp
     <script>
         $(document).ready(function() {
             // Load Sales Orders with eager loaded items and warehouse details
-            const salesOrdersList = @json($salesOrders->map(function($so) {
-                return [
-                    'id' => $so->id,
-                    'items' => $so->items->map(function($item) {
-                        return [
-                            'product_id' => $item->product_id,
-                            'item_name' => $item->item_name,
-                            'quantity' => $item->quantity,
-                            'unit_price' => $item->unit_price,
-                            'warehouse_id' => $item->warehouse_id,
-                            'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
-                        ];
-                    })
-                ];
-            }));
+            const salesOrdersList = @json($salesOrdersData);
 
             $('#salesOrderSelect').on('change', function() {
                 const soId = $(this).val();

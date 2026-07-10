@@ -34,7 +34,7 @@ class RoutingController extends Controller
         Gate::authorize('viewAny', Routing::class);
 
         $filters  = $request->only(['product_id', 'status', 'search']);
-        $routings = $this->routingRepository->getAll($filters);
+        $routings = $this->routingRepository->paginateAll($filters, 15)->withQueryString();
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
 
         return view('modules.production.routing.index', compact('routings', 'products', 'filters'));
