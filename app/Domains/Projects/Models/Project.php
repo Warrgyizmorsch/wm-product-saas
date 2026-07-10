@@ -84,4 +84,9 @@ class Project extends BaseModel
     {
         return $this->hasMany(ActivityLog::class, 'project_id');
     }
+
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(Milestone::class, 'project_id');
+    }
 }

@@ -3,11 +3,13 @@
 namespace App\Domains\Projects\Controllers;
 
 use App\Domains\CRM\Models\Customer;
+use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectMember;
 use App\Domains\Projects\Requests\StoreProjectRequest;
 use App\Domains\Projects\Requests\UpdateProjectRequest;
 use App\Domains\Projects\Services\ActivityLogService;
+use App\Domains\Projects\Services\MilestoneService;
 use App\Domains\Projects\Services\ProjectMemberService;
 use App\Domains\Projects\Services\ProjectService;
 use App\Http\Controllers\Controller;
@@ -22,6 +24,7 @@ class ProjectController extends Controller
         private readonly ProjectService $projects,
         private readonly ActivityLogService $activity,
         private readonly ProjectMemberService $members,
+        private readonly MilestoneService $milestones,
     ) {
     }
 
@@ -63,13 +66,15 @@ class ProjectController extends Controller
         $this->authorize('view', $project);
 
         $canManageMembers = auth()->user()->can('manage', [ProjectMember::class, $project]);
+        $canManageMilestones = auth()->user()->can('manage', [Milestone::class, $project]);
 
         return view('modules.projects.show', [
-            'project'          => $project,
-            'activities'       => $this->activity->forProject($project),
-            'members'          => $this->members->list($project),
-            'canManageMembers' => $canManageMembers,
-            'tenantUsers'      => $canManageMembers
+            'project'             => $project,
+            'members'             => $this->members->list($project),
+            'canManageMembers'    => $canManageMembers,
+            'milestones'          => $this->milestones->list($project),
+            'canManageMilestones' => $canManageMilestones,
+            'tenantUsers'         => ($canManageMembers || $canManageMilestones)
                 ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
                 : collect(),
         ]);
