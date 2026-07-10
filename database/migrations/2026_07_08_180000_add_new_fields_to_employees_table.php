@@ -51,8 +51,15 @@ return new class extends Migration
         Schema::table('employees', function (Blueprint $table) {
             $table->dropForeign(['reporting_manager_id']);
             $table->dropForeign(['shift_id']);
-
+            $table->dropForeign(['attendance_penalty_id']);
+            $table->dropForeign(['pay_group_id']);
+            $table->dropForeign(['salary_structure_id']);
+            $table->dropForeign(['leave_plan_id']);
             $table->dropColumn([
+                'pay_group_id',
+                'salary_structure_id',
+                'leave_plan_id',
+                'attendance_penalty_id',
                 'reporting_manager_id',
                 'date_of_birth',
                 'probation_end_date',

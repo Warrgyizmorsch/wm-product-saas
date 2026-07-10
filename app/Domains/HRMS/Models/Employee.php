@@ -131,6 +131,11 @@ class Employee extends Model
         return $this->belongsTo(\App\Domains\Production\Models\ProductionShift::class, 'shift_id');
     }
 
+    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(Document::class, 'documentable');
+    }
+
     public function managedBranches(): HasMany
     {
         return $this->hasMany(Branch::class, 'manager_employee_id');

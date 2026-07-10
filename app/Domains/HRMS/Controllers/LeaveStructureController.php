@@ -14,18 +14,6 @@ class LeaveStructureController extends Controller
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
-        // Programmatically run schema updates if they haven't been applied yet
-        try {
-            if (!\Illuminate\Support\Facades\Schema::hasTable('leave_plans')) {
-                \Illuminate\Support\Facades\Artisan::call('migrate', [
-                    '--path' => 'database/migrations/2026_07_02_170000_create_leave_structures_tables.php',
-                    '--force' => true
-                ]);
-            }
-        } catch (\Exception $e) {
-            // Silently capture any setup errors
-        }
-
         $companies = Company::all();
         $leavePlans = LeavePlan::with(['company', 'types'])->get();
 
