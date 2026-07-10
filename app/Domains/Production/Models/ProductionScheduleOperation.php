@@ -175,4 +175,59 @@ class ProductionScheduleOperation extends BaseModel
     {
         $query->where('machine_id', $machineId);
     }
+
+    protected static function booted()
+    {
+        static::saving(function ($operation) {
+            if ($operation->warnings && is_array($operation->warnings)) {
+                $operation->warnings = self::aggregateWarnings($operation->warnings);
+            }
+        });
+    }
+
+    public static function aggregateWarnings(array $warnings): array
+    {
+        $holidaySkippedDates = [];
+        $otherWarnings = [];
+
+        foreach ($warnings as $w) {
+            if (isset($w['code']) && $w['code'] === 'HOLIDAY_SKIPPED') {
+                preg_match_all('/\d{4}-\d{2}-\d{2}/', $w['message'] ?? '', $matches);
+                if (!empty($matches[0])) {
+                    $holidaySkippedDates = array_merge($holidaySkippedDates, $matches[0]);
+                }
+            } else {
+                $otherWarnings[] = $w;
+            }
+        }
+
+        if (!empty($holidaySkippedDates)) {
+            $holidaySkippedDates = array_values(array_unique($holidaySkippedDates));
+            sort($holidaySkippedDates);
+            $count = count($holidaySkippedDates);
+            if ($count === 1) {
+                $msg = "Scheduled date {$holidaySkippedDates[0]} skipped due to holiday/weekend configuration.";
+            } else {
+                $msg = "{$count} day(s) skipped due to holiday/weekend configuration (" . implode(', ', $holidaySkippedDates) . ").";
+            }
+            $otherWarnings[] = [
+                'code'     => 'HOLIDAY_SKIPPED',
+                'message'  => $msg,
+                'severity' => 'info',
+            ];
+        }
+
+        // Deduplicate other warnings by code and message
+        $uniqueWarnings = [];
+        $seen = [];
+        foreach ($otherWarnings as $w) {
+            $key = ($w['code'] ?? '') . '_' . ($w['message'] ?? '');
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $uniqueWarnings[] = $w;
+            }
+        }
+
+        return $uniqueWarnings;
+    }
 }

@@ -178,6 +178,7 @@
         {{-- Tabs --}}
         <x-ui.horizontal-tabs id="scheduleTabs" :tabs="[
             ['id' => 'tab-operations', 'label' => 'Schedule Operations', 'active' => true, 'icon' => 'feather-list'],
+            ['id' => 'tab-capacity', 'label' => 'Capacity Analysis', 'active' => false, 'icon' => 'feather-activity'],
         ]" />
 
         <div class="tab-content mt-3">
@@ -192,6 +193,7 @@
                                 <th style="width: 12%">Planned Machine</th>
                                 <th style="width: 12%">Actual Machine</th>
                                 <th style="width: 8%">Status</th>
+                                <th style="width: 10%">Duration</th>
                                 <th style="width: 10%">Planned Start</th>
                                 <th style="width: 10%">Planned Finish</th>
                                 <th style="width: 13%">Gantt Config</th>
@@ -234,6 +236,7 @@
                                             <span class="erp-badge-draft text-uppercase">{{ $op->status }}</span>
                                         @endif
                                     </td>
+                                    <td class="align-middle fs-11 text-dark fw-semibold">{{ number_format($op->planned_duration_minutes, 1) }} mins</td>
                                     <td class="align-middle fs-11 text-muted">{{ $op->planned_start->format('d/m H:i') }}</td>
                                     <td class="align-middle fs-11 text-muted">{{ $op->planned_finish->format('d/m H:i') }}</td>
                                     <td class="align-middle fs-11 text-muted">
@@ -249,10 +252,23 @@
                                     </td>
                                     <td class="align-middle">
                                         @if($op->warnings && count($op->warnings) > 0)
+                                            @php
+                                                $renderedWarnings = [];
+                                            @endphp
                                             @foreach($op->warnings as $warn)
-                                                <span class="badge bg-soft-danger text-danger d-block mb-1 font-monospace" style="font-size: 10px;" title="{{ $warn['message'] }}">
-                                                    {{ $warn['code'] }}
-                                                </span>
+                                                @php
+                                                    $warnCode = $warn['code'] ?? '';
+                                                    $warnMsg = $warn['message'] ?? '';
+                                                    $warnKey = $warnCode . '_' . $warnMsg;
+                                                @endphp
+                                                @if(!in_array($warnKey, $renderedWarnings))
+                                                    @php
+                                                        $renderedWarnings[] = $warnKey;
+                                                    @endphp
+                                                    <span class="badge bg-soft-danger text-danger d-block mb-1 font-monospace" style="font-size: 10px;" title="{{ $warnMsg }}">
+                                                        {{ $warnCode }}
+                                                    </span>
+                                                @endif
                                             @endforeach
                                         @else
                                             <span class="text-success fs-12"><i class="feather-check-circle"></i> Clean</span>
@@ -261,8 +277,65 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="11" class="text-center py-4 text-muted">
+                                    <td colspan="12" class="text-center py-4 text-muted">
                                         <i class="feather-info me-2"></i>No operations scheduled.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </x-ui.odoo-form-ui>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-capacity" role="tabpanel">
+                <div class="table-responsive">
+                    <x-ui.odoo-form-ui type="table">
+                        <thead>
+                            <tr>
+                                <th>Work Center</th>
+                                <th>Active Shift(s)</th>
+                                <th class="text-center">Resource Count</th>
+                                <th class="text-end">Scheduled Time</th>
+                                <th class="text-end">Available Capacity</th>
+                                <th>Utilization %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($capacityDetails as $detail)
+                                <tr>
+                                    <td class="fw-bold align-middle">
+                                        {{ $detail['work_center']->name }}
+                                        <br><small class="text-muted">Calendar: {{ $detail['calendar_name'] }} ({{ $detail['working_days'] }})</small>
+                                    </td>
+                                    <td class="align-middle">
+                                        {{ $detail['shifts'] }}
+                                    </td>
+                                    <td class="align-middle text-center">
+                                        <span class="badge bg-soft-info text-info">{{ $detail['active_machines'] }} Active Machine(s)</span>
+                                    </td>
+                                    <td class="align-middle text-end font-monospace">{{ number_format($detail['scheduled_minutes'], 1) }} mins</td>
+                                    <td class="align-middle text-end font-monospace">{{ number_format($detail['capacity_minutes'], 1) }} mins</td>
+                                    <td class="align-middle">
+                                        <div class="d-flex align-items-center">
+                                            <span class="fw-bold me-2 {{ $detail['utilization'] > 85 ? 'text-danger' : 'text-success' }}">
+                                                {{ number_format($detail['utilization'], 2) }}%
+                                            </span>
+                                            <div class="progress flex-grow-1" style="height: 6px; min-width: 100px;">
+                                                <div class="progress-bar {{ $detail['utilization'] > 85 ? 'bg-danger' : 'bg-success' }}" 
+                                                     role="progressbar" 
+                                                     style="width: {{ $detail['utilization'] }}%" 
+                                                     aria-valuenow="{{ $detail['utilization'] }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        <i class="feather-info me-2"></i>No capacity data available for this schedule.
                                     </td>
                                 </tr>
                             @endforelse

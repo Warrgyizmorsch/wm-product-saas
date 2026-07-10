@@ -166,16 +166,19 @@ class MesController extends Controller
 
         // Running operations
         $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
             ->get();
 
         // Ready queue
         $ready = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_READY)
             ->get();
 
         // Paused
         $paused = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
             ->get();
 

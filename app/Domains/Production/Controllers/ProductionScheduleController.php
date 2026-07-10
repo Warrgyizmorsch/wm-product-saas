@@ -22,7 +22,7 @@ class ProductionScheduleController extends Controller
     {
         $this->authorize('viewAny', ProductionSchedule::class);
 
-        $query = ProductionSchedule::with(['order.product', 'creator']);
+        $query = ProductionSchedule::with(['order.product', 'creator', 'operations']);
 
         if ($request->filled('search')) {
             $search = '%' . $request->input('search') . '%';
@@ -118,9 +118,12 @@ class ProductionScheduleController extends Controller
         $this->authorize('view', $schedule);
 
         $tenantId = require_tenant_id();
-        $warnings = $this->schedulingService->detectOverloads($tenantId);
+        $overloads = $this->schedulingService->detectOverloads($tenantId);
+        $conflicts = $this->schedulingService->detectConflicts($tenantId);
+        $warnings = array_merge($overloads, $conflicts);
+        $capacityDetails = $this->schedulingService->getWorkCenterCapacityDetails($schedule);
 
-        return view('modules.production.schedules.show', compact('schedule', 'warnings'));
+        return view('modules.production.schedules.show', compact('schedule', 'warnings', 'capacityDetails'));
     }
 
     public function destroy(int $id)
