@@ -56,10 +56,22 @@ class DeliveryOrderController extends Controller
 
         $warehouses = Warehouse::query()->where('status', 'active')->orderBy('name')->get();
 
+        // Calculate available stock map for these products across all warehouses
+        $productIds = $salesOrder->items->pluck('product_id')->filter()->unique()->toArray();
+        $stocks = \App\Domains\Inventory\Models\ProductWarehouseStock::query()
+            ->whereIn('product_id', $productIds)
+            ->get();
+
+        $stockMap = [];
+        foreach ($stocks as $stock) {
+            $stockMap[$stock->product_id][$stock->warehouse_id] = (float)$stock->available_qty;
+        }
+
         return view('modules.sales.deliveries.create', [
             'salesOrder' => $salesOrder,
             'shippedQuantities' => $shippedQuantities,
             'warehouses' => $warehouses,
+            'stockMap' => $stockMap,
             'nextDeliveryNumber' => $this->deliveryService->getNextDeliveryNumber(),
         ]);
     }

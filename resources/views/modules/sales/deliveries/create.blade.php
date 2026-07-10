@@ -34,7 +34,7 @@
                     <h5 class="fw-bold text-dark mb-0">New Delivery Order (Fulfillment)</h5>
                     <span class="fs-12 text-muted">Fulfillment for Sales Order: <strong>{{ $salesOrder->sales_order_number }}</strong></span>
                 </div>
-                <a href="{{ route('sales.orders.show', $salesOrder->id) }}" class="btn btn-sm btn-light border">Cancel</a>
+                <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
             </div>
 
             <div class="row g-4 mb-4 fs-13 text-dark">
@@ -93,10 +93,13 @@
                                         </td>
                                         <td>
                                             @php
-                                                $firstAlloc = $salesOrder->stockAllocations->where('sales_order_item_id', $item->id)->first();
-                                                $selectedWhId = $firstAlloc ? $firstAlloc->warehouse_id : null;
+                                                $selectedWhId = $item->warehouse_id;
                                             @endphp
-                                            <select name="items[{{ $item->id }}][warehouse_id]" class="form-select form-select-sm" style="max-width: 220px;" required>
+                                            <select name="items[{{ $item->id }}][warehouse_id]" 
+                                                    class="form-select form-select-sm warehouse-select" 
+                                                    data-product-id="{{ $item->product_id }}" 
+                                                    data-item-id="{{ $item->id }}" 
+                                                    style="max-width: 220px;" required>
                                                 <option value="">Select Warehouse...</option>
                                                 @foreach ($warehouses as $wh)
                                                     <option value="{{ $wh->id }}" {{ $selectedWhId == $wh->id ? 'selected' : '' }}>
@@ -104,6 +107,7 @@
                                                     </option>
                                                 @endforeach
                                             </select>
+                                            <span class="available-qty-display d-block text-muted fs-11 mt-1 font-monospace" id="avail-qty-{{ $item->id }}">Available: 0</span>
                                         </td>
                                         <td class="text-end fw-semibold">{{ (int)$item->quantity }}</td>
                                         <td class="text-end text-muted">{{ (int)$shipped }}</td>
@@ -114,9 +118,11 @@
                                                        class="odoo-table-input text-end fw-bold text-primary qty-to-ship-input" 
                                                        value="{{ (int)$remaining }}" 
                                                        min="0" 
-                                                       max="{{ (int)$remaining }}" 
+                                                       data-product-id="{{ $item->product_id }}"
+                                                       data-item-id="{{ $item->id }}"
                                                        required 
                                                        style="width: 100px; margin-left: auto;">
+                                                <div class="text-end text-danger fw-semibold mt-1 fs-11 validation-error-msg" id="error-{{ $item->id }}" style="display: none;"></div>
                                             @else
                                                 <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11">Fully Delivered</span>
                                                 <input type="hidden" name="items[{{ $item->id }}][quantity]" value="0">
@@ -131,9 +137,110 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                <a href="{{ route('sales.orders.show', $salesOrder->id) }}" class="btn btn-md btn-light border py-2 px-4 shadow-sm fs-12">Discard</a>
-                <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Delivery Order</button>
+                <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" size="md" class="border py-2 px-4 fs-12 shadow-sm">Discard</x-ui.button>
+                <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">Save Delivery Order</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>
 @endsection
+
+@push('scripts')
+<script>
+    window.productWarehouseStocks = @json($stockMap);
+
+    $(document).ready(function() {
+        // Trigger validation on warehouse change and quantity change
+        $(document).on('change', '.warehouse-select', function() {
+            validateRow($(this).data('item-id'));
+        });
+
+        $(document).on('input change', '.qty-to-ship-input', function() {
+            validateRow($(this).data('item-id'));
+        });
+
+        // Run validation on page load for all items
+        $('.warehouse-select').each(function() {
+            validateRow($(this).data('item-id'));
+        });
+
+        function validateRow(itemId) {
+            const whSelect = $(`.warehouse-select[data-item-id="${itemId}"]`);
+            const qtyInput = $(`.qty-to-ship-input[data-item-id="${itemId}"]`);
+            const availDisplay = $(`#avail-qty-${itemId}`);
+            const errorDisplay = $(`#error-${itemId}`);
+
+            if (!whSelect.length || !qtyInput.length) return;
+
+            const productId = whSelect.data('product-id');
+            const warehouseId = whSelect.val();
+            const qtyVal = parseFloat(qtyInput.val()) || 0;
+
+            let availableStock = 0;
+            if (warehouseId && window.productWarehouseStocks[productId] && window.productWarehouseStocks[productId][warehouseId] !== undefined) {
+                availableStock = parseFloat(window.productWarehouseStocks[productId][warehouseId]);
+            }
+
+            // Update display
+            if (warehouseId) {
+                availDisplay.text(`Available: ${availableStock}`);
+                availDisplay.removeClass('text-muted text-danger text-success');
+                if (availableStock <= 0) {
+                    availDisplay.addClass('text-danger');
+                } else {
+                    availDisplay.addClass('text-success');
+                }
+            } else {
+                availDisplay.text('Available: 0');
+                availDisplay.removeClass('text-danger text-success').addClass('text-muted');
+            }
+
+            // Validation check
+            let isInvalid = false;
+            let errorMsg = '';
+
+            if (warehouseId && qtyVal > availableStock) {
+                isInvalid = true;
+                errorMsg = `Exceeds available stock (${availableStock})!`;
+            }
+
+            if (isInvalid) {
+                qtyInput.addClass('is-invalid');
+                errorDisplay.text(errorMsg).show();
+            } else {
+                qtyInput.removeClass('is-invalid');
+                errorDisplay.hide().text('');
+            }
+
+            checkOverallFormValidity();
+        }
+
+        function checkOverallFormValidity() {
+            let formHasErrors = false;
+
+            // Check for is-invalid class on any input
+            $('.qty-to-ship-input').each(function() {
+                if ($(this).hasClass('is-invalid')) {
+                    formHasErrors = true;
+                }
+            });
+
+            // Check if any warehouse select has value and is invalid
+            $('.warehouse-select').each(function() {
+                const itemId = $(this).data('item-id');
+                const qtyInput = $(`.qty-to-ship-input[data-item-id="${itemId}"]`);
+                if (qtyInput.length && parseFloat(qtyInput.val()) > 0 && !$(this).val()) {
+                    // Warehouse is required if shipping > 0
+                    formHasErrors = true;
+                }
+            });
+
+            const submitBtn = $('#deliveryForm button[type="submit"]');
+            if (formHasErrors) {
+                submitBtn.attr('disabled', 'disabled');
+            } else {
+                submitBtn.removeAttr('disabled');
+            }
+        }
+    });
+</script>
+@endpush

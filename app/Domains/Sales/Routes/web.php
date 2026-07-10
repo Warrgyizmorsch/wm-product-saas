@@ -15,8 +15,6 @@ Route::prefix('sales')
         Route::delete('orders/{order}', [SalesOrderController::class, 'destroy'])->name('orders.destroy');
         Route::post('orders/{order}/confirm', [SalesOrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/cancel', [SalesOrderController::class, 'cancel'])->name('orders.cancel');
-        Route::get('orders/{order}/plan', [SalesOrderController::class, 'plan'])->name('orders.plan');
-        Route::post('orders/{order}/plan', [SalesOrderController::class, 'processPlan'])->name('orders.processPlan');
 
         // Delivery Orders Routes
         Route::get('deliveries', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'index'])->name('deliveries.index');

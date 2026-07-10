@@ -63,11 +63,19 @@ class DeliveryOrderService
                     throw new \Exception("Quantity to ship ({$qtyToShip}) exceeds remaining ordered quantity ({$remaining}) for item: {$soItem->item_name}");
                 }
 
+                $warehouseId = $itemData['warehouse_id'] ?? $soItem->warehouse_id;
+                if ($warehouseId && $soItem->product_id && $soItem->product && $soItem->product->type !== 'Service') {
+                    $available = \App\Domains\Inventory\Services\StockService::getAvailableStock($soItem->product_id, $warehouseId);
+                    if ($qtyToShip > $available) {
+                        throw new \Exception("Insufficient stock in selected warehouse for item '{$soItem->item_name}'. Available: {$available}, Requested: {$qtyToShip}");
+                    }
+                }
+
                 DeliveryOrderItem::create([
                     'delivery_order_id' => $delivery->id,
                     'sales_order_item_id' => $soItem->id,
                     'product_id' => $soItem->product_id,
-                    'warehouse_id' => $soItem->warehouse_id ?? $itemData['warehouse_id'],
+                    'warehouse_id' => $warehouseId,
                     'batch_id' => !empty($itemData['batch_id']) ? intval($itemData['batch_id']) : null,
                     'quantity' => $qtyToShip,
                 ]);

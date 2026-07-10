@@ -82,7 +82,6 @@
     @php
         $soTabs = [
             ['id' => 'tab-order', 'label' => 'Sales Order Details', 'active' => true, 'icon' => 'feather-shopping-cart'],
-            ['id' => 'tab-replenishment', 'label' => 'Replenishment Plan', 'active' => false, 'icon' => 'feather-activity'],
             ['id' => 'tab-deliveries', 'label' => 'Delivery Orders (' . $order->deliveries->count() . ')', 'active' => false, 'icon' => 'feather-truck'],
             ['id' => 'tab-invoices', 'label' => 'Invoices (' . $order->invoices->count() . ')', 'active' => false, 'icon' => 'feather-file-text'],
             ['id' => 'tab-payments', 'label' => 'Payments & Advances (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
@@ -90,15 +89,15 @@
         ];
     @endphp
 
-    <div class="mb-4 d-print-none bg-white p-3 rounded shadow-sm">
-        <x-ui.horizontal-tabs id="salesOrderTabs" :tabs="$soTabs" />
-    </div>
-
-    <div class="tab-content">
-        <!-- TAB 1: Sales Order Details -->
-        <div class="tab-pane fade show active" id="tab-order">
-            <div class="card border-0 shadow-sm print-area">
-                <div class="card-body p-5">
+    <div class="card border-0 shadow-sm print-area">
+        <div class="card-header bg-white border-bottom py-0 px-4 d-print-none">
+            <x-ui.horizontal-tabs id="salesOrderTabs" :tabs="$soTabs" />
+        </div>
+        
+        <div class="card-body p-0">
+            <div class="tab-content">
+                <!-- TAB 1: Sales Order Details -->
+                <div class="tab-pane fade show active p-5" id="tab-order">
                     <!-- Header section -->
                     <div class="row align-items-center mb-5">
                         <div class="col-sm-6 text-start">
@@ -123,13 +122,6 @@
                                 elseif ($order->status === 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
                             @endphp
                             <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 mt-1">{{ $order->status }}</span>
-                            @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped' || $order->status === 'Shipped')
-                                @php
-                                    $planBadgeClass = 'bg-soft-warning text-warning';
-                                    if ($order->planning_status === 'Completed') $planBadgeClass = 'bg-soft-success text-success';
-                                @endphp
-                                <span class="badge {{ $planBadgeClass }} px-2 py-0.5 fs-11 mt-1">Planning: {{ $order->planning_status ?: 'Pending' }}</span>
-                            @endif
                         </div>
                     </div>
 
@@ -201,14 +193,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @php
-                                                $allocs = $order->stockAllocations->where('sales_order_item_id', $item->id);
-                                            @endphp
-                                            @forelse ($allocs as $al)
-                                                <span class="d-block fs-11 text-muted">{{ $al->warehouse?->name }} ({{ (int)$al->reserved_qty }})</span>
-                                            @empty
-                                                <span class="text-muted">—</span>
-                                            @endforelse
+                                            {{ $item->warehouse?->name ?: '—' }}
                                         </td>
                                         <td class="text-center">{{ $item->quantity }}</td>
                                         <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
@@ -290,127 +275,27 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- TAB: Replenishment Plan -->
-        <div class="tab-pane fade" id="tab-replenishment">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-activity me-2 text-primary"></i>Replenishment & Procurement Summary</h5>
+                <!-- TAB 2: Delivery Orders -->
+                <div class="tab-pane fade" id="tab-deliveries">
+                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
+                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-truck me-2 text-primary"></i>Fulfillment History (Delivery Orders)</h5>
                         @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                            <a href="{{ route('sales.orders.plan', $order->id) }}" class="btn btn-sm btn-primary">
-                                <i class="feather-sliders me-1"></i>Configure Replenishment Plan
-                            </a>
+                            <x-ui.button href="{{ route('sales.deliveries.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
+                                Create Delivery Order
+                            </x-ui.button>
                         @endif
                     </div>
-
                     <div class="table-responsive">
-                        <table class="table odoo-table align-middle bg-white rounded border fs-13 text-dark">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                                 <tr>
-                                    <th class="ps-3">Item Details</th>
-                                    <th class="text-end">Ordered Qty</th>
-                                    <th class="text-end">Reserved Qty</th>
-                                    <th class="text-end">Shortage Qty</th>
-                                    <th>Preferred Strategy</th>
-                                    <th>Active Action / Link</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($order->items as $item)
-                                    @if (!$item->product_id || $item->product->type === 'Service') @continue @endif
-                                    @php
-                                        // Fetch actual saved allocations for this item
-                                        $allocs = $order->stockAllocations->where('sales_order_item_id', $item->id);
-                                        $reservedByThis = $allocs->sum('reserved_qty');
-                                        $shortage = max(0.0, floatval($item->quantity) - $reservedByThis);
-
-                                        // Check if already planned
-                                        $existingMo = $order->productionOrders->where('sales_order_item_id', $item->id)->first();
-                                        
-                                        $existingPrItem = null;
-                                        foreach ($order->purchaseRequisitions as $pr) {
-                                            $found = $pr->items->where('sales_order_item_id', $item->id)->first();
-                                            if ($found) {
-                                                $existingPrItem = $found;
-                                                break;
-                                            }
-                                        }
-                                    @endphp
-                                    <tr>
-                                        <td class="ps-3">
-                                            <strong>{{ $item->product?->name }}</strong>
-                                            <span class="text-muted d-block fs-11">SKU: {{ $item->product?->sku }}</span>
-                                        </td>
-                                        <td class="text-end fw-semibold">{{ (int)$item->quantity }}</td>
-                                        <td class="text-end text-muted">
-                                            @if ($allocs->count() > 0)
-                                                @foreach ($allocs as $al)
-                                                    <span class="d-block fs-11 text-muted">{{ $al->warehouse?->name }}: <strong>{{ (int)$al->reserved_qty }}</strong></span>
-                                                @endforeach
-                                            @else
-                                                <span class="text-muted">0</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-end fw-bold {{ $shortage > 0 ? 'text-danger' : 'text-success' }}">
-                                            {{ (int)$shortage }}
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-soft-secondary text-secondary text-capitalize px-2 py-0.5">
-                                                {{ $item->product?->planning_type ?: 'stock' }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            @if ($existingMo)
-                                                <span class="badge bg-soft-success text-success px-2 py-1 fs-12 border-0">
-                                                    <i class="feather-package me-1"></i>MO: {{ $existingMo->order_number }} (Draft)
-                                                </span>
-                                            @elseif ($existingPrItem)
-                                                <span class="badge bg-soft-info text-info px-2 py-1 fs-12 border-0">
-                                                    <i class="feather-shopping-cart me-1"></i>PR: {{ $existingPrItem->requisition->requisition_number }} (Draft)
-                                                </span>
-                                            @elseif ($shortage <= 0)
-                                                <span class="text-success"><i class="feather-check-circle me-1"></i> Stock Available</span>
-                                            @else
-                                                <span class="badge bg-soft-warning text-warning px-2 py-1 fs-12 border-0">
-                                                    <i class="feather-alert-circle me-1"></i> Plan Pending
-                                                </span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB 2: Delivery Orders -->
-        <div class="tab-pane fade" id="tab-deliveries">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-truck me-2 text-primary"></i>Fulfillment History (Delivery Orders)</h5>
-                        @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                            <a href="{{ route('sales.deliveries.create', ['sales_order_id' => $order->id]) }}" class="btn btn-sm btn-primary">
-                                <i class="feather-plus me-1"></i>Create Delivery Order
-                            </a>
-                        @endif
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table odoo-table align-middle bg-white rounded border">
-                            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
-                                <tr>
-                                    <th class="ps-3">Delivery Number</th>
+                                    <th class="ps-4">Delivery Number</th>
                                     <th>Date</th>
                                     <th>Carrier</th>
                                     <th>Tracking Number</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-end pe-3">Actions</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -424,31 +309,41 @@
                                         $invoiced = $order->invoices->where('delivery_order_id', $do->id)->first();
                                     @endphp
                                     <tr>
-                                        <td class="ps-3 fw-bold"><a href="{{ route('sales.deliveries.show', $do->id) }}" class="text-primary">{{ $do->delivery_number }}</a></td>
+                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.deliveries.show', $do->id) }}" class="text-primary">{{ $do->delivery_number }}</a></td>
                                         <td>{{ $do->delivery_date->format('d/m/Y') }}</td>
                                         <td>{{ $do->carrier ?: '—' }}</td>
                                         <td>{{ $do->tracking_number ?: '—' }}</td>
-                                        <td class="text-center"><span class="badge {{ $doBadge }} px-2 py-0.5">{{ $do->status }}</span></td>
-                                        <td class="text-end pe-3">
-                                            <div class="d-flex justify-content-end align-items-center gap-2">
-                                                @if ($do->status === 'Shipped')
-                                                    @if ($invoiced)
-                                                        <span class="fs-12 text-muted me-2">
-                                                            Invoiced: <a href="{{ route('sales.invoices.show', $invoiced->id) }}" class="text-success fw-bold">{{ $invoiced->invoice_number }}</a>
-                                                        </span>
-                                                    @else
-                                                        <a href="{{ route('sales.invoices.create', ['delivery_order_id' => $do->id]) }}" class="btn btn-xs btn-primary fw-bold py-1">
-                                                            <i class="feather-file-text me-1"></i>Create Invoice
-                                                        </a>
+                                        <td><span class="badge {{ $doBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $do->status }}</span></td>
+                                        <td class="text-end pe-4">
+                                            @if ($do->status === 'Shipped' && $invoiced)
+                                                <div class="d-flex justify-content-end align-items-center gap-2">
+                                                    <span class="fs-12 text-muted me-2">
+                                                        Invoiced: <a href="{{ route('sales.invoices.show', $invoiced->id) }}" class="text-success fw-bold">{{ $invoiced->invoice_number }}</a>
+                                                    </span>
+                                                    <x-ui.action-dropdown :viewUrl="route('sales.deliveries.show', $do->id)">
+                                                        <x-ui.dropdown-item href="{{ route('sales.deliveries.show', $do->id) }}" icon="feather-eye">
+                                                            View Details
+                                                        </x-ui.dropdown-item>
+                                                    </x-ui.action-dropdown>
+                                                </div>
+                                            @else
+                                                <x-ui.action-dropdown :viewUrl="route('sales.deliveries.show', $do->id)">
+                                                    <x-ui.dropdown-item href="{{ route('sales.deliveries.show', $do->id) }}" icon="feather-eye">
+                                                        View Details
+                                                    </x-ui.dropdown-item>
+                                                    @if ($do->status === 'Shipped' && !$invoiced)
+                                                        <x-ui.dropdown-item href="{{ route('sales.invoices.create', ['delivery_order_id' => $do->id]) }}" icon="feather-file-text">
+                                                            Create Invoice
+                                                        </x-ui.dropdown-item>
                                                     @endif
-                                                @endif
-                                                <a href="{{ route('sales.deliveries.show', $do->id) }}" class="btn btn-xs btn-outline-primary fw-bold py-1">View Delivery</a>
-                                            </div>
+                                                </x-ui.action-dropdown>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="text-center text-muted py-4 fs-12">
+                                        <td colspan="6" class="text-center py-5 text-muted">
+                                            <i class="feather-truck fs-1 mb-2 d-block text-gray-300"></i>
                                             No delivery orders created for this Sales Order yet.
                                         </td>
                                     </tr>
@@ -457,32 +352,27 @@
                         </table>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- TAB 3: Invoices -->
-        <div class="tab-pane fade" id="tab-invoices">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-file-text me-2 text-primary"></i>Sales Invoices</h5>
+                <!-- TAB 3: Invoices -->
+                <div class="tab-pane fade" id="tab-invoices">
+                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
+                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-file-text me-2 text-primary"></i>Sales Invoices</h5>
                         @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped' || $order->status === 'Shipped')
-                            <a href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" class="btn btn-sm btn-primary">
-                                <i class="feather-plus me-1"></i>Create Invoice
-                            </a>
+                            <x-ui.button href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
+                                Create Invoice
+                            </x-ui.button>
                         @endif
                     </div>
-
                     <div class="table-responsive">
-                        <table class="table odoo-table align-middle bg-white rounded border">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                                 <tr>
-                                    <th class="ps-3">Invoice Number</th>
+                                    <th class="ps-4">Invoice Number</th>
                                     <th>Date</th>
                                     <th>Source Shipment</th>
                                     <th class="text-end">Grand Total</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-end pe-3">Actions</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -495,7 +385,7 @@
                                         elseif ($inv->status === 'Cancelled') $invBadge = 'bg-soft-danger text-danger';
                                     @endphp
                                     <tr>
-                                        <td class="ps-3 fw-bold"><a href="{{ route('sales.invoices.show', $inv->id) }}" class="text-primary">{{ $inv->invoice_number }}</a></td>
+                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.invoices.show', $inv->id) }}" class="text-primary">{{ $inv->invoice_number }}</a></td>
                                         <td>{{ date('d/m/Y', strtotime($inv->invoice_date)) }}</td>
                                         <td>
                                             @if ($inv->deliveryOrder)
@@ -507,14 +397,17 @@
                                             @endif
                                         </td>
                                         <td class="text-end fw-bold">₹{{ number_format($inv->grand_total, 2) }}</td>
-                                        <td class="text-center"><span class="badge {{ $invBadge }} px-2 py-0.5">{{ $inv->status }}</span></td>
-                                        <td class="text-end pe-3">
-                                            <a href="{{ route('sales.invoices.show', $inv->id) }}" class="btn btn-xs btn-outline-primary fw-bold">View Invoice</a>
+                                        <td><span class="badge {{ $invBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $inv->status }}</span></td>
+                                        <td class="text-end pe-4">
+                                            <x-ui.button href="{{ route('sales.invoices.show', $inv->id) }}" variant="outline-primary" size="sm" class="fw-bold">
+                                                View Invoice
+                                            </x-ui.button>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted py-4 fs-12">
+                                        <td colspan="6" class="text-center py-5 text-muted">
+                                            <i class="feather-file-text fs-1 mb-2 d-block text-gray-300"></i>
                                             No invoices generated for this Sales Order yet.
                                         </td>
                                     </tr>
@@ -523,45 +416,41 @@
                         </table>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- TAB 4: Payments & Advance Allocations -->
-        <div class="tab-pane fade" id="tab-payments">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-dollar-sign me-2 text-primary"></i>Payments & Advance Allocations</h5>
+                <!-- TAB 4: Payments & Advance Allocations -->
+                <div class="tab-pane fade" id="tab-payments">
+                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
+                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-dollar-sign me-2 text-primary"></i>Payments & Advance Allocations</h5>
                         @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                            <a href="{{ route('sales.payments.create', ['sales_order_id' => $order->id, 'customer_id' => $order->customer_id, 'allocate_to' => 'sales_order']) }}" class="btn btn-sm btn-primary">
-                                <i class="feather-plus me-1"></i>Record Receipt / Advance
-                            </a>
+                            <x-ui.button href="{{ route('sales.payments.create', ['sales_order_id' => $order->id, 'customer_id' => $order->customer_id, 'allocate_to' => 'sales_order']) }}" variant="primary" size="sm" icon="feather-plus">
+                                Record Receipt / Advance
+                            </x-ui.button>
                         @endif
                     </div>
-
                     <div class="table-responsive">
-                        <table class="table odoo-table align-middle bg-white rounded border">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                                 <tr>
-                                    <th class="ps-3">Payment Number</th>
+                                    <th class="ps-4">Payment Number</th>
                                     <th>Date</th>
                                     <th>Method</th>
                                     <th>Reference No</th>
-                                    <th class="text-end pe-3">Allocated Amount</th>
+                                    <th class="text-end pe-4">Allocated Amount</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
                                 @forelse ($order->allocations as $alloc)
                                     <tr>
-                                        <td class="ps-3 fw-bold"><a href="{{ route('sales.payments.show', $alloc->payment->id) }}" class="text-primary">{{ $alloc->payment->payment_number }}</a></td>
+                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.payments.show', $alloc->payment->id) }}" class="text-primary">{{ $alloc->payment->payment_number }}</a></td>
                                         <td>{{ date('d/m/Y', strtotime($alloc->payment->payment_date)) }}</td>
                                         <td>{{ $alloc->payment->payment_method }}</td>
                                         <td class="text-muted">{{ $alloc->payment->reference_no ?: '—' }}</td>
-                                        <td class="text-end pe-3 fw-bold text-dark">₹{{ number_format($alloc->allocated_amount, 2) }}</td>
+                                        <td class="text-end pe-4 fw-bold text-dark">₹{{ number_format($alloc->allocated_amount, 2) }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted py-4 fs-12">
+                                        <td colspan="5" class="text-center py-5 text-muted">
+                                            <i class="feather-dollar-sign fs-1 mb-2 d-block text-gray-300"></i>
                                             No payment receipts or advances adjusted for this Sales Order yet.
                                         </td>
                                     </tr>
@@ -570,31 +459,26 @@
                         </table>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- TAB 5: Returns -->
-        <div class="tab-pane fade" id="tab-returns">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-rotate-ccw me-2 text-primary"></i>Sales Returns</h5>
+                <!-- TAB 5: Returns -->
+                <div class="tab-pane fade" id="tab-returns">
+                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
+                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-rotate-ccw me-2 text-primary"></i>Sales Returns</h5>
                         @if ($order->status === 'Partially Shipped' || $order->status === 'Shipped')
-                            <a href="{{ route('sales.returns.create', ['sales_order_id' => $order->id]) }}" class="btn btn-sm btn-primary">
-                                <i class="feather-plus me-1"></i>Create Sales Return
-                            </a>
+                            <x-ui.button href="{{ route('sales.returns.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
+                                Create Sales Return
+                            </x-ui.button>
                         @endif
                     </div>
-
                     <div class="table-responsive">
-                        <table class="table odoo-table align-middle bg-white rounded border">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                                 <tr>
-                                    <th class="ps-3">Return Number</th>
+                                    <th class="ps-4">Return Number</th>
                                     <th>Date</th>
                                     <th class="text-end">Refund Amount</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-end pe-3">Actions</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-4">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -605,17 +489,20 @@
                                         elseif ($ret->status === 'Cancelled') $retBadge = 'bg-soft-danger text-danger';
                                     @endphp
                                     <tr>
-                                        <td class="ps-3 fw-bold"><a href="{{ route('sales.returns.show', $ret->id) }}" class="text-primary">{{ $ret->return_number }}</a></td>
+                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.returns.show', $ret->id) }}" class="text-primary">{{ $ret->return_number }}</a></td>
                                         <td>{{ date('d/m/Y', strtotime($ret->return_date)) }}</td>
                                         <td class="text-end fw-bold">₹{{ number_format($ret->total_refund_amount, 2) }}</td>
-                                        <td class="text-center"><span class="badge {{ $retBadge }} px-2 py-0.5">{{ $ret->status }}</span></td>
-                                        <td class="text-end pe-3">
-                                            <a href="{{ route('sales.returns.show', $ret->id) }}" class="btn btn-xs btn-outline-primary fw-bold">View Return</a>
+                                        <td><span class="badge {{ $retBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $ret->status }}</span></td>
+                                        <td class="text-end pe-4">
+                                            <x-ui.button href="{{ route('sales.returns.show', $ret->id) }}" variant="outline-primary" size="sm" class="fw-bold">
+                                                View Return
+                                            </x-ui.button>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted py-4 fs-12">
+                                        <td colspan="5" class="text-center py-5 text-muted">
+                                            <i class="feather-rotate-ccw fs-1 mb-2 d-block text-gray-300"></i>
                                             No returns processed for this Sales Order yet.
                                         </td>
                                     </tr>
@@ -679,7 +566,8 @@
                 position: static !important;
             }
 
-            .card-body.p-5 {
+            .card-body.p-5,
+            .tab-pane.p-5 {
                 padding: 0 !important;
             }
 
