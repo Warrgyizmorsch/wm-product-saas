@@ -34,7 +34,6 @@ class SalesOrder extends BaseModel
         'order_date',
         'shipment_date',
         'status',
-        'planning_status',
         'billing_address',
         'shipping_address',
         'payment_terms',
@@ -110,8 +109,4 @@ class SalesOrder extends BaseModel
         return $this->hasMany(\App\Domains\Purchase\Models\PurchaseRequisition::class, 'sales_order_id');
     }
 
-    public function stockAllocations(): HasMany
-    {
-        return $this->hasMany(SalesOrderAllocation::class, 'sales_order_id');
-    }
 }

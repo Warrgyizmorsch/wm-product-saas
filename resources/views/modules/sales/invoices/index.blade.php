@@ -21,62 +21,65 @@
     @endif
 
     <div class="card border-0 shadow-sm">
-        <div class="card-body p-4">
-            <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-                <h5 class="fw-bold text-dark mb-0">Customer Invoices</h5>
-            </div>
-
+        <div class="card-header bg-transparent border-bottom py-3">
+            <h5 class="card-title mb-0 fw-bold text-dark">
+                <i class="feather-file-text me-2 text-primary"></i>Customer Invoices
+            </h5>
+        </div>
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table odoo-table align-middle bg-white rounded border">
+                <table class="table table-hover align-middle mb-0">
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>
-                            <th class="ps-3">Invoice Number</th>
+                            <th class="ps-4">Invoice Number</th>
                             <th>Date</th>
                             <th>Sales Order</th>
                             <th>Customer</th>
                             <th class="text-end">Grand Total</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-end pe-3">Actions</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="fs-13 text-dark">
                         @forelse ($invoices as $inv)
                             <tr>
-                                <td class="ps-3 fw-bold">
-                                    <a href="{{ route('sales.invoices.show', $inv->id) }}" class="text-primary">
+                                <td class="ps-4 fw-bold text-primary">
+                                    <a href="{{ route('sales.invoices.show', $inv->id) }}">
                                         {{ $inv->invoice_number }}
                                     </a>
                                 </td>
                                 <td>{{ date('d/m/Y', strtotime($inv->invoice_date)) }}</td>
                                 <td>
-                                    <a href="{{ route('sales.orders.show', $inv->salesOrder->id) }}" class="text-muted">
+                                    <a href="{{ route('sales.orders.show', $inv->salesOrder->id) }}" class="text-muted fw-semibold">
                                         {{ $inv->salesOrder->sales_order_number }}
                                     </a>
                                 </td>
-                                <td>{{ $inv->salesOrder->customer?->name }}</td>
-                                <td class="text-end fw-bold text-dark">₹{{ number_format($inv->grand_total, 2) }}</td>
-                                <td class="text-center">
-                                    @if ($inv->status == 'Paid')
-                                        <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11">Paid</span>
-                                    @elseif ($inv->status == 'Partially Paid')
-                                        <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11">Partially Paid</span>
-                                    @elseif ($inv->status == 'Sent')
-                                        <span class="badge bg-soft-info text-info px-2 py-0.5 fs-11">Sent</span>
-                                    @elseif ($inv->status == 'Cancelled')
-                                        <span class="badge bg-soft-danger text-danger px-2 py-0.5 fs-11">Cancelled</span>
-                                    @else
-                                        <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11">Draft</span>
-                                    @endif
+                                <td>
+                                    <span class="fw-bold">{{ $inv->salesOrder->customer?->name }}</span>
                                 </td>
-                                <td class="text-end pe-3">
-                                    <a href="{{ route('sales.invoices.show', $inv->id) }}" class="btn btn-sm btn-light border py-1">
-                                        <i class="feather-eye me-1"></i>View
-                                    </a>
+                                <td class="text-end fw-bold text-dark">₹{{ number_format($inv->grand_total, 2) }}</td>
+                                <td>
+                                    @php
+                                        $badgeClass = 'bg-soft-secondary text-secondary';
+                                        if ($inv->status == 'Paid') $badgeClass = 'bg-soft-success text-success';
+                                        elseif ($inv->status == 'Partially Paid') $badgeClass = 'bg-soft-warning text-warning';
+                                        elseif ($inv->status == 'Sent') $badgeClass = 'bg-soft-info text-info';
+                                        elseif ($inv->status == 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
+                                    @endphp
+                                    <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $inv->status }}</span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-flex justify-content-end gap-2 align-items-center">
+                                        <a href="{{ route('sales.invoices.show', $inv->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Invoice Details">
+                                            <i class="feather feather-eye"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4 fs-12">
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="feather-file-text fs-1 mb-2 d-block text-gray-300"></i>
                                     No invoices generated yet. Create invoices from confirmed Sales Orders.
                                 </td>
                             </tr>
