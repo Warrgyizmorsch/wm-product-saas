@@ -5,7 +5,7 @@
 @section('breadcrumb', 'Lot Traceability')
 
 @section('content')
-    <div class="container-fluid py-2">
+    <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
         @if (session('success'))
             <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
         @endif
@@ -13,33 +13,29 @@
             <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
         @endif
 
-        {{-- Search Card --}}
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body p-4">
-                <h5 class="fw-bold mb-3"><i class="feather-search text-primary me-2"></i> Trace Batch / Serial / Order</h5>
-                <form method="GET" action="{{ route('production.mes.traceability.search') }}">
-                    <div class="row g-3">
-                        <div class="col-md-3">
-                            <label class="form-label fs-11 text-muted uppercase font-semibold">Entity Type</label>
-                            <select name="type" class="form-select form-select-lg">
-                                <option value="batch" @if(request('type') === 'batch') selected @endif>Batch Number</option>
-                                <option value="serial" @if(request('type') === 'serial') selected @endif>Serial Number</option>
-                                <option value="order" @if(request('type') === 'order') selected @endif>Production Order</option>
-                            </select>
-                        </div>
-                        <div class="col-md-7">
-                            <label class="form-label fs-11 text-muted uppercase font-semibold">Unique Code / Tag</label>
-                            <input type="text" name="code" class="form-control form-control-lg fw-bold font-monospace" placeholder="Enter batch/serial/order number..." value="{{ request('code') }}" required>
-                        </div>
-                        <div class="col-md-2 d-flex align-items-end">
-                            <button type="submit" class="btn btn-primary btn-lg w-100" style="min-height: 48px;">
-                                <i class="feather-sliders me-1"></i> Trace
-                            </button>
-                        </div>
+        {{-- Search Sheet --}}
+        <x-ui.odoo-form-ui type="sheet">
+            <h5 class="fw-bold mb-3 text-dark"><i class="feather-search text-primary me-2"></i> Trace Batch / Serial / Order</h5>
+            <form method="GET" action="{{ route('production.mes.traceability.search') }}">
+                <div class="row g-3 align-items-end fs-13 text-dark">
+                    <div class="col-md-3">
+                        <x-ui.odoo-form-ui type="select" label="Entity Type" name="type" id="type" :required="true">
+                            <option value="batch" @selected(request('type') === 'batch')>Batch Number</option>
+                            <option value="serial" @selected(request('type') === 'serial')>Serial Number</option>
+                            <option value="order" @selected(request('type') === 'order')>Production Order</option>
+                        </x-ui.odoo-form-ui>
                     </div>
-                </form>
-            </div>
-        </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="Unique Code" name="code" placeholder="Enter batch/serial/order number..." value="{{ request('code') }}" :required="true" />
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100 py-2">
+                            <i class="feather-sliders me-1"></i> Trace Entity
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </x-ui.odoo-form-ui>
 
         {{-- Trace Genealogy Output --}}
         @if(isset($nodes))

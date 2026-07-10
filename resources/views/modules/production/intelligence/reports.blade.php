@@ -19,17 +19,16 @@
                         <h5 class="fw-bold text-dark">Machine Performance Report</h5>
                         <p class="text-muted fs-13">Analyze OEE components, availability, cycle time losses, and production quantities for individual machines.</p>
                         
-                        <form method="GET" action="{{ route('production.intelligence.reports.show', 'machine') }}" target="_blank" class="mt-3">
+                        <form method="GET" action="{{ route('production.intelligence.reports.show', 'machine') }}" target="_blank" class="mt-3 fs-13 text-dark">
                             <div class="mb-3">
-                                <label class="form-label fs-11 text-uppercase text-muted">Machine</label>
-                                <select name="machine_id" class="form-select form-select-sm">
+                                <x-ui.odoo-form-ui type="select" label="Machine" name="machine_id">
                                     <option value="">All Machines</option>
                                     @foreach($machines as $m)
                                         <option value="{{ $m->id }}">{{ $m->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 mt-4">
                                 <button type="submit" class="btn btn-sm btn-primary flex-fill">View Report</button>
                                 <button type="submit" name="print" value="1" class="btn btn-sm btn-outline-dark"><i class="feather-printer"></i></button>
                             </div>
@@ -48,17 +47,16 @@
                         <h5 class="fw-bold text-dark">Work Center Report</h5>
                         <p class="text-muted fs-13">Evaluate capacity loading, running vs breakdown machines, bottleneck queue times, and average OEE averages.</p>
                         
-                        <form method="GET" action="{{ route('production.intelligence.reports.show', 'work-center') }}" target="_blank" class="mt-3">
+                        <form method="GET" action="{{ route('production.intelligence.reports.show', 'work-center') }}" target="_blank" class="mt-3 fs-13 text-dark">
                             <div class="mb-3">
-                                <label class="form-label fs-11 text-uppercase text-muted">Work Center</label>
-                                <select name="work_center_id" class="form-select form-select-sm">
+                                <x-ui.odoo-form-ui type="select" label="Work Center" name="work_center_id">
                                     <option value="">All Work Centers</option>
                                     @foreach($workCenters as $wc)
                                         <option value="{{ $wc->id }}">{{ $wc->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 mt-4">
                                 <button type="submit" class="btn btn-sm btn-success flex-fill">View Report</button>
                                 <button type="submit" name="print" value="1" class="btn btn-sm btn-outline-dark"><i class="feather-printer"></i></button>
                             </div>
@@ -77,17 +75,16 @@
                         <h5 class="fw-bold text-dark">Downtime Breakdown Report</h5>
                         <p class="text-muted fs-13">Trace equipment failure downtime occurrences, reasons, setup & adjustments times, and root causes summaries.</p>
                         
-                        <form method="GET" action="{{ route('production.intelligence.reports.show', 'downtime') }}" target="_blank" class="mt-3">
+                        <form method="GET" action="{{ route('production.intelligence.reports.show', 'downtime') }}" target="_blank" class="mt-3 fs-13 text-dark">
                             <div class="mb-3">
-                                <label class="form-label fs-11 text-uppercase text-muted">Filter by Machine</label>
-                                <select name="machine_id" class="form-select form-select-sm">
+                                <x-ui.odoo-form-ui type="select" label="Filter by Machine" name="machine_id">
                                     <option value="">All Machines</option>
                                     @foreach($machines as $m)
                                         <option value="{{ $m->id }}">{{ $m->name }}</option>
                                     @endforeach
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex gap-2 mt-4">
                                 <button type="submit" class="btn btn-sm btn-danger flex-fill">View Report</button>
                                 <button type="submit" name="print" value="1" class="btn btn-sm btn-outline-dark"><i class="feather-printer"></i></button>
                             </div>

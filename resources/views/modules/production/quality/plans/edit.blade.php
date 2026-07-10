@@ -142,6 +142,8 @@
 @endsection
 
 @push('scripts')
+    <!-- Load Alpine.js for dynamic component grid management -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script>
         function qualityPlanForm() {
             return {
