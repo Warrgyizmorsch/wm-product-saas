@@ -31,6 +31,30 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
         return $query->orderBy('name')->get();
     }
 
+    public function paginateAll(array $filters = [], int $perPage = 15): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = WorkCenter::query()->withCount('machines');
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['work_center_type'])) {
+            $query->where('work_center_type', $filters['work_center_type']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search): void {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('department_name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->orderBy('name')->paginate($perPage);
+    }
+
     public function find(int $id): ?WorkCenter
     {
         return WorkCenter::with(['machines'])->find($id);

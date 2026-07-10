@@ -92,18 +92,11 @@
 
     {{-- Alerts --}}
     @if(session('success'))
-        <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-            <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-            <p class="fs-12 mb-0">{{ session('success') }}</p>
-        </x-ui.alert>
-        <div class="mb-4"></div>
+        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
     @endif
+
     @if(session('error'))
-        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-            <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-            <p class="fs-12 mb-0">{{ session('error') }}</p>
-        </x-ui.alert>
-        <div class="mb-4"></div>
+        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
     @endif
 
     {{-- Warnings Diagnostics Panel --}}

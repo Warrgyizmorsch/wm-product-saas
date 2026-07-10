@@ -91,14 +91,24 @@
                             @endif
                         </td>
                         <td class="text-end">
-                            <div class="d-flex justify-content-end gap-1">
-                                <a href="{{ route('production.calendars.edit', $calendar->id) }}" class="btn btn-xs btn-outline-primary py-1"><i class="feather-edit-3 me-1"></i>Edit</a>
-                                <form method="POST" action="{{ route('production.calendars.destroy', $calendar->id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this calendar?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-xs btn-outline-danger py-1"><i class="feather-trash-2"></i></button>
-                                </form>
-                            </div>
+                            <x-ui.action-dropdown>
+                                <li>
+                                    <a href="{{ route('production.calendars.edit', $calendar->id) }}" class="dropdown-item">
+                                        <i class="feather-edit me-2 text-muted fs-12"></i>Edit Calendar
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form method="POST" action="{{ route('production.calendars.destroy', $calendar->id) }}"
+                                          onsubmit="return confirm('Are you sure you want to delete this calendar?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Permanent
+                                        </button>
+                                    </form>
+                                </li>
+                            </x-ui.action-dropdown>
                         </td>
                     </tr>
                 @empty

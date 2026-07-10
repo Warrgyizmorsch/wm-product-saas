@@ -18,11 +18,13 @@ class LotTraceabilityController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         return view('modules.production.mes.operator.traceability');
     }
 
     public function search(SearchLotTraceabilityRequest $request)
     {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
         $data = $request->validated();
 

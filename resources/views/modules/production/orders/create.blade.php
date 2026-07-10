@@ -49,23 +49,11 @@
     <div class="erp-single-panel">
         <!-- Validation Errors -->
         @if ($errors->any())
-            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                <h6 class="alert-heading fw-bold mb-1">Validation Errors!</h6>
-                <ul class="mb-0 fs-12 ps-3">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </x-ui.alert>
-            <div class="mb-4"></div>
+            <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
         @endif
 
         @if (session('error'))
-            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                <p class="fs-12 mb-0">{{ session('error') }}</p>
-            </x-ui.alert>
-            <div class="mb-4"></div>
+            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
         @endif
 
         <form method="POST" action="{{ route('production.orders.store') }}">
