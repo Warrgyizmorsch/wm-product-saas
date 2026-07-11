@@ -293,11 +293,24 @@
     <!-- Global Toast Notifications -->
     <div class="erp-toast-container">
         @if (session('success'))
-            <x-ui.toast :auto="true" title="Success" type="success" delay="5000">
-                {{ session('success') }}
+            <x-ui.toast :auto="true" title="{{ session('success') }}" type="success" delay="5000">
             </x-ui.toast>
         @endif
 
+        @if (session('error'))
+            <x-ui.toast :auto="true" title="{{ session('error') }}" type="error" delay="5000">
+            </x-ui.toast>
+        @endif
+
+        @if (session('danger'))
+            <x-ui.toast :auto="true" title="{{ session('danger') }}" type="error" delay="5000">
+            </x-ui.toast>
+        @endif
+
+        @if ($errors->any())
+            <x-ui.toast :auto="true" title="{{ $errors->first() }}" type="error" delay="5000">
+            </x-ui.toast>
+        @endif
     </div>
 
     <script>
@@ -309,7 +322,13 @@
                     successToast.show();
                 }
             @endif
-
+            @if (session('error') || session('danger') || $errors->any())
+                var errorToastEl = document.getElementById('globalErrorToast');
+                if (errorToastEl) {
+                    var errorToast = bootstrap.Toast.getOrCreateInstance(errorToastEl);
+                    errorToast.show();
+                }
+            @endif
         });
     </script>
 

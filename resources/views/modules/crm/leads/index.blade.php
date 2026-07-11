@@ -5,12 +5,6 @@
 @section('breadcrumb', 'CRM Leads')
 
 @section('page-actions')
-    <span class="badge bg-soft-success text-success p-2 me-2">
-        <i class="feather-database me-1"></i> Database Connected
-    </span>
-    <x-ui.button href="{{ route('crm.leads.trackStatus') }}" variant="soft-primary" icon="feather-activity" class="me-2">
-        Track Status
-    </x-ui.button>
     <x-ui.button href="{{ route('crm.leads.create') }}" variant="primary" icon="feather-plus">
         Add New Call / Lead
     </x-ui.button>
@@ -18,95 +12,102 @@
 
 @section('content')
 
-    <!-- Metrics Cards -->
-    <div class="row g-4 mb-4">
-        <!-- Metric 1: Total Leads -->
-        <div class="col-xxl-3 col-md-6">
-            <x-ui.card stretch="true">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted fs-12 text-uppercase fw-bold">Total Calls / Leads</span>
-                        <h3 class="mb-1 mt-2 text-dark fw-bolder">{{ $metrics['total'] }}</h3>
-                        <span class="text-primary fs-12 fw-semibold">
-                            <i class="feather-phone-call me-1"></i> Active CRM database
-                        </span>
-                    </div>
-                    <div class="avatar-text avatar-lg bg-soft-primary text-primary">
-                        <i class="feather-phone"></i>
-                    </div>
-                </div>
-            </x-ui.card>
-        </div>
+    @php
+        $sortBy = request('sort_by', 'call_date');
+        $sortOrder = request('sort_order', 'desc');
+    @endphp
 
-        <!-- Metric 2: Expected Revenue -->
-        <div class="col-xxl-3 col-md-6">
-            <x-ui.card stretch="true">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted fs-12 text-uppercase fw-bold">Expected Revenue</span>
-                        <h3 class="mb-1 mt-2 text-dark fw-bolder">₹{{ number_format($metrics['revenue'], 2) }}</h3>
-                        <span class="text-success fs-12 fw-semibold">
-                            <i class="feather-trending-up me-1"></i> Projected sales value
-                        </span>
-                    </div>
-                    <div class="avatar-text avatar-lg bg-soft-success text-success">
-                        <i class="feather-dollar-sign"></i>
-                    </div>
-                </div>
-            </x-ui.card>
-        </div>
+    <div class="erp-single-panel">
+        <!-- Toolbar: Sort, Filters -->
+        <div class="d-flex align-items-center mb-3">
+            <h5 class="fw-bold text-dark mb-0">Leads Listing</h5>
+            <div class="d-flex gap-2 ms-auto">
+                <!-- Custom Sort Component -->
+                <x-ui.sort-dropdown label="Sort">
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Call Date (Latest first)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>Call Date (Oldest first)</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company_name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'company_name' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>Company Name (A-Z)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company_name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'company_name' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Company Name (Z-A)</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Est. Sale (High to Low)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>Est. Sale (Low to High)</span>
+                    </a>
+                </x-ui.sort-dropdown>
 
-        <!-- Metric 3: High Priority Leads -->
-        <div class="col-xxl-3 col-md-6">
-            <x-ui.card stretch="true">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted fs-12 text-uppercase fw-bold">High Priority</span>
-                        <h3 class="mb-1 mt-2 text-dark fw-bolder">{{ $metrics['high_priority'] }}</h3>
-                        <span class="text-danger fs-12 fw-semibold">
-                            <i class="feather-alert-circle me-1"></i> Requires urgent follow-up
-                        </span>
-                    </div>
-                    <div class="avatar-text avatar-lg bg-soft-danger text-danger">
-                        <i class="feather-alert-triangle"></i>
-                    </div>
-                </div>
-            </x-ui.card>
-        </div>
+                <!-- Custom Filter Component -->
+                <form method="GET" action="{{ route('crm.leads.index') }}" class="d-inline">
+                    <x-ui.filter label="Filter" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search company, contact..." value="{{ request('search') }}" />
+                        </div>
 
-        <!-- Metric 4: Enterprise Segment -->
-        <div class="col-xxl-3 col-md-6">
-            <x-ui.card stretch="true">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-muted fs-12 text-uppercase fw-bold">Enterprise Segment</span>
-                        <h3 class="mb-1 mt-2 text-dark fw-bolder">{{ $metrics['enterprise'] }}</h3>
-                        <span class="text-info fs-12 fw-semibold">
-                            <i class="feather-briefcase me-1"></i> High-value accounts
-                        </span>
-                    </div>
-                    <div class="avatar-text avatar-lg bg-soft-info text-info">
-                        <i class="feather-layers"></i>
-                    </div>
-                </div>
-            </x-ui.card>
-        </div>
-    </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Priority</label>
+                            <x-ui.odoo-form-ui type="select" name="priority">
+                                <option value="">All Priorities</option>
+                                <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>Low</option>
+                                <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>Medium</option>
+                                <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>High</option>
+                                <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>Urgent</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
 
-    <!-- Leads Table List -->
-    <x-ui.card title="Leads Listing">
-        <x-slot name="headerAction">
-            <div class="input-group input-group-sm" style="width: 250px;">
-                <span class="input-group-text bg-light border-0"><i class="feather-search text-muted"></i></span>
-                <input type="text" id="tableSearch" class="form-control bg-light border-0" placeholder="Search leads...">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Segment</label>
+                            <x-ui.odoo-form-ui type="select" name="segment">
+                                <option value="">All Segments</option>
+                                <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>SME</option>
+                                <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>Mid-Market</option>
+                                <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>Enterprise</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <x-ui.odoo-form-ui type="select" name="status">
+                                <option value="">All Statuses</option>
+                                <option value="New" {{ request('status') === 'New' ? 'selected' : '' }}>New</option>
+                                <option value="Follow-up Scheduled" {{ request('status') === 'Follow-up Scheduled' ? 'selected' : '' }}>Follow-up Scheduled</option>
+                                <option value="Contacted" {{ request('status') === 'Contacted' ? 'selected' : '' }}>Contacted</option>
+                                <option value="Qualified" {{ request('status') === 'Qualified' ? 'selected' : '' }}>Qualified</option>
+                                <option value="Converted" {{ request('status') === 'Converted' ? 'selected' : '' }}>Converted</option>
+                                <option value="Lost" {{ request('status') === 'Lost' ? 'selected' : '' }}>Lost</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <a href="{{ route('crm.leads.index') }}" class="btn btn-sm btn-light border">Reset</a>
+                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        </div>
+                    </x-ui.filter>
+                </form>
             </div>
-        </x-slot>
+        </div>
 
+        <!-- Leads List Table -->
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" id="leadsTable">
-                <thead class="table-light fs-11 text-uppercase text-muted">
+            <x-ui.odoo-form-ui type="table" id="leadsTable">
+                <thead>
                     <tr>
-                        <th class="ps-4">Call Date & Time</th>
+                        <th style="width: 3%" class="text-center">
+                            <input type="checkbox" class="form-check-input">
+                        </th>
+                        <th>Call Date & Time</th>
                         <th>Lead / Company</th>
                         <th>Phone / Email</th>
                         <th class="text-end">Value / Est. Sale</th>
@@ -117,10 +118,13 @@
                         <th class="text-end pe-4">Action</th>
                     </tr>
                 </thead>
-                <tbody class="fs-13 text-dark">
+                <tbody>
                     @forelse ($leads as $lead)
                         <tr>
-                            <td class="ps-4">
+                            <td class="text-center">
+                                <input type="checkbox" class="form-check-input">
+                            </td>
+                            <td>
                                 <div class="d-flex align-items-center">
                                     <div class="avatar-text avatar-sm bg-soft-primary text-primary me-2">
                                         <i class="feather-calendar"></i>
@@ -204,46 +208,50 @@
                                     </div>
                                 @endif
                             </td>
-                           <td class="text-end pe-4">
-                           <x-ui.action-dropdown :viewUrl="route('crm.leads.show', $lead->id)">
-                       
-                               {{-- Edit --}}
-                               <li>
-                                   <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="dropdown-item">
-                                       <i class="feather-edit me-2 text-muted fs-12"></i>Edit Lead
-                                   </a>
-                               </li>
-                       
-                               {{-- Delete --}}
-                               <li><hr class="dropdown-divider"></li>
-                               <li>
-                                   <form action="{{ route('crm.leads.destroy', $lead->id) }}"
-                                         method="POST"
-                                         onsubmit="return confirm('Are you sure you want to delete this lead?');">
-                                       @csrf
-                                       @method('DELETE')
-                       
-                                       <button type="submit" class="dropdown-item text-danger">
-                                           <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Lead
-                                       </button>
-                                   </form>
-                               </li>
-                       
-                           </x-ui.action-dropdown>
-                       </td>
+                            <td class="text-end pe-4">
+                               <x-ui.action-dropdown :viewUrl="route('crm.leads.show', $lead->id)">
+                           
+                                   {{-- Edit --}}
+                                   <li>
+                                       <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="dropdown-item">
+                                           <i class="feather-edit me-2 text-muted fs-12"></i>Edit Lead
+                                       </a>
+                                   </li>
+                           
+                                   {{-- Delete --}}
+                                   <li><hr class="dropdown-divider"></li>
+                                   <li>
+                                       <form action="{{ route('crm.leads.destroy', $lead->id) }}"
+                                             method="POST"
+                                             onsubmit="return confirm('Are you sure you want to delete this lead?');">
+                                           @csrf
+                                           @method('DELETE')
+                           
+                                           <button type="submit" class="dropdown-item text-danger">
+                                               <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Lead
+                                           </button>
+                                       </form>
+                                   </li>
+                           
+                               </x-ui.action-dropdown>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-5 text-muted">
+                            <td colspan="10" class="text-center py-5 text-muted">
                                 <i class="feather-users fs-1 d-block mb-3 text-light"></i>
                                 No leads registered yet. Click "Add New Call / Lead" to create one.
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
-            </table>
+            </x-ui.odoo-form-ui>
         </div>
-    </x-ui.card>
+
+        <div class="mt-4">
+            {{ $leads->links() }}
+        </div>
+    </div>
 @endsection
 
 @push('styles')
