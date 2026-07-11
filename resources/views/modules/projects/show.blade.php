@@ -61,7 +61,7 @@
 
         {{-- Identity / Meta Grid --}}
         <div class="row g-4 mb-4">
-            <div class="col-md-6 border-end">
+            <div class="col-lg-4 col-md-6">
                 <div class="row erp-form-row mb-2">
                     <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.client') }}:</span></div>
                     <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->customer?->name ?: '—' }}</span></div>
@@ -79,7 +79,7 @@
                     <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ __('projects.priorities.' . $project->priority) }}</span></div>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-lg-4 col-md-6">
                 <div class="row erp-form-row mb-2">
                     <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.start_date') }} / {{ __('projects.end_date') }}:</span></div>
                     <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->start_date?->format('d/m/Y') ?: '—' }} – {{ $project->end_date?->format('d/m/Y') ?: '—' }}</span></div>
@@ -97,6 +97,9 @@
                     <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->budget_hours !== null ? number_format((float) $project->budget_hours, 2) : '—' }}</span></div>
                 </div>
             </div>
+            <div class="col-lg-4">
+                @include('modules.projects._collaborators')
+            </div>
         </div>
 
         @if ($project->description)
@@ -108,13 +111,12 @@
 
         {{-- Tab Navigation --}}
         @php
-            $activeProjectTab = in_array(request('tab'), ['summary', 'members', 'milestones', 'tasklists'], true)
+            $activeProjectTab = in_array(request('tab'), ['summary', 'milestones', 'tasklists'], true)
                 ? request('tab')
                 : (in_array(old('_tasklist_form'), ['add', 'edit'], true) ? 'tasklists'
                     : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'summary'));
             $projectDetailTabs = [
                 ['id' => 'tab-summary', 'label' => __('projects.summary'), 'icon' => 'feather-grid', 'active' => $activeProjectTab === 'summary'],
-                ['id' => 'tab-members', 'label' => __('projects.members'), 'icon' => 'feather-users', 'active' => $activeProjectTab === 'members'],
                 ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
                 ['id' => 'tab-tasklists', 'label' => __('projects.tasklists'), 'icon' => 'feather-list', 'active' => $activeProjectTab === 'tasklists'],
             ];
@@ -125,9 +127,6 @@
             <div class="tab-pane fade {{ $activeProjectTab === 'summary' ? 'show active' : '' }}" id="tab-summary" role="tabpanel" aria-labelledby="tab-summary-tab">
                 @include('modules.projects._dashboard-stats')
                 @include('modules.projects._project-widgets')
-            </div>
-            <div class="tab-pane fade {{ $activeProjectTab === 'members' ? 'show active' : '' }}" id="tab-members" role="tabpanel" aria-labelledby="tab-members-tab">
-                @include('modules.projects._members')
             </div>
             <div class="tab-pane fade {{ $activeProjectTab === 'milestones' ? 'show active' : '' }}" id="tab-milestones" role="tabpanel" aria-labelledby="tab-milestones-tab">
                 @include('modules.projects._milestones')
