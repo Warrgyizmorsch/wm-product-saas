@@ -10,7 +10,7 @@ class TaskRepository implements TaskRepositoryInterface
     public function getForProject(int $projectId): Collection
     {
         return Task::query()
-            ->with(['taskList', 'milestone', 'assignee', 'reviewer'])
+            ->with(['taskList', 'milestone', 'assignee', 'reviewer', 'subTasks.assignee', 'dependencies.dependsOn'])
             ->where('project_id', $projectId)
             ->orderBy('position')
             ->orderBy('id')

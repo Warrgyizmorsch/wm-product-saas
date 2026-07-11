@@ -77,7 +77,8 @@ class ProjectController extends Controller
         $canCreateTasks = auth()->user()->can('create', [Task::class, $project]);
 
         $taskLists = $this->taskLists->list($project);
-        $tasksByList = $this->tasks->list($project)->groupBy('task_list_id');
+        $allTasks = $this->tasks->list($project);
+        $tasksByList = $allTasks->groupBy('task_list_id');
 
         return view('modules.projects.show', [
             'project'             => $project,
@@ -88,6 +89,7 @@ class ProjectController extends Controller
             'taskLists'           => $taskLists,
             'canManageTaskLists'  => $canManageTaskLists,
             'tasksByList'         => $tasksByList,
+            'allTasks'            => $allTasks->keyBy('id'),
             'canCreateTasks'      => $canCreateTasks,
             'activeMembers'       => ($canManageMembers || $canManageMilestones || $canManageTaskLists || $canCreateTasks)
                 ? $this->members->list($project)->where('is_active', true)

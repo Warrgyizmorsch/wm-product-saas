@@ -84,6 +84,18 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Repositories\TaskRepositoryInterface::class,
             \App\Domains\Projects\Repositories\TaskRepository::class
         );
+
+        // ── Projects: Sub Task ────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\SubTaskRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\SubTaskRepository::class
+        );
+
+        // ── Projects: Task Dependency ─────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\TaskDependencyRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\TaskDependencyRepository::class
+        );
     }
 
     public function boot(): void

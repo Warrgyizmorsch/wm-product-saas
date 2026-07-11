@@ -4,7 +4,9 @@ use App\Domains\Projects\Controllers\MilestoneController;
 use App\Domains\Projects\Controllers\ProjectActivityLogController;
 use App\Domains\Projects\Controllers\ProjectController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
+use App\Domains\Projects\Controllers\SubTaskController;
 use App\Domains\Projects\Controllers\TaskController;
+use App\Domains\Projects\Controllers\TaskDependencyController;
 use App\Domains\Projects\Controllers\TaskListController;
 use Illuminate\Support\Facades\Route;
 
@@ -61,5 +63,23 @@ Route::prefix('projects')
                 Route::delete('{task}', [TaskController::class, 'destroy'])->name('destroy');
                 Route::patch('{task}/status', [TaskController::class, 'updateStatus'])->name('update-status');
                 Route::patch('{task}/assign', [TaskController::class, 'assign'])->name('assign');
+
+                Route::prefix('{task}/subtasks')
+                    ->as('subtasks.')
+                    ->scopeBindings()
+                    ->group(function (): void {
+                        Route::post('/', [SubTaskController::class, 'store'])->name('store');
+                        Route::put('{subTask}', [SubTaskController::class, 'update'])->name('update');
+                        Route::patch('{subTask}/toggle-complete', [SubTaskController::class, 'toggleComplete'])->name('toggle-complete');
+                        Route::delete('{subTask}', [SubTaskController::class, 'destroy'])->name('destroy');
+                    });
+
+                Route::prefix('{task}/dependencies')
+                    ->as('dependencies.')
+                    ->scopeBindings()
+                    ->group(function (): void {
+                        Route::post('/', [TaskDependencyController::class, 'store'])->name('store');
+                        Route::delete('{dependency}', [TaskDependencyController::class, 'destroy'])->name('destroy');
+                    });
             });
     });

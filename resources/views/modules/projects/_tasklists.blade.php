@@ -96,6 +96,27 @@
                                                     startDate: @js(optional($task->start_date)->format('Y-m-d')),
                                                     dueDate: @js(optional($task->due_date)->format('Y-m-d')),
                                                     estimatedHours: @js($task->estimated_hours),
+                                                    subtaskStoreUrl: @js(route('projects.tasks.subtasks.store', [$project, $task])),
+                                                    dependencyStoreUrl: @js(route('projects.tasks.dependencies.store', [$project, $task])),
+                                                    subtasks: @js($task->subTasks->map(fn ($subTask) => [
+                                                        'id' => $subTask->id,
+                                                        'title' => $subTask->title,
+                                                        'isCompleted' => $subTask->is_completed,
+                                                        'assigneeId' => $subTask->assignee_id,
+                                                        'assigneeName' => $subTask->assignee?->name,
+                                                        'updateUrl' => route('projects.tasks.subtasks.update', [$project, $task, $subTask]),
+                                                        'toggleUrl' => route('projects.tasks.subtasks.toggle-complete', [$project, $task, $subTask]),
+                                                        'deleteUrl' => route('projects.tasks.subtasks.destroy', [$project, $task, $subTask]),
+                                                    ])),
+                                                    dependencies: @js($task->dependencies->map(fn ($dependency) => [
+                                                        'id' => $dependency->id,
+                                                        'label' => $dependency->dependsOn?->task_code . ' — ' . $dependency->dependsOn?->title,
+                                                        'deleteUrl' => route('projects.tasks.dependencies.destroy', [$project, $task, $dependency]),
+                                                    ])),
+                                                    otherTasks: @js($allTasks->except($task->id)->map(fn ($otherTask) => [
+                                                        'id' => $otherTask->id,
+                                                        'label' => $otherTask->task_code . ' — ' . $otherTask->title,
+                                                    ])->values()),
                                                 })"
                                             @endif>
                                             <div class="fw-semibold text-dark fs-13">{{ $task->task_code }} — {{ $task->title }}</div>
