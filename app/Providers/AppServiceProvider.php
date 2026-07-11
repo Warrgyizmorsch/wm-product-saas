@@ -66,6 +66,12 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Repositories\ProjectMemberRepositoryInterface::class,
             \App\Domains\Projects\Repositories\ProjectMemberRepository::class
         );
+
+        // ── Projects: Milestone ───────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\MilestoneRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\MilestoneRepository::class
+        );
     }
 
     public function boot(): void
@@ -212,6 +218,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Projects\Models\ProjectMember::class,
             \App\Domains\Projects\Policies\ProjectMemberPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\Milestone::class,
+            \App\Domains\Projects\Policies\MilestonePolicy::class
         );
 
         // ── Access (RBAC admin) Policies ──────────────────────────────────────

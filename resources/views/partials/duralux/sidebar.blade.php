@@ -31,7 +31,7 @@
             ]],
             ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
                 ['label' => __('ui.projects'), 'route' => 'projects.index'],
-                'Milestones',
+                ['label' => __('projects.milestones'), 'route' => 'projects.milestones.index'],
                 'Tasks',
                 'Timesheets',
             ]],
