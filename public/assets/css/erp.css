@@ -1001,3 +1001,14 @@ a.btn:hover, a.btn:focus, a.btn:active { text-decoration: none !important; }
     text-transform: uppercase;
 }
 
+.erp-single-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: calc(100vh - 180px) !important;
+}
+.table-responsive {
+    position: relative;
+}
+.table-responsive:has(.dropdown.show) {
+    overflow: visible !important;
+}
