@@ -37,12 +37,32 @@ class MesExecutionService
     {
         DB::transaction(function () use ($scheduleOpId, $machineId, $operatorId) {
             $schedOp = ProductionScheduleOperation::with(['schedule', 'order'])
+                ->lockForUpdate()
                 ->findOrFail($scheduleOpId);
 
             if (!$schedOp->canStart()) {
                 throw new InvalidArgumentException(
                     "Operation cannot be started. Current status: [{$schedOp->status}]. Only 'ready' operations can be started."
                 );
+            }
+
+            // Sync with underlying ProductionOrderOperation and check skills qualification
+            // Skills validation is opt-in: only enforced if tenant has skills configured
+            $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
+            if ($operatorId && $orderOp) {
+                $tenantId = $schedOp->schedule->order->tenant_id;
+                $tenantHasSkills = \App\Domains\Production\Models\ProductionOperatorSkill::where('tenant_id', $tenantId)
+                    ->where('active', true)
+                    ->exists();
+
+                if ($tenantHasSkills) {
+                    try {
+                        app(\App\Domains\Production\Services\OperatorAssignmentService::class)
+                            ->validateOperatorQualification($operatorId, $orderOp, $tenantId);
+                    } catch (\LogicException $e) {
+                        throw new InvalidArgumentException($e->getMessage());
+                    }
+                }
             }
 
             // Validate predecessor operations are complete
@@ -64,6 +84,12 @@ class MesExecutionService
             // Validate machine if provided
             $resolvedMachineId = $machineId ?? $schedOp->machine_id;
             if ($resolvedMachineId) {
+                // Lock machine row to prevent concurrent assignment
+                Machine::withoutGlobalScopes()
+                    ->where('tenant_id', $schedOp->schedule->order->tenant_id)
+                    ->lockForUpdate()
+                    ->findOrFail($resolvedMachineId);
+
                 $this->validateMachineForExecution($resolvedMachineId, $schedOp->schedule->order->tenant_id);
 
                 // Check machine is not double-booked (another running op on same machine)
@@ -154,10 +180,10 @@ class MesExecutionService
      *
      * @throws InvalidArgumentException When operation is not in 'running' status.
      */
-    public function pauseOperation(int $scheduleOpId, ?string $remarks = null): void
+    public function pauseOperation(int $scheduleOpId, ?string $remarks = null, ?int $operatorId = null): void
     {
-        DB::transaction(function () use ($scheduleOpId, $remarks) {
-            $schedOp = ProductionScheduleOperation::findOrFail($scheduleOpId);
+        DB::transaction(function () use ($scheduleOpId, $remarks, $operatorId) {
+            $schedOp = ProductionScheduleOperation::lockForUpdate()->findOrFail($scheduleOpId);
 
             if (!$schedOp->isRunning()) {
                 throw new InvalidArgumentException(
@@ -165,7 +191,10 @@ class MesExecutionService
                 );
             }
 
-            $schedOp->update(['status' => ProductionScheduleOperation::STATUS_PAUSED]);
+            $schedOp->update([
+                'status' => ProductionScheduleOperation::STATUS_PAUSED,
+                'last_paused_at' => now(),
+            ]);
 
             // Sync ProductionOrderOperation
             $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
@@ -175,19 +204,28 @@ class MesExecutionService
             }
 
             $machineId = $schedOp->machine_id;
+            $userId = $operatorId ?? auth()->id() ?? null;
             if ($machineId) {
                 $reason = $remarks ?? 'Operation Paused';
-                $state = 'Waiting Operator';
+                $category = 'Operator Shortage';
                 if (str_contains(strtolower($reason), 'material')) {
-                    $state = 'Waiting Material';
+                    $category = 'Material Shortage';
                 } elseif (str_contains(strtolower($reason), 'breakdown') || str_contains(strtolower($reason), 'failure')) {
-                    $state = 'Breakdown';
+                    $category = 'Breakdown';
                 }
-                app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
+
+                // startDowntime will automatically transition machine state and write events
+                app(\App\Domains\Production\Services\DowntimeService::class)->startDowntime(
                     $schedOp->schedule->order->tenant_id,
                     $machineId,
-                    $state,
-                    $reason
+                    $category,
+                    $reason,
+                    $userId,
+                    [
+                        'production_order_id' => $schedOp->production_order_id,
+                        'production_order_operation_id' => $schedOp->production_order_operation_id,
+                        'remarks' => $remarks
+                    ]
                 );
             }
 
@@ -195,11 +233,13 @@ class MesExecutionService
                 'production_order_id'            => $schedOp->production_order_id,
                 'production_order_operation_id'  => $schedOp->production_order_operation_id,
                 'machine_id'                     => $machineId,
+                'operator_id'                    => $userId,
                 'event_type'                     => 'Operation Paused',
                 'title'                          => 'Operation Paused',
                 'description'                    => "Operation paused. Reason: {$remarks}",
                 'severity'                       => 'warning',
                 'event_source'                   => 'MesExecutionService',
+                'triggered_by'                   => $userId,
             ]);
         });
     }
@@ -211,14 +251,15 @@ class MesExecutionService
      * the assigned machine back to 'Running' state.
      *
      * @param  int  $scheduleOpId  ID of the paused ProductionScheduleOperation.
+     * @param  int|null $operatorId Operator who resumed the operation.
      * @return void
      *
      * @throws InvalidArgumentException When operation is not in 'paused' status.
      */
-    public function resumeOperation(int $scheduleOpId): void
+    public function resumeOperation(int $scheduleOpId, ?int $operatorId = null): void
     {
-        DB::transaction(function () use ($scheduleOpId) {
-            $schedOp = ProductionScheduleOperation::findOrFail($scheduleOpId);
+        DB::transaction(function () use ($scheduleOpId, $operatorId) {
+            $schedOp = ProductionScheduleOperation::lockForUpdate()->findOrFail($scheduleOpId);
 
             if (!$schedOp->isPaused()) {
                 throw new InvalidArgumentException(
@@ -226,7 +267,17 @@ class MesExecutionService
                 );
             }
 
-            $schedOp->update(['status' => ProductionScheduleOperation::STATUS_RUNNING]);
+            $now = now();
+            $pausedSeconds = 0;
+            if ($schedOp->last_paused_at) {
+                $pausedSeconds = max(0, $now->timestamp - $schedOp->last_paused_at->timestamp);
+            }
+
+            $schedOp->update([
+                'status' => ProductionScheduleOperation::STATUS_RUNNING,
+                'accumulated_paused_seconds' => $schedOp->accumulated_paused_seconds + $pausedSeconds,
+                'last_paused_at' => null,
+            ]);
 
             $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
             if ($orderOp) {
@@ -235,12 +286,30 @@ class MesExecutionService
             }
 
             $machineId = $schedOp->machine_id;
+            $userId = $operatorId ?? auth()->id() ?? null;
             if ($machineId) {
+                // Find and close open downtime
+                $activeDowntime = \App\Domains\Production\Models\ProductionMachineDowntime::where('tenant_id', $schedOp->schedule->order->tenant_id)
+                    ->where('machine_id', $machineId)
+                    ->where('production_order_operation_id', $schedOp->production_order_operation_id)
+                    ->where('status', \App\Domains\Production\Models\ProductionMachineDowntime::STATUS_OPEN)
+                    ->first();
+                if ($activeDowntime) {
+                    app(\App\Domains\Production\Services\DowntimeService::class)->endDowntime(
+                        $schedOp->schedule->order->tenant_id,
+                        $activeDowntime->id,
+                        $userId,
+                        'Operation Resumed'
+                    );
+                }
+
+                // Always transition machine state back to Running on resume
                 app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
                     $schedOp->schedule->order->tenant_id,
                     $machineId,
                     'Running',
-                    'Operation Resumed'
+                    'Operation Resumed',
+                    $userId
                 );
             }
 
@@ -248,11 +317,13 @@ class MesExecutionService
                 'production_order_id'            => $schedOp->production_order_id,
                 'production_order_operation_id'  => $schedOp->production_order_operation_id,
                 'machine_id'                     => $machineId,
+                'operator_id'                    => $userId,
                 'event_type'                     => 'Operation Resumed',
                 'title'                          => 'Operation Resumed',
                 'description'                    => "Operation has been resumed.",
                 'severity'                       => 'info',
                 'event_source'                   => 'MesExecutionService',
+                'triggered_by'                   => $userId,
             ]);
         });
     }
@@ -277,7 +348,9 @@ class MesExecutionService
     public function completeOperation(int $scheduleOpId, array $data, ?int $operatorId): void
     {
         DB::transaction(function () use ($scheduleOpId, $data, $operatorId) {
-            $schedOp = ProductionScheduleOperation::with(['schedule', 'order'])->findOrFail($scheduleOpId);
+            $schedOp = ProductionScheduleOperation::with(['schedule.order.tenant', 'order'])
+                ->lockForUpdate()
+                ->findOrFail($scheduleOpId);
 
             if (!$schedOp->isRunning() && !$schedOp->isPaused()) {
                 throw new InvalidArgumentException(
@@ -286,11 +359,17 @@ class MesExecutionService
             }
 
             $now = now();
+            $pausedSeconds = 0;
+            if ($schedOp->isPaused() && $schedOp->last_paused_at) {
+                $pausedSeconds = max(0, $now->timestamp - $schedOp->last_paused_at->timestamp);
+            }
 
             // Update schedule operation timing
             $schedOp->update([
                 'status'        => ProductionScheduleOperation::STATUS_COMPLETED,
                 'actual_finish' => $now,
+                'accumulated_paused_seconds' => $schedOp->accumulated_paused_seconds + $pausedSeconds,
+                'last_paused_at' => null,
             ]);
 
             // Sync ProductionOrderOperation
@@ -301,6 +380,24 @@ class MesExecutionService
                 $scrapped      = (float) ($data['quantity_scrapped'] ?? 0);
                 $setupMinutes  = (float) ($data['setup_minutes'] ?? 0);
                 $runMinutes    = (float) ($data['run_minutes'] ?? 0);
+
+                if ($produced < 0 || $rejected < 0 || $scrapped < 0) {
+                    throw new InvalidArgumentException("Quantities cannot be negative.");
+                }
+
+                // Overproduction Limit Check
+                $plannedQty = (float) $schedOp->schedule->order->quantity_ordered;
+                $totalProcessedSoFar = $orderOp->quantity_produced + $orderOp->quantity_scrapped;
+                $currentProcessed = $produced + $scrapped;
+                $totalProcessed = $totalProcessedSoFar + $currentProcessed;
+
+                $tenant = $schedOp->schedule->order->tenant;
+                $limitPercent = (float) ($tenant->settings['overproduction_limit_percentage'] ?? 20.0);
+                $maxAllowed = $plannedQty * (1 + $limitPercent / 100);
+
+                if ($totalProcessed > $maxAllowed) {
+                    throw new InvalidArgumentException("Quantity exceeds the allowed overproduction limit of {$limitPercent}% (Max allowed: {$maxAllowed} units).");
+                }
 
                 // Create progress log
                 ProductionOrderProgressLog::create([
@@ -331,20 +428,27 @@ class MesExecutionService
                 $orderOp->save();
             }
 
-            // Advance next schedule operation to ready
-            $nextSchedOp = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+            // Advance next schedule operations to ready (including parallel operations sharing the same next sequence)
+            $nextSequence = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                 ->where('sequence', '>', $schedOp->sequence)
-                ->orderBy('sequence')
-                ->first();
+                ->min('sequence');
 
-            if ($nextSchedOp && $nextSchedOp->isWaiting()) {
-                $nextSchedOp->update(['status' => ProductionScheduleOperation::STATUS_READY]);
+            if ($nextSequence) {
+                $nextSchedOps = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                    ->where('sequence', $nextSequence)
+                    ->get();
 
-                // Sync next order operation too
-                $nextOrderOp = ProductionOrderOperation::find($nextSchedOp->production_order_operation_id);
-                if ($nextOrderOp && $nextOrderOp->status === ProductionOrderOperation::STATUS_WAITING) {
-                    $nextOrderOp->status = ProductionOrderOperation::STATUS_READY;
-                    $nextOrderOp->save();
+                foreach ($nextSchedOps as $nsOp) {
+                    if ($nsOp->isWaiting()) {
+                        $nsOp->update(['status' => ProductionScheduleOperation::STATUS_READY]);
+
+                        // Sync next order operation too
+                        $nextOrderOp = ProductionOrderOperation::find($nsOp->production_order_operation_id);
+                        if ($nextOrderOp && $nextOrderOp->status === ProductionOrderOperation::STATUS_WAITING) {
+                            $nextOrderOp->status = ProductionOrderOperation::STATUS_READY;
+                            $nextOrderOp->save();
+                        }
+                    }
                 }
             }
 
@@ -363,13 +467,29 @@ class MesExecutionService
 
             $machineId = $schedOp->machine_id;
             if ($machineId) {
-                app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
-                    $schedOp->schedule->order->tenant_id,
-                    $machineId,
-                    'Idle',
-                    'Operation Completed',
-                    $operatorId
-                );
+                // If operation was paused, close open downtime first
+                $activeDowntime = \App\Domains\Production\Models\ProductionMachineDowntime::where('tenant_id', $schedOp->schedule->order->tenant_id)
+                    ->where('machine_id', $machineId)
+                    ->where('production_order_operation_id', $schedOp->production_order_operation_id)
+                    ->where('status', \App\Domains\Production\Models\ProductionMachineDowntime::STATUS_OPEN)
+                    ->first();
+                if ($activeDowntime) {
+                    app(\App\Domains\Production\Services\DowntimeService::class)->endDowntime(
+                        $schedOp->schedule->order->tenant_id,
+                        $activeDowntime->id,
+                        $operatorId ?? 0,
+                        'Operation Completed'
+                    );
+                } else {
+                    // Transition machine state back to Idle
+                    app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
+                        $schedOp->schedule->order->tenant_id,
+                        $machineId,
+                        'Idle',
+                        'Operation Completed',
+                        $operatorId
+                    );
+                }
             }
 
             app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
@@ -392,7 +512,7 @@ class MesExecutionService
     public function holdOperation(int $scheduleOpId, ?string $remarks = null): void
     {
         DB::transaction(function () use ($scheduleOpId, $remarks) {
-            $schedOp = ProductionScheduleOperation::findOrFail($scheduleOpId);
+            $schedOp = ProductionScheduleOperation::lockForUpdate()->findOrFail($scheduleOpId);
 
             $schedOp->update(['status' => ProductionScheduleOperation::STATUS_PAUSED]);
 
@@ -410,10 +530,36 @@ class MesExecutionService
     public function cancelOperation(int $scheduleOpId): void
     {
         DB::transaction(function () use ($scheduleOpId) {
-            $schedOp = ProductionScheduleOperation::findOrFail($scheduleOpId);
+            $schedOp = ProductionScheduleOperation::lockForUpdate()->findOrFail($scheduleOpId);
 
             if ($schedOp->isCompleted()) {
                 throw new InvalidArgumentException("Completed operations cannot be cancelled.");
+            }
+
+            $machineId = $schedOp->machine_id;
+            if ($machineId && ($schedOp->isRunning() || $schedOp->isPaused())) {
+                // If operation was paused, close open downtime first
+                $activeDowntime = \App\Domains\Production\Models\ProductionMachineDowntime::where('tenant_id', $schedOp->schedule->order->tenant_id)
+                    ->where('machine_id', $machineId)
+                    ->where('production_order_operation_id', $schedOp->production_order_operation_id)
+                    ->where('status', \App\Domains\Production\Models\ProductionMachineDowntime::STATUS_OPEN)
+                    ->first();
+                if ($activeDowntime) {
+                    app(\App\Domains\Production\Services\DowntimeService::class)->endDowntime(
+                        $schedOp->schedule->order->tenant_id,
+                        $activeDowntime->id,
+                        auth()->id() ?? $schedOp->tenant_id,
+                        'Operation Cancelled'
+                    );
+                } else {
+                    // Transition machine state back to Idle
+                    app(\App\Domains\Production\Services\MachineStateService::class)->transitionState(
+                        $schedOp->schedule->order->tenant_id,
+                        $machineId,
+                        'Idle',
+                        'Operation Cancelled'
+                    );
+                }
             }
 
             $schedOp->update(['status' => ProductionScheduleOperation::STATUS_CANCELLED]);

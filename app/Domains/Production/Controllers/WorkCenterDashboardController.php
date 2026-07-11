@@ -69,15 +69,38 @@ class WorkCenterDashboardController extends Controller
             ->whereDate('actual_finish', today())
             ->count();
 
-        // Utilization: sum of planned minutes vs available today (8h assumed)
+        // Utilization: sum of planned minutes vs available today (active shifts or 8h fallback)
+        $shifts = $workCenter->shifts()->where('active', true)->get();
+        if ($shifts->isEmpty()) {
+            $baseAvailableMinutes = 8 * 60;
+        } else {
+            $totalMinutes = 0.0;
+            foreach ($shifts as $shift) {
+                $start = \Carbon\Carbon::parse($shift->start_time);
+                $end   = \Carbon\Carbon::parse($shift->end_time);
+
+                if ($end->lt($start)) {
+                    $end->addDay();
+                }
+
+                $diff = $start->diffInMinutes($end);
+                if ($shift->break_minutes > 0) {
+                    $diff -= $shift->break_minutes;
+                }
+
+                $totalMinutes += max(0.0, $diff);
+            }
+            $baseAvailableMinutes = $totalMinutes;
+        }
+
         $plannedMinutes  = $queue->sum('planned_duration_minutes');
-        $availableMinutes = 8 * 60 * ($workCenter->efficiency_percentage / 100);
+        $availableMinutes = $baseAvailableMinutes * ($workCenter->efficiency_percentage / 100);
         $utilization     = $availableMinutes > 0
             ? round(min(100, ($plannedMinutes / $availableMinutes) * 100), 1)
             : 0;
 
         return view('modules.production.mes.work-center-detail', compact(
-            'workCenter', 'queue', 'completedToday', 'utilization', 'plannedMinutes', 'availableMinutes'
+            'workCenter', 'queue', 'completedToday', 'utilization', 'plannedMinutes', 'availableMinutes', 'shifts'
         ));
     }
 }

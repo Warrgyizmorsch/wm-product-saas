@@ -57,7 +57,7 @@ class WorkCenterRepository implements WorkCenterRepositoryInterface
 
     public function find(int $id): ?WorkCenter
     {
-        return WorkCenter::with(['machines'])->find($id);
+        return WorkCenter::with(['machines', 'shifts'])->find($id);
     }
 
     public function create(array $data): WorkCenter
