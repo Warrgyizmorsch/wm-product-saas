@@ -89,4 +89,14 @@ class Project extends BaseModel
     {
         return $this->hasMany(Milestone::class, 'project_id');
     }
+
+    public function taskLists(): HasMany
+    {
+        return $this->hasMany(TaskList::class, 'project_id');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'project_id');
+    }
 }
