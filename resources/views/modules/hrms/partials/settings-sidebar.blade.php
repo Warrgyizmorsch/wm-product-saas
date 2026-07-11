@@ -3,7 +3,8 @@
     $isLeave = request()->routeIs('hrms.leave-structure.index');
     $isPenalty = request()->routeIs('hrms.penalization-policy.index');
     $isRoster = request()->routeIs('hrms.roster.index');
-    $isOrg = !$isSalary && !$isLeave && !$isPenalty && !$isRoster;
+    $isAsset = request()->routeIs('hrms.assets.index');
+    $isOrg = !$isSalary && !$isLeave && !$isPenalty && !$isRoster && !$isAsset;
 @endphp
 
 <div class="settings-sidebar-panel h-100">
@@ -31,6 +32,10 @@
             <a class="nav-link {{ $isPenalty ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="penalization-policy-menu" href="{{ route('hrms.penalization-policy.index') }}" role="tab" aria-selected="{{ $isPenalty ? 'true' : 'false' }}">
                 <i class="feather-alert-octagon me-3 fs-16"></i>
                 <span>Penalization Policy</span>
+            </a>
+            <a class="nav-link {{ $isAsset ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="asset-management-menu" href="{{ route('hrms.assets.index') }}" role="tab" aria-selected="{{ $isAsset ? 'true' : 'false' }}">
+                <i class="feather-package me-3 fs-16"></i>
+                <span>Asset Management</span>
             </a>
         </div>
     </div>

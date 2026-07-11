@@ -8,6 +8,7 @@ use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\EmployeeEmploymentHistory;
 use App\Domains\HRMS\Models\PayGroup;
 use App\Domains\HRMS\Models\SalaryStructure;
 use App\Domains\HRMS\Models\LeavePlan;
@@ -158,7 +159,7 @@ class EmployeeController extends Controller
             'pay_group_id' => ['nullable', 'exists:pay_groups,id'],
             'leave_plan_id' => ['nullable', 'exists:leave_plans,id'],
             'employee_id' => [
-                'required',
+                'nullable',
                 'string',
                 'max:255',
                 Rule::unique('employees', 'employee_id')->ignore($employee?->id),
@@ -457,8 +458,8 @@ class EmployeeController extends Controller
             ];
         }
 
-        // Load employee penalties, adhoc components, and documents
-        $employee->load('documents.requestedBy');
+        // Load employee penalties, adhoc components, documents, and employment histories
+        $employee->load(['documents.requestedBy', 'employmentHistories']);
 
         $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::query()
             ->where('employee_id', $employee->id)
@@ -659,5 +660,35 @@ class EmployeeController extends Controller
 
         return redirect()->route('hrms.employees.show', [$employeeId, 'tab' => 'documents'])
             ->with('success', 'Document record deleted successfully.');
+    }
+
+    public function storeEmploymentHistory(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'company_name' => 'required|string|max:255',
+            'designation' => 'required|string|max:255',
+            'start_date' => 'required|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'job_description' => 'nullable|string|max:1000',
+        ]);
+
+        $employee->employmentHistories()->create($validated);
+
+        return redirect()
+            ->route('hrms.employees.show', [$employee->id, 'tab' => 'history'])
+            ->with('success', 'Employment history record added successfully.');
+    }
+
+    public function destroyEmploymentHistory(Employee $employee, EmployeeEmploymentHistory $history): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $history->delete();
+
+        return redirect()
+            ->route('hrms.employees.show', [$employee->id, 'tab' => 'history'])
+            ->with('success', 'Employment history record deleted successfully.');
     }
 }

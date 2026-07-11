@@ -6,6 +6,7 @@ use App\Domains\HRMS\Controllers\SalaryStructureController;
 use App\Domains\HRMS\Controllers\LeaveStructureController;
 use App\Domains\HRMS\Controllers\PenalizationPolicyController;
 use App\Domains\HRMS\Controllers\RosterController;
+use App\Domains\HRMS\Controllers\AssetController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('hrms')
@@ -49,6 +50,8 @@ Route::prefix('hrms')
         Route::delete('/employees/adhoc-components/{adhocComponent}', [EmployeeController::class, 'destroyAdhocComponent'])->name('employees.adhoc-components.destroy');
         Route::post('/employees/{employee}/penalties', [EmployeeController::class, 'storePenalty'])->name('employees.penalties.store');
         Route::delete('/employees/penalties/{penalty}', [EmployeeController::class, 'destroyPenalty'])->name('employees.penalties.destroy');
+        Route::post('/employees/{employee}/employment-history', [EmployeeController::class, 'storeEmploymentHistory'])->name('employees.history.store');
+        Route::delete('/employees/{employee}/employment-history/{history}', [EmployeeController::class, 'destroyEmploymentHistory'])->name('employees.history.destroy');
 
         Route::get('/salary-structure', [SalaryStructureController::class, 'index'])->name('salary-structure.index');
         Route::post('/salary-structure/component/store', [SalaryStructureController::class, 'storeComponent'])->name('salary-structure.store');
@@ -89,4 +92,15 @@ Route::prefix('hrms')
         Route::post('/leave-structure/type/{leaveType}/rules', [LeaveStructureController::class, 'updateRules'])->name('leave-structure.type.rules');
 
         Route::view('/track-status', 'modules.hrms.track-status')->name('track-status');
+
+        // Asset Management
+        Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
+        Route::post('/assets/store', [AssetController::class, 'store'])->name('assets.store');
+        Route::post('/assets/update/{asset}', [AssetController::class, 'update'])->name('assets.update');
+        Route::delete('/assets/delete/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+        Route::post('/assets/category/store', [AssetController::class, 'storeCategory'])->name('assets.category.store');
+        Route::post('/assets/{asset}/allocate', [AssetController::class, 'allocate'])->name('assets.allocate');
+        Route::post('/assets/{asset}/return', [AssetController::class, 'returnAsset'])->name('assets.return');
+        Route::post('/assets/requests/store', [AssetController::class, 'storeRequest'])->name('assets.requests.store');
+        Route::post('/assets/requests/{request}/reject', [AssetController::class, 'rejectRequest'])->name('assets.requests.reject');
     });
