@@ -5,9 +5,12 @@ namespace App\Domains\HRMS\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
 
         'company_id',
@@ -99,9 +102,21 @@ class Employee extends Model
                     $prefix = strtoupper($prefix);
                 }
 
-                // Get count of employees under the same company
-                $companyCount = self::query()->where('company_id', $employee->company_id)->count();
-                $nextSequence = $companyCount + 1;
+                // Find the highest sequence number among existing employees (including soft deleted ones)
+                $maxEmployee = self::withTrashed()
+                    ->where('company_id', $employee->company_id)
+                    ->where('employee_id', 'LIKE', $prefix . '-%')
+                    ->orderByRaw('CAST(SUBSTRING(employee_id, LENGTH(?) + 2) AS UNSIGNED) DESC', [$prefix])
+                    ->first();
+
+                $nextSequence = 1;
+                if ($maxEmployee) {
+                    $parts = explode('-', $maxEmployee->employee_id);
+                    $lastNum = (int) end($parts);
+                    if ($lastNum > 0) {
+                        $nextSequence = $lastNum + 1;
+                    }
+                }
 
                 // Format: PREFIX-XXXX (e.g. ACM-0001)
                 $employee->employee_id = $prefix . '-' . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);

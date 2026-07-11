@@ -404,7 +404,6 @@
                                 <th>Employee Code</th>
                                 <th>Department</th>
                                 <th>Designation</th>
-                                <th>Pay Group</th>
                                 <th>Company</th>
                                 <th>Status</th>
                                 <th width="150" class="text-end">Actions</th>
@@ -432,7 +431,6 @@
                                     <td><code>{{ $employee->employee_id }}</code></td>
                                     <td>{{ $employee->department?->name ?? 'Not assigned' }}</td>
                                     <td>{{ $employee->designation?->name ?? 'Not assigned' }}</td>
-                                    <td>{{ $employee->payGroup?->name ?? 'Not assigned' }}</td>
                                     <td>{{ $employee->company?->company_name ?? 'Not assigned' }}</td>
                                     <td>
                                         @if($employee->status)
@@ -459,6 +457,16 @@
                                                     <span>Edit</span>
                                                 </a>
                                             </li>
+                                            <li>
+                                                <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this employee?');" style="display: inline;">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start">
+                                                        <i class="feather feather-trash-2 me-3"></i>
+                                                        <span>Delete</span>
+                                                    </button>
+                                                </form>
+                                            </li>
                                         </x-ui.action-dropdown>
                                     </td>
                                 </tr>
@@ -475,11 +483,21 @@
                     </table>
                 </div>
 
-                @if($employees->hasPages())
-                    <div class="px-4 py-3 border-top">
-                        {{ $employees->links() }}
-                    </div>
-                @endif
+                @php
+                    $currentPage = $employees->currentPage();
+                    $totalPages = $employees->lastPage();
+                    $totalResults = $employees->total();
+                    $perPage = $employees->perPage();
+                @endphp
+                <div id="employeePaginationWrapper">
+                    <x-ui.pagination 
+                        class="px-4 py-3 border-top"
+                        :current-page="$currentPage"
+                        :total-pages="$totalPages"
+                        :total-results="$totalResults"
+                        :per-page="$perPage"
+                    />
+                </div>
             </div>
     </div>
 
@@ -557,7 +575,7 @@
                 }
             });
 
-            function initInlineSelects(container) {
+            function initInlineSelects(container, dropdownParent = null) {
                 $(container).find('select').each(function () {
                     const $select = $(this);
 
@@ -565,10 +583,16 @@
                         $select.select2('destroy');
                     }
 
-                    $select.select2({
+                    const config = {
                         theme: 'bootstrap-5',
                         width: '100%',
-                    });
+                    };
+
+                    if (dropdownParent) {
+                        config.dropdownParent = $(dropdownParent);
+                    }
+
+                    $select.select2(config);
                 });
             }
 
@@ -1017,6 +1041,16 @@
                         if (!hasSelected && filterDeptSelect.value !== '') {
                             filterDeptSelect.value = '';
                         }
+
+                        // Re-initialize Select2 on the department select
+                        if ($(filterDeptSelect).hasClass('select2-hidden-accessible')) {
+                            $(filterDeptSelect).select2('destroy');
+                        }
+                        $(filterDeptSelect).select2({
+                            theme: 'bootstrap-5',
+                            width: '100%',
+                            dropdownParent: $(filterForm).parent()
+                        });
                     }
 
                     // Attach change listener using jQuery to catch Select2/Normal changes uniformly
@@ -1027,7 +1061,9 @@
                 }
             }
 
-            initInlineSelects(document.querySelector('.employee-filter-card'));
+            if (filterForm) {
+                initInlineSelects(filterForm, filterForm.parentNode);
+            }
             setPreview('create', null, document.getElementById('create_full_name')?.value || 'Employee');
 
             const formMode = @json(old('form_mode'));
@@ -1088,7 +1124,25 @@
                 ['search', 'company_id', 'department_id', 'status', 'sort'].forEach(function (name) {
                     document.querySelectorAll(`[name="${name}"]`).forEach(function (field) {
                         field.value = params.get(name) || '';
+                        if (field.tagName === 'SELECT' && $(field).hasClass('select2-hidden-accessible')) {
+                            $(field).trigger('change.select2');
+                        }
                     });
+                });
+
+                // Synchronize the active state and checkmark icon of sorting dropdown links
+                const currentSort = params.get('sort') || 'name_asc';
+                document.querySelectorAll('.employee-sort-link').forEach(function (link) {
+                    const sortVal = link.dataset.sort;
+                    link.classList.remove('active');
+                    link.querySelector('.feather-check')?.remove();
+
+                    if (sortVal === currentSort) {
+                        link.classList.add('active');
+                        const checkIcon = document.createElement('i');
+                        checkIcon.className = 'feather-check ms-3';
+                        link.appendChild(checkIcon);
+                    }
                 });
             }
 
@@ -1121,19 +1175,15 @@
                         const doc = new DOMParser().parseFromString(html, 'text/html');
                         const newBody = doc.getElementById('employeeTableBody');
                         const oldBody = document.getElementById('employeeTableBody');
-                        const newPagination = doc.querySelector('#employeeListCard .border-top');
-                        const oldPagination = document.querySelector('#employeeListCard .border-top');
+                        const newPagination = doc.getElementById('employeePaginationWrapper');
+                        const oldPagination = document.getElementById('employeePaginationWrapper');
 
                         if (newBody && oldBody) {
                             oldBody.innerHTML = newBody.innerHTML;
                         }
 
                         if (newPagination && oldPagination) {
-                            oldPagination.replaceWith(newPagination);
-                        } else if (newPagination) {
-                            document.querySelector('#employeeListCard .table-responsive')?.after(newPagination);
-                        } else if (oldPagination) {
-                            oldPagination.remove();
+                            oldPagination.innerHTML = newPagination.innerHTML;
                         }
 
                         syncEmployeeForms(targetUrl.searchParams);
@@ -1195,7 +1245,7 @@
                 }));
             });
 
-            $(document).on('click', '#employeeListCard .pagination a', function (event) {
+            $(document).on('click', '#employeeListCard .pagination a, #employeeListCard .erp-pagination a', function (event) {
                 event.preventDefault();
                 if (this.href) {
                     refreshEmployeeList(this.href);

@@ -46,6 +46,7 @@ Route::prefix('hrms')
         Route::post('/employees/store', [EmployeeController::class, 'store'])->name('employees.store');
         Route::post('/employees/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
         Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
+        Route::delete('/employees/delete/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
         Route::post('/employees/{employee}/adhoc-components', [EmployeeController::class, 'storeAdhocComponent'])->name('employees.adhoc-components.store');
         Route::delete('/employees/adhoc-components/{adhocComponent}', [EmployeeController::class, 'destroyAdhocComponent'])->name('employees.adhoc-components.destroy');
         Route::post('/employees/{employee}/penalties', [EmployeeController::class, 'storePenalty'])->name('employees.penalties.store');
