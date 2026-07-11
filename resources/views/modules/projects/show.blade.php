@@ -119,12 +119,14 @@
     <div class="row g-4 mt-1">
         <div class="col-12">
             @php
-                $activeProjectTab = in_array(request('tab'), ['members', 'milestones'], true)
+                $activeProjectTab = in_array(request('tab'), ['members', 'milestones', 'tasklists'], true)
                     ? request('tab')
-                    : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'members');
+                    : (in_array(old('_tasklist_form'), ['add', 'edit'], true) ? 'tasklists'
+                        : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'members'));
                 $projectDetailTabs = [
                     ['id' => 'tab-members', 'label' => __('projects.members'), 'icon' => 'feather-users', 'active' => $activeProjectTab === 'members'],
                     ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
+                    ['id' => 'tab-tasklists', 'label' => __('projects.tasklists'), 'icon' => 'feather-list', 'active' => $activeProjectTab === 'tasklists'],
                 ];
             @endphp
             <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" />
@@ -135,6 +137,9 @@
                 </div>
                 <div class="tab-pane fade {{ $activeProjectTab === 'milestones' ? 'show active' : '' }}" id="tab-milestones" role="tabpanel" aria-labelledby="tab-milestones-tab">
                     @include('modules.projects._milestones')
+                </div>
+                <div class="tab-pane fade {{ $activeProjectTab === 'tasklists' ? 'show active' : '' }}" id="tab-tasklists" role="tabpanel" aria-labelledby="tab-tasklists-tab">
+                    @include('modules.projects._tasklists')
                 </div>
             </div>
         </div>
