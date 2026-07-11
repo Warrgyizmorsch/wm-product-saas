@@ -8,6 +8,9 @@
     <span class="badge bg-soft-success text-success p-2 me-2">
         <i class="feather-info me-1"></i> Static Array Mode
     </span>
+    <a href="{{ route('production.mes.dashboard') }}" class="btn btn-light btn-sm border">
+        <i class="feather-arrow-left me-1"></i> Back to Dashboard
+    </a>
 @endsection
 
 @php
@@ -94,133 +97,331 @@
     ];
 
     /**
-     * Map the checklist to each of the tabs (Lead, Quotation, Invoices).
-     * You can edit individual status values here.
+     * Map the checklist to each of the 12 actual Production Sub-Modules.
+     * Calculated based on structural analysis of the Laravel project domain.
      * Allowed statuses: 'Pending', 'Developer Complete', 'Internal Testing Complete', 'External Testing Complete', 'Rework', 'Complete'
      */
     $tabData = [
-        'BOM' => [
-            array_merge($checklistTasks[0], ['status' => 'Developer Complete']),                  // CRUD
-            array_merge($checklistTasks[1], ['status' => 'Developer Complete']),        // Toasters
-            array_merge($checklistTasks[2], ['status' => 'Pending']), // Validations
-            array_merge($checklistTasks[3], ['status' => 'Developer Complete']), // Filters
-            array_merge($checklistTasks[4], ['status' => 'Developer Complete']),                    // Pagination
-            array_merge($checklistTasks[5], ['status' => 'Developer Complete']),                   // Search Filter
-            array_merge($checklistTasks[6], ['status' => 'Developer Complete']),                   // Sorting
-            array_merge($checklistTasks[7], ['status' => 'Pending']),                   // Import
-            array_merge($checklistTasks[8], ['status' => 'Pending']),                   // Export
-            array_merge($checklistTasks[9], ['status' => 'Pending']),                   // Soft Delete
-            array_merge($checklistTasks[10], ['status' => 'Developer Complete']),                 // Using Common Elements
-            array_merge($checklistTasks[11], ['status' => 'Pending']),                  // File Preview
-            array_merge($checklistTasks[12], ['status' => 'Developer Complete']),                 // Seeders
-            array_merge($checklistTasks[13], ['status' => 'Pending']),                  // Multi Language/Currency
-            array_merge($checklistTasks[14], ['status' => 'Developer Complete']),                  // Approvals
-        ],
-        'Machines' => [
-            array_merge($checklistTasks[0], ['status' => 'Developer Complete']),
-            array_merge($checklistTasks[1], ['status' => 'Pending']),
-            array_merge($checklistTasks[2], ['status' => 'Pending']),
-            array_merge($checklistTasks[3], ['status' => 'Pending']),
-            array_merge($checklistTasks[4], ['status' => 'Pending']),
-            array_merge($checklistTasks[5], ['status' => 'Pending']),
-            array_merge($checklistTasks[6], ['status' => 'Pending']),
+        'Bill of Materials (BOM)' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
             array_merge($checklistTasks[7], ['status' => 'Pending']),
             array_merge($checklistTasks[8], ['status' => 'Pending']),
-            array_merge($checklistTasks[9], ['status' => 'Pending']),
-            array_merge($checklistTasks[10], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
             array_merge($checklistTasks[11], ['status' => 'Pending']),
-            array_merge($checklistTasks[12], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
             array_merge($checklistTasks[13], ['status' => 'Pending']),
-            array_merge($checklistTasks[14], ['status' => 'Pending']),
-        ],
-        'Work Orders' => [
-            array_merge($checklistTasks[0], ['status' => 'Developer Complete']),
-            array_merge($checklistTasks[1], ['status' => 'Pending']),
-            array_merge($checklistTasks[2], ['status' => 'Pending']),
-            array_merge($checklistTasks[3], ['status' => 'Pending']),
-            array_merge($checklistTasks[4], ['status' => 'Pending']),
-            array_merge($checklistTasks[5], ['status' => 'Pending']),
-            array_merge($checklistTasks[6], ['status' => 'Pending']),
-            array_merge($checklistTasks[7], ['status' => 'Pending']),
-            array_merge($checklistTasks[8], ['status' => 'Pending']),
-            array_merge($checklistTasks[9], ['status' => 'Pending']),
-            array_merge($checklistTasks[10], ['status' => 'Pending']),
-            array_merge($checklistTasks[11], ['status' => 'Pending']),
-            array_merge($checklistTasks[12], ['status' => 'Pending']),
-            array_merge($checklistTasks[13], ['status' => 'Pending']),
-            array_merge($checklistTasks[14], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Complete']),
         ],
         'Routing' => [
-            array_merge($checklistTasks[0], ['status' => 'Developer Complete']),
-            array_merge($checklistTasks[1], ['status' => 'Pending']),
-            array_merge($checklistTasks[2], ['status' => 'Pending']),
-            array_merge($checklistTasks[3], ['status' => 'Pending']),
-            array_merge($checklistTasks[4], ['status' => 'Pending']),
-            array_merge($checklistTasks[5], ['status' => 'Pending']),
-            array_merge($checklistTasks[6], ['status' => 'Pending']),
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
             array_merge($checklistTasks[7], ['status' => 'Pending']),
             array_merge($checklistTasks[8], ['status' => 'Pending']),
-            array_merge($checklistTasks[9], ['status' => 'Pending']),
-            array_merge($checklistTasks[10], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
             array_merge($checklistTasks[11], ['status' => 'Pending']),
-            array_merge($checklistTasks[12], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
+            array_merge($checklistTasks[13], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Complete']),
+        ],
+        'Work Centers' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
+            array_merge($checklistTasks[7], ['status' => 'Pending']),
+            array_merge($checklistTasks[8], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
+            array_merge($checklistTasks[11], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
+            array_merge($checklistTasks[13], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Pending']),
+        ],
+        'Machines' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
+            array_merge($checklistTasks[7], ['status' => 'Pending']),
+            array_merge($checklistTasks[8], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
+            array_merge($checklistTasks[11], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
             array_merge($checklistTasks[13], ['status' => 'Pending']),
             array_merge($checklistTasks[14], ['status' => 'Pending']),
         ],
         'Production Planning' => [
-            array_merge($checklistTasks[0], ['status' => 'Developer Complete']),
-            array_merge($checklistTasks[1], ['status' => 'Pending']),
-            array_merge($checklistTasks[2], ['status' => 'Pending']),
-            array_merge($checklistTasks[3], ['status' => 'Pending']),
-            array_merge($checklistTasks[4], ['status' => 'Pending']),
-            array_merge($checklistTasks[5], ['status' => 'Pending']),
-            array_merge($checklistTasks[6], ['status' => 'Pending']),
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
             array_merge($checklistTasks[7], ['status' => 'Pending']),
             array_merge($checklistTasks[8], ['status' => 'Pending']),
-            array_merge($checklistTasks[9], ['status' => 'Pending']),
-            array_merge($checklistTasks[10], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
             array_merge($checklistTasks[11], ['status' => 'Pending']),
-            array_merge($checklistTasks[12], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
+            array_merge($checklistTasks[13], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Complete']),
+        ],
+        'Production Scheduling' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
+            array_merge($checklistTasks[7], ['status' => 'Pending']),
+            array_merge($checklistTasks[8], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
+            array_merge($checklistTasks[11], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
+            array_merge($checklistTasks[13], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Complete']),
+        ],
+        'Shifts & Calendars' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
+            array_merge($checklistTasks[7], ['status' => 'Pending']),
+            array_merge($checklistTasks[8], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
+            array_merge($checklistTasks[11], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
             array_merge($checklistTasks[13], ['status' => 'Pending']),
             array_merge($checklistTasks[14], ['status' => 'Pending']),
         ],
-        'Production Order' => [
-            array_merge($checklistTasks[0], ['status' => 'Developer Complete']),
-            array_merge($checklistTasks[1], ['status' => 'Pending']),
-            array_merge($checklistTasks[2], ['status' => 'Pending']),
-            array_merge($checklistTasks[3], ['status' => 'Pending']),
-            array_merge($checklistTasks[4], ['status' => 'Pending']),
-            array_merge($checklistTasks[5], ['status' => 'Pending']),
-            array_merge($checklistTasks[6], ['status' => 'Pending']),
+        'Quality Plans & Operator Skills' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
             array_merge($checklistTasks[7], ['status' => 'Pending']),
             array_merge($checklistTasks[8], ['status' => 'Pending']),
-            array_merge($checklistTasks[9], ['status' => 'Pending']),
-            array_merge($checklistTasks[10], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
             array_merge($checklistTasks[11], ['status' => 'Pending']),
-            array_merge($checklistTasks[12], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
             array_merge($checklistTasks[13], ['status' => 'Pending']),
             array_merge($checklistTasks[14], ['status' => 'Pending']),
         ],
-       
+        'Production Orders' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
+            array_merge($checklistTasks[7], ['status' => 'Pending']),
+            array_merge($checklistTasks[8], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
+            array_merge($checklistTasks[11], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
+            array_merge($checklistTasks[13], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Complete']),
+        ],
+        'Shop Floor (MES)' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
+            array_merge($checklistTasks[7], ['status' => 'Pending']),
+            array_merge($checklistTasks[8], ['status' => 'Complete']), // Export Scan Logs
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
+            array_merge($checklistTasks[11], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
+            array_merge($checklistTasks[13], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Complete']),
+        ],
+        'Quality Management' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
+            array_merge($checklistTasks[7], ['status' => 'Pending']),
+            array_merge($checklistTasks[8], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
+            array_merge($checklistTasks[11], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
+            array_merge($checklistTasks[13], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Complete']),
+        ],
+        'Manufacturing Intelligence' => [
+            array_merge($checklistTasks[0], ['status' => 'Complete']),
+            array_merge($checklistTasks[1], ['status' => 'Complete']),
+            array_merge($checklistTasks[2], ['status' => 'Complete']),
+            array_merge($checklistTasks[3], ['status' => 'Complete']),
+            array_merge($checklistTasks[4], ['status' => 'Complete']),
+            array_merge($checklistTasks[5], ['status' => 'Complete']),
+            array_merge($checklistTasks[6], ['status' => 'Complete']),
+            array_merge($checklistTasks[7], ['status' => 'Pending']),
+            array_merge($checklistTasks[8], ['status' => 'Pending']),
+            array_merge($checklistTasks[9], ['status' => 'Complete']),
+            array_merge($checklistTasks[10], ['status' => 'Complete']),
+            array_merge($checklistTasks[11], ['status' => 'Pending']),
+            array_merge($checklistTasks[12], ['status' => 'Complete']),
+            array_merge($checklistTasks[13], ['status' => 'Pending']),
+            array_merge($checklistTasks[14], ['status' => 'Complete']),
+        ],
     ];
+
+    // Compute Overall Statistics
+    $totalCompletedTasks = 0;
+    $totalTasksCount = 0;
+    $moduleCompletionRates = [];
+    $allowedCompleteStatuses = ['Complete', 'Developer Complete', 'Internal Testing Complete', 'External Testing Complete'];
+    
+    foreach ($tabData as $modName => $tasks) {
+        $completedCount = 0;
+        $moduleTasksCount = count($tasks);
+        foreach ($tasks as $t) {
+            if (in_array($t['status'], $allowedCompleteStatuses)) {
+                $completedCount++;
+            }
+        }
+        $rate = $moduleTasksCount > 0 ? round(($completedCount / $moduleTasksCount) * 100) : 0;
+        $moduleCompletionRates[$modName] = $rate;
+        $totalCompletedTasks += $completedCount;
+        $totalTasksCount += $moduleTasksCount;
+    }
+    
+    $overallCompletionRate = $totalTasksCount > 0 ? round(($totalCompletedTasks / $totalTasksCount) * 100) : 0;
+    
+    $activeModulesCount = count(array_filter($moduleCompletionRates, function($rate) {
+        return $rate >= 70;
+    }));
 @endphp
 
 @section('content')
+    <!-- Production Overview Dashboard -->
+    <div class="row g-4 mb-4">
+        <!-- Overall Progress Card -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">
+                <div class="card-body p-4 text-white">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="text-uppercase text-white-50 fw-bold fs-12 mb-0">Overall Completion</h6>
+                        <div class="bg-white bg-opacity-20 p-2 rounded-circle">
+                            <i class="feather-trending-up text-white fs-18"></i>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-baseline mb-2">
+                        <h2 class="fw-bold mb-0 text-white display-6">{{ $overallCompletionRate }}%</h2>
+                    </div>
+                    <div class="progress bg-white bg-opacity-20" style="height: 6px;">
+                        <div class="progress-bar bg-white" role="progressbar" style="width: {{ $overallCompletionRate }}%;" aria-valuenow="{{ $overallCompletionRate }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <small class="text-white-50 mt-2 d-block">Average across all 12 sub-modules</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Checklist Card -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-white">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3 text-dark">
+                        <h6 class="text-uppercase text-muted fw-bold fs-12 mb-0">Checklist Tasks</h6>
+                        <div class="bg-soft-primary p-2 rounded-circle text-primary">
+                            <i class="feather-check-square fs-18"></i>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-baseline mb-2">
+                        <h2 class="fw-bold text-dark mb-0 display-6">{{ $totalCompletedTasks }} <span class="fs-18 text-muted">/ {{ $totalTasksCount }}</span></h2>
+                    </div>
+                    <div class="progress bg-light" style="height: 6px;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ ($totalCompletedTasks / $totalTasksCount) * 100 }}%;" aria-valuenow="{{ $totalCompletedTasks }}" aria-valuemin="0" aria-valuemax="{{ $totalTasksCount }}"></div>
+                    </div>
+                    <small class="text-muted mt-2 d-block">Task completeness ratio</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sub-Modules Card -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-white">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3 text-dark">
+                        <h6 class="text-uppercase text-muted fw-bold fs-12 mb-0">Sub-Modules Status</h6>
+                        <div class="bg-soft-success p-2 rounded-circle text-success">
+                            <i class="feather-layers fs-18"></i>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-baseline mb-2">
+                        <h2 class="fw-bold text-dark mb-0 display-6">{{ $activeModulesCount }} <span class="fs-18 text-muted">/ 12 Active</span></h2>
+                    </div>
+                    <div class="progress bg-light" style="height: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ ($activeModulesCount / 12) * 100 }}%;" aria-valuenow="{{ $activeModulesCount }}" aria-valuemin="0" aria-valuemax="12"></div>
+                    </div>
+                    <small class="text-muted mt-2 d-block">Sub-modules with &ge; 70% completion</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Task List Card with Tabs -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">Lead Module Task Status Tracker</h5>
+            <h5 class="card-title mb-0">Production Module Task Status Tracker</h5>
         </div>
         <div class="card-body p-0">
             <!-- Tab Navigation -->
-            <ul class="nav nav-tabs erp-horizontal-tabs px-4 pt-3" id="trackStatusTabs" role="tablist">
+            <ul class="nav nav-tabs erp-horizontal-tabs px-4 pt-3" id="trackStatusTabs" role="tablist" style="overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch;">
                 @php $isFirst = true; @endphp
-                @foreach (array_keys($tabData) as $tabName)
+                @foreach ($tabData as $tabName => $tasks)
                     @php 
                         $tabId = Str::slug($tabName); 
+                        $rate = $moduleCompletionRates[$tabName];
+                        $badgeClass = 'bg-soft-primary text-primary';
+                        if ($rate >= 80) $badgeClass = 'bg-soft-success text-success';
+                        elseif ($rate >= 70) $badgeClass = 'bg-soft-info text-info';
+                        elseif ($rate >= 50) $badgeClass = 'bg-soft-warning text-warning';
                     @endphp
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link {{ $isFirst ? 'active' : '' }}" 
+                        <button class="nav-link {{ $isFirst ? 'active' : '' }} text-nowrap" 
                                 id="{{ $tabId }}-tab" 
                                 data-bs-toggle="tab" 
                                 data-bs-target="#{{ $tabId }}" 
@@ -229,6 +430,7 @@
                                 aria-controls="{{ $tabId }}" 
                                 aria-selected="{{ $isFirst ? 'true' : 'false' }}">
                             {{ $tabName }}
+                            <span class="badge {{ $badgeClass }} ms-2 fs-10 px-2 py-1 rounded-pill">{{ $rate }}%</span>
                         </button>
                     </li>
                     @php $isFirst = false; @endphp
@@ -241,11 +443,22 @@
                 @foreach ($tabData as $tabName => $tasks)
                     @php 
                         $tabId = Str::slug($tabName); 
+                        $rate = $moduleCompletionRates[$tabName];
                     @endphp
                     <div class="tab-pane fade {{ $isFirst ? 'show active' : '' }}" 
                          id="{{ $tabId }}" 
                          role="tabpanel" 
                          aria-labelledby="{{ $tabId }}-tab">
+                        <div class="px-4 py-3 bg-light bg-opacity-50 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="fw-bold text-dark fs-14">{{ $tabName }} Progress</span>
+                                <div class="progress" style="width: 150px; height: 6px; margin-bottom: 0;">
+                                    <div class="progress-bar {{ $rate >= 80 ? 'bg-success' : ($rate >= 70 ? 'bg-info' : 'bg-warning') }}" role="progressbar" style="width: {{ $rate }}%;" aria-valuenow="{{ $rate }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <span class="text-muted fs-12">{{ $rate }}% Completed ({{ count(array_filter($tasks, function($t) use ($allowedCompleteStatuses) { return in_array($t['status'], $allowedCompleteStatuses); })) }}/{{ count($tasks) }} tasks)</span>
+                            </div>
+                            <span class="badge bg-soft-primary text-primary px-3 py-1 fs-12">Production Module</span>
+                        </div>
                         <div class="table-responsive">
                             <table class="table mb-0 align-middle table-hover">
                                 <thead class="table-light fs-11 text-uppercase text-muted">

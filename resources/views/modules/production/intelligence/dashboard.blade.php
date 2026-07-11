@@ -5,6 +5,36 @@
 @section('breadcrumb', 'Manufacturing Intelligence')
 
 @section('page-actions')
+    <form method="GET" action="{{ route('production.intelligence.dashboard') }}" class="d-inline me-2">
+        <x-ui.filter label="Filter" offset="0, 5">
+            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Work Center</label>
+                <x-ui.odoo-form-ui type="select" name="work_center_id">
+                    <option value="">All Work Centers</option>
+                    @foreach($workCenters as $wc)
+                        <option value="{{ $wc->id }}" {{ request('work_center_id') == $wc->id ? 'selected' : '' }}>{{ $wc->name }}</option>
+                    @endforeach
+                </x-ui.odoo-form-ui>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Start Date</label>
+                <x-ui.odoo-form-ui type="input" inputType="date" name="date_start" value="{{ request('date_start', today()->toDateString()) }}" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">End Date</label>
+                <x-ui.odoo-form-ui type="input" inputType="date" name="date_end" value="{{ request('date_end', today()->toDateString()) }}" />
+            </div>
+
+            <div class="d-flex gap-2 justify-content-end mt-4">
+                <a href="{{ route('production.intelligence.dashboard') }}" class="btn btn-sm btn-light border">Reset</a>
+                <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+            </div>
+        </x-ui.filter>
+    </form>
     <button type="button" class="btn btn-primary me-2" onclick="saveDashboardPrefs()">
         <i class="feather-save me-2"></i>Save Layout Preferences
     </button>
@@ -18,30 +48,6 @@
         @if (session('success'))
             <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
         @endif
-
-        {{-- Filters Section --}}
-        <form method="GET" action="{{ route('production.intelligence.dashboard') }}" class="row g-3 mb-4 pb-4 border-bottom align-items-end">
-            <div class="col-md-3">
-                <label class="form-label fw-bold">Work Center</label>
-                <select name="work_center_id" class="form-select">
-                    <option value="">All Work Centers</option>
-                    @foreach($workCenters as $wc)
-                        <option value="{{ $wc->id }}" {{ request('work_center_id') == $wc->id ? 'selected' : '' }}>{{ $wc->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold">Start Date</label>
-                <input type="date" name="date_start" class="form-control" value="{{ request('date_start', today()->toDateString()) }}">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold">End Date</label>
-                <input type="date" name="date_end" class="form-control" value="{{ request('date_end', today()->toDateString()) }}">
-            </div>
-            <div class="col-md-3 d-flex gap-2">
-                <button type="submit" class="btn btn-dark w-100"><i class="feather-filter me-2"></i>Apply Filters</button>
-            </div>
-        </form>
 
         {{-- Widget Grid --}}
         <div class="row g-4" id="executive-widgets">

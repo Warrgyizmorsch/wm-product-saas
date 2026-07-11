@@ -6,54 +6,61 @@
 
 @section('content')
 <div class="erp-single-panel bg-white p-4">
-    {{-- Search and Filters Card --}}
-    <div class="card border shadow-sm mb-4">
-        <div class="card-header bg-light border-0 py-3">
-            <h6 class="fw-bold text-dark mb-0"><i class="feather-filter me-2 text-primary"></i>Filter Manufacturing Events</h6>
-        </div>
-        <div class="card-body">
-            <form action="{{ route('production.mes.timeline.index') }}" method="GET">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted text-uppercase">Machine</label>
-                        <select class="form-select fs-12" name="machine_id">
+    <!-- Toolbar: Sort, Filters -->
+    <div class="d-flex align-items-center mb-4">
+        <h5 class="fw-bold text-dark mb-0">
+            <i class="feather-activity me-2"></i>Manufacturing Audit Logs Stream
+        </h5>
+        <div class="d-flex gap-2 ms-auto">
+            <!-- Custom Filter Component -->
+            <form action="{{ route('production.mes.timeline.index') }}" method="GET" class="d-inline">
+                <x-ui.filter label="Filter" offset="0, 5">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Machine</label>
+                        <x-ui.odoo-form-ui type="select" name="machine_id">
                             <option value="">All Machines</option>
                             @foreach($machines as $machine)
                                 <option value="{{ $machine->id }}" {{ request('machine_id') == $machine->id ? 'selected' : '' }}>{{ $machine->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.odoo-form-ui>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted text-uppercase">Production Order</label>
-                        <select class="form-select fs-12" name="production_order_id">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Production Order</label>
+                        <x-ui.odoo-form-ui type="select" name="production_order_id">
                             <option value="">All Orders</option>
                             @foreach($orders as $order)
                                 <option value="{{ $order->id }}" {{ request('production_order_id') == $order->id ? 'selected' : '' }}>{{ $order->order_number }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.odoo-form-ui>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted text-uppercase">Operator</label>
-                        <select class="form-select fs-12" name="operator_id">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Operator</label>
+                        <x-ui.odoo-form-ui type="select" name="operator_id">
                             <option value="">All Operators</option>
                             @foreach($operators as $operator)
                                 <option value="{{ $operator->id }}" {{ request('operator_id') == $operator->id ? 'selected' : '' }}>{{ $operator->name }}</option>
                             @endforeach
-                        </select>
+                        </x-ui.odoo-form-ui>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted text-uppercase">Severity</label>
-                        <select class="form-select fs-12" name="severity">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Severity</label>
+                        <x-ui.odoo-form-ui type="select" name="severity">
                             <option value="">All Severities</option>
                             <option value="info" {{ request('severity') === 'info' ? 'selected' : '' }}>Info</option>
                             <option value="success" {{ request('severity') === 'success' ? 'selected' : '' }}>Success</option>
                             <option value="warning" {{ request('severity') === 'warning' ? 'selected' : '' }}>Warning</option>
                             <option value="critical" {{ request('severity') === 'critical' ? 'selected' : '' }}>Critical</option>
-                        </select>
+                        </x-ui.odoo-form-ui>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted text-uppercase">Event Source</label>
-                        <select class="form-select fs-12" name="event_source">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Event Source</label>
+                        <x-ui.odoo-form-ui type="select" name="event_source">
                             <option value="">All Sources</option>
                             <option value="ProductionOrderService" {{ request('event_source') === 'ProductionOrderService' ? 'selected' : '' }}>ProductionOrderService</option>
                             <option value="SchedulingService" {{ request('event_source') === 'SchedulingService' ? 'selected' : '' }}>SchedulingService</option>
@@ -63,31 +70,32 @@
                             <option value="MachineStateService" {{ request('event_source') === 'MachineStateService' ? 'selected' : '' }}>MachineStateService</option>
                             <option value="DowntimeService" {{ request('event_source') === 'DowntimeService' ? 'selected' : '' }}>DowntimeService</option>
                             <option value="System" {{ request('event_source') === 'System' ? 'selected' : '' }}>System</option>
-                        </select>
+                        </x-ui.odoo-form-ui>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted text-uppercase">Batch Code</label>
-                        <input type="text" class="form-control fs-12" name="batch_code" value="{{ request('batch_code') }}" placeholder="Search batch number...">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Batch Code</label>
+                        <x-ui.odoo-form-ui type="input" name="batch_code" value="{{ request('batch_code') }}" placeholder="Search batch number..." />
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted text-uppercase">Serial Code</label>
-                        <input type="text" class="form-control fs-12" name="serial_code" value="{{ request('serial_code') }}" placeholder="Search serial number...">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Serial Code</label>
+                        <x-ui.odoo-form-ui type="input" name="serial_code" value="{{ request('serial_code') }}" placeholder="Search serial number..." />
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fs-11 fw-bold text-muted text-uppercase">Event Date</label>
-                        <input type="date" class="form-control fs-12" name="date" value="{{ request('date') }}">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Event Date</label>
+                        <x-ui.odoo-form-ui type="input" inputType="date" name="date" value="{{ request('date') }}" />
                     </div>
-                </div>
-                <div class="d-flex justify-content-end gap-2 mt-3">
-                    <a href="{{ route('production.mes.timeline.index') }}" class="btn btn-sm btn-light fw-bold">Reset Filters</a>
-                    <button type="submit" class="btn btn-sm btn-primary fw-bold px-4">Apply Filters</button>
-                </div>
+
+                    <div class="d-flex gap-2 justify-content-end mt-4">
+                        <a href="{{ route('production.mes.timeline.index') }}" class="btn btn-sm btn-light border">Reset</a>
+                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                    </div>
+                </x-ui.filter>
             </form>
         </div>
     </div>
-
-    {{-- Timeline Stream --}}
-    <h5 class="fw-bold text-dark mb-4">
         <i class="feather-activity me-2"></i>Manufacturing Audit Logs Stream
     </h5>
 

@@ -362,10 +362,14 @@
                                     <td class="fw-bold">{{ $op->sequence }}</td>
                                     <td class="text-dark font-monospace fw-semibold">{{ $op->operation_number }}</td>
                                     <td>{{ $op->name }}</td>
-                                    <td>
-                                        <span class="fw-medium text-dark d-block">{{ $op->workCenter->name }}</span>
-                                        <small class="text-muted fs-10">{{ $op->workCenter->getHierarchyPath() }}</small>
-                                    </td>
+                                     <td>
+                                         <span class="fw-medium text-dark d-block">{{ $op->workCenter->name }}</span>
+                                         @if($op->workCenter->parent)
+                                             <small class="text-muted fs-10">
+                                                 {{ $op->workCenter->parent->parent ? $op->workCenter->parent->parent->name . ' › ' : '' }}{{ $op->workCenter->parent->name }}
+                                             </small>
+                                         @endif
+                                     </td>
                                     <td class="text-muted">{{ $op->machine ? $op->machine->name : 'Manual / None' }}</td>
                                     <td class="text-end">{{ number_format($op->setup_time_minutes, 1) }}</td>
                                     <td class="text-end">{{ number_format($op->processing_time_minutes, 1) }}</td>

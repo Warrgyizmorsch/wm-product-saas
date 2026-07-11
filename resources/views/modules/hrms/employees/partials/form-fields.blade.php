@@ -51,7 +51,7 @@
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="Employee Code" name="employee_id" id="{{ $prefix }}_employee_id" :required="true" :value="$fieldValue('employee_id')" placeholder="EMP-0001" :errorText="$errors->first('employee_id')" />
+                <x-ui.odoo-form-ui type="input" label="Employee Code" name="employee_id" id="{{ $prefix }}_employee_id" :required="false" :value="$fieldValue('employee_id')" placeholder="Auto-generated if left blank" :errorText="$errors->first('employee_id')" />
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="select" label="Reporting Manager" name="reporting_manager_id" id="{{ $prefix }}_reporting_manager_id" select2-selector="default" :errorText="$errors->first('reporting_manager_id')">

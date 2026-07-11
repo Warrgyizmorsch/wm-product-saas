@@ -445,10 +445,17 @@
                                         </td>
                                         <td class="align-middle">
                                             @if ($op->workCenter)
-                                                <a href="{{ route('production.work-centers.show', $op->work_center_id) }}" class="fw-semibold text-primary">
-                                                    {{ $op->workCenter->getHierarchyPath() }}
-                                                </a>
-                                                <small class="text-muted d-block fs-10">{{ $op->workCenter->code }}</small>
+                                                <div class="d-flex flex-column">
+                                                    <a href="{{ route('production.work-centers.show', $op->work_center_id) }}" class="fw-bold text-primary fs-13">
+                                                        {{ $op->workCenter->name }}
+                                                    </a>
+                                                    @if($op->workCenter->parent)
+                                                        <small class="text-muted fs-10">
+                                                            {{ $op->workCenter->parent->parent ? $op->workCenter->parent->parent->name . ' › ' : '' }}{{ $op->workCenter->parent->name }}
+                                                        </small>
+                                                    @endif
+                                                    <small class="text-secondary font-monospace fs-10 mt-1">{{ $op->workCenter->code }}</small>
+                                                </div>
                                             @else
                                                 <span class="text-danger">Missing</span>
                                             @endif

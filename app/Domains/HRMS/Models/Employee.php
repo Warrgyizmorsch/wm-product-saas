@@ -76,6 +76,39 @@ class Employee extends Model
         'status' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function ($employee): void {
+            if (empty($employee->employee_id)) {
+                // Load company name to generate the prefix
+                $company = $employee->company ?: \App\Domains\HRMS\Models\Company::find($employee->company_id);
+                $prefix = 'EMP';
+
+                if ($company && !empty($company->company_name)) {
+                    // Extract words
+                    $words = preg_split('/\s+/', trim(preg_replace('/[^A-Za-z0-9\s]/', '', $company->company_name))) ?: [];
+                    
+                    if (count($words) >= 2) {
+                        $prefix = '';
+                        foreach (array_slice($words, 0, 3) as $word) {
+                            $prefix .= substr($word, 0, 1);
+                        }
+                    } else if (isset($words[0]) && strlen($words[0]) > 0) {
+                        $prefix = substr($words[0], 0, 3);
+                    }
+                    $prefix = strtoupper($prefix);
+                }
+
+                // Get count of employees under the same company
+                $companyCount = self::query()->where('company_id', $employee->company_id)->count();
+                $nextSequence = $companyCount + 1;
+
+                // Format: PREFIX-XXXX (e.g. ACM-0001)
+                $employee->employee_id = $prefix . '-' . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);
+            }
+        });
+    }
+
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
@@ -134,6 +167,21 @@ class Employee extends Model
     public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
     {
         return $this->morphMany(Document::class, 'documentable');
+    }
+
+    public function employmentHistories(): HasMany
+    {
+        return $this->hasMany(EmployeeEmploymentHistory::class)->orderBy('start_date', 'desc');
+    }
+
+    public function assets(): HasMany
+    {
+        return $this->hasMany(Asset::class, 'assigned_employee_id');
+    }
+
+    public function assetRequests(): HasMany
+    {
+        return $this->hasMany(AssetRequest::class, 'employee_id')->orderBy('request_date', 'desc');
     }
 
     public function managedBranches(): HasMany
