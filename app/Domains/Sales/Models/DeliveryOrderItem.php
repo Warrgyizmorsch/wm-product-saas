@@ -20,6 +20,11 @@ class DeliveryOrderItem extends Model
         'warehouse_id',
         'batch_id',
         'quantity',
+        'quantity_ordered',
+        'quantity_reserved',
+        'status',
+        'purchase_requisition_id',
+        'production_order_id',
     ];
 
     protected $casts = [
@@ -29,6 +34,10 @@ class DeliveryOrderItem extends Model
         'warehouse_id' => 'integer',
         'batch_id' => 'integer',
         'quantity' => 'decimal:4',
+        'quantity_ordered' => 'decimal:4',
+        'quantity_reserved' => 'decimal:4',
+        'purchase_requisition_id' => 'integer',
+        'production_order_id' => 'integer',
     ];
 
     public function deliveryOrder(): BelongsTo
@@ -59,5 +68,20 @@ class DeliveryOrderItem extends Model
     public function serialNumbers(): HasMany
     {
         return $this->hasMany(\App\Domains\Inventory\Models\SerialNumber::class, 'delivery_order_item_id');
+    }
+
+    public function purchaseRequisition(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Purchase\Models\PurchaseRequisition::class, 'purchase_requisition_id');
+    }
+
+    public function productionOrder(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionOrder::class, 'production_order_id');
+    }
+
+    public function dispatchItems(): HasMany
+    {
+        return $this->hasMany(DispatchOrderItem::class, 'delivery_order_item_id');
     }
 }

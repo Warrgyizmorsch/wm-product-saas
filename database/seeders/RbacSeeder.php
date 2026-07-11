@@ -102,14 +102,34 @@ class RbacSeeder extends Seeder
             'sales.deliveries.create' => $permissions['sales.deliveries.create'],
             'sales.deliveries.ship' => $permissions['sales.deliveries.ship'],
             'sales.deliveries.cancel' => $permissions['sales.deliveries.cancel'],
+            'sales.dispatches.view' => $permissions['sales.dispatches.view'],
+            'sales.dispatches.create' => $permissions['sales.dispatches.create'],
+            'sales.invoices.view' => $permissions['sales.invoices.view'],
+            'sales.invoices.create' => $permissions['sales.invoices.create'],
+            'sales.invoices.send' => $permissions['sales.invoices.send'],
+            'sales.payments.view' => $permissions['sales.payments.view'],
+            'sales.payments.create' => $permissions['sales.payments.create'],
+            'sales.returns.view' => $permissions['sales.returns.view'],
+            'sales.returns.create' => $permissions['sales.returns.create'],
+            'sales.returns.complete' => $permissions['sales.returns.complete'],
         ], RolePermission::SCOPE_TENANT);
 
         // Creating an order has no existing record to own yet, so it's granted at
-        // tenant scope; deliveries are shared fulfillment work, not personally owned.
+        // tenant scope; deliveries/dispatches/invoices/payments/returns are shared
+        // order-to-cash fulfillment work, not personally owned.
         $this->grant($roles['sales_executive'], [
             'sales.orders.create' => $permissions['sales.orders.create'],
             'sales.deliveries.view' => $permissions['sales.deliveries.view'],
             'sales.deliveries.create' => $permissions['sales.deliveries.create'],
+            'sales.dispatches.view' => $permissions['sales.dispatches.view'],
+            'sales.dispatches.create' => $permissions['sales.dispatches.create'],
+            'sales.invoices.view' => $permissions['sales.invoices.view'],
+            'sales.invoices.create' => $permissions['sales.invoices.create'],
+            'sales.invoices.send' => $permissions['sales.invoices.send'],
+            'sales.payments.view' => $permissions['sales.payments.view'],
+            'sales.payments.create' => $permissions['sales.payments.create'],
+            'sales.returns.view' => $permissions['sales.returns.view'],
+            'sales.returns.create' => $permissions['sales.returns.create'],
         ], RolePermission::SCOPE_TENANT);
 
         // Viewing, updating, confirming, and cancelling orders is restricted to
@@ -191,11 +211,27 @@ class RbacSeeder extends Seeder
             ['name' => 'sales.deliveries.create', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'create'],
             ['name' => 'sales.deliveries.ship', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'ship'],
             ['name' => 'sales.deliveries.cancel', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'cancel'],
+            ['name' => 'sales.dispatches.view', 'module' => 'sales', 'entity' => 'dispatches', 'action' => 'view'],
+            ['name' => 'sales.dispatches.create', 'module' => 'sales', 'entity' => 'dispatches', 'action' => 'create'],
+            ['name' => 'sales.invoices.view', 'module' => 'sales', 'entity' => 'invoices', 'action' => 'view'],
+            ['name' => 'sales.invoices.create', 'module' => 'sales', 'entity' => 'invoices', 'action' => 'create'],
+            ['name' => 'sales.invoices.send', 'module' => 'sales', 'entity' => 'invoices', 'action' => 'send'],
+            ['name' => 'sales.payments.view', 'module' => 'sales', 'entity' => 'payments', 'action' => 'view'],
+            ['name' => 'sales.payments.create', 'module' => 'sales', 'entity' => 'payments', 'action' => 'create'],
+            ['name' => 'sales.returns.view', 'module' => 'sales', 'entity' => 'returns', 'action' => 'view'],
+            ['name' => 'sales.returns.create', 'module' => 'sales', 'entity' => 'returns', 'action' => 'create'],
+            ['name' => 'sales.returns.complete', 'module' => 'sales', 'entity' => 'returns', 'action' => 'complete'],
             ['name' => 'projects.projects.view', 'module' => 'projects', 'entity' => 'projects', 'action' => 'view'],
             ['name' => 'projects.projects.create', 'module' => 'projects', 'entity' => 'projects', 'action' => 'create'],
             ['name' => 'projects.projects.update', 'module' => 'projects', 'entity' => 'projects', 'action' => 'update'],
             ['name' => 'projects.projects.delete', 'module' => 'projects', 'entity' => 'projects', 'action' => 'delete'],
             ['name' => 'projects.members.manage', 'module' => 'projects', 'entity' => 'members', 'action' => 'manage'],
+            ['name' => 'projects.milestones.manage', 'module' => 'projects', 'entity' => 'milestones', 'action' => 'manage'],
+            ['name' => 'projects.tasklists.manage', 'module' => 'projects', 'entity' => 'tasklists', 'action' => 'manage'],
+            ['name' => 'projects.tasks.view', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'view'],
+            ['name' => 'projects.tasks.create', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'create'],
+            ['name' => 'projects.tasks.update', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'update'],
+            ['name' => 'projects.tasks.delete', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'delete'],
         ];
 
         $permissions = [];

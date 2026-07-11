@@ -18,6 +18,8 @@ class SalesReturnController extends Controller
 {
     public function index(): View
     {
+        $this->authorize('viewAny', SalesReturn::class);
+
         $returns = SalesReturn::with(['salesOrder.customer', 'deliveryOrder', 'invoice'])->latest()->get();
 
         return view('modules.sales.returns.index', [
@@ -27,6 +29,8 @@ class SalesReturnController extends Controller
 
     public function create(Request $request): View
     {
+        $this->authorize('create', SalesReturn::class);
+
         $salesOrders = SalesOrder::with('customer')->orderBy('sales_order_number')->get();
         $deliveries = DeliveryOrder::orderBy('delivery_number')->get();
         $invoices = Invoice::orderBy('invoice_number')->get();
@@ -49,6 +53,8 @@ class SalesReturnController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', SalesReturn::class);
+
         $validated = $request->validate([
             'return_number' => 'required|string',
             'return_date' => 'required|date',
@@ -64,15 +70,12 @@ class SalesReturnController extends Controller
         ]);
 
         $return = DB::transaction(function () use ($validated) {
-            $tenantId = 1; // Default tenant ID
-
             $totalRefundAmount = 0;
             foreach ($validated['items'] as $itemData) {
                 $totalRefundAmount += floatval($itemData['quantity']) * floatval($itemData['unit_price']);
             }
 
             $return = SalesReturn::create([
-                'tenant_id' => $tenantId,
                 'sales_order_id' => $validated['sales_order_id'] ?? null,
                 'delivery_order_id' => $validated['delivery_order_id'] ?? null,
                 'invoice_id' => $validated['invoice_id'] ?? null,
@@ -105,6 +108,8 @@ class SalesReturnController extends Controller
     {
         $return = SalesReturn::with(['salesOrder.customer', 'deliveryOrder', 'invoice', 'items.product', 'items.warehouse'])->findOrFail($id);
 
+        $this->authorize('view', $return);
+
         return view('modules.sales.returns.show', [
             'return' => $return,
         ]);
@@ -113,6 +118,8 @@ class SalesReturnController extends Controller
     public function complete(int $id): RedirectResponse
     {
         $return = SalesReturn::with('items.product')->findOrFail($id);
+
+        $this->authorize('complete', $return);
 
         if ($return->status !== 'Draft') {
             return back()->withErrors(['status' => 'Only Draft Returns can be completed.']);

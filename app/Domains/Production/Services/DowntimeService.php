@@ -10,7 +10,8 @@ use InvalidArgumentException;
 class DowntimeService
 {
     public function __construct(
-        private readonly MachineStateService $stateService
+        private readonly MachineStateService $stateService,
+        private readonly ProductionEventService $eventService
     ) {}
 
     /**
@@ -21,7 +22,7 @@ class DowntimeService
         int $machineId,
         string $category,
         string $reason,
-        int $userId,
+        ?int $userId = null,
         array $params = []
     ): ProductionMachineDowntime {
         return DB::transaction(function () use ($tenantId, $machineId, $category, $reason, $userId, $params) {
@@ -67,6 +68,19 @@ class DowntimeService
 
             $this->stateService->transitionState($tenantId, $machineId, $newState, $reason, $userId, $params['remarks'] ?? null);
 
+            $this->eventService->writeEvent($tenantId, [
+                'production_order_id'            => $downtime->production_order_id,
+                'production_order_operation_id'  => $downtime->production_order_operation_id,
+                'machine_id'                     => $machineId,
+                'operator_id'                    => $userId,
+                'event_type'                     => 'Downtime Started',
+                'title'                          => 'Downtime Started',
+                'description'                    => "Machine [{$machine->name}] has entered downtime ({$category}). Reason: {$reason}",
+                'severity'                       => 'warning',
+                'event_source'                   => 'DowntimeService',
+                'triggered_by'                   => $userId,
+            ]);
+
             return $downtime;
         });
     }
@@ -77,7 +91,7 @@ class DowntimeService
     public function endDowntime(
         int $tenantId,
         int $downtimeId,
-        int $userId,
+        ?int $userId = null,
         ?string $remarks = null
     ): ProductionMachineDowntime {
         return DB::transaction(function () use ($tenantId, $downtimeId, $userId, $remarks) {
@@ -100,6 +114,21 @@ class DowntimeService
 
             // Transition machine state back to Idle
             $this->stateService->transitionState($tenantId, $downtime->machine_id, 'Idle', 'Downtime Ended', $userId, $remarks);
+
+            $machineName = $downtime->machine ? $downtime->machine->name : 'Machine';
+
+            $this->eventService->writeEvent($tenantId, [
+                'production_order_id'            => $downtime->production_order_id,
+                'production_order_operation_id'  => $downtime->production_order_operation_id,
+                'machine_id'                     => $downtime->machine_id,
+                'operator_id'                    => $userId,
+                'event_type'                     => 'Downtime Ended',
+                'title'                          => 'Downtime Ended',
+                'description'                    => "Downtime on machine [{$machineName}] has ended.",
+                'severity'                       => 'info',
+                'event_source'                   => 'DowntimeService',
+                'triggered_by'                   => $userId,
+            ]);
 
             return $downtime;
         });

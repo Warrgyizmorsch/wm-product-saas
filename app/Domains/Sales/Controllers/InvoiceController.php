@@ -17,6 +17,8 @@ class InvoiceController extends Controller
 {
     public function index(): View
     {
+        $this->authorize('viewAny', Invoice::class);
+
         $invoices = Invoice::with('salesOrder.customer')->latest()->get();
 
         return view('modules.sales.invoices.index', [
@@ -26,6 +28,8 @@ class InvoiceController extends Controller
 
     public function create(Request $request): View
     {
+        $this->authorize('create', Invoice::class);
+
         $salesOrderId = $request->input('sales_order_id');
         $deliveryOrderId = $request->input('delivery_order_id');
 
@@ -110,6 +114,8 @@ class InvoiceController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', Invoice::class);
+
         $validated = $request->validate([
             'sales_order_id' => 'required|exists:sales_orders,id',
             'delivery_order_id' => 'nullable|exists:delivery_orders,id',
@@ -221,6 +227,8 @@ class InvoiceController extends Controller
     {
         $invoice = Invoice::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'allocations.payment', 'deliveryOrder'])->findOrFail($id);
 
+        $this->authorize('view', $invoice);
+
         // Sum of all allocations applied to this invoice
         $adjustedAmount = $invoice->allocations->sum('allocated_amount');
         $balanceDue = max(0.00, $invoice->grand_total - $adjustedAmount);
@@ -235,6 +243,8 @@ class InvoiceController extends Controller
     public function send(int $id): RedirectResponse
     {
         $invoice = Invoice::findOrFail($id);
+
+        $this->authorize('send', $invoice);
 
         if ($invoice->status === 'Draft') {
             $invoice->update(['status' => 'Sent']);

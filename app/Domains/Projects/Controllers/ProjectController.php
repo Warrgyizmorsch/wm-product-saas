@@ -3,13 +3,19 @@
 namespace App\Domains\Projects\Controllers;
 
 use App\Domains\CRM\Models\Customer;
+use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectMember;
+use App\Domains\Projects\Models\Task;
+use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Requests\StoreProjectRequest;
 use App\Domains\Projects\Requests\UpdateProjectRequest;
 use App\Domains\Projects\Services\ActivityLogService;
+use App\Domains\Projects\Services\MilestoneService;
 use App\Domains\Projects\Services\ProjectMemberService;
 use App\Domains\Projects\Services\ProjectService;
+use App\Domains\Projects\Services\TaskListService;
+use App\Domains\Projects\Services\TaskService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +28,9 @@ class ProjectController extends Controller
         private readonly ProjectService $projects,
         private readonly ActivityLogService $activity,
         private readonly ProjectMemberService $members,
+        private readonly MilestoneService $milestones,
+        private readonly TaskListService $taskLists,
+        private readonly TaskService $tasks,
     ) {
     }
 
@@ -63,13 +72,29 @@ class ProjectController extends Controller
         $this->authorize('view', $project);
 
         $canManageMembers = auth()->user()->can('manage', [ProjectMember::class, $project]);
+        $canManageMilestones = auth()->user()->can('manage', [Milestone::class, $project]);
+        $canManageTaskLists = auth()->user()->can('manage', [TaskList::class, $project]);
+        $canCreateTasks = auth()->user()->can('create', [Task::class, $project]);
+
+        $taskLists = $this->taskLists->list($project);
+        $allTasks = $this->tasks->list($project);
+        $tasksByList = $allTasks->groupBy('task_list_id');
 
         return view('modules.projects.show', [
-            'project'          => $project,
-            'activities'       => $this->activity->forProject($project),
-            'members'          => $this->members->list($project),
-            'canManageMembers' => $canManageMembers,
-            'tenantUsers'      => $canManageMembers
+            'project'             => $project,
+            'members'             => $this->members->list($project),
+            'canManageMembers'    => $canManageMembers,
+            'milestones'          => $this->milestones->list($project),
+            'canManageMilestones' => $canManageMilestones,
+            'taskLists'           => $taskLists,
+            'canManageTaskLists'  => $canManageTaskLists,
+            'tasksByList'         => $tasksByList,
+            'allTasks'            => $allTasks->keyBy('id'),
+            'canCreateTasks'      => $canCreateTasks,
+            'activeMembers'       => ($canManageMembers || $canManageMilestones || $canManageTaskLists || $canCreateTasks)
+                ? $this->members->list($project)->where('is_active', true)
+                : collect(),
+            'tenantUsers'         => ($canManageMembers || $canManageMilestones || $canManageTaskLists)
                 ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
                 : collect(),
         ]);

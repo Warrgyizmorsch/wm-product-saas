@@ -38,6 +38,11 @@ class StoreWorkCenterRequest extends FormRequest
                 'nullable', 'string',
                 Rule::in(['department', 'section', 'work_center', 'machine_group'])
             ],
+            'shifts'                => 'nullable|array',
+            'shifts.*'              => [
+                'integer',
+                Rule::exists('production_shifts', 'id')->where('tenant_id', $tenantId)
+            ],
         ];
     }
 

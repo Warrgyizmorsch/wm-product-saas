@@ -104,4 +104,17 @@ class HrmsAuthorizationTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    /** @test */
+    public function a_role_without_hr_permission_cannot_create_a_pay_group(): void
+    {
+        $response = $this->actingAs($this->salesExecutive)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('hrms.salary-structure.pay-group.store'), [
+                'name' => 'Unauthorized Pay Group',
+                'status' => '1',
+            ]);
+
+        $response->assertForbidden();
+    }
 }

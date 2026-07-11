@@ -6,6 +6,9 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
+        <a href="javascript:void(0);" onclick="openActivityDrawer('{{ route('projects.activity', $project) }}')" class="btn btn-light">
+            <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
+        </a>
         <a href="{{ route('projects.edit', $project) }}" class="btn btn-light">
             <i class="feather-edit-2 me-2"></i>{{ __('projects.edit') }}
         </a>
@@ -37,7 +40,7 @@
     @endif
 
     <div class="row g-4">
-        <div class="col-xl-8">
+        <div class="col-12">
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between">
                     <h5 class="card-title mb-0 fw-bold text-dark">
@@ -89,15 +92,15 @@
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.billing_method') }}</span>
                             <span class="fw-semibold text-dark">{{ $project->billing_method ? __('projects.billing_methods.' . $project->billing_method) : '—' }}</span>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.budget_type') }}</span>
                             <span class="fw-semibold text-dark">{{ $project->budget_type ? __('projects.budget_types.' . $project->budget_type) : '—' }}</span>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.budget_amount') }}</span>
                             <span class="fw-semibold text-dark">{{ $project->budget_amount !== null ? number_format((float) $project->budget_amount, 2) : '—' }}</span>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.budget_hours') }}</span>
                             <span class="fw-semibold text-dark">{{ $project->budget_hours !== null ? number_format((float) $project->budget_hours, 2) : '—' }}</span>
                         </div>
@@ -111,18 +114,82 @@
                 </div>
             </div>
         </div>
-
-        <div class="col-xl-4">
-            @include('modules.projects._activity-feed', [
-                'activities' => $activities,
-                'viewAllUrl' => route('projects.activity', $project),
-            ])
-        </div>
     </div>
 
     <div class="row g-4 mt-1">
         <div class="col-12">
-            @include('modules.projects._members')
+            @php
+                $activeProjectTab = in_array(request('tab'), ['members', 'milestones', 'tasklists'], true)
+                    ? request('tab')
+                    : (in_array(old('_tasklist_form'), ['add', 'edit'], true) ? 'tasklists'
+                        : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'members'));
+                $projectDetailTabs = [
+                    ['id' => 'tab-members', 'label' => __('projects.members'), 'icon' => 'feather-users', 'active' => $activeProjectTab === 'members'],
+                    ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
+                    ['id' => 'tab-tasklists', 'label' => __('projects.tasklists'), 'icon' => 'feather-list', 'active' => $activeProjectTab === 'tasklists'],
+                ];
+            @endphp
+            <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" />
+
+            <div class="tab-content mt-3">
+                <div class="tab-pane fade {{ $activeProjectTab === 'members' ? 'show active' : '' }}" id="tab-members" role="tabpanel" aria-labelledby="tab-members-tab">
+                    @include('modules.projects._members')
+                </div>
+                <div class="tab-pane fade {{ $activeProjectTab === 'milestones' ? 'show active' : '' }}" id="tab-milestones" role="tabpanel" aria-labelledby="tab-milestones-tab">
+                    @include('modules.projects._milestones')
+                </div>
+                <div class="tab-pane fade {{ $activeProjectTab === 'tasklists' ? 'show active' : '' }}" id="tab-tasklists" role="tabpanel" aria-labelledby="tab-tasklists-tab">
+                    @include('modules.projects._tasklists')
+                </div>
+            </div>
         </div>
     </div>
+
+    <x-ui.drawer id="activityLogDrawer" title="Activity History" position="end" style="width: 480px; max-width: 100%;">
+        <div id="activityLogDrawerContent">
+            <div class="text-center py-5 text-muted">
+                <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                <div class="fs-12">{{ __('ui.loading') }}</div>
+            </div>
+        </div>
+    </x-ui.drawer>
+
+    @push('scripts')
+        <script>
+            function openActivityDrawer(url) {
+                var drawerEl = document.getElementById('activityLogDrawer');
+                if (!drawerEl) return;
+
+                var offcanvas = bootstrap.Offcanvas.getOrCreateInstance(drawerEl);
+                offcanvas.show();
+
+                var contentEl = document.getElementById('activityLogDrawerContent');
+                contentEl.innerHTML = `
+                    <div class="text-center py-5 text-muted">
+                        <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                        <div class="fs-12">{{ __('ui.loading') }}</div>
+                    </div>
+                `;
+
+                fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.text())
+                .then(html => {
+                    contentEl.innerHTML = html;
+                })
+                .catch(err => {
+                    console.error(err);
+                    contentEl.innerHTML = `
+                        <div class="text-center py-5 text-danger">
+                            <i class="feather-alert-triangle fs-2 mb-2 d-block"></i>
+                            Failed to load activities.
+                        </div>
+                    `;
+                });
+            }
+        </script>
+    @endpush
 @endsection

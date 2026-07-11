@@ -143,4 +143,15 @@ class InventoryAuthorizationTest extends TestCase
         $response->assertForbidden();
         $this->assertNotNull($product->fresh());
     }
+
+    /** @test */
+    public function inventory_manager_can_access_material_requirements(): void
+    {
+        $response = $this->actingAs($this->inventoryManager)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('inventory.requirements.index'));
+
+        $response->assertStatus(200);
+        $response->assertViewIs('modules.inventory.requirements.index');
+    }
 }

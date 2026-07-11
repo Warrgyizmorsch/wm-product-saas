@@ -17,6 +17,8 @@ class CustomerPaymentController extends Controller
 {
     public function index(): View
     {
+        $this->authorize('viewAny', CustomerPayment::class);
+
         $payments = CustomerPayment::with('customer')->latest()->get();
 
         return view('modules.sales.payments.index', [
@@ -26,6 +28,8 @@ class CustomerPaymentController extends Controller
 
     public function create(Request $request): View
     {
+        $this->authorize('create', CustomerPayment::class);
+
         $customers = Customer::orderBy('name')->get();
         
         // Confirmed sales orders to receive advance for
@@ -52,6 +56,8 @@ class CustomerPaymentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', CustomerPayment::class);
+
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'payment_number' => 'required|string',
@@ -67,7 +73,6 @@ class CustomerPaymentController extends Controller
 
         $payment = DB::transaction(function () use ($validated) {
             $payment = CustomerPayment::create([
-                'tenant_id' => 1, // Default tenant ID
                 'customer_id' => $validated['customer_id'],
                 'payment_number' => $validated['payment_number'],
                 'payment_date' => $validated['payment_date'],
@@ -82,7 +87,6 @@ class CustomerPaymentController extends Controller
             $allocateTo = $validated['allocate_to'] ?? 'unallocated';
             if ($allocateTo === 'sales_order' && !empty($validated['sales_order_id'])) {
                 PaymentAllocation::create([
-                    'tenant_id' => 1,
                     'customer_payment_id' => $payment->id,
                     'sales_order_id' => $validated['sales_order_id'],
                     'invoice_id' => null,
@@ -90,7 +94,6 @@ class CustomerPaymentController extends Controller
                 ]);
             } elseif ($allocateTo === 'invoice' && !empty($validated['invoice_id'])) {
                 PaymentAllocation::create([
-                    'tenant_id' => 1,
                     'customer_payment_id' => $payment->id,
                     'sales_order_id' => null,
                     'invoice_id' => $validated['invoice_id'],
@@ -119,6 +122,8 @@ class CustomerPaymentController extends Controller
     public function show(int $id): View
     {
         $payment = CustomerPayment::with(['customer', 'allocations.salesOrder', 'allocations.invoice'])->findOrFail($id);
+
+        $this->authorize('view', $payment);
 
         return view('modules.sales.payments.show', [
             'payment' => $payment,

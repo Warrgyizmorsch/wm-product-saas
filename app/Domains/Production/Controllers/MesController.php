@@ -32,6 +32,7 @@ class MesController extends Controller
 
         // Running operations in this tenant
         $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
             ->orderBy('planned_start')
             ->get();
@@ -91,7 +92,7 @@ class MesController extends Controller
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         try {
-            $this->mesService->pauseOperation($op, $request->input('remarks'));
+            $this->mesService->pauseOperation($op, $request->input('remarks'), auth()->id());
             return redirect()->back()->with('success', 'Operation paused.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -103,7 +104,7 @@ class MesController extends Controller
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
 
         try {
-            $this->mesService->resumeOperation($op);
+            $this->mesService->resumeOperation($op, auth()->id());
             return redirect()->back()->with('success', 'Operation resumed.');
         } catch (InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());

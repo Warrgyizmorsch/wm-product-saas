@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Controllers;
 
+use App\Domains\Projects\Concerns\BuildsBackUrl;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectMember;
 use App\Domains\Projects\Requests\StoreProjectMemberRequest;
@@ -12,6 +13,8 @@ use Illuminate\Http\RedirectResponse;
 
 class ProjectMemberController extends Controller
 {
+    use BuildsBackUrl;
+
     public function __construct(
         private readonly ProjectMemberService $members,
     ) {
@@ -24,7 +27,7 @@ class ProjectMemberController extends Controller
         $this->members->add($project, $request->validated());
 
         return redirect()
-            ->route('projects.show', $project)
+            ->to($this->backUrlWithQuery(route('projects.show', $project), ['member_page' => 1, 'tab' => 'members']))
             ->with('success', __('projects.member_added'));
     }
 
@@ -41,7 +44,7 @@ class ProjectMemberController extends Controller
         $this->members->update($member, $request->validated());
 
         return redirect()
-            ->route('projects.show', $project)
+            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'members']))
             ->with('success', __('projects.member_updated'));
     }
 
@@ -59,7 +62,7 @@ class ProjectMemberController extends Controller
         $this->members->setActive($member, !$wasActive);
 
         return redirect()
-            ->route('projects.show', $project)
+            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'members']))
             ->with('success', $wasActive ? __('projects.member_deactivated') : __('projects.member_activated'));
     }
 
@@ -76,7 +79,7 @@ class ProjectMemberController extends Controller
         $this->members->remove($member);
 
         return redirect()
-            ->route('projects.show', $project)
+            ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'members']))
             ->with('success', __('projects.member_removed'));
     }
 }

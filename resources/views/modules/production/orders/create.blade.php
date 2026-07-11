@@ -14,6 +14,20 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
         $(document).ready(function () {
+            // Handle Sales Order item autofill
+            $('#product_select').on('change', function () {
+                var selectedOption = $(this).find('option:selected');
+                var qty = selectedOption.data('qty');
+                var soItemId = selectedOption.data('so-item-id');
+                
+                if (qty !== undefined) {
+                    $('input[name="quantity_ordered"]').val(qty);
+                }
+                if (soItemId !== undefined) {
+                    $('#sales_order_item_id').val(soItemId);
+                }
+            });
+
             // When product changes, dynamically load approved BOMs and active Routings
             $('#product_select').on('change', function () {
                 var productId = $(this).val();
@@ -72,14 +86,32 @@
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
-                        <x-ui.odoo-form-ui type="select" label="Target Product" name="product_id" id="product_select" :required="true">
-                            <option value="">Select Finished Good or Semi-Finished Product...</option>
-                            @foreach($products as $product)
-                                <option value="{{ $product->id }}" @selected(old('product_id') == $product->id)>
-                                    {{ $product->name }} ({{ $product->sku }})
-                                </option>
-                            @endforeach
-                        </x-ui.odoo-form-ui>
+                        @if(isset($salesOrder) && $salesOrder)
+                            <input type="hidden" name="sales_order_id" value="{{ $salesOrder->id }}">
+                            <input type="hidden" name="sales_order_item_id" id="sales_order_item_id" value="{{ old('sales_order_item_id') }}">
+
+                            <x-ui.odoo-form-ui type="input" label="Sales Order" name="sales_order_number" :value="$salesOrder->sales_order_number" readonly="true" style="font-weight: bold; background-color: #f8f9fa;" />
+
+                            <x-ui.odoo-form-ui type="select" label="Target Product (from Sales Order)" name="product_id" id="product_select" :required="true">
+                                <option value="">Select Target Product...</option>
+                                @foreach($salesOrderItems as $item)
+                                    @if($item->product)
+                                        <option value="{{ $item->product->id }}" data-qty="{{ $item->quantity }}" data-so-item-id="{{ $item->id }}" @selected(old('product_id') == $item->product->id)>
+                                            {{ $item->product->name }} ({{ $item->product->sku }}) — Qty: {{ (int)$item->quantity }}
+                                        </option>
+                                    @endif
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        @else
+                            <x-ui.odoo-form-ui type="select" label="Target Product" name="product_id" id="product_select" :required="true">
+                                <option value="">Select Finished Good or Semi-Finished Product...</option>
+                                @foreach($products as $product)
+                                    <option value="{{ $product->id }}" @selected(old('product_id') == $product->id)>
+                                        {{ $product->name }} ({{ $product->sku }})
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        @endif
 
                         <x-ui.odoo-form-ui type="select" label="Bill of Materials" name="bom_id" id="bom_select">
                             <option value="">Auto-select (Latest Approved BOM)</option>

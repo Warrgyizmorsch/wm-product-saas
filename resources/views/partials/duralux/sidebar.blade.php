@@ -31,12 +31,16 @@
             ]],
             ['label' => __('ui.projects'), 'icon' => 'feather-briefcase', 'url' => '#', 'children' => [
                 ['label' => __('ui.projects'), 'route' => 'projects.index'],
-                'Milestones',
+                ['label' => __('projects.milestones'), 'route' => 'projects.milestones.index'],
                 'Tasks',
                 'Timesheets',
             ]],
         ],
         __('ui.supply_chain') => [
+            ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
+                ['label' => 'Delivery Orders', 'route' => 'sales.deliveries.index'],
+                ['label' => 'Dispatch Orders', 'route' => 'sales.dispatches.index'],
+            ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],
             ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', 'Requests', 'Purchase Orders', 'Bills']],
         ],

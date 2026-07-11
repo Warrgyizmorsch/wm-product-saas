@@ -2,10 +2,10 @@
 
 namespace App\Domains\Sales\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class PaymentAllocation extends Model
+class PaymentAllocation extends BaseModel
 {
     protected $fillable = [
         'tenant_id',

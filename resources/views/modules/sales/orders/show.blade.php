@@ -23,6 +23,14 @@
             <a href="{{ route('sales.deliveries.create', ['sales_order_id' => $order->id]) }}" class="btn btn-primary d-print-none">
                 <i class="feather-truck me-2"></i>Create Delivery
             </a>
+            @php
+                $hasManufactureItems = $order->items->contains(fn($item) => $item->product?->supplier_method === 'manufacture');
+            @endphp
+            @if ($hasManufactureItems)
+                <a href="{{ route('production.orders.create', ['sales_order_id' => $order->id]) }}" class="btn btn-warning d-print-none">
+                    <i class="feather-cpu me-2"></i>Create MO
+                </a>
+            @endif
         @endif
 
         @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
@@ -86,6 +94,7 @@
             ['id' => 'tab-invoices', 'label' => 'Invoices (' . $order->invoices->count() . ')', 'active' => false, 'icon' => 'feather-file-text'],
             ['id' => 'tab-payments', 'label' => 'Payments & Advances (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
             ['id' => 'tab-returns', 'label' => 'Returns (' . $order->returns->count() . ')', 'active' => false, 'icon' => 'feather-rotate-ccw'],
+            ['id' => 'tab-production', 'label' => 'Manufacturing Orders (MO) (' . ($order->productionOrders ?? collect())->count() . ')', 'active' => false, 'icon' => 'feather-cpu'],
         ];
     @endphp
 
@@ -184,13 +193,38 @@
                                     <tr>
                                         <td class="ps-3 text-muted text-center">{{ $index + 1 }}</td>
                                         <td>
-                                            <strong class="text-dark">{{ $item->item_name }}</strong>
-                                            @if($item->product?->sku)
-                                                <small class="text-muted d-block mt-0.5">SKU: {{ $item->product->sku }}</small>
-                                            @endif
-                                            @if($item->description)
-                                                <small class="text-muted d-block mt-0.5">{{ $item->description }}</small>
-                                            @endif
+                                            <div class="d-flex align-items-center justify-content-between">
+                                                <div>
+                                                    <strong class="text-dark">{{ $item->item_name }}</strong>
+                                                    @if($item->product?->sku)
+                                                        <small class="text-muted d-block mt-0.5">SKU: {{ $item->product->sku }}</small>
+                                                    @endif
+                                                    @if($item->description)
+                                                        <small class="text-muted d-block mt-0.5">{{ $item->description }}</small>
+                                                    @endif
+                                                </div>
+                                                <div class="text-end">
+                                                    @php
+                                                        $method = $item->product?->supplier_method ?? 'buy';
+                                                    @endphp
+                                                    @if ($method === 'manufacture')
+                                                        <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold d-inline-block">Manufacture</span>
+                                                        @php
+                                                            $linkedMo = $order->productionOrders->firstWhere('sales_order_item_id', $item->id);
+                                                        @endphp
+                                                        @if ($linkedMo)
+                                                            <div class="mt-1">
+                                                                <a href="{{ route('production.orders.show', $linkedMo->id) }}" class="text-primary fw-bold fs-11">
+                                                                    <i class="feather-cpu me-1"></i>{{ $linkedMo->order_number }}
+                                                                </a>
+                                                                <span class="badge bg-soft-secondary text-secondary px-1 py-0.2 fs-10">{{ ucfirst($linkedMo->status) }}</span>
+                                                            </div>
+                                                        @endif
+                                                    @else
+                                                        <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold d-inline-block">Buy</span>
+                                                    @endif
+                                                </div>
+                                            </div>
                                         </td>
                                         <td>
                                             {{ $item->warehouse?->name ?: '—' }}
@@ -331,7 +365,13 @@
                                                     <x-ui.dropdown-item href="{{ route('sales.deliveries.show', $do->id) }}" icon="feather-eye">
                                                         View Details
                                                     </x-ui.dropdown-item>
-                                                    @if ($do->status === 'Shipped' && !$invoiced)
+                                                    @php
+                                                        $invoicePolicy = config('sales.invoice_policy', 'On Dispatch');
+                                                        $canInvoice = ($invoicePolicy === 'On Dispatch') 
+                                                            ? in_array($do->status, ['Dispatched', 'Delivered', 'Shipped']) 
+                                                            : ($do->status === 'Delivered');
+                                                    @endphp
+                                                    @if ($canInvoice && !$invoiced)
                                                         <x-ui.dropdown-item href="{{ route('sales.invoices.create', ['delivery_order_id' => $do->id]) }}" icon="feather-file-text">
                                                             Create Invoice
                                                         </x-ui.dropdown-item>
@@ -504,6 +544,78 @@
                                         <td colspan="5" class="text-center py-5 text-muted">
                                             <i class="feather-rotate-ccw fs-1 mb-2 d-block text-gray-300"></i>
                                             No returns processed for this Sales Order yet.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- TAB 6: Manufacturing Orders (MO) -->
+                <div class="tab-pane fade" id="tab-production">
+                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
+                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-cpu me-2 text-primary"></i>Manufacturing Orders (MO)</h5>
+                        @php
+                            $hasManufactureItems = $order->items->contains(fn($item) => $item->product?->supplier_method === 'manufacture');
+                        @endphp
+                        @if (($order->status === 'Confirmed' || $order->status === 'Partially Shipped') && $hasManufactureItems)
+                            <x-ui.button href="{{ route('production.orders.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
+                                Create MO
+                            </x-ui.button>
+                        @endif
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                                <tr>
+                                    <th class="ps-4">MO Number</th>
+                                    <th>Target Product</th>
+                                    <th class="text-end">Qty Ordered</th>
+                                    <th class="text-end">Qty Produced</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="fs-13 text-dark">
+                                @forelse ($order->productionOrders ?? [] as $mo)
+                                    @php
+                                        $moBadge = 'bg-soft-secondary text-secondary';
+                                        if ($mo->status === 'completed') $moBadge = 'bg-soft-success text-success';
+                                        elseif ($mo->status === 'released') $moBadge = 'bg-soft-info text-info';
+                                        elseif ($mo->status === 'in_progress') $moBadge = 'bg-soft-warning text-warning';
+                                        elseif ($mo->status === 'cancelled') $moBadge = 'bg-soft-danger text-danger';
+                                    @endphp
+                                    <tr>
+                                        <td class="ps-4 fw-bold">
+                                            <a href="{{ route('production.orders.show', $mo->id) }}" class="text-primary">{{ $mo->order_number }}</a>
+                                        </td>
+                                        <td>
+                                            <span class="fw-bold">{{ $mo->product?->name }}</span>
+                                            @if ($mo->product?->sku)
+                                                <small class="text-muted d-block">SKU: {{ $mo->product->sku }}</small>
+                                            @endif
+                                        </td>
+                                        <td class="text-end fw-semibold">{{ (int)$mo->quantity_ordered }}</td>
+                                        <td class="text-end text-muted">{{ (int)$mo->quantity_produced }}</td>
+                                        <td>{{ $mo->start_date ? $mo->start_date->format('d/m/Y') : '—' }}</td>
+                                        <td>{{ $mo->end_date ? $mo->end_date->format('d/m/Y') : '—' }}</td>
+                                        <td>
+                                            <span class="badge {{ $moBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ ucfirst($mo->status) }}</span>
+                                        </td>
+                                        <td class="text-end pe-4">
+                                            <x-ui.button href="{{ route('production.orders.show', $mo->id) }}" variant="outline-primary" size="sm" class="fw-bold">
+                                                View MO
+                                            </x-ui.button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="8" class="text-center py-5 text-muted">
+                                            <i class="feather-cpu fs-1 mb-2 d-block text-gray-300"></i>
+                                            No manufacturing orders created for this Sales Order yet.
                                         </td>
                                     </tr>
                                 @endforelse

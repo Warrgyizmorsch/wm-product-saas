@@ -59,16 +59,37 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // Calculate client-server clock offset once
+            let clockOffsetMs = 0;
+            const firstBlock = document.querySelector('.mes-timer-block');
+            if (firstBlock && firstBlock.dataset.serverTime) {
+                const serverTime = new Date(firstBlock.dataset.serverTime);
+                const clientTime = new Date();
+                clockOffsetMs = serverTime - clientTime;
+            }
+
             function updateTimers() {
-                const now = new Date();
+                const now = new Date(new Date().getTime() + clockOffsetMs);
                 
                 document.querySelectorAll('.mes-timer-block').forEach(block => {
                     const startTimeStr = block.dataset.start;
+                    const plannedStartStr = block.dataset.plannedStart;
                     const finishTimeStr = block.dataset.finish;
+                    const status = block.dataset.status;
+                    const accumulatedPausedSecs = parseInt(block.dataset.accumulatedPausedSeconds || '0', 10);
+                    const lastPausedAtStr = block.dataset.lastPausedAt;
                     
                     if (startTimeStr) {
                         const start = new Date(startTimeStr);
-                        const elapsedMs = now - start;
+                        
+                        let elapsedMs = 0;
+                        if (status === 'paused' && lastPausedAtStr) {
+                            const lastPausedAt = new Date(lastPausedAtStr);
+                            elapsedMs = (lastPausedAt - start) - (accumulatedPausedSecs * 1000);
+                        } else {
+                            elapsedMs = (now - start) - (accumulatedPausedSecs * 1000);
+                        }
+                        
                         if (elapsedMs > 0) {
                             const elapsedSecs = Math.floor(elapsedMs / 1000);
                             const h = String(Math.floor(elapsedSecs / 3600)).padStart(2, '0');
@@ -80,17 +101,21 @@
                         }
                     }
                     
-                    if (finishTimeStr && startTimeStr) {
-                        const start = new Date(startTimeStr);
+                    if (finishTimeStr) {
                         const finish = new Date(finishTimeStr);
+                        const start = plannedStartStr ? new Date(plannedStartStr) : (startTimeStr ? new Date(startTimeStr) : null);
                         
-                        const totalDuration = finish - start;
-                        const elapsed = now - start;
-                        
-                        if (totalDuration > 0) {
-                            let percent = (elapsed / totalDuration) * 100;
-                            if (percent < 0) percent = 0;
-                            if (percent > 100) percent = 100;
+                        // 1. Progress Bar (Calendar timeline progress)
+                        if (start) {
+                            const totalDuration = finish - start;
+                            let percent = 0;
+                            if (totalDuration > 0) {
+                                percent = ((now - start) / totalDuration) * 100;
+                                if (percent < 0) percent = 0;
+                                if (percent > 100) percent = 100;
+                            } else {
+                                percent = 100;
+                            }
                             
                             const progressBar = block.querySelector('.timer-progress-bar');
                             if (progressBar) {
@@ -104,26 +129,27 @@
                                     progressBar.className = 'progress-bar timer-progress-bar bg-success';
                                 }
                             }
-                            
-                            // Remaining countdown
-                            const remainingMs = finish - now;
-                            const remainingEl = block.querySelector('.timer-remaining');
-                            if (remainingEl) {
-                                if (remainingMs > 0) {
-                                    const remainingSecs = Math.floor(remainingMs / 1000);
-                                    const h = String(Math.floor(remainingSecs / 3600)).padStart(2, '0');
-                                    const m = String(Math.floor((remainingSecs % 3600) / 60)).padStart(2, '0');
-                                    const s = String(remainingSecs % 60).padStart(2, '0');
-                                    remainingEl.textContent = `${h}:${m}:${s}`;
-                                    remainingEl.className = 'timer-remaining text-success fw-bold font-monospace';
-                                } else {
-                                    const overdueSecs = Math.floor(Math.abs(remainingMs) / 1000);
-                                    const h = String(Math.floor(overdueSecs / 3600)).padStart(2, '0');
-                                    const m = String(Math.floor((overdueSecs % 3600) / 60)).padStart(2, '0');
-                                    const s = String(overdueSecs % 60).padStart(2, '0');
-                                    remainingEl.textContent = `Overdue: -${h}:${m}:${s}`;
-                                    remainingEl.className = 'timer-remaining text-danger fw-bold font-monospace';
-                                }
+                        }
+                        
+                        // 2. Remaining Countdown (Calendar deadline countdown)
+                        const remainingSecsLeft = (finish - now) / 1000;
+                        
+                        const remainingEl = block.querySelector('.timer-remaining');
+                        if (remainingEl) {
+                            if (remainingSecsLeft > 0) {
+                                const remainingSecs = Math.floor(remainingSecsLeft);
+                                const h = String(Math.floor(remainingSecs / 3600)).padStart(2, '0');
+                                const m = String(Math.floor((remainingSecs % 3600) / 60)).padStart(2, '0');
+                                const s = String(remainingSecs % 60).padStart(2, '0');
+                                remainingEl.textContent = `${h}:${m}:${s}`;
+                                remainingEl.className = 'timer-remaining text-success fw-bold font-monospace';
+                            } else {
+                                const overdueSecs = Math.floor(Math.abs(remainingSecsLeft));
+                                const h = String(Math.floor(overdueSecs / 3600)).padStart(2, '0');
+                                const m = String(Math.floor((overdueSecs % 3600) / 60)).padStart(2, '0');
+                                const s = String(overdueSecs % 60).padStart(2, '0');
+                                remainingEl.textContent = `Overdue: -${h}:${m}:${s}`;
+                                remainingEl.className = 'timer-remaining text-danger fw-bold font-monospace';
                             }
                         }
                     }
@@ -133,6 +159,34 @@
             // Initial call and tick every second
             updateTimers();
             setInterval(updateTimers, 1000);
+
+            // Automatically pre-fill run minutes in the completion modals based on actual elapsed stopwatch time
+            document.querySelectorAll('[id^="completeModal"]').forEach(modal => {
+                modal.addEventListener('show.bs.modal', function () {
+                    // Try to find card relative to modal or match by ID suffix
+                    const opId = modal.id.replace('completeModal', '');
+                    const block = document.querySelector(`.mes-timer-block[data-start]`);
+                    
+                    // Fallback to find nearest block using sibling relationships
+                    const card = modal.closest('.card') || document.getElementById(`completeModal${opId}`).closest('.card');
+                    if (card) {
+                        const timerElapsedText = card.querySelector('.timer-elapsed')?.textContent;
+                        if (timerElapsedText) {
+                            const parts = timerElapsedText.split(':');
+                            if (parts.length === 3) {
+                                const hours = parseInt(parts[0], 10);
+                                const minutes = parseInt(parts[1], 10);
+                                const seconds = parseInt(parts[2], 10);
+                                const totalMinutes = (hours * 60) + minutes + (seconds / 60);
+                                const runMinutesInput = modal.querySelector('input[name="run_minutes"]');
+                                if (runMinutesInput) {
+                                    runMinutesInput.value = totalMinutes.toFixed(1);
+                                }
+                            }
+                        }
+                    }
+                });
+            });
         });
     </script>
 @endpush
@@ -200,7 +254,12 @@
                                     <div class="col-md-6">
                                         <div class="bg-light p-3 rounded border mes-timer-block" 
                                              data-start="{{ $op->actual_start ? $op->actual_start->toISOString() : '' }}"
-                                             data-finish="{{ $op->planned_finish ? $op->planned_finish->toISOString() : '' }}">
+                                             data-planned-start="{{ $op->planned_start ? $op->planned_start->toISOString() : '' }}"
+                                             data-finish="{{ $op->planned_finish ? $op->planned_finish->toISOString() : '' }}"
+                                             data-status="{{ $op->status }}"
+                                             data-accumulated-paused-seconds="{{ $op->accumulated_paused_seconds ?? 0 }}"
+                                             data-last-paused-at="{{ $op->last_paused_at ? $op->last_paused_at->toISOString() : '' }}"
+                                             data-server-time="{{ now()->toISOString() }}">
                                             <div class="row text-center g-2">
                                                 <div class="col-6 border-end">
                                                     <small class="text-muted text-uppercase d-block fs-9 mb-1 fw-bold">Elapsed Stopwatch</small>
@@ -377,20 +436,69 @@
                                                 {{ $op->remarks ?? 'No remarks provided.' }}
                                             </td>
                                             <td class="text-end">
-                                                <form method="POST" action="{{ route('production.mes.resume', $op->id) }}" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-primary px-3 fw-semibold">
-                                                        <i class="feather-play me-1"></i>Resume
+                                                <div class="d-flex justify-content-end gap-2">
+                                                    <form method="POST" action="{{ route('production.mes.resume', $op->id) }}" class="d-inline">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-sm btn-primary px-3 fw-semibold">
+                                                            <i class="feather-play me-1"></i>Resume
+                                                        </button>
+                                                    </form>
+                                                    <button type="button" class="btn btn-sm btn-success px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#completeModal{{ $op->id }}">
+                                                        <i class="feather-check-circle me-1"></i>Complete
                                                     </button>
-                                                </form>
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
-                            </x-ui.odoo-form-ui>
-                        </div>
-                    </div>
-                @endif
+                             </x-ui.odoo-form-ui>
+                         </div>
+                     </div>
+
+                     {{-- Modals for Paused Operations --}}
+                     @foreach($paused as $op)
+                         @php
+                             $elapsedSecs = 0;
+                             if ($op->actual_start && $op->last_paused_at) {
+                                 $elapsedSecs = max(0, $op->last_paused_at->timestamp - $op->actual_start->timestamp - $op->accumulated_paused_seconds);
+                             } elseif ($op->actual_start) {
+                                 $elapsedSecs = max(0, now()->timestamp - $op->actual_start->timestamp - $op->accumulated_paused_seconds);
+                             }
+                             $elapsedMinutes = round($elapsedSecs / 60, 1);
+                         @endphp
+                         <x-ui.modal id="completeModal{{ $op->id }}" title="Log Production Progress — {{ $op->orderOperation->name ?? 'Op #'.$op->sequence }}" class="text-start">
+                             <form method="POST" action="{{ route('production.mes.complete', $op->id) }}" id="completeForm{{ $op->id }}">
+                                 @csrf
+                                 <div class="row g-3">
+                                     <div class="col-md-6">
+                                         <x-ui.odoo-form-ui type="input" label="Qty Produced" name="quantity_produced" inputType="number" step="any" value="0" :required="true" />
+                                     </div>
+                                     <div class="col-md-6">
+                                         <x-ui.odoo-form-ui type="input" label="Qty Rejected" name="quantity_rejected" inputType="number" step="any" value="0" />
+                                     </div>
+                                     <div class="col-md-6">
+                                         <x-ui.odoo-form-ui type="input" label="Qty Scrapped" name="quantity_scrapped" inputType="number" step="any" value="0" />
+                                     </div>
+                                     <div class="col-md-6">
+                                         <x-ui.odoo-form-ui type="input" label="Setup Time (min)" name="setup_minutes" inputType="number" step="any" value="0" />
+                                     </div>
+                                     <div class="col-md-12">
+                                         <x-ui.odoo-form-ui type="input" label="Run Time (min)" name="run_minutes" inputType="number" step="any" value="{{ $elapsedMinutes }}" />
+                                     </div>
+                                     <div class="col-md-12">
+                                         <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Optional completion notes..." />
+                                     </div>
+                                 </div>
+                             </form>
+                             <x-slot name="footer">
+                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                 <button type="submit" class="btn btn-success px-4" onclick="document.getElementById('completeForm{{ $op->id }}').submit();">
+                                     <i class="feather-check me-1"></i>Complete Operation
+                                 </button>
+                             </x-slot>
+                         </x-ui.modal>
+                     @endforeach
+                 @endif
 
                 {{-- 4. Upcoming operations --}}
                 @if($upcoming->count() > 0)

@@ -19,30 +19,54 @@ class LeadController extends Controller
     /**
      * Display a listing of the leads.
      */
-    public function index(QuotationService $quotationService)
+    public function index(Request $request, QuotationService $quotationService)
     {
         $this->authorize('viewAny', Lead::class);
 
-        // Direct DB fetch
-        $leads = Lead::latest()->get();
+        $query = Lead::query();
 
-        // Calculate metrics
-        $totalLeadsCount = $leads->count();
-        $expectedRevenue = $leads->sum('expected_amount');
-        $highPriorityCount = $leads->where('priority', 'High')->count();
-        $enterpriseCount = $leads->where('segment', 'Enterprise')->count();
+        // Search Keywords
+        if ($search = $request->input('search')) {
+            $query->where(function($q) use ($search) {
+                $q->where('company_name', 'like', "%{$search}%")
+                  ->orWhere('contact_person', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('source', 'like', "%{$search}%");
+            });
+        }
 
-        $metrics = [
-            'total' => $totalLeadsCount,
-            'revenue' => $expectedRevenue,
-            'high_priority' => $highPriorityCount,
-            'enterprise' => $enterpriseCount,
-        ];
+        // Priority Filter
+        if ($priority = $request->input('priority')) {
+            $query->where('priority', $priority);
+        }
 
-        // Fetch quotations for secondary tab
+        // Segment Filter
+        if ($segment = $request->input('segment')) {
+            $query->where('segment', $segment);
+        }
+
+        // Status Filter
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'call_date');
+        $sortOrder = $request->input('sort_order', 'desc');
+        
+        $allowedSorts = ['call_date', 'company_name', 'expected_amount', 'priority', 'status'];
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        $leads = $query->paginate(10)->withQueryString();
+
         $quotations = $quotationService->latest();
 
-        return view('modules.crm.leads.index', compact('leads', 'metrics', 'quotations'));
+        return view('modules.crm.leads.index', compact('leads', 'quotations'));
     }
 
     /**

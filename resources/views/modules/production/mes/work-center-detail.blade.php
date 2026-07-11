@@ -141,7 +141,20 @@
                      aria-valuemax="100">
                 </div>
             </div>
-            <small class="text-muted fs-11 mt-1 d-block">Based on 8-hour shift. Shift planning integration coming in a future release.</small>
+            <small class="text-muted fs-11 mt-1 d-flex align-items-center gap-1">
+                <i class="feather-clock fs-12"></i>
+                <span>
+                    @if($shifts->isNotEmpty())
+                        Based on active shift{{ $shifts->count() > 1 ? 's' : '' }}:
+                        @foreach($shifts as $index => $shift)
+                            <strong>{{ $shift->name }}</strong> ({{ substr($shift->start_time, 0, 5) }} - {{ substr($shift->end_time, 0, 5) }}{{ $shift->break_minutes > 0 ? ', break: ' . $shift->break_minutes . 'm' : '' }}){{ $index < $shifts->count() - 1 ? ', ' : '' }}
+                        @endforeach
+                        &middot; Adjusted for {{ $workCenter->efficiency_percentage }}% efficiency.
+                    @else
+                        Based on Standard Shift (8 hours) &middot; Adjusted for {{ $workCenter->efficiency_percentage }}% efficiency. <span class="text-warning">(No active shifts configured; showing fallback)</span> &middot; <a href="{{ route('production.shifts.index') }}" class="text-primary fw-semibold"><i class="feather-settings"></i> Manage Shifts</a>
+                    @endif
+                </span>
+            </small>
         </div>
     </div>
 @endsection
