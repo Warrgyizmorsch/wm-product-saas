@@ -470,6 +470,20 @@
             border-bottom: 2px solid #e2e8f0;
             gap: 8px;
             margin-bottom: 24px;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
+        }
+
+        .tab-nav-custom::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+
+        .tab-nav-custom .nav-item {
+            flex-shrink: 0;
         }
 
         .tab-nav-custom .nav-link {
@@ -479,7 +493,7 @@
             color: #64748b !important;
             font-size: 14px;
             font-weight: 600;
-            padding: 12px 20px;
+            padding: 12px 16px;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
@@ -680,6 +694,16 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="false">
                     <i class="feather-file-text"></i> Documents
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab" aria-controls="history-pane" aria-selected="false">
+                    <i class="feather-clock"></i> Employment History
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="assets-tab" data-bs-toggle="tab" data-bs-target="#assets-pane" type="button" role="tab" aria-controls="assets-pane" aria-selected="false">
+                    <i class="feather-package"></i> Assigned Assets
                 </button>
             </li>
         </ul>
@@ -1425,6 +1449,179 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 6. EMPLOYMENT HISTORY TAB -->
+            <div class="tab-pane fade" id="history-pane" role="tabpanel" aria-labelledby="history-tab">
+                <div class="card-custom">
+                    <div class="card-custom-header">
+                        <div>
+                            <h5 class="card-custom-title"><i class="feather-clock text-primary"></i> Previous Employment History</h5>
+                            <small class="text-muted d-block mt-1">Timeline of previous roles and experiences outside this company.</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-primary py-2 px-3 d-flex align-items-center gap-1" style="border-radius: 6px; font-size: 12px;" data-bs-toggle="modal" data-bs-target="#addHistoryModal">
+                            <i class="feather-plus"></i> Add Experience
+                        </button>
+                    </div>
+                    <div class="card-body p-4">
+                        @if($employee->employmentHistories->isEmpty())
+                            <div class="p-5 text-center text-muted">
+                                <i class="feather-activity fs-32 d-block mb-3 text-secondary"></i>
+                                <div class="fw-bold mb-1">No Previous Employment Records</div>
+                                <div>Click "Add Experience" to document work history.</div>
+                            </div>
+                        @else
+                            <div class="timeline-container px-3">
+                                @foreach($employee->employmentHistories as $history)
+                                    <div class="timeline-item position-relative pb-4" style="padding-left: 30px; border-left: 2px solid #e2e8f0;">
+                                        <div class="timeline-badge position-absolute bg-primary rounded-circle" style="left: -7px; top: 0; width: 12px; height: 12px; border: 2px solid #fff; box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.2);"></div>
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="fw-bold text-dark mb-1">{{ $history->designation }}</h6>
+                                                <div class="fw-semibold text-secondary mb-2" style="font-size: 13px;">{{ $history->company_name }}</div>
+                                                <span class="badge bg-soft-primary text-primary fs-11 px-2 py-1 rounded">
+                                                    {{ $history->start_date->format('M Y') }} – {{ $history->end_date ? $history->end_date->format('M Y') : 'Present' }}
+                                                </span>
+                                                @if($history->job_description)
+                                                    <p class="text-muted fs-13 mt-3 mb-0 text-wrap" style="max-width: 100%; white-space: pre-line;">{{ $history->job_description }}</p>
+                                                @endif
+                                            </div>
+                                            @if(auth()->user()->hasHrPermission('hr.settings.manage'))
+                                                <form action="{{ route('hrms.employees.history.destroy', [$employee->id, $history->id]) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-1 px-3" style="border-radius: 6px; font-size: 11px;">
+                                                        <i class="feather-trash-2"></i> Delete
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. ASSIGNED ASSETS TAB -->
+            <div class="tab-pane fade" id="assets-pane" role="tabpanel" aria-labelledby="assets-tab">
+                <div class="card-custom">
+                    <div class="card-custom-header">
+                        <div>
+                            <h5 class="card-custom-title"><i class="feather-package text-primary"></i> Company Assets</h5>
+                            <small class="text-muted d-block mt-1">Laptops, devices, and other assets currently assigned to this employee.</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive border rounded bg-white">
+                            <table class="table table-hover align-middle mb-0 text-center">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-start" style="width: 150px; padding-left: 20px;">Asset Tag / Code</th>
+                                        <th class="text-start">Asset Name</th>
+                                        <th>Category</th>
+                                        <th>Serial Number</th>
+                                        <th>Assigned At</th>
+                                        <th class="text-end" style="width: 180px; padding-right: 20px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($employee->assets as $asset)
+                                        <tr>
+                                            <td class="text-start" style="padding-left: 20px;"><code class="fw-bold fs-13">{{ $asset->asset_code }}</code></td>
+                                            <td class="text-start">
+                                                <div class="fw-bold text-dark fs-13">{{ $asset->name }}</div>
+                                                <small class="text-muted fs-11">{{ $asset->brand }} {{ $asset->model_number }}</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-soft-primary text-primary">{{ $asset->category->name }}</span>
+                                            </td>
+                                            <td><span class="text-dark fw-semibold fs-13">{{ $asset->serial_number ?: 'N/A' }}</span></td>
+                                            <td><span class="text-secondary fs-13">{{ $asset->allocated_at ? $asset->allocated_at->format('d M, Y') : 'N/A' }}</span></td>
+                                            <td class="text-end" style="padding-right: 20px;">
+                                                @if(auth()->user()->hasHrPermission('hr.settings.manage'))
+                                                    <button type="button" class="btn btn-sm btn-light border text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center" style="border-color: #cbd5e1; background-color: #ffffff; color: #475569; font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-asset-id="{{ $asset->id }}" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})">
+                                                         Return Asset
+                                                    </button>
+                                                @else
+                                                    <span class="text-muted fs-12">-</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                                <i class="feather-package fs-24 d-block mb-2 text-secondary"></i>
+                                                No company assets are currently assigned to this employee.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab card 2: Asset Requests History -->
+                    @php
+                        $categories = \App\Domains\HRMS\Models\AssetCategory::query()->orderBy('name')->get();
+                    @endphp
+                    <div class="card border rounded bg-white shadow-sm mt-4">
+                        <div class="card-header border-bottom d-flex justify-content-between align-items-center py-3 px-4 bg-white">
+                            <div>
+                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 14px;">Asset Requests Log</h5>
+                                <small class="text-muted fs-11">Trace requests submitted by this employee for hardware or credentials.</small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary py-2 px-3 d-flex align-items-center gap-1" style="border-radius: 6px; font-size: 11px;" data-bs-toggle="modal" data-bs-target="#requestAssetModal">
+                                <i class="feather-plus"></i> Request Asset
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0 text-center">
+                                    <thead class="table-light text-uppercase fs-10" style="letter-spacing: 0.5px;">
+                                        <tr>
+                                            <th class="text-start" style="padding-left: 20px;">Requested Category</th>
+                                            <th>Request Date</th>
+                                            <th class="text-start">Reason</th>
+                                            <th>Status</th>
+                                            <th class="text-start" style="padding-right: 20px;">Admin Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($employee->assetRequests as $req)
+                                            <tr>
+                                                <td class="text-start" style="padding-left: 20px;">
+                                                    <span class="badge bg-soft-primary text-primary">{{ $req->category->name }}</span>
+                                                </td>
+                                                <td><span class="text-secondary fs-12">{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}</span></td>
+                                                <td class="text-start text-muted fs-12" style="max-width: 250px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ $req->reason }}">{{ $req->reason }}</td>
+                                                <td>
+                                                    @if($req->status === 'pending')
+                                                        <span class="badge bg-soft-warning text-warning px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
+                                                    @elseif($req->status === 'allocated')
+                                                        <span class="badge bg-soft-success text-success px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
+                                                    @elseif($req->status === 'rejected')
+                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
+                                                    @else
+                                                        <span class="badge bg-light text-secondary px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
+                                                    @endif
+                                                </td>
+                                                <td class="text-start text-muted fs-11" style="padding-right: 20px;">{{ $req->admin_notes ?: '-' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="5" class="text-center py-4 text-muted fs-11">
+                                                    No asset requests have been submitted by this employee.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- HR REQUEST DOCUMENT MODAL -->
@@ -1497,6 +1694,46 @@
                         </div>
                         <div class="modal-footer bg-light py-2 gap-2">
                             <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Upload File</button>
+                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADD EMPLOYMENT HISTORY MODAL -->
+        <div class="modal fade" id="addHistoryModal" tabindex="-1" aria-labelledby="addHistoryModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold text-dark" id="addHistoryModalLabel">
+                            <i class="feather-clock me-2 text-primary" style="font-size: 16px;"></i>Add Previous Work Experience
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="{{ route('hrms.employees.history.store', $employee->id) }}" method="POST">
+                        @csrf
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="input" label="Company Name" name="company_name" placeholder="e.g. Acme Corp" :required="true" />
+                                </div>
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="input" label="Designation" name="designation" placeholder="e.g. Senior Software Engineer" :required="true" />
+                                </div>
+                                <div class="col-6">
+                                    <x-ui.odoo-form-ui type="input" label="Start Date" name="start_date" inputType="date" :required="true" />
+                                </div>
+                                <div class="col-6">
+                                    <x-ui.odoo-form-ui type="input" label="End Date" name="end_date" inputType="date" placeholder="Leave empty if present" />
+                                </div>
+                                <div class="col-12">
+                                    <x-ui.odoo-form-ui type="textarea" label="Job Description" name="job_description" rows="3" placeholder="Explain your key responsibilities, achievements, and tech stack..." />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2 gap-2">
+                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Experience</button>
                             <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
                         </div>
                     </form>
@@ -1641,6 +1878,88 @@
         @endforeach
     @endif
 
+    <!-- RETURN ASSET MODAL FOR PROFILE TAB -->
+    <div class="modal fade" id="returnAssetModal" tabindex="-1" aria-labelledby="returnAssetModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="returnAssetModalLabel">
+                        <i class="feather-corner-up-left me-2 text-primary"></i>Return Asset to Inventory
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="returnAssetForm" method="POST">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="info-label mb-1">Asset To Return</label>
+                                <input type="text" id="return_asset_name_display" class="form-control bg-light" readonly>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="Return Date" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="Return Condition" name="return_condition" :required="true" select2-selector="default">
+                                    <option value="good">Good</option>
+                                    <option value="new">New</option>
+                                    <option value="fair">Fair</option>
+                                    <option value="damaged">Damaged (Needs Maintenance)</option>
+                                    <option value="scrapped">Scrapped</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="textarea" label="Return Notes" name="return_notes" placeholder="Condition details, damage details, return notes..." />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 gap-2">
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Process Return</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+    <!-- REQUEST ASSET MODAL FOR PROFILE TAB -->
+    <div class="modal fade" id="requestAssetModal" tabindex="-1" aria-labelledby="requestAssetModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="requestAssetModalLabel">
+                        <i class="feather-plus me-2 text-primary"></i>Request Company Asset
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('hrms.assets.requests.store') }}" method="POST">
+                    @csrf
+                    <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="info-label mb-1">Employee Requesting</label>
+                                <input type="text" class="form-control bg-light" value="{{ $employee->display_name }} ({{ $employee->employee_id }})" readonly>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="Asset Category" name="asset_category_id" :required="true" select2-selector="default">
+                                    <option value="">Select Category</option>
+                                    @foreach($categories->where('company_id', $employee->company_id) as $category)
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="textarea" label="Reason for Request" name="reason" placeholder="Please specify why you need this asset..." :required="true" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 gap-2">
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Submit Request</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     @push('scripts')
         <script>
             $(document).ready(function() {
@@ -1650,6 +1969,20 @@
                 $('[id^="leaveRulesModal"]').appendTo('body');
                 $('#requestDocumentModal').appendTo('body');
                 $('#uploadDocumentModal').appendTo('body');
+                $('#addHistoryModal').appendTo('body');
+                $('#returnAssetModal').appendTo('body');
+                $('#requestAssetModal').appendTo('body');
+
+                // Handle return modal details binding
+                $('#returnAssetModal').on('show.bs.modal', function(event) {
+                    var button = $(event.relatedTarget);
+                    var assetId = button.data('asset-id');
+                    var assetName = button.data('asset-name');
+
+                    var modal = $(this);
+                    modal.find('form').attr('action', '/hrms/assets/' + assetId + '/return');
+                    modal.find('#return_asset_name_display').val(assetName);
+                });
 
                 // Keep active tab on refresh / redirect
                 const urlParams = new URLSearchParams(window.location.search);
