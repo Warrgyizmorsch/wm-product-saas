@@ -48,8 +48,6 @@ class DatabaseSeeder extends Seeder
             RbacSeeder::class,
             ProductionBomSeeder::class,
             InventoryMasterDemoSeeder::class,
-            ProductionDemoScenarioSeeder::class,
-            HrmsDemoSeeder::class,
         ]);
     }
 }
