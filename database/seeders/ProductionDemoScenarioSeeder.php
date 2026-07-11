@@ -91,6 +91,7 @@ class ProductionDemoScenarioSeeder extends Seeder
         DB::table('production_kpi_targets')->truncate();
         DB::table('production_alert_configurations')->truncate();
         DB::table('production_event_timelines')->truncate();
+        DB::table('production_dashboard_preferences')->truncate();
         Schema::enableForeignKeyConstraints();
 
         $tenant = Tenant::where('slug', 'demo')->first() ?? Tenant::first();

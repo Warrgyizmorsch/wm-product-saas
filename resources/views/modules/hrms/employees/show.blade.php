@@ -5,9 +5,18 @@
 @section('breadcrumb', 'HRMS / Employees / Profile')
 
 @section('page-actions')
-    <x-ui.button href="{{ route('hrms.employees.index') }}" variant="light" icon="feather-arrow-left">
-        Back to Registry
-    </x-ui.button>
+    <div class="d-flex gap-2">
+        <x-ui.button href="{{ route('hrms.employees.index') }}" variant="light" icon="feather-arrow-left">
+            Back to Registry
+        </x-ui.button>
+        <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this employee?');" style="display: inline;">
+            @csrf
+            @method('DELETE')
+            <x-ui.button type="submit" variant="danger" icon="feather-trash-2">
+                Delete Profile
+            </x-ui.button>
+        </form>
+    </div>
 @endsection
 
 @php
@@ -631,6 +640,279 @@
             margin-top: 7px;
             flex: 0 0 auto;
         }
+
+        .text-primary {
+            color: var(--bs-primary) !important;
+        }
+
+        .bg-soft-primary {
+            background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
+        }
+
+        .btn-link {
+            text-decoration: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Table custom file upload styling */
+        .erp-custom-file-upload {
+            display: block;
+            width: 100%;
+        }
+        .erp-custom-file-upload .file-upload-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed #ced4da;
+            border-radius: 6px;
+            padding: 6px 12px;
+            background-color: #f8fafc;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            width: 100%;
+        }
+        .erp-custom-file-upload .file-upload-label:hover {
+            background-color: #f1f5f9;
+            border-color: var(--bs-primary);
+            color: var(--bs-primary);
+        }
+
+        /* Documents registry toolbar */
+        .documents-toolbar {
+            row-gap: 10px;
+        }
+
+        .documents-search {
+            height: 38px;
+            min-width: 230px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+        }
+
+        .documents-search:focus-within {
+            background: #fff;
+            border-color: rgba(var(--bs-primary-rgb), 0.45);
+            box-shadow: 0 0 0 3px rgba(var(--bs-primary-rgb), 0.08);
+        }
+
+        .documents-search input::placeholder {
+            color: #94a3b8;
+        }
+
+        .documents-toolbar .sort-toggle-custom,
+        .documents-toolbar .filter-toggle-custom,
+        .document-action-btn {
+            height: 38px;
+            border-radius: 10px !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            border: 1px solid #dbe3ec !important;
+            background: #fff !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+            padding-inline: 14px !important;
+        }
+
+        .documents-toolbar .sort-toggle-custom:hover,
+        .documents-toolbar .filter-toggle-custom:hover,
+        .document-action-btn:hover {
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+            background: rgba(var(--bs-primary-rgb), 0.06) !important;
+        }
+
+        .document-action-btn-primary {
+            border-color: var(--bs-primary) !important;
+            background: var(--bs-primary) !important;
+            color: #fff !important;
+        }
+
+        .document-action-btn-primary:hover {
+            background: color-mix(in srgb, var(--bs-primary) 88%, #000) !important;
+            color: #fff !important;
+        }
+
+        .documents-action-group {
+            flex-wrap: nowrap;
+        }
+
+        .document-filter-panel {
+            width: auto;
+            max-width: 100%;
+        }
+
+        .document-filter-label {
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .document-filter-panel .select2-container {
+            width: 100% !important;
+        }
+
+        .document-filter-panel .select2-container--bootstrap-5 .select2-selection {
+            min-height: 36px;
+            border: 0 !important;
+            border-bottom: 1px solid #cbd5e1 !important;
+            border-radius: 0 !important;
+            background: #fff !important;
+            box-shadow: none !important;
+            padding-left: 0 !important;
+            font-size: 13px;
+        }
+
+        .document-filter-panel .select2-container--bootstrap-5.select2-container--focus .select2-selection,
+        .document-filter-panel .select2-container--bootstrap-5.select2-container--open .select2-selection {
+            border-bottom-color: #0f172a !important;
+            box-shadow: none !important;
+        }
+
+        .document-filter-select-dropdown {
+            border: 1px solid #dbe3ec !important;
+            border-radius: 10px !important;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12) !important;
+            overflow: hidden;
+        }
+
+        .document-filter-select-dropdown .select2-search--dropdown {
+            padding: 8px !important;
+        }
+
+        .document-filter-select-dropdown .select2-search__field {
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 5px !important;
+            min-height: 38px;
+            outline: none !important;
+        }
+
+        .document-filter-select-dropdown .select2-results__option {
+            padding: 10px 14px !important;
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .document-filter-select-dropdown .select2-results__option--selected {
+            background: #2b2525 !important;
+            color: #fff !important;
+        }
+
+        .document-filter-select-dropdown .select2-results__option--highlighted {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+
+        .document-filter-select-dropdown .select2-results__option--selected.select2-results__option--highlighted {
+            background: #2b2525 !important;
+            color: #fff !important;
+        }
+
+        .asset-toolbar .documents-search {
+            min-width: 220px;
+        }
+
+        .asset-toolbar .sort-toggle-custom,
+        .asset-toolbar .filter-toggle-custom,
+        .asset-action-btn {
+            height: 38px;
+            border-radius: 10px !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            border: 1px solid #dbe3ec !important;
+            background: #fff !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+            padding-inline: 14px !important;
+        }
+
+        .asset-toolbar .sort-toggle-custom:hover,
+        .asset-toolbar .filter-toggle-custom:hover,
+        .asset-action-btn:hover {
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+            background: rgba(var(--bs-primary-rgb), 0.06) !important;
+        }
+
+        .asset-action-btn-primary {
+            border-color: var(--bs-primary) !important;
+            background: var(--bs-primary) !important;
+            color: #fff !important;
+        }
+
+        .asset-action-btn-primary:hover {
+            background: color-mix(in srgb, var(--bs-primary) 88%, #000) !important;
+            color: #fff !important;
+        }
+
+        .document-filter-footer {
+            gap: 8px;
+        }
+
+        .document-filter-btn {
+            height: 36px;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+        }
+
+        .documents-table th {
+            font-size: 11px;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: #0f172a;
+            background: #f8fafc;
+        }
+
+        .documents-table tbody tr {
+            transition: background-color 0.15s ease;
+        }
+
+        .documents-table tbody tr:hover {
+            background-color: #fbfdff;
+        }
+
+        /* File Card and actions */
+        .file-card-container {
+            border: 1px solid #e2e8f0 !important;
+            background-color: #f8fafc;
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 280px;
+            transition: all 0.2s ease-in-out;
+        }
+        .file-card-container:hover {
+            border-color: #cbd5e1 !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+        }
+        .file-action-btn {
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50% !important;
+            border: 1px solid #e2e8f0 !important;
+            background-color: #ffffff !important;
+            color: #64748b !important;
+            transition: all 0.2s ease;
+        }
+        .file-action-btn:hover {
+            color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            background-color: color-mix(in srgb, var(--bs-primary) 5%, transparent) !important;
+        }
     </style>
 
     <div class="profile-page">
@@ -1022,9 +1304,16 @@
                         <div class="card-custom">
                             <div class="card-custom-header">
                                 <h5 class="card-custom-title"><i class="feather-plus-circle text-primary"></i> Monthly Adhoc Components</h5>
-                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addAdhocModal" @disabled(!$employee->pay_group_id)>
-                                    Add
-                                </button>
+                                <x-ui.button 
+                                    type="button" 
+                                    variant="soft-primary" 
+                                    size="sm" 
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#addAdhocModal" 
+                                    :disabled="!$employee->pay_group_id"
+                                >
+                                    ADD
+                                </x-ui.button>
                             </div>
                             <div class="card-body p-0">
                                 @if($adhocComponents->isEmpty())
@@ -1034,34 +1323,35 @@
                                 @else
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>Component</th>
-                                                    <th>Month</th>
-                                                    <th class="text-end">Amount</th>
-                                                    <th class="text-end">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($adhocComponents as $adhoc)
-                                                    <tr>
-                                                        <td>
-                                                            <div class="fw-bold">{{ $adhoc->component->name }}</div>
-                                                            <span class="badge bg-soft-info text-info fs-10">{{ $adhoc->status }}</span>
-                                                        </td>
-                                                        <td><code>{{ $adhoc->payroll_month }}</code></td>
-                                                        <td class="text-end fw-semibold">₹{{ number_format($adhoc->amount, 2) }}</td>
-                                                        <td class="text-end">
-                                                            <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirm('Delete this adhoc component?');">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <button type="submit" class="btn btn-link text-danger p-1 m-0"><i class="feather-trash-2"></i></button>
-                                                            </form>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
+                                             <thead class="table-light">
+                                                 <tr>
+                                                     <th>Component</th>
+                                                     <th class="text-end">Amount</th>
+                                                     <th class="text-end">Action</th>
+                                                 </tr>
+                                             </thead>
+                                             <tbody>
+                                                 @foreach($adhocComponents as $adhoc)
+                                                     <tr>
+                                                         <td>
+                                                             <div class="fw-bold">{{ $adhoc->component->name }}</div>
+                                                             <div class="d-flex align-items-center gap-2 mt-1">
+                                                                 <span class="badge bg-soft-info text-info fs-10">{{ $adhoc->status }}</span>
+                                                                 <span class="text-muted fs-11"><i class="feather-calendar me-1"></i>{{ $adhoc->payroll_month }}</span>
+                                                             </div>
+                                                         </td>
+                                                         <td class="text-end fw-semibold">₹{{ number_format($adhoc->amount, 2) }}</td>
+                                                         <td class="text-end">
+                                                             <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirm('Delete this adhoc component?');">
+                                                                 @csrf
+                                                                 @method('DELETE')
+                                                                 <button type="submit" class="btn btn-link text-danger p-1 m-0" style="text-decoration: none !important; box-shadow: none !important;"><i class="feather-trash-2"></i></button>
+                                                             </form>
+                                                         </td>
+                                                     </tr>
+                                                 @endforeach
+                                             </tbody>
+                                         </table>
                                     </div>
                                 @endif
                             </div>
@@ -1197,7 +1487,19 @@
                                                         <td class="fw-semibold">{{ $penalty->date ? $penalty->date->format('d M, Y') : 'N/A' }}</td>
                                                         <td>
                                                             <div class="text-dark fw-bold">{{ ucwords(str_replace('_', ' ', $penalty->rule_type)) }}</div>
-                                                            <small class="text-muted d-block">{{ $penalty->remarks ?: 'No remarks' }}</small>
+                                                            @if($penalty->remarks)
+                                                                @if(str_contains($penalty->remarks, ' ('))
+                                                                    @php
+                                                                        [$first, $second] = explode(' (', $penalty->remarks, 2);
+                                                                    @endphp
+                                                                    <small class="text-muted d-block">{{ $first }}</small>
+                                                                    <small class="text-secondary fs-11 d-block">({{ $second }}</small>
+                                                                @else
+                                                                    <small class="text-muted d-block">{{ $penalty->remarks }}</small>
+                                                                @endif
+                                                            @else
+                                                                <small class="text-muted d-block">No remarks</small>
+                                                            @endif
                                                         </td>
                                                         <td>
                                                             @if($penalty->status === 'applied')
@@ -1214,7 +1516,7 @@
                                                             <form action="{{ route('hrms.employees.penalties.destroy', $penalty->id) }}" method="POST" onsubmit="return confirm('Delete this penalty log?');">
                                                                 @csrf
                                                                 @method('DELETE')
-                                                                <button type="submit" class="btn btn-link text-danger p-1 m-0"><i class="feather-trash-2"></i></button>
+                                                                <button type="submit" class="btn btn-link text-danger p-1 m-0" style="text-decoration: none !important; box-shadow: none !important;"><i class="feather-trash-2"></i></button>
                                                             </form>
                                                         </td>
                                                     </tr>
@@ -1309,20 +1611,80 @@
                 <div class="row">
                     <div class="col-12">
                         <div class="card-custom">
-                            <div class="card-custom-header d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+                            <div class="card-custom-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
                                 <div>
                                     <h5 class="card-custom-title"><i class="feather-file-text text-primary"></i> Employee Documents Registry</h5>
                                     <small class="text-muted d-block mt-1">Manage, upload, or request official documents for this employee.</small>
                                 </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    @if(auth()->user()->hasHrPermission('hr.settings.manage'))
-                                        <x-ui.icon-btn type="button" variant="transparent-dark" size="md" icon="feather-git-pull-request" class="fw-bold text-uppercase" data-bs-toggle="modal" data-bs-target="#requestDocumentModal">
-                                            <span>Request Document</span>
-                                        </x-ui.icon-btn>
-                                    @endif
-                                    <x-ui.button variant="primary" size="sm" class="fw-bold text-uppercase" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" icon="feather-upload-cloud">
-                                        Upload Document
-                                    </x-ui.button>
+                                <div class="documents-toolbar d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
+                                    <div class="documents-search d-flex align-items-center px-3 py-1">
+                                        <i class="feather-search text-muted me-2 fs-14"></i>
+                                        <input 
+                                            type="text" 
+                                            id="documentSearchInput" 
+                                            class="form-control border-0 bg-transparent p-0 fs-13" 
+                                            placeholder="Search documents..." 
+                                            autocomplete="off"
+                                            style="box-shadow: none; height: 32px;"
+                                        >
+                                    </div>
+
+                                    <x-ui.sort-dropdown label="SORT">
+                                        <a class="dropdown-item document-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="title_asc">
+                                            <span>Document Title (A-Z)</span>
+                                            <i class="feather-check ms-3"></i>
+                                        </a>
+                                        <a class="dropdown-item document-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="title_desc">
+                                            <span>Document Title (Z-A)</span>
+                                        </a>
+                                        <div class="dropdown-divider"></div>
+                                        <a class="dropdown-item document-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="expiry_asc">
+                                            <span>Expiry Date (Soonest)</span>
+                                        </a>
+                                        <a class="dropdown-item document-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="expiry_desc">
+                                            <span>Expiry Date (Latest)</span>
+                                        </a>
+                                    </x-ui.sort-dropdown>
+
+                                    <x-ui.filter label="FILTER">
+                                        <div class="document-filter-panel">
+                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                        <form id="documentFilterForm" onsubmit="return false;">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Document Status</label>
+                                                <x-ui.odoo-form-ui type="select" name="status">
+                                                    <option value="">All Statuses</option>
+                                                    <option value="uploaded">Uploaded</option>
+                                                    <option value="requested">Pending Upload</option>
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Expiry Requirement</label>
+                                                <x-ui.odoo-form-ui type="select" name="has_expiry">
+                                                    <option value="">All Documents</option>
+                                                    <option value="1">Has Expiry</option>
+                                                    <option value="0">No Expiry</option>
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                            <div class="dropdown-divider my-3"></div>
+                                            <div class="document-filter-footer d-flex">
+                                                <x-ui.button type="button" id="btnDocumentFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">Apply Filters</x-ui.button>
+                                                <x-ui.button type="button" id="btnDocumentFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">Reset</x-ui.button>
+                                            </div>
+                                        </form>
+                                        </div>
+                                    </x-ui.filter>
+
+                                    <div class="documents-action-group d-flex align-items-center gap-2">
+                                        @if(auth()->user()->hasHrPermission('hr.settings.manage'))
+                                            <x-ui.button variant="light" size="sm" class="document-action-btn" data-bs-toggle="modal" data-bs-target="#requestDocumentModal" icon="feather-git-pull-request">
+                                                Request Document
+                                            </x-ui.button>
+                                        @endif
+                                        <x-ui.button variant="primary" size="sm" class="document-action-btn document-action-btn-primary" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" icon="feather-upload-cloud">
+                                            Upload Document
+                                        </x-ui.button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-body p-4">
@@ -1330,7 +1692,7 @@
                                     <div class="alert alert-danger mb-3">{{ session('error') }}</div>
                                 @endif
                                 <div class="table-responsive border rounded bg-white">
-                                    <table class="table table-bordered table-hover mb-0 align-middle text-center">
+                                    <table class="table table-bordered table-hover mb-0 align-middle text-center documents-table">
                                         <thead class="table-light">
                                             <tr>
                                                 <th class="text-start" style="width: 250px;">Document Title</th>
@@ -1343,7 +1705,22 @@
                                         </thead>
                                         <tbody>
                                             @foreach($employee->documents as $doc)
-                                                <tr>
+                                                @php
+                                                    $documentSearchText = trim(implode(' ', array_filter([
+                                                        $doc->name,
+                                                        $doc->description,
+                                                        $doc->requestedBy?->name,
+                                                        $doc->file_name,
+                                                        $doc->status,
+                                                        $doc->has_expiry ? 'has expiry' : 'no expiry',
+                                                    ])));
+                                                @endphp
+                                                <tr class="document-row"
+                                                    data-title="{{ \Illuminate\Support\Str::lower($doc->name) }}"
+                                                    data-search="{{ \Illuminate\Support\Str::lower($documentSearchText) }}"
+                                                    data-status="{{ $doc->status }}"
+                                                    data-has-expiry="{{ $doc->has_expiry ? '1' : '0' }}"
+                                                    data-expiry="{{ $doc->expiry_date ? $doc->expiry_date->timestamp : '' }}">
                                                     <td class="text-start font-semibold">
                                                         <div class="text-dark fw-bold fs-13">{{ $doc->name }}</div>
                                                         @if($doc->description)
@@ -1379,15 +1756,31 @@
                                                         @endif
                                                     </td>
                                                     <td class="text-start">
-                                                        @if($doc->file_path)
-                                                            <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="fw-bold text-primary d-flex align-items-center gap-1 justify-content-center">
-                                                                <i class="feather-download-cloud fs-12"></i>
-                                                                <span style="display:inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ $doc->file_name }}</span>
-                                                            </a>
-                                                            <div class="text-muted text-center" style="font-size: 10px;">{{ number_format($doc->file_size / 1024, 1) }} KB</div>
-                                                        @else
-                                                            <span class="text-muted fs-11 d-block text-center">No File Uploaded</span>
-                                                        @endif
+                                                         @if($doc->file_path)
+                                                             <div class="file-card-container">
+                                                                 <div class="d-flex align-items-center gap-2 overflow-hidden">
+                                                                     <div class="d-flex align-items-center justify-content-center bg-soft-primary rounded text-primary" style="width: 32px; height: 32px; min-width: 32px;">
+                                                                         <i class="feather-file fs-16"></i>
+                                                                     </div>
+                                                                     <div class="overflow-hidden">
+                                                                         <div class="text-dark fw-bold fs-12 text-truncate" style="max-width: 130px;" title="{{ $doc->file_name }}">
+                                                                             {{ $doc->file_name }}
+                                                                         </div>
+                                                                         <div class="text-muted fs-10">{{ number_format($doc->file_size / 1024, 1) }} KB</div>
+                                                                     </div>
+                                                                 </div>
+                                                                 <div class="hstack gap-1">
+                                                                     <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="file-action-btn" title="View Document" data-bs-toggle="tooltip">
+                                                                         <i class="feather-eye fs-12"></i>
+                                                                     </a>
+                                                                     <a href="{{ asset('storage/' . $doc->file_path) }}" download="{{ $doc->file_name }}" class="file-action-btn" title="Download Document" data-bs-toggle="tooltip">
+                                                                         <i class="feather-download fs-12"></i>
+                                                                     </a>
+                                                                 </div>
+                                                             </div>
+                                                         @else
+                                                             <span class="text-muted fs-11 d-block text-center">No File Uploaded</span>
+                                                         @endif
                                                     </td>
                                                     <td>
                                                         @if($doc->status === 'requested')
@@ -1405,7 +1798,13 @@
                                                                 @csrf
                                                                 <input type="hidden" name="document_id" value="{{ $doc->id }}">
                                                                 <div class="flex-grow-1 text-start">
-                                                                    <input type="file" name="file" class="form-control form-control-sm" required style="font-size: 11px; padding: 0.25rem 0.5rem; height: auto;">
+                                                                    <div class="erp-custom-file-upload">
+                                                                        <label class="file-upload-label py-1.5 px-3" style="font-size: 11px; cursor: pointer; border-style: dashed; border-width: 1px;" for="table_file_{{ $doc->id }}">
+                                                                            <i class="feather-upload-cloud me-1 text-primary fs-12"></i>
+                                                                            <span class="file-text text-muted" id="file_text_{{ $doc->id }}">Choose File</span>
+                                                                            <input type="file" name="file" id="table_file_{{ $doc->id }}" class="d-none" required onchange="document.getElementById('file_text_{{ $doc->id }}').innerText = this.files[0]?.name || 'Choose File'">
+                                                                        </label>
+                                                                    </div>
                                                                     @if($doc->has_expiry)
                                                                         <div class="mt-1 d-flex align-items-center gap-1">
                                                                             <span class="text-secondary fs-9 text-uppercase" style="font-size: 8px;">Expiry:</span>
@@ -1438,6 +1837,13 @@
                                                     <td colspan="6" class="text-center py-5 text-muted fs-12">
                                                         <i class="feather-file fs-24 d-block mb-2 text-secondary"></i>
                                                         No documents uploaded or requested for this employee profile yet.
+                                                    </td>
+                                                </tr>
+                                            @else
+                                                <tr id="documentNoResultsRow" class="d-none">
+                                                    <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                                        <i class="feather-search fs-24 d-block mb-2 text-secondary"></i>
+                                                        No documents match your search or filters.
                                                     </td>
                                                 </tr>
                                             @endif
@@ -1505,16 +1911,73 @@
 
             <!-- 7. ASSIGNED ASSETS TAB -->
             <div class="tab-pane fade" id="assets-pane" role="tabpanel" aria-labelledby="assets-tab">
+                @php
+                    $categories = \App\Domains\HRMS\Models\AssetCategory::query()->orderBy('name')->get();
+                    $assignedAssetCategories = $employee->assets->pluck('category.name')->filter()->unique()->sort()->values();
+                    $requestAssetCategories = $employee->assetRequests->pluck('category.name')->filter()->unique()->sort()->values();
+                    $requestAssetStatuses = $employee->assetRequests->pluck('status')->filter()->unique()->sort()->values();
+                @endphp
                 <div class="card-custom">
-                    <div class="card-custom-header">
+                    <div class="card-custom-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
                         <div>
                             <h5 class="card-custom-title"><i class="feather-package text-primary"></i> Company Assets</h5>
                             <small class="text-muted d-block mt-1">Laptops, devices, and other assets currently assigned to this employee.</small>
                         </div>
+                        <div class="asset-toolbar d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
+                            <div class="documents-search d-flex align-items-center px-3 py-1">
+                                <i class="feather-search text-muted me-2 fs-14"></i>
+                                <input type="text" id="assignedAssetSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search assigned assets..." autocomplete="off" style="box-shadow: none; height: 32px;">
+                            </div>
+                            <x-ui.sort-dropdown label="SORT">
+                                <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="name_asc">
+                                    <span>Asset Name (A-Z)</span>
+                                    <i class="feather-check ms-3"></i>
+                                </a>
+                                <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="name_desc">
+                                    <span>Asset Name (Z-A)</span>
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="assigned_desc">
+                                    <span>Assigned Date (Latest)</span>
+                                </a>
+                                <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="assigned_asc">
+                                    <span>Assigned Date (Oldest)</span>
+                                </a>
+                            </x-ui.sort-dropdown>
+                            <x-ui.filter label="FILTER">
+                                <div class="document-filter-panel">
+                                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                    <form id="assignedAssetFilterForm" onsubmit="return false;">
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Asset Category</label>
+                                            <x-ui.odoo-form-ui type="select" name="category">
+                                                <option value="">All Categories</option>
+                                                @foreach($assignedAssetCategories as $categoryName)
+                                                    <option value="{{ \Illuminate\Support\Str::lower($categoryName) }}">{{ $categoryName }}</option>
+                                                @endforeach
+                                            </x-ui.odoo-form-ui>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Serial Number</label>
+                                            <x-ui.odoo-form-ui type="select" name="serial">
+                                                <option value="">All Assets</option>
+                                                <option value="1">Has Serial Number</option>
+                                                <option value="0">No Serial Number</option>
+                                            </x-ui.odoo-form-ui>
+                                        </div>
+                                        <div class="dropdown-divider my-3"></div>
+                                        <div class="document-filter-footer d-flex">
+                                            <x-ui.button type="button" id="btnAssignedAssetFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">Apply Filters</x-ui.button>
+                                            <x-ui.button type="button" id="btnAssignedAssetFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">Reset</x-ui.button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </x-ui.filter>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive border rounded bg-white">
-                            <table class="table table-hover align-middle mb-0 text-center">
+                            <table class="table table-hover align-middle mb-0 text-center assigned-assets-table">
                                 <thead class="table-light">
                                     <tr>
                                         <th class="text-start" style="width: 150px; padding-left: 20px;">Asset Tag / Code</th>
@@ -1527,7 +1990,22 @@
                                 </thead>
                                 <tbody>
                                     @forelse($employee->assets as $asset)
-                                        <tr>
+                                        @php
+                                            $assetSearchText = trim(implode(' ', array_filter([
+                                                $asset->asset_code,
+                                                $asset->name,
+                                                $asset->brand,
+                                                $asset->model_number,
+                                                $asset->category?->name,
+                                                $asset->serial_number,
+                                            ])));
+                                        @endphp
+                                        <tr class="assigned-asset-row"
+                                            data-name="{{ \Illuminate\Support\Str::lower($asset->name) }}"
+                                            data-search="{{ \Illuminate\Support\Str::lower($assetSearchText) }}"
+                                            data-category="{{ \Illuminate\Support\Str::lower($asset->category?->name) }}"
+                                            data-has-serial="{{ $asset->serial_number ? '1' : '0' }}"
+                                            data-assigned="{{ $asset->allocated_at ? $asset->allocated_at->timestamp : '' }}">
                                             <td class="text-start" style="padding-left: 20px;"><code class="fw-bold fs-13">{{ $asset->asset_code }}</code></td>
                                             <td class="text-start">
                                                 <div class="fw-bold text-dark fs-13">{{ $asset->name }}</div>
@@ -1556,28 +2034,85 @@
                                             </td>
                                         </tr>
                                     @endforelse
+                                    @if($employee->assets->isNotEmpty())
+                                        <tr id="assignedAssetNoResultsRow" class="d-none">
+                                            <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                                <i class="feather-search fs-24 d-block mb-2 text-secondary"></i>
+                                                No assigned assets match your search or filters.
+                                            </td>
+                                        </tr>
+                                    @endif
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
                     <!-- Tab card 2: Asset Requests History -->
-                    @php
-                        $categories = \App\Domains\HRMS\Models\AssetCategory::query()->orderBy('name')->get();
-                    @endphp
                     <div class="card border rounded bg-white shadow-sm mt-4">
-                        <div class="card-header border-bottom d-flex justify-content-between align-items-center py-3 px-4 bg-white">
+                        <div class="card-header border-bottom d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 py-3 px-4 bg-white">
                             <div>
                                 <h5 class="fw-bold mb-0 text-dark" style="font-size: 14px;">Asset Requests Log</h5>
                                 <small class="text-muted fs-11">Trace requests submitted by this employee for hardware or credentials.</small>
                             </div>
-                            <button type="button" class="btn btn-sm btn-primary py-2 px-3 d-flex align-items-center gap-1" style="border-radius: 6px; font-size: 11px;" data-bs-toggle="modal" data-bs-target="#requestAssetModal">
-                                <i class="feather-plus"></i> Request Asset
-                            </button>
+                            <div class="asset-toolbar d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
+                                <div class="documents-search d-flex align-items-center px-3 py-1">
+                                    <i class="feather-search text-muted me-2 fs-14"></i>
+                                    <input type="text" id="assetRequestSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search requests..." autocomplete="off" style="box-shadow: none; height: 32px;">
+                                </div>
+                                <x-ui.sort-dropdown label="SORT">
+                                    <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="date_desc">
+                                        <span>Request Date (Latest)</span>
+                                        <i class="feather-check ms-3"></i>
+                                    </a>
+                                    <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="date_asc">
+                                        <span>Request Date (Oldest)</span>
+                                    </a>
+                                    <div class="dropdown-divider"></div>
+                                    <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="category_asc">
+                                        <span>Category (A-Z)</span>
+                                    </a>
+                                    <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="status_asc">
+                                        <span>Status (A-Z)</span>
+                                    </a>
+                                </x-ui.sort-dropdown>
+                                <x-ui.filter label="FILTER">
+                                    <div class="document-filter-panel">
+                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                        <form id="assetRequestFilterForm" onsubmit="return false;">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Requested Category</label>
+                                                <x-ui.odoo-form-ui type="select" name="category">
+                                                    <option value="">All Categories</option>
+                                                    @foreach($requestAssetCategories as $categoryName)
+                                                        <option value="{{ \Illuminate\Support\Str::lower($categoryName) }}">{{ $categoryName }}</option>
+                                                    @endforeach
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Request Status</label>
+                                                <x-ui.odoo-form-ui type="select" name="status">
+                                                    <option value="">All Statuses</option>
+                                                    @foreach($requestAssetStatuses as $statusName)
+                                                        <option value="{{ $statusName }}">{{ ucfirst($statusName) }}</option>
+                                                    @endforeach
+                                                </x-ui.odoo-form-ui>
+                                            </div>
+                                            <div class="dropdown-divider my-3"></div>
+                                            <div class="document-filter-footer d-flex">
+                                                <x-ui.button type="button" id="btnAssetRequestFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">Apply Filters</x-ui.button>
+                                                <x-ui.button type="button" id="btnAssetRequestFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">Reset</x-ui.button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </x-ui.filter>
+                                <button type="button" class="btn btn-sm asset-action-btn asset-action-btn-primary d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#requestAssetModal">
+                                    <i class="feather-plus"></i> Request Asset
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table align-middle mb-0 text-center">
+                                <table class="table align-middle mb-0 text-center asset-requests-table">
                                     <thead class="table-light text-uppercase fs-10" style="letter-spacing: 0.5px;">
                                         <tr>
                                             <th class="text-start" style="padding-left: 20px;">Requested Category</th>
@@ -1589,7 +2124,19 @@
                                     </thead>
                                     <tbody>
                                         @forelse($employee->assetRequests as $req)
-                                            <tr>
+                                            @php
+                                                $requestSearchText = trim(implode(' ', array_filter([
+                                                    $req->category?->name,
+                                                    $req->reason,
+                                                    $req->status,
+                                                    $req->admin_notes,
+                                                ])));
+                                            @endphp
+                                            <tr class="asset-request-row"
+                                                data-category="{{ \Illuminate\Support\Str::lower($req->category?->name) }}"
+                                                data-status="{{ $req->status }}"
+                                                data-search="{{ \Illuminate\Support\Str::lower($requestSearchText) }}"
+                                                data-date="{{ $req->request_date ? $req->request_date->timestamp : '' }}">
                                                 <td class="text-start" style="padding-left: 20px;">
                                                     <span class="badge bg-soft-primary text-primary">{{ $req->category->name }}</span>
                                                 </td>
@@ -1615,6 +2162,14 @@
                                                 </td>
                                             </tr>
                                         @endforelse
+                                        @if($employee->assetRequests->isNotEmpty())
+                                            <tr id="assetRequestNoResultsRow" class="d-none">
+                                                <td colspan="5" class="text-center py-4 text-muted fs-11">
+                                                    <i class="feather-search fs-20 d-block mb-2 text-secondary"></i>
+                                                    No asset requests match your search or filters.
+                                                </td>
+                                            </tr>
+                                        @endif
                                     </tbody>
                                 </table>
                             </div>
@@ -2047,6 +2602,358 @@
                         updatePolicySliderButtons();
                     }
                 });
+
+                const $documentRows = $('.document-row');
+                const $documentTbody = $('.documents-table tbody');
+                const $documentNoResultsRow = $('#documentNoResultsRow');
+                let documentSortMode = 'title_asc';
+                let appliedDocumentFilters = {
+                    status: '',
+                    hasExpiry: '',
+                };
+
+                function normalizeText(value) {
+                    return String(value || '').toLowerCase().trim();
+                }
+
+                function getDocumentFilters() {
+                    return {
+                        search: normalizeText($('#documentSearchInput').val()),
+                        status: appliedDocumentFilters.status,
+                        hasExpiry: appliedDocumentFilters.hasExpiry,
+                    };
+                }
+
+                function setDocumentFilterChoice(groupName, value) {
+                    $(`#documentFilterForm [name="${groupName}"]`).val(value).trigger('change');
+                }
+
+                function initDocumentFilterSelects() {
+                    $('.document-filter-select, .asset-filter-select').each(function() {
+                        const $select = $(this);
+
+                        if ($select.hasClass('select2-hidden-accessible')) {
+                            $select.select2('destroy');
+                        }
+
+                        $select.select2({
+                            theme: 'bootstrap-5',
+                            width: '100%',
+                            dropdownParent: $select.closest('.dropdown-menu'),
+                            dropdownCssClass: 'document-filter-select-dropdown',
+                            placeholder: $select.data('placeholder') || '',
+                        });
+                    });
+                }
+
+                function compareDocumentRows(firstRow, secondRow) {
+                    const $first = $(firstRow);
+                    const $second = $(secondRow);
+                    const firstTitle = $first.data('title') || '';
+                    const secondTitle = $second.data('title') || '';
+                    const firstExpiry = parseInt($first.data('expiry'), 10);
+                    const secondExpiry = parseInt($second.data('expiry'), 10);
+                    const firstHasExpiryDate = !Number.isNaN(firstExpiry);
+                    const secondHasExpiryDate = !Number.isNaN(secondExpiry);
+                    const firstExpiryValue = firstHasExpiryDate ? firstExpiry : Number.MAX_SAFE_INTEGER;
+                    const secondExpiryValue = secondHasExpiryDate ? secondExpiry : Number.MAX_SAFE_INTEGER;
+
+                    if (documentSortMode === 'title_desc') {
+                        return secondTitle.localeCompare(firstTitle);
+                    }
+
+                    if (documentSortMode === 'expiry_asc') {
+                        return firstExpiryValue - secondExpiryValue || firstTitle.localeCompare(secondTitle);
+                    }
+
+                    if (documentSortMode === 'expiry_desc') {
+                        if (!firstHasExpiryDate && !secondHasExpiryDate) {
+                            return firstTitle.localeCompare(secondTitle);
+                        }
+
+                        if (!firstHasExpiryDate) {
+                            return 1;
+                        }
+
+                        if (!secondHasExpiryDate) {
+                            return -1;
+                        }
+
+                        return secondExpiryValue - firstExpiryValue || firstTitle.localeCompare(secondTitle);
+                    }
+
+                    return firstTitle.localeCompare(secondTitle);
+                }
+
+                function refreshDocumentRows() {
+                    const filters = getDocumentFilters();
+                    let visibleCount = 0;
+                    const sortedRows = $documentRows.toArray().sort(compareDocumentRows);
+
+                    $.each(sortedRows, function(_, row) {
+                        const $row = $(row);
+                        const matchesSearch = !filters.search || normalizeText($row.data('search')).includes(filters.search);
+                        const matchesStatus = !filters.status || $row.data('status') === filters.status;
+                        const matchesExpiry = filters.hasExpiry === '' || String($row.data('has-expiry')) === filters.hasExpiry;
+                        const isVisible = matchesSearch && matchesStatus && matchesExpiry;
+
+                        $row.toggleClass('d-none', !isVisible);
+                        if (isVisible) {
+                            visibleCount++;
+                        }
+
+                        $documentTbody.append(row);
+                    });
+
+                    if ($documentNoResultsRow.length) {
+                        $documentTbody.append($documentNoResultsRow);
+                        $documentNoResultsRow.toggleClass('d-none', visibleCount > 0);
+                    }
+                }
+
+                const $assignedAssetRows = $('.assigned-asset-row');
+                const $assignedAssetTbody = $('.assigned-assets-table tbody');
+                const $assignedAssetNoResultsRow = $('#assignedAssetNoResultsRow');
+                let assignedAssetSortMode = 'name_asc';
+                let appliedAssignedAssetFilters = {
+                    category: '',
+                    serial: '',
+                };
+
+                function getAssignedAssetFilters() {
+                    return {
+                        search: normalizeText($('#assignedAssetSearchInput').val()),
+                        category: appliedAssignedAssetFilters.category,
+                        serial: appliedAssignedAssetFilters.serial,
+                    };
+                }
+
+                function compareAssignedAssetRows(firstRow, secondRow) {
+                    const $first = $(firstRow);
+                    const $second = $(secondRow);
+                    const firstName = $first.data('name') || '';
+                    const secondName = $second.data('name') || '';
+                    const firstAssigned = parseInt($first.data('assigned'), 10);
+                    const secondAssigned = parseInt($second.data('assigned'), 10);
+                    const firstAssignedValue = Number.isNaN(firstAssigned) ? 0 : firstAssigned;
+                    const secondAssignedValue = Number.isNaN(secondAssigned) ? 0 : secondAssigned;
+
+                    if (assignedAssetSortMode === 'name_desc') {
+                        return secondName.localeCompare(firstName);
+                    }
+
+                    if (assignedAssetSortMode === 'assigned_desc') {
+                        return secondAssignedValue - firstAssignedValue || firstName.localeCompare(secondName);
+                    }
+
+                    if (assignedAssetSortMode === 'assigned_asc') {
+                        return firstAssignedValue - secondAssignedValue || firstName.localeCompare(secondName);
+                    }
+
+                    return firstName.localeCompare(secondName);
+                }
+
+                function refreshAssignedAssetRows() {
+                    const filters = getAssignedAssetFilters();
+                    let visibleCount = 0;
+                    const sortedRows = $assignedAssetRows.toArray().sort(compareAssignedAssetRows);
+
+                    $.each(sortedRows, function(_, row) {
+                        const $row = $(row);
+                        const matchesSearch = !filters.search || normalizeText($row.data('search')).includes(filters.search);
+                        const matchesCategory = !filters.category || $row.data('category') === filters.category;
+                        const matchesSerial = filters.serial === '' || String($row.data('has-serial')) === filters.serial;
+                        const isVisible = matchesSearch && matchesCategory && matchesSerial;
+
+                        $row.toggleClass('d-none', !isVisible);
+                        if (isVisible) {
+                            visibleCount++;
+                        }
+
+                        $assignedAssetTbody.append(row);
+                    });
+
+                    if ($assignedAssetNoResultsRow.length) {
+                        $assignedAssetTbody.append($assignedAssetNoResultsRow);
+                        $assignedAssetNoResultsRow.toggleClass('d-none', visibleCount > 0);
+                    }
+                }
+
+                const $assetRequestRows = $('.asset-request-row');
+                const $assetRequestTbody = $('.asset-requests-table tbody');
+                const $assetRequestNoResultsRow = $('#assetRequestNoResultsRow');
+                let assetRequestSortMode = 'date_desc';
+                let appliedAssetRequestFilters = {
+                    category: '',
+                    status: '',
+                };
+
+                function getAssetRequestFilters() {
+                    return {
+                        search: normalizeText($('#assetRequestSearchInput').val()),
+                        category: appliedAssetRequestFilters.category,
+                        status: appliedAssetRequestFilters.status,
+                    };
+                }
+
+                function compareAssetRequestRows(firstRow, secondRow) {
+                    const $first = $(firstRow);
+                    const $second = $(secondRow);
+                    const firstCategory = $first.data('category') || '';
+                    const secondCategory = $second.data('category') || '';
+                    const firstStatus = $first.data('status') || '';
+                    const secondStatus = $second.data('status') || '';
+                    const firstDate = parseInt($first.data('date'), 10);
+                    const secondDate = parseInt($second.data('date'), 10);
+                    const firstDateValue = Number.isNaN(firstDate) ? 0 : firstDate;
+                    const secondDateValue = Number.isNaN(secondDate) ? 0 : secondDate;
+
+                    if (assetRequestSortMode === 'date_asc') {
+                        return firstDateValue - secondDateValue || firstCategory.localeCompare(secondCategory);
+                    }
+
+                    if (assetRequestSortMode === 'category_asc') {
+                        return firstCategory.localeCompare(secondCategory) || secondDateValue - firstDateValue;
+                    }
+
+                    if (assetRequestSortMode === 'status_asc') {
+                        return firstStatus.localeCompare(secondStatus) || secondDateValue - firstDateValue;
+                    }
+
+                    return secondDateValue - firstDateValue || firstCategory.localeCompare(secondCategory);
+                }
+
+                function refreshAssetRequestRows() {
+                    const filters = getAssetRequestFilters();
+                    let visibleCount = 0;
+                    const sortedRows = $assetRequestRows.toArray().sort(compareAssetRequestRows);
+
+                    $.each(sortedRows, function(_, row) {
+                        const $row = $(row);
+                        const matchesSearch = !filters.search || normalizeText($row.data('search')).includes(filters.search);
+                        const matchesCategory = !filters.category || $row.data('category') === filters.category;
+                        const matchesStatus = !filters.status || $row.data('status') === filters.status;
+                        const isVisible = matchesSearch && matchesCategory && matchesStatus;
+
+                        $row.toggleClass('d-none', !isVisible);
+                        if (isVisible) {
+                            visibleCount++;
+                        }
+
+                        $assetRequestTbody.append(row);
+                    });
+
+                    if ($assetRequestNoResultsRow.length) {
+                        $assetRequestTbody.append($assetRequestNoResultsRow);
+                        $assetRequestNoResultsRow.toggleClass('d-none', visibleCount > 0);
+                    }
+                }
+
+                initDocumentFilterSelects();
+
+                $('#documentSearchInput').on('input', refreshDocumentRows);
+                $('#assignedAssetSearchInput').on('input', refreshAssignedAssetRows);
+                $('#assetRequestSearchInput').on('input', refreshAssetRequestRows);
+
+                $('#btnDocumentFilterApply').on('click', function() {
+                    const $form = $('#documentFilterForm');
+                    appliedDocumentFilters = {
+                        status: $form.find('[name="status"]').val(),
+                        hasExpiry: $form.find('[name="has_expiry"]').val(),
+                    };
+
+                    refreshDocumentRows();
+                    $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                    $('.erp-filter-dropdown.show').removeClass('show');
+                });
+
+                $('#btnDocumentFilterReset').on('click', function() {
+                    setDocumentFilterChoice('status', '');
+                    setDocumentFilterChoice('has_expiry', '');
+                    appliedDocumentFilters = {
+                        status: '',
+                        hasExpiry: '',
+                    };
+                    refreshDocumentRows();
+                });
+
+                $('#btnAssignedAssetFilterApply').on('click', function() {
+                    const $form = $('#assignedAssetFilterForm');
+                    appliedAssignedAssetFilters = {
+                        category: $form.find('[name="category"]').val(),
+                        serial: $form.find('[name="serial"]').val(),
+                    };
+
+                    refreshAssignedAssetRows();
+                    $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                    $('.erp-filter-dropdown.show').removeClass('show');
+                });
+
+                $('#btnAssignedAssetFilterReset').on('click', function() {
+                    $('#assignedAssetFilterForm [name="category"]').val('').trigger('change');
+                    $('#assignedAssetFilterForm [name="serial"]').val('').trigger('change');
+                    appliedAssignedAssetFilters = {
+                        category: '',
+                        serial: '',
+                    };
+                    refreshAssignedAssetRows();
+                });
+
+                $('#btnAssetRequestFilterApply').on('click', function() {
+                    const $form = $('#assetRequestFilterForm');
+                    appliedAssetRequestFilters = {
+                        category: $form.find('[name="category"]').val(),
+                        status: $form.find('[name="status"]').val(),
+                    };
+
+                    refreshAssetRequestRows();
+                    $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                    $('.erp-filter-dropdown.show').removeClass('show');
+                });
+
+                $('#btnAssetRequestFilterReset').on('click', function() {
+                    $('#assetRequestFilterForm [name="category"]').val('').trigger('change');
+                    $('#assetRequestFilterForm [name="status"]').val('').trigger('change');
+                    appliedAssetRequestFilters = {
+                        category: '',
+                        status: '',
+                    };
+                    refreshAssetRequestRows();
+                });
+
+                $('.document-sort-link').on('click', function(e) {
+                    e.preventDefault();
+                    documentSortMode = $(this).data('sort') || 'title_asc';
+                    $('.document-sort-link').removeClass('active').find('.feather-check').remove();
+                    $(this).addClass('active').append('<i class="feather-check ms-3"></i>');
+                    refreshDocumentRows();
+                    $('.erp-sort-dropdown .dropdown-menu.show').removeClass('show');
+                    $('.erp-sort-dropdown.show').removeClass('show');
+                });
+
+                $('.assigned-asset-sort-link').on('click', function(e) {
+                    e.preventDefault();
+                    assignedAssetSortMode = $(this).data('sort') || 'name_asc';
+                    $('.assigned-asset-sort-link').removeClass('active').find('.feather-check').remove();
+                    $(this).addClass('active').append('<i class="feather-check ms-3"></i>');
+                    refreshAssignedAssetRows();
+                    $('.erp-sort-dropdown .dropdown-menu.show').removeClass('show');
+                    $('.erp-sort-dropdown.show').removeClass('show');
+                });
+
+                $('.asset-request-sort-link').on('click', function(e) {
+                    e.preventDefault();
+                    assetRequestSortMode = $(this).data('sort') || 'date_desc';
+                    $('.asset-request-sort-link').removeClass('active').find('.feather-check').remove();
+                    $(this).addClass('active').append('<i class="feather-check ms-3"></i>');
+                    refreshAssetRequestRows();
+                    $('.erp-sort-dropdown .dropdown-menu.show').removeClass('show');
+                    $('.erp-sort-dropdown.show').removeClass('show');
+                });
+
+                refreshDocumentRows();
+                refreshAssignedAssetRows();
+                refreshAssetRequestRows();
             });
         </script>
     @endpush

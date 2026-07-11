@@ -79,7 +79,7 @@ class EmployeeController extends Controller
                         break;
                 }
             })
-            ->paginate(12)
+            ->paginate(10)
             ->withQueryString();
 
         return view('modules.hrms.employees.index', [
@@ -143,6 +143,17 @@ class EmployeeController extends Controller
         return redirect()
             ->route('hrms.employees.index')
             ->with('success', 'Employee updated successfully.');
+    }
+
+    public function destroy(Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $employee->delete();
+
+        return redirect()
+            ->route('hrms.employees.index')
+            ->with('success', 'Employee deleted successfully.');
     }
 
     /**
