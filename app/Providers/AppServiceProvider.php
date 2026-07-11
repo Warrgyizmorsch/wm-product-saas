@@ -72,6 +72,18 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Repositories\MilestoneRepositoryInterface::class,
             \App\Domains\Projects\Repositories\MilestoneRepository::class
         );
+
+        // ── Projects: Task List ───────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\TaskListRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\TaskListRepository::class
+        );
+
+        // ── Projects: Task ─────────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Projects\Repositories\TaskRepositoryInterface::class,
+            \App\Domains\Projects\Repositories\TaskRepository::class
+        );
     }
 
     public function boot(): void
@@ -223,6 +235,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Projects\Models\Milestone::class,
             \App\Domains\Projects\Policies\MilestonePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\TaskList::class,
+            \App\Domains\Projects\Policies\TaskListPolicy::class
         );
 
         // ── Access (RBAC admin) Policies ──────────────────────────────────────

@@ -6,12 +6,14 @@ use App\Domains\CRM\Models\Customer;
 use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectMember;
+use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Requests\StoreProjectRequest;
 use App\Domains\Projects\Requests\UpdateProjectRequest;
 use App\Domains\Projects\Services\ActivityLogService;
 use App\Domains\Projects\Services\MilestoneService;
 use App\Domains\Projects\Services\ProjectMemberService;
 use App\Domains\Projects\Services\ProjectService;
+use App\Domains\Projects\Services\TaskListService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +27,7 @@ class ProjectController extends Controller
         private readonly ActivityLogService $activity,
         private readonly ProjectMemberService $members,
         private readonly MilestoneService $milestones,
+        private readonly TaskListService $taskLists,
     ) {
     }
 
@@ -67,6 +70,7 @@ class ProjectController extends Controller
 
         $canManageMembers = auth()->user()->can('manage', [ProjectMember::class, $project]);
         $canManageMilestones = auth()->user()->can('manage', [Milestone::class, $project]);
+        $canManageTaskLists = auth()->user()->can('manage', [TaskList::class, $project]);
 
         return view('modules.projects.show', [
             'project'             => $project,
@@ -74,7 +78,9 @@ class ProjectController extends Controller
             'canManageMembers'    => $canManageMembers,
             'milestones'          => $this->milestones->list($project),
             'canManageMilestones' => $canManageMilestones,
-            'tenantUsers'         => ($canManageMembers || $canManageMilestones)
+            'taskLists'           => $this->taskLists->list($project),
+            'canManageTaskLists'  => $canManageTaskLists,
+            'tenantUsers'         => ($canManageMembers || $canManageMilestones || $canManageTaskLists)
                 ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
                 : collect(),
         ]);
