@@ -124,6 +124,52 @@
             </div>
         @endif
 
+        <!-- Assigned Shifts Section -->
+        <div class="mb-4 pb-4 border-bottom">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-dark mb-0">Assigned Production Shifts</h5>
+                @can('update', $workCenter)
+                    <a href="{{ route('production.work-centers.edit', $workCenter->id) }}" class="btn btn-sm btn-soft-primary">
+                        <i class="feather-edit-2 me-1"></i>Manage Shift Assignments
+                    </a>
+                @endcan
+            </div>
+
+            @if($workCenter->shifts->count() > 0)
+                <div class="row g-3">
+                    @foreach($workCenter->shifts as $shift)
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-2">{{ $shift->code }}</span>
+                                    @if($shift->active)
+                                        <span class="badge bg-soft-success text-success fs-9 rounded-pill px-2">Active</span>
+                                    @else
+                                        <span class="badge bg-soft-secondary text-secondary fs-9 rounded-pill px-2">Inactive</span>
+                                    @endif
+                                </div>
+                                <h6 class="fw-bold text-dark mb-1 fs-13">{{ $shift->name }}</h6>
+                                <div class="text-muted fs-12 mt-2">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <i class="feather-clock text-muted fs-13"></i>
+                                        <span>{{ substr($shift->start_time, 0, 5) }} - {{ substr($shift->end_time, 0, 5) }}</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="feather-coffee text-muted fs-13"></i>
+                                        <span>Break: {{ $shift->break_minutes }} minutes</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="text-center py-4 bg-light rounded text-muted fs-13 border border-dashed">
+                    <i class="feather-info me-2 fs-16"></i>No production shifts explicitly assigned to this work center. Running on fallback Standard Shift (8 hours).
+                </div>
+            @endif
+        </div>
+
         <!-- Assigned Machines List -->
         <div>
             <div class="d-flex justify-content-between align-items-center mb-3">

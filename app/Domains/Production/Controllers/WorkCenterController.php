@@ -14,6 +14,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
+use App\Domains\Production\Models\ProductionShift;
+
 class WorkCenterController extends Controller
 {
     public function __construct(
@@ -37,9 +39,11 @@ class WorkCenterController extends Controller
     {
         Gate::authorize('create', WorkCenter::class);
 
+        $tenantId = require_tenant_id();
+        $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->orderBy('name')->get();
         $workCenterTypes = config('production.work_center_types', []);
         $parentOptions = WorkCenter::orderBy('name')->get();
-        return view('modules.production.work-centers.create', compact('workCenterTypes', 'parentOptions'));
+        return view('modules.production.work-centers.create', compact('workCenterTypes', 'parentOptions', 'shifts'));
     }
 
     public function store(StoreWorkCenterRequest $request): RedirectResponse
@@ -50,6 +54,14 @@ class WorkCenterController extends Controller
             $tenantId = require_tenant_id();
             $dto      = WorkCenterDTO::fromArray($request->validated());
             $wc       = $this->service->create($dto, $tenantId);
+
+            // Sync shifts
+            $shifts = $request->input('shifts', []);
+            $syncData = [];
+            foreach ($shifts as $shiftId) {
+                $syncData[$shiftId] = ['tenant_id' => $tenantId];
+            }
+            $wc->shifts()->sync($syncData);
 
             return redirect()
                 ->route('production.work-centers.show', $wc->id)
@@ -76,9 +88,11 @@ class WorkCenterController extends Controller
 
         Gate::authorize('update', $workCenter);
 
+        $tenantId = require_tenant_id();
+        $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->orderBy('name')->get();
         $workCenterTypes = config('production.work_center_types', []);
         $parentOptions = WorkCenter::where('id', '!=', $id)->orderBy('name')->get();
-        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'parentOptions'));
+        return view('modules.production.work-centers.edit', compact('workCenter', 'workCenterTypes', 'parentOptions', 'shifts'));
     }
 
     public function update(UpdateWorkCenterRequest $request, int $id): RedirectResponse
@@ -89,8 +103,17 @@ class WorkCenterController extends Controller
         Gate::authorize('update', $workCenter);
 
         try {
+            $tenantId = require_tenant_id();
             $dto = WorkCenterDTO::fromArray($request->validated());
             $wc  = $this->service->update($id, $dto);
+
+            // Sync shifts
+            $shifts = $request->input('shifts', []);
+            $syncData = [];
+            foreach ($shifts as $shiftId) {
+                $syncData[$shiftId] = ['tenant_id' => $tenantId];
+            }
+            $wc->shifts()->sync($syncData);
 
             return redirect()
                 ->route('production.work-centers.show', $wc->id)

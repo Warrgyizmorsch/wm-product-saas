@@ -88,6 +88,14 @@
                         
                         <x-ui.odoo-form-ui type="input" label="Cost Per Hour ($)" name="cost_per_hour" inputType="number" :value="old('cost_per_hour', $workCenter->cost_per_hour)" :required="true" />
                         
+                        <x-ui.odoo-form-ui type="select" label="Active Shifts" name="shifts[]" :multiple="true" :searchable="true">
+                            @foreach($shifts as $shift)
+                                <option value="{{ $shift->id }}" @selected(in_array($shift->id, old('shifts', $workCenter->shifts->pluck('id')->toArray())))>
+                                    {{ $shift->name }} ({{ substr($shift->start_time, 0, 5) }} - {{ substr($shift->end_time, 0, 5) }})
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                        
                         <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="4">{{ old('description', $workCenter->description) }}</x-ui.odoo-form-ui>
                     </div>
                 </div>

@@ -135,4 +135,84 @@ class WorkCenterTest extends TestCase
             'department_name' => 'Fabrication',
         ]);
     }
+
+    public function test_work_center_creation_with_shifts(): void
+    {
+        $shift = \App\Domains\Production\Models\ProductionShift::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Morning Shift',
+            'code' => 'MORN',
+            'start_time' => '08:00:00',
+            'end_time' => '16:00:00',
+            'break_minutes' => 30,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.work-centers.store'), [
+                'name' => 'CNC Station',
+                'code' => 'WC-CNC',
+                'work_center_type' => 'machining',
+                'status' => 'active',
+                'efficiency_percentage' => 100.0,
+                'cost_per_hour' => 50.00,
+                'shifts' => [$shift->id],
+            ]);
+
+        $response->assertRedirect();
+        
+        $wc = WorkCenter::where('code', 'WC-CNC')->firstOrFail();
+        $this->assertCount(1, $wc->shifts);
+        $this->assertEquals('Morning Shift', $wc->shifts->first()->name);
+        $this->assertDatabaseHas('production_work_center_shifts', [
+            'work_center_id' => $wc->id,
+            'shift_id' => $shift->id,
+            'tenant_id' => $this->tenantA->id,
+        ]);
+    }
+
+    public function test_work_center_update_with_shifts(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Assembly Area',
+            'code' => 'WC-ASSY',
+            'status' => 'active',
+            'efficiency_percentage' => 100.0,
+            'cost_per_hour' => 20.00,
+        ]);
+
+        $shift = \App\Domains\Production\Models\ProductionShift::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Night Shift',
+            'code' => 'NIGHT',
+            'start_time' => '16:00:00',
+            'end_time' => '00:00:00',
+            'break_minutes' => 45,
+            'active' => true,
+        ]);
+
+        $response = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->put(route('production.work-centers.update', $wc->id), [
+                'name' => 'Assembly Area Updated',
+                'code' => 'WC-ASSY',
+                'status' => 'active',
+                'efficiency_percentage' => 95.0,
+                'cost_per_hour' => 25.00,
+                'shifts' => [$shift->id],
+            ]);
+
+        $response->assertRedirect();
+        
+        $wc->refresh();
+        $this->assertCount(1, $wc->shifts);
+        $this->assertEquals('Night Shift', $wc->shifts->first()->name);
+        $this->assertDatabaseHas('production_work_center_shifts', [
+            'work_center_id' => $wc->id,
+            'shift_id' => $shift->id,
+            'tenant_id' => $this->tenantA->id,
+        ]);
+    }
 }
