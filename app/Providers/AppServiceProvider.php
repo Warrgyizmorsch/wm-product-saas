@@ -242,6 +242,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Policies\TaskListPolicy::class
         );
 
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Projects\Models\Task::class,
+            \App\Domains\Projects\Policies\TaskPolicy::class
+        );
+
         // ── Access (RBAC admin) Policies ──────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Models\User::class,
