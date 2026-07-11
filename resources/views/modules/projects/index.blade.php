@@ -51,26 +51,6 @@
             <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
         @endif
 
-        <!-- Metrics Cards -->
-        <div class="row g-4 mb-4">
-            <div class="col-xxl-3 col-md-6">
-                <div class="card stretch stretch-full border-0 shadow-sm">
-                    <div class="card-body">
-                        <span class="text-muted fs-12 text-uppercase">{{ __('projects.total_projects') }}</span>
-                        <h3 class="mb-0 mt-2 fw-bold text-dark">{{ $summary['total'] }}</h3>
-                    </div>
-                </div>
-            </div>
-            <div class="col-xxl-3 col-md-6">
-                <div class="card stretch stretch-full border-0 shadow-sm">
-                    <div class="card-body">
-                        <span class="text-muted fs-12 text-uppercase">{{ __('projects.active_projects') }}</span>
-                        <h3 class="mb-0 mt-2 fw-bold text-dark">{{ $summary['active'] }}</h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
             <h5 class="fw-bold text-dark mb-0">
