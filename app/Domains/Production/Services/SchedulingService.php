@@ -67,6 +67,20 @@ class SchedulingService
     public function generateForwardSchedule(ProductionOrder $order, Carbon $startDate): ProductionSchedule
     {
         return DB::transaction(function () use ($order, $startDate) {
+            $operations = $order->operations()->with('workCenter')->orderBy('sequence')->get();
+            if ($operations->isEmpty()) {
+                throw new \LogicException("Cannot generate schedule: Production Order has no operations configured.");
+            }
+
+            foreach ($operations as $op) {
+                if (!$op->workCenter) {
+                    throw new \LogicException("Cannot generate schedule: Work Center is missing for operation sequence [{$op->sequence}].");
+                }
+                if (!$op->workCenter->isActive()) {
+                    throw new \LogicException("Cannot generate schedule: Work Center [{$op->workCenter->name}] for operation sequence [{$op->sequence}] is inactive.");
+                }
+            }
+
             // Delete existing active/draft schedules for this order
             ProductionSchedule::withoutGlobalScopes()
                 ->where('production_order_id', $order->id)
@@ -85,8 +99,6 @@ class SchedulingService
                 'scheduled_at'        => now(),
                 'created_by'          => auth()->id() ?: 1,
             ]);
-
-            $operations = $order->operations()->orderBy('sequence')->get();
             $scheduledData = [];
 
             foreach ($operations as $op) {
@@ -180,6 +192,20 @@ class SchedulingService
     public function generateBackwardSchedule(ProductionOrder $order, Carbon $dueDate): ProductionSchedule
     {
         return DB::transaction(function () use ($order, $dueDate) {
+            $operations = $order->operations()->with('workCenter')->orderBy('sequence')->get();
+            if ($operations->isEmpty()) {
+                throw new \LogicException("Cannot generate schedule: Production Order has no operations configured.");
+            }
+
+            foreach ($operations as $op) {
+                if (!$op->workCenter) {
+                    throw new \LogicException("Cannot generate schedule: Work Center is missing for operation sequence [{$op->sequence}].");
+                }
+                if (!$op->workCenter->isActive()) {
+                    throw new \LogicException("Cannot generate schedule: Work Center [{$op->workCenter->name}] for operation sequence [{$op->sequence}] is inactive.");
+                }
+            }
+
             ProductionSchedule::withoutGlobalScopes()
                 ->where('production_order_id', $order->id)
                 ->whereIn('status', [ProductionSchedule::STATUS_DRAFT, ProductionSchedule::STATUS_SCHEDULED])
@@ -199,11 +225,11 @@ class SchedulingService
             ]);
 
             // For backward scheduling, schedule operations in reverse order
-            $operations = $order->operations()->orderByDesc('sequence')->get();
+            $reversedOps = $operations->reverse();
             $records    = [];
             $scheduledData = [];
 
-            foreach ($operations as $op) {
+            foreach ($reversedOps as $op) {
                 $times    = $this->calculateOperationTimes($op, $order->quantity_ordered);
                 $duration = $times['total_minutes'];
 
@@ -461,7 +487,11 @@ class SchedulingService
                     'message'  => "Scheduled date {$searchDate->toDateString()} skipped due to holiday/weekend configuration.",
                     'severity' => 'info',
                 ];
-                $searchDate->addDay()->startOfDay();
+                if ($forward) {
+                    $searchDate->addDay()->startOfDay();
+                } else {
+                    $searchDate->subDay()->endOfDay();
+                }
                 continue;
             }
 
@@ -487,13 +517,17 @@ class SchedulingService
                 $windows[] = ['start' => $start, 'finish' => $end];
             }
 
-            // Sort windows
-            usort($windows, fn($a, $b) => $a['start'] <=> $b['start']);
+            // Sort windows: if forward, earliest first; if backward, latest first
+            if ($forward) {
+                usort($windows, fn($a, $b) => $a['start'] <=> $b['start']);
+            } else {
+                usort($windows, fn($a, $b) => $b['start'] <=> $a['start']);
+            }
 
             // Find free space within work windows
             foreach ($windows as $window) {
                 $searchStart  = $forward ? $window['start']->max($from) : $window['start'];
-                $searchFinish = $window['finish'];
+                $searchFinish = $forward ? $window['finish'] : $window['finish']->min($from);
 
                 if ($searchStart->gt($searchFinish) || $searchStart->diffInMinutes($searchFinish) < $durationMinutes) {
                     continue;
@@ -502,41 +536,74 @@ class SchedulingService
                 // Check overlays with other bookings inside this window
                 $windowBookings = $bookings->filter(fn($b) => 
                     $b->planned_start->lt($searchFinish) && $b->planned_finish->gt($searchStart)
-                )->sortBy('planned_start');
+                );
 
-                $slotCandidate = $searchStart->copy();
-                
-                while ($slotCandidate->copy()->addMinutes((int)$durationMinutes)->lte($searchFinish)) {
-                    $candidateEnd = $slotCandidate->copy()->addMinutes((int)$durationMinutes);
-                    $overlap      = false;
+                if ($forward) {
+                    $windowBookings = $windowBookings->sortBy('planned_start');
+                    $slotCandidate = $searchStart->copy();
+                    
+                    while ($slotCandidate->copy()->addMinutes((int)$durationMinutes)->lte($searchFinish)) {
+                        $candidateEnd = $slotCandidate->copy()->addMinutes((int)$durationMinutes);
+                        $overlap      = false;
 
-                    foreach ($windowBookings as $b) {
-                        if ($b->planned_start->lt($candidateEnd) && $b->planned_finish->gt($slotCandidate)) {
-                            // Overlap! Push candidate past this booking
-                            $slotCandidate = $b->planned_finish->copy();
-                            $overlap       = true;
-                            break;
+                        foreach ($windowBookings as $b) {
+                            if ($b->planned_start->lt($candidateEnd) && $b->planned_finish->gt($slotCandidate)) {
+                                // Overlap! Push candidate past this booking
+                                $slotCandidate = $b->planned_finish->copy();
+                                $overlap       = true;
+                                break;
+                            }
+                        }
+
+                        if (!$overlap) {
+                            // Found a valid finite capacity slot
+                            return [
+                                'start'    => $slotCandidate,
+                                'finish'   => $candidateEnd,
+                                'warnings' => $warnings,
+                            ];
                         }
                     }
+                } else {
+                    $windowBookings = $windowBookings->sortByDesc('planned_finish');
+                    $slotFinish = $searchFinish->copy();
 
-                    if (!$overlap) {
-                        // Found a valid finite capacity slot
-                        return [
-                            'start'    => $slotCandidate,
-                            'finish'   => $candidateEnd,
-                            'warnings' => $warnings,
-                        ];
+                    while ($slotFinish->copy()->subMinutes((int)ceil($durationMinutes))->gte($searchStart)) {
+                        $candidateStart = $slotFinish->copy()->subMinutes((int)ceil($durationMinutes));
+                        $overlap        = false;
+
+                        foreach ($windowBookings as $b) {
+                            if ($b->planned_start->lt($slotFinish) && $b->planned_finish->gt($candidateStart)) {
+                                // Overlap! Push candidate to before this booking start
+                                $slotFinish = $b->planned_start->copy();
+                                $overlap    = true;
+                                break;
+                            }
+                        }
+
+                        if (!$overlap) {
+                            // Found a valid finite capacity slot
+                            return [
+                                'start'    => $candidateStart,
+                                'finish'   => $slotFinish,
+                                'warnings' => $warnings,
+                            ];
+                        }
                     }
                 }
             }
 
-            $searchDate->addDay()->startOfDay();
+            if ($forward) {
+                $searchDate->addDay()->startOfDay();
+            } else {
+                $searchDate->subDay()->endOfDay();
+            }
         }
 
         // Full fallback: Unlimited capacity schedule at start if no slot resolved in 365 days
         return [
-            'start'    => $from->copy(),
-            'finish'   => $from->copy()->addMinutes((int)$durationMinutes),
+            'start'    => $forward ? $from->copy() : $from->copy()->subMinutes((int)$durationMinutes),
+            'finish'   => $forward ? $from->copy()->addMinutes((int)$durationMinutes) : $from->copy(),
             'warnings' => array_merge($warnings, [[
                 'code'     => 'CAPACITY_OVERLOAD',
                 'message'  => 'No finite slot found. Scheduled with standard unlimited capacity.',
@@ -653,6 +720,7 @@ class SchedulingService
 
         $winner = $evaluated[0];
         $allWarnings = array_merge($warnings, $winner['slot']['warnings']);
+        $allWarnings = ProductionScheduleOperation::aggregateWarnings($allWarnings);
 
         // Warn if an alternate machine was selected over the primary
         if ($winner['priority'] > 0) {
@@ -662,6 +730,8 @@ class SchedulingService
                 'severity' => 'info',
             ];
         }
+
+        $allWarnings = ProductionScheduleOperation::aggregateWarnings($allWarnings);
 
         return [
             'machine_id' => $winner['machine']->id,
@@ -747,7 +817,7 @@ class SchedulingService
             }
         }
 
-        return $conflicts;
+        return array_values(array_unique($conflicts));
     }
 
     /**
@@ -792,7 +862,7 @@ class SchedulingService
             }
         }
 
-        return $overloads;
+        return array_values(array_unique($overloads));
     }
 
     // ─── Private Helpers ─────────────────────────────────────────────────────
@@ -974,5 +1044,62 @@ class SchedulingService
                 }
             }
         }
+    }
+
+    /**
+     * Get capacity utilization details for each work center in the schedule.
+     *
+     * @param  ProductionSchedule $schedule
+     * @return array
+     */
+    public function getWorkCenterCapacityDetails(ProductionSchedule $schedule): array
+    {
+        $ops = $schedule->operations;
+        if ($ops->isEmpty()) return [];
+
+        $minDate = $ops->min('planned_start');
+        $maxDate = $ops->max('planned_finish');
+        if (!$minDate || !$maxDate) return [];
+
+        $details = [];
+        $groupedOps = $ops->groupBy('work_center_id');
+
+        foreach ($groupedOps as $wcId => $wcOps) {
+            $wc = WorkCenter::withoutGlobalScopes()->find($wcId);
+            if (!$wc) continue;
+
+            $totalScheduled = $wcOps->sum('planned_duration_minutes');
+            $totalCapacity = 0.0;
+
+            $date = $minDate->copy()->startOfDay();
+            while ($date->lte($maxDate)) {
+                $totalCapacity += $this->calculateCapacity($wcId, $date);
+                $date->addDay();
+            }
+
+            $utilization = $totalCapacity > 0 ? ($totalScheduled / $totalCapacity) * 100 : 100;
+
+            $shiftsList = $wc->shifts()->where('active', true)->pluck('name')->toArray();
+            $calendarName = $wc->calendar ? $wc->calendar->name : 'Mon-Fri Fallback';
+            $workingDays = $wc->calendar ? $wc->calendar->working_days : [1, 2, 3, 4, 5];
+            
+            $daysMap = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 0 => 'Sun'];
+            $workingDaysStr = implode(', ', array_map(fn($d) => $daysMap[$d] ?? $d, $workingDays));
+
+            $activeMachinesCount = $wc->activeMachines()->count();
+
+            $details[] = [
+                'work_center' => $wc,
+                'calendar_name' => $calendarName,
+                'working_days' => $workingDaysStr,
+                'shifts' => empty($shiftsList) ? 'Standard Shift (Fallback)' : implode(', ', $shiftsList),
+                'active_machines' => $activeMachinesCount,
+                'scheduled_minutes' => $totalScheduled,
+                'capacity_minutes' => $totalCapacity,
+                'utilization' => min(100.00, $utilization),
+            ];
+        }
+
+        return $details;
     }
 }

@@ -27,13 +27,13 @@
 @endpush
 
 @section('page-actions')
-    <a href="{{ route('production.mes.scanner.index') }}" class="btn btn-touch btn-primary px-3">
+    <a href="{{ route('production.mes.scanner.index') }}" class="btn btn-primary">
         <i class="feather-camera me-2"></i> Scan Barcode
     </a>
 @endsection
 
 @section('content')
-    <div class="container-fluid py-2">
+    <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
         @if (session('success'))
             <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
         @endif

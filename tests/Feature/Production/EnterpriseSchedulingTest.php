@@ -387,4 +387,306 @@ class EnterpriseSchedulingTest extends TestCase
 
         return $order;
     }
+
+    /**
+     * Test backward scheduling time and sequence adjustments.
+     */
+    public function test_backward_scheduling_correctness(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'CNC Fabrication',
+            'code'                  => 'CNC-01',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+
+        $machine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'CNC Laser Cutter',
+            'code'           => 'CNC-LSR',
+            'status'         => 'active',
+        ]);
+
+        $cal = ProductionCalendar::create([
+            'tenant_id'    => $this->tenant->id,
+            'name'         => 'Default Calendar',
+            'working_days' => [1, 2, 3, 4, 5],
+            'is_default'   => true,
+        ]);
+        $wc->update(['production_calendar_id' => $cal->id]);
+
+        $shiftA = ProductionShift::create([
+            'tenant_id'        => $this->tenant->id,
+            'name'             => 'Shift A',
+            'code'             => 'SH_A',
+            'start_time'       => '08:00:00',
+            'end_time'         => '16:00:00',
+            'break_minutes'    => 0,
+            'overtime_allowed' => false,
+            'active'           => true,
+        ]);
+        $wc->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenant->id]);
+
+        // Create 2 identical orders with 1 operation of 120 mins duration
+        $order1 = $this->createMockOrder('ORD-BACK-101', $wc, $machine, 120);
+        $order2 = $this->createMockOrder('ORD-BACK-102', $wc, $machine, 120);
+
+        // Schedule first order ending Friday 2026-07-10 at 16:00:00 (Due Date)
+        $dueDate = Carbon::parse('2026-07-10 16:00:00');
+        $sched1 = $this->schedulingService->generateSchedule($order1, $dueDate, 'backward');
+
+        // Schedule second order ending Friday at same due date (should slide backwards to end at 14:00)
+        $sched2 = $this->schedulingService->generateSchedule($order2, $dueDate, 'backward');
+
+        $op1 = $sched1->operations->first();
+        $op2 = $sched2->operations->first();
+
+        // Op 1 runs from 14:00 to 16:00 on Friday
+        $this->assertEquals('2026-07-10 14:00:00', $op1->planned_start->toDateTimeString());
+        $this->assertEquals('2026-07-10 16:00:00', $op1->planned_finish->toDateTimeString());
+
+        // Op 2 should finish at 14:00 (when Machine becomes busy going backward) and start at 12:00
+        $this->assertEquals('2026-07-10 12:00:00', $op2->planned_start->toDateTimeString());
+        $this->assertEquals('2026-07-10 14:00:00', $op2->planned_finish->toDateTimeString());
+    }
+
+    /**
+     * Test schedule generation data integrity and business validations.
+     */
+    public function test_schedule_generation_data_integrity(): void
+    {
+        // 1. Order with no operations throws LogicException
+        $orderNoOps = ProductionOrder::create([
+            'tenant_id'        => $this->tenant->id,
+            'order_number'     => 'ORD-NOOPS',
+            'product_id'       => $this->product->id,
+            'quantity_ordered' => 1.0,
+            'start_date'       => now(),
+            'end_date'         => now()->addDays(5),
+            'status'           => ProductionOrder::STATUS_RELEASED,
+        ]);
+
+        $this->expectException(\LogicException::class);
+        $this->schedulingService->generateSchedule($orderNoOps, now(), 'forward');
+    }
+
+    /**
+     * Test holiday skipped warnings are aggregated.
+     */
+    public function test_holiday_warnings_aggregation(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'Assembly Line',
+            'code'                  => 'ASSY-02',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+
+        $machine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'CNC Mill',
+            'code'           => 'CNC-MIL',
+            'status'         => 'active',
+        ]);
+
+        $cal = ProductionCalendar::create([
+            'tenant_id'    => $this->tenant->id,
+            'name'         => 'Calendar with Weekend',
+            'working_days' => [1, 2, 3, 4, 5],
+            'is_default'   => false,
+        ]);
+        $wc->update(['production_calendar_id' => $cal->id]);
+
+        $shiftA = ProductionShift::create([
+            'tenant_id'        => $this->tenant->id,
+            'name'             => 'Shift A',
+            'code'             => 'SH_A',
+            'start_time'       => '08:00:00',
+            'end_time'         => '16:00:00',
+            'break_minutes'    => 0,
+            'overtime_allowed' => false,
+            'active'           => true,
+        ]);
+        $wc->shifts()->attach($shiftA->id, ['tenant_id' => $this->tenant->id]);
+
+        // Start Friday 2026-07-03 at 15:30:00. Runs for 120 mins.
+        // It skips Saturday 2026-07-04 and Sunday 2026-07-05.
+        // Completes Monday 2026-07-06 at 09:30:00.
+        $order = $this->createMockOrder('ORD-WARN-AGG', $wc, $machine, 120);
+        $start = Carbon::parse('2026-07-03 15:30:00');
+
+        $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
+        $op    = $sched->operations->first();
+
+        // Should skip Saturday & Sunday, ending on Monday morning
+        $this->assertEquals('2026-07-06 10:00:00', $op->planned_finish->toDateTimeString());
+
+        $warnings = $op->warnings;
+        // There should be exactly 1 aggregated HOLIDAY_SKIPPED warning
+        $this->assertCount(1, $warnings);
+        $this->assertEquals('HOLIDAY_SKIPPED', $warnings[0]['code']);
+        $this->assertStringContainsString('2 day(s) skipped', $warnings[0]['message']);
+        $this->assertStringContainsString('2026-07-04', $warnings[0]['message']);
+        $this->assertStringContainsString('2026-07-05', $warnings[0]['message']);
+    }
+
+    /**
+     * Test that multiple machine candidates do not result in duplicate warnings.
+     */
+    public function test_duplicate_warnings_prevention_on_multiple_machines(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'Test WC',
+            'code'                  => 'T-WC',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+
+        $machine1 = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'Mach 1',
+            'code'           => 'M-1',
+            'status'         => 'active',
+        ]);
+
+        $machine2 = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'Mach 2',
+            'code'           => 'M-2',
+            'status'         => 'active',
+        ]);
+
+        $cal = ProductionCalendar::create([
+            'tenant_id'    => $this->tenant->id,
+            'name'         => 'Calendar',
+            'working_days' => [1, 2, 3, 4, 5],
+            'is_default'   => false,
+        ]);
+        $wc->update(['production_calendar_id' => $cal->id]);
+
+        $shift = ProductionShift::create([
+            'tenant_id'        => $this->tenant->id,
+            'name'             => 'Shift',
+            'code'             => 'SH',
+            'start_time'       => '08:00:00',
+            'end_time'         => '16:00:00',
+            'break_minutes'    => 0,
+            'active'           => true,
+        ]);
+        $wc->shifts()->attach($shift->id, ['tenant_id' => $this->tenant->id]);
+
+        // Start Saturday 2026-07-04. Both machines skip Sat & Sun.
+        $order = $this->createMockOrder('ORD-WARN-MULT', $wc, $machine1, 60);
+        
+        // Add alternate machine
+        RoutingOperationAlternateMachine::create([
+            'tenant_id'            => $this->tenant->id,
+            'routing_operation_id' => $order->operations->first()->routing_operation_id,
+            'machine_id'           => $machine2->id,
+            'priority'             => 1,
+        ]);
+
+        $start = Carbon::parse('2026-07-04 08:00:00');
+        $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
+        $op = $sched->operations->first();
+
+        // Check warnings list on the persisted operation
+        $warnings = $op->warnings;
+        $holidayWarnings = collect($warnings)->where('code', 'HOLIDAY_SKIPPED');
+
+        // There must be exactly 1 aggregated HOLIDAY_SKIPPED warning
+        $this->assertCount(1, $holidayWarnings);
+    }
+
+    /**
+     * Test that recalculating/saving the same schedule does not append/multiply warnings.
+     */
+    public function test_recalculating_does_not_append_warnings(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'WC Recalc',
+            'code'                  => 'WC-RECALC',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+
+        $machine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'Mach Recalc',
+            'code'           => 'M-RECALC',
+            'status'         => 'active',
+        ]);
+
+        $cal = ProductionCalendar::create([
+            'tenant_id'    => $this->tenant->id,
+            'name'         => 'Calendar',
+            'working_days' => [1, 2, 3, 4, 5],
+            'is_default'   => false,
+        ]);
+        $wc->update(['production_calendar_id' => $cal->id]);
+
+        $shift = ProductionShift::create([
+            'tenant_id'        => $this->tenant->id,
+            'name'             => 'Shift',
+            'code'             => 'SH',
+            'start_time'       => '08:00:00',
+            'end_time'         => '16:00:00',
+            'break_minutes'    => 0,
+            'active'           => true,
+        ]);
+        $wc->shifts()->attach($shift->id, ['tenant_id' => $this->tenant->id]);
+
+        $order = $this->createMockOrder('ORD-RECALC', $wc, $machine, 60);
+        $start = Carbon::parse('2026-07-04 08:00:00'); // Saturday (skips Sat & Sun)
+
+        $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
+        $op = $sched->operations->first();
+
+        $this->assertCount(1, collect($op->warnings)->where('code', 'HOLIDAY_SKIPPED'));
+
+        // Save again
+        $op->save();
+        $this->assertCount(1, collect($op->warnings)->where('code', 'HOLIDAY_SKIPPED'));
+
+        // Reschedule
+        $this->schedulingService->reschedule($sched->id, $start->addDay());
+        $op->refresh();
+        $this->assertCount(1, collect($op->warnings)->where('code', 'HOLIDAY_SKIPPED'));
+    }
+
+    /**
+     * Test that existing duplicate warning payloads in DB are aggregated and other types remain visible.
+     */
+    public function test_existing_duplicate_payloads_render_cleanly(): void
+    {
+        $rawWarnings = [
+            ['code' => 'HOLIDAY_SKIPPED', 'message' => 'Scheduled date 2026-07-04 skipped.', 'severity' => 'info'],
+            ['code' => 'HOLIDAY_SKIPPED', 'message' => 'Scheduled date 2026-07-05 skipped.', 'severity' => 'info'],
+            ['code' => 'CAPACITY_OVERLOAD', 'message' => 'Overloaded WC.', 'severity' => 'warning'],
+            ['code' => 'HOLIDAY_SKIPPED', 'message' => 'Scheduled date 2026-07-04 skipped.', 'severity' => 'info'],
+        ];
+
+        // Process through model aggregation
+        $cleaned = ProductionScheduleOperation::aggregateWarnings($rawWarnings);
+
+        // Should have exactly 2 unique codes: HOLIDAY_SKIPPED (consolidated) and CAPACITY_OVERLOAD
+        $this->assertCount(2, $cleaned);
+        
+        $holiday = collect($cleaned)->firstWhere('code', 'HOLIDAY_SKIPPED');
+        $overload = collect($cleaned)->firstWhere('code', 'CAPACITY_OVERLOAD');
+
+        $this->assertNotNull($holiday);
+        $this->assertNotNull($overload);
+        $this->assertStringContainsString('2 day(s) skipped', $holiday['message']);
+        $this->assertEquals('Overloaded WC.', $overload['message']);
+    }
 }
