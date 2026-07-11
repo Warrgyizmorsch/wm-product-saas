@@ -18,6 +18,8 @@ class DispatchOrderController extends Controller
 {
     public function index(): View
     {
+        $this->authorize('viewAny', DispatchOrder::class);
+
         $dispatches = DispatchOrder::with('salesOrder.customer', 'deliveryOrder')
             ->latest()
             ->get();
@@ -35,6 +37,8 @@ class DispatchOrderController extends Controller
 
     public function create(): View
     {
+        $this->authorize('create', DispatchOrder::class);
+
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();
 
         // Delivery orders without a dispatch order yet
@@ -52,6 +56,8 @@ class DispatchOrderController extends Controller
      */
     public function pendingDeliveryOrders(Request $request): JsonResponse
     {
+        $this->authorize('create', DispatchOrder::class);
+
         $dos = DeliveryOrder::with(['salesOrder.customer', 'items.product', 'items.dispatchItems'])
             ->whereNotIn('status', ['Cancelled', 'Delivered'])
             ->latest()
@@ -106,6 +112,8 @@ class DispatchOrderController extends Controller
      */
     public function warehouseAddress(int $warehouseId): JsonResponse
     {
+        $this->authorize('create', DispatchOrder::class);
+
         $warehouse = Warehouse::findOrFail($warehouseId);
         return response()->json([
             'address' => $warehouse->address ?? '',
@@ -115,6 +123,8 @@ class DispatchOrderController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorize('create', DispatchOrder::class);
+
         $request->validate([
             'delivery_order_id' => 'required|exists:delivery_orders,id',
             'carrier'           => 'nullable|string|max:255',
@@ -204,6 +214,8 @@ class DispatchOrderController extends Controller
             'items.product',
             'items.warehouse',
         ])->findOrFail($id);
+
+        $this->authorize('view', $dispatch);
 
         return view('modules.sales.dispatches.show', compact('dispatch'));
     }

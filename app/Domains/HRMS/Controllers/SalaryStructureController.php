@@ -315,6 +315,8 @@ class SalaryStructureController extends Controller
 
     public function storePayGroup(Request $request)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'name' => 'required|max:255',
             'company_id' => 'nullable|integer',
@@ -337,6 +339,8 @@ class SalaryStructureController extends Controller
 
     public function updatePayGroup(Request $request, PayGroup $payGroup)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $request->validate([
             'name' => 'required|max:255',
             'company_id' => 'nullable|integer',
@@ -358,6 +362,8 @@ class SalaryStructureController extends Controller
 
     public function destroyPayGroup(PayGroup $payGroup)
     {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
         $payGroup->delete();
 
         return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay Group deleted successfully.');

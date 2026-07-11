@@ -48,7 +48,8 @@ class DatabaseSeeder extends Seeder
             RbacSeeder::class,
             ProductionBomSeeder::class,
             InventoryMasterDemoSeeder::class,
-            ProductionDemoScenarioSeeder::class,
+            MultiLevelBomDemoSeeder::class,
+            FurnitureManufacturingDemoSeeder::class,
         ]);
     }
 }

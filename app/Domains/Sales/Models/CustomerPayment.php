@@ -2,12 +2,12 @@
 
 namespace App\Domains\Sales\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Domains\CRM\Models\Customer;
 
-class CustomerPayment extends Model
+class CustomerPayment extends BaseModel
 {
     protected $fillable = [
         'tenant_id',

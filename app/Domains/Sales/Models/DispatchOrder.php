@@ -2,12 +2,12 @@
 
 namespace App\Domains\Sales\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class DispatchOrder extends Model
+class DispatchOrder extends BaseModel
 {
     use HasFactory;
 

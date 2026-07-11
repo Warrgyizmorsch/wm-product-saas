@@ -233,6 +233,26 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Sales\Policies\DeliveryOrderPolicy::class
         );
 
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Sales\Models\DispatchOrder::class,
+            \App\Domains\Sales\Policies\DispatchOrderPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Sales\Models\Invoice::class,
+            \App\Domains\Sales\Policies\InvoicePolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Sales\Models\CustomerPayment::class,
+            \App\Domains\Sales\Policies\CustomerPaymentPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Sales\Models\SalesReturn::class,
+            \App\Domains\Sales\Policies\SalesReturnPolicy::class
+        );
+
         // ── Projects Policies ─────────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Projects\Models\Project::class,
