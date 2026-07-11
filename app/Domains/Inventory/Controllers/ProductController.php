@@ -64,6 +64,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'item_type' => 'required|in:Goods,Service',
+            'supplier_method' => 'nullable|in:buy,manufacture',
             'type' => 'required|in:finished_good,semi_finished,raw_material,component,service',
             'variation_type' => 'required|in:Single,Variant',
             'sku' => [
@@ -162,6 +163,7 @@ class ProductController extends Controller
                 'track_batch' => !empty($validated['track_batch']),
                 'inventory_valuation_method' => $validated['inventory_valuation_method'] ?? 'FIFO',
                 'attributes_config' => $validated['attributes'] ?? null,
+                'supplier_method' => $validated['supplier_method'] ?? 'buy',
             ]);
 
             if ($validated['variation_type'] === 'Single') {
@@ -208,6 +210,7 @@ class ProductController extends Controller
                             'variant_values' => ['label' => $vData['attributes'] ?? ''],
                             'track_serial_number' => $parentProduct->track_serial_number,
                             'track_batch' => $parentProduct->track_batch,
+                            'supplier_method' => $parentProduct->supplier_method,
                         ]);
 
                         // Save Variant Opening Stock to the default warehouse
@@ -279,6 +282,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'type' => 'required|in:finished_good,semi_finished,raw_material,component,service',
+            'supplier_method' => 'nullable|in:buy,manufacture',
             'sku' => [
                 'required',
                 'string',
@@ -359,10 +363,14 @@ class ProductController extends Controller
                 'track_serial_number' => !empty($validated['track_serial_number']),
                 'track_batch' => !empty($validated['track_batch']),
                 'inventory_valuation_method' => $validated['inventory_valuation_method'] ?? 'FIFO',
+                'supplier_method' => $validated['supplier_method'] ?? 'buy',
             ]);
 
-            // Sync type to variants
-            Product::where('parent_id', $product->id)->update(['type' => $validated['type']]);
+            // Sync type and supplier method to variants
+            Product::where('parent_id', $product->id)->update([
+                'type' => $validated['type'],
+                'supplier_method' => $validated['supplier_method'] ?? 'buy'
+            ]);
 
             if ($product->variation_type === 'Single') {
                 // Update stock per warehouse

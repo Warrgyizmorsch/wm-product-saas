@@ -131,35 +131,43 @@ class ProductionOrderService
             $quantity = (float) $data['quantity_ordered'];
 
             // Fetch latest active BOM & Routing
-            $bom = ProductionBom::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('product_id', $productId)
-                ->where('status', 'approved')
-                ->first();
+            $bomId = $data['bom_id'] ?? null;
+            $bom = $bomId 
+                ? ProductionBom::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($bomId)
+                : ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $productId)
+                    ->where('status', 'approved')
+                    ->first();
 
-            $routing = Routing::withoutGlobalScopes()
-                ->where('tenant_id', $tenantId)
-                ->where('product_id', $productId)
-                ->where('status', 'active')
-                ->first();
+            $routingId = $data['routing_id'] ?? null;
+            $routing = $routingId
+                ? Routing::withoutGlobalScopes()->where('tenant_id', $tenantId)->findOrFail($routingId)
+                : Routing::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where('product_id', $productId)
+                    ->where('status', 'active')
+                    ->first();
 
             if (!$bom || !$routing) {
                 throw new InvalidArgumentException("Cannot create order: No approved BOM and/or active Routing exists for this product.");
             }
 
             $order = ProductionOrder::create([
-                'tenant_id'          => $tenantId,
-                'order_number'       => $this->numberService->generateNextNumber($tenantId),
-                'production_plan_id' => null,
-                'product_id'         => $productId,
-                'bom_id'             => $bom->id,
-                'routing_id'         => $routing->id,
-                'quantity_ordered'   => $quantity,
-                'start_date'         => $data['start_date'],
-                'end_date'           => $data['end_date'],
-                'status'             => ProductionOrder::STATUS_DRAFT,
-                'description'        => $data['description'] ?? null,
-                'created_by'         => $userId,
+                'tenant_id'           => $tenantId,
+                'order_number'        => $this->numberService->generateNextNumber($tenantId),
+                'production_plan_id'  => null,
+                'product_id'          => $productId,
+                'bom_id'              => $bom->id,
+                'routing_id'          => $routing->id,
+                'sales_order_id'      => $data['sales_order_id'] ?? null,
+                'sales_order_item_id' => $data['sales_order_item_id'] ?? null,
+                'quantity_ordered'    => $quantity,
+                'start_date'          => $data['start_date'],
+                'end_date'            => $data['end_date'],
+                'status'              => ProductionOrder::STATUS_DRAFT,
+                'description'         => $data['description'] ?? null,
+                'created_by'          => $userId,
             ]);
 
             // 1. Resolve & Snapshot reservations directly from BOM items

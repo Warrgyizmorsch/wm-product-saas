@@ -6,22 +6,14 @@
 
 @section('content')
     @if ($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                    <ul class="fs-12 mb-0 ps-3">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="shadow-sm mb-4">
+            <strong>Please fix the following errors:</strong>
+            <ul class="mb-0 mt-1 ps-3">
+                @foreach ($errors->all() as $error)
+                    <li class="fs-12">{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
     @endif
 
     <form action="{{ route('sales.deliveries.store') }}" method="POST" id="deliveryForm">
@@ -96,10 +88,10 @@
                                                 $selectedWhId = $item->warehouse_id;
                                             @endphp
                                             <select name="items[{{ $item->id }}][warehouse_id]" 
-                                                    class="form-select form-select-sm warehouse-select" 
+                                                    class="odoo-table-select warehouse-select" 
                                                     data-product-id="{{ $item->product_id }}" 
                                                     data-item-id="{{ $item->id }}" 
-                                                    style="max-width: 220px;" required>
+                                                    required>
                                                 <option value="">Select Warehouse...</option>
                                                 @foreach ($warehouses as $wh)
                                                     <option value="{{ $wh->id }}" {{ $selectedWhId == $wh->id ? 'selected' : '' }}>
@@ -107,7 +99,7 @@
                                                     </option>
                                                 @endforeach
                                             </select>
-                                            <span class="available-qty-display d-block text-muted fs-11 mt-1 font-monospace" id="avail-qty-{{ $item->id }}">Available: 0</span>
+                                            <span class="available-qty-display d-block fs-11 mt-1 font-monospace text-muted" id="avail-qty-{{ $item->id }}">Available: 0</span>
                                         </td>
                                         <td class="text-end fw-semibold">{{ (int)$item->quantity }}</td>
                                         <td class="text-end text-muted">{{ (int)$shipped }}</td>

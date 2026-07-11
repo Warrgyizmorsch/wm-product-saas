@@ -116,6 +116,13 @@
                         <x-ui.radio name="variation_type" value="Variant" label="Contains Variants (e.g. Size, Color)" />
                     </div>
 
+                    <!-- Supplier Method Selector -->
+                    <div class="custom-radio-group mb-4">
+                        <span class="custom-radio-label">Supplier Method <span class="text-danger">*</span></span>
+                        <x-ui.radio name="supplier_method" value="buy" label="Buy" :checked="true" />
+                        <x-ui.radio name="supplier_method" value="manufacture" label="Manufacture" />
+                    </div>
+
                     <div class="row g-4 mb-4 fs-13 text-dark">
                         <!-- Left Column: Primary details -->
                         <div class="col-lg-6 border-end">

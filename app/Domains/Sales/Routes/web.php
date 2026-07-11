@@ -24,6 +24,26 @@ Route::prefix('sales')
         Route::post('deliveries/{delivery}/ship', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'ship'])->name('deliveries.ship');
         Route::post('deliveries/{delivery}/cancel', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'cancel'])->name('deliveries.cancel');
 
+        Route::post('deliveries/items/{itemId}/warehouse', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'updateWarehouse'])->name('deliveries.update-warehouse');
+        Route::post('deliveries/items/{itemId}/reserve', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'reserveQty'])->name('deliveries.reserve-qty');
+        Route::post('deliveries/items/{itemId}/indent', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'mockIndent'])->name('deliveries.mock-indent');
+        Route::post('deliveries/items/{itemId}/mo', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'mockMo'])->name('deliveries.mock-mo');
+        Route::post('deliveries/{delivery}/picking', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'startPicking'])->name('deliveries.picking');
+        Route::post('deliveries/{delivery}/pack', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'pack'])->name('deliveries.pack');
+        Route::post('deliveries/{delivery}/dispatch', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'dispatch'])->name('deliveries.dispatch');
+        Route::post('deliveries/{delivery}/dispatch-order', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'storeDispatchOrder'])->name('deliveries.dispatch-order.store');
+        Route::post('deliveries/{delivery}/deliver', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'deliver'])->name('deliveries.deliver');
+
+        // Dispatch Orders Routes
+        Route::get('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'index'])->name('dispatches.index');
+        Route::get('dispatches/create', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'create'])->name('dispatches.create');
+        Route::post('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'store'])->name('dispatches.store');
+        Route::get('dispatches/delivery-orders', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'pendingDeliveryOrders'])->name('dispatches.pending-do');
+        Route::get('dispatches/warehouse/{warehouse}/address', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'warehouseAddress'])->name('dispatches.warehouse-address');
+        Route::get('dispatches/{dispatch}', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'show'])->name('dispatches.show');
+
+
+
         // Invoices Routes
         Route::get('invoices', [\App\Domains\Sales\Controllers\InvoiceController::class, 'index'])->name('invoices.index');
         Route::get('invoices/create', [\App\Domains\Sales\Controllers\InvoiceController::class, 'create'])->name('invoices.create');

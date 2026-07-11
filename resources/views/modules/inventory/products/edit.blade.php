@@ -73,6 +73,13 @@
                         <input type="hidden" name="variation_type" value="{{ $product->variation_type }}">
                     </div>
 
+                    <!-- Supplier Method Selector -->
+                    <div class="custom-radio-group mb-4">
+                        <span class="custom-radio-label">Supplier Method <span class="text-danger">*</span></span>
+                        <x-ui.radio name="supplier_method" value="buy" label="Buy" :checked="$product->supplier_method === 'buy' || is_null($product->supplier_method)" />
+                        <x-ui.radio name="supplier_method" value="manufacture" label="Manufacture" :checked="$product->supplier_method === 'manufacture'" />
+                    </div>
+
                     <div class="row g-4 mb-4 fs-13 text-dark">
                         <!-- Left Column: Primary details -->
                         <div class="col-lg-6 border-end">

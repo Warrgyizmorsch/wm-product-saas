@@ -66,12 +66,25 @@ class ProductionOrderController extends Controller
         return view('modules.production.orders.index', compact('orders', 'statusCounts'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         Gate::authorize('create', ProductionOrder::class);
 
-        $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
-        return view('modules.production.orders.create', compact('products'));
+        $salesOrderId = $request->query('sales_order_id');
+        $salesOrder = null;
+        $salesOrderItems = collect();
+
+        if ($salesOrderId) {
+            $salesOrder = \App\Domains\Sales\Models\SalesOrder::with(['items.product'])->findOrFail($salesOrderId);
+            $salesOrderItems = $salesOrder->items->filter(function ($item) {
+                return $item->product && $item->product->supplier_method === 'manufacture';
+            });
+            $products = $salesOrderItems->map(fn($item) => $item->product)->unique('id');
+        } else {
+            $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
+        }
+
+        return view('modules.production.orders.create', compact('products', 'salesOrder', 'salesOrderItems'));
     }
 
     public function store(StoreProductionOrderRequest $request)
