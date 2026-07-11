@@ -306,4 +306,96 @@ class SalesOrderTest extends TestCase
 
         $response->assertStatus(404); // Scoped out
     }
+
+    /** @test */
+    public function test_supplier_method_routing_rules()
+    {
+        // Assign production_manager role to bypass 403 on production order creation
+        $prodRole = Role::query()->whereNull('tenant_id')->where('slug', 'production_manager')->firstOrFail();
+        UserRole::create([
+            'user_id' => $this->user->id,
+            'role_id' => $prodRole->id,
+            'tenant_id' => $this->tenant->id,
+        ]);
+        $this->user->update(['role' => 'admin']);
+
+        $warehouse = \App\Domains\Inventory\Models\Warehouse::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Main WH',
+            'code' => 'MAIN-WH',
+            'status' => 'active'
+        ]);
+
+        // Create Buy Product
+        $buyProduct = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Buy Widget',
+            'sku' => 'BUY-001',
+            'type' => 'finished_good',
+            'status' => 'active',
+            'supplier_method' => 'buy',
+            'unit_cost' => 100.00,
+        ]);
+
+        // Create Manufacture Product
+        $mfgProduct = Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Mfg Widget',
+            'sku' => 'MFG-001',
+            'type' => 'finished_good',
+            'status' => 'active',
+            'supplier_method' => 'manufacture',
+            'unit_cost' => 150.00,
+        ]);
+
+        // Create Sales Order
+        $order = SalesOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'customer_id' => $this->customer->id,
+            'sales_order_number' => 'SO-SUPPLIER-TEST',
+            'order_date' => now(),
+            'status' => 'Draft',
+            'subtotal' => 250,
+            'total_amount' => 295,
+        ]);
+
+        $itemBuy = $order->items()->create([
+            'product_id' => $buyProduct->id,
+            'warehouse_id' => $warehouse->id,
+            'item_name' => 'Buy Widget',
+            'quantity' => 2,
+            'unit_price' => 100.00,
+            'amount' => 200.00
+        ]);
+
+        $itemMfg = $order->items()->create([
+            'product_id' => $mfgProduct->id,
+            'warehouse_id' => $warehouse->id,
+            'item_name' => 'Mfg Widget',
+            'quantity' => 1,
+            'unit_price' => 150.00,
+            'amount' => 150.00
+        ]);
+
+        // Confirm Order
+        $order->update(['status' => 'Confirmed']);
+
+        // 1. Create Delivery Order — verify only Buy item is present
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('sales.deliveries.create', ['sales_order_id' => $order->id]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Buy Widget');
+        $response->assertDontSee('Mfg Widget');
+
+        // 2. Create Production Order — verify only Manufacture item is present
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('production.orders.create', ['sales_order_id' => $order->id]));
+
+        $response->assertStatus(200);
+        $response->assertSee('Mfg Widget');
+        $response->assertDontSee('Buy Widget');
+    }
 }

@@ -17,6 +17,46 @@ class ProductionOrder extends BaseModel
 
     protected $table = 'production_orders';
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::updated(function ($order) {
+            if (in_array($order->status, [self::STATUS_COMPLETED, self::STATUS_CLOSED])) {
+                // Find and update linked ProductionOrderRequests
+                $requests = \App\Domains\Production\Models\ProductionOrderRequest::where('production_order_id', $order->id)
+                    ->orWhere(function($query) use ($order) {
+                        if ($order->sales_order_item_id) {
+                            $query->whereHas('deliveryOrderItem', function($q) use ($order) {
+                                $q->where('sales_order_item_id', $order->sales_order_item_id);
+                            });
+                        }
+                    })
+                    ->get();
+
+                foreach ($requests as $req) {
+                    $req->update(['status' => 'completed']);
+                    if ($req->deliveryOrderItem) {
+                        $req->deliveryOrderItem->update(['status' => 'Ready']);
+                    }
+                }
+
+                // Fallback for direct delivery order items update
+                $items = \App\Domains\Sales\Models\DeliveryOrderItem::where('production_order_id', $order->id)
+                    ->orWhere(function($query) use ($order) {
+                        if ($order->sales_order_item_id) {
+                            $query->where('sales_order_item_id', $order->sales_order_item_id);
+                        }
+                    })
+                    ->get();
+
+                foreach ($items as $item) {
+                    $item->update(['status' => 'Ready']);
+                }
+            }
+        });
+    }
+
     public const STATUS_DRAFT         = 'draft';
     public const STATUS_RELEASED      = 'released';
     public const STATUS_IN_PROGRESS   = 'in_progress';

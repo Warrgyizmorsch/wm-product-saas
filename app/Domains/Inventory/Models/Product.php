@@ -21,6 +21,7 @@ class Product extends BaseModel
         'sku',
         'type', // finished_good, raw_material, component, etc.
         'planning_type', // stock, manufacture, purchase, manual
+        'supplier_method',
         'item_type', // Goods, Service
         'variation_type', // Single, Variant
         'uom_id',

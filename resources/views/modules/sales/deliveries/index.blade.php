@@ -5,80 +5,105 @@
 @section('breadcrumb', 'Sales / Deliveries')
 
 @section('content')
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-transparent border-bottom py-3">
-            <h5 class="card-title mb-0 fw-bold text-dark">
+
+    {{-- Session Alerts --}}
+    @if (session('success'))
+        <x-ui.alert variant="success" :dismissible="true" icon="feather-check-circle" class="shadow-sm mb-4">
+            <strong>Success!</strong> {{ session('success') }}
+        </x-ui.alert>
+    @endif
+    @if (session('error'))
+        <x-ui.alert variant="danger" :dismissible="true" icon="feather-alert-triangle" class="shadow-sm mb-4">
+            <strong>Error!</strong> {{ session('error') }}
+        </x-ui.alert>
+    @endif
+
+    <x-ui.odoo-form-ui type="sheet" class="p-0">
+
+        {{-- Header --}}
+        <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+            <h6 class="fw-bold text-dark mb-0">
                 <i class="feather-truck me-2 text-primary"></i>Delivery Orders (Shipments)
-            </h5>
+            </h6>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+
+        {{-- Table --}}
+        <div class="table-responsive">
+            <x-ui.odoo-form-ui type="table" class="align-middle fs-13 mb-0" style="margin-top:0; border-radius:0;">
+                <thead class="fs-11 text-uppercase fw-semibold text-muted">
+                    <tr>
+                        <th class="ps-4">Delivery Number</th>
+                        <th>Sales Order</th>
+                        <th>Customer</th>
+                        <th>Delivery Date</th>
+                        <th>Carrier</th>
+                        <th>Tracking</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="text-dark">
+                    @forelse ($deliveries as $do)
+                        @php
+                            $badgeVariant = 'secondary';
+                            if (in_array($do->status, ['Ready', 'Delivered']))              $badgeVariant = 'success';
+                            elseif (in_array($do->status, ['Partially Ready', 'Processing'])) $badgeVariant = 'info';
+                            elseif (in_array($do->status, ['Picked', 'Packed']))             $badgeVariant = 'primary';
+                            elseif ($do->status === 'Dispatched')                            $badgeVariant = 'dark';
+                            elseif ($do->status === 'Cancelled')                             $badgeVariant = 'danger';
+                        @endphp
                         <tr>
-                            <th class="ps-4">Delivery Number</th>
-                            <th>Sales Order</th>
-                            <th>Customer</th>
-                            <th>Delivery Date</th>
-                            <th>Carrier</th>
-                            <th>Tracking Number</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="fs-13 text-dark">
-                        @forelse ($deliveries as $do)
-                            @php
-                                $badgeClass = 'bg-soft-secondary text-secondary';
-                                if ($do->status === 'Shipped') $badgeClass = 'bg-soft-success text-success';
-                                elseif ($do->status === 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
-                            @endphp
-                            <tr>
-                                <td class="ps-4 fw-bold text-primary">
-                                    <a href="{{ route('sales.deliveries.show', $do->id) }}">{{ $do->delivery_number }}</a>
-                                </td>
-                                <td>
-                                    <a href="{{ route('sales.orders.show', $do->sales_order_id) }}" class="text-dark fw-semibold">{{ $do->salesOrder->sales_order_number }}</a>
-                                </td>
-                                <td>
-                                    <span class="fw-bold">{{ $do->salesOrder->customer?->name ?? '—' }}</span>
-                                </td>
-                                <td>{{ $do->delivery_date->format('d/m/Y') }}</td>
-                                <td>{{ $do->carrier ?: '—' }}</td>
-                                <td>{{ $do->tracking_number ?: '—' }}</td>
-                                <td>
-                                    <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $do->status }}</span>
-                                </td>
-                                <td class="text-end pe-4">
-                                    @php
-                                        // Check if this specific shipment has already been invoiced
-                                        $invoiced = $do->salesOrder?->invoices->where('delivery_order_id', $do->id)->first();
-                                    @endphp
-                                    <x-ui.action-dropdown :viewUrl="route('sales.deliveries.show', $do->id)">
-                                        <x-ui.dropdown-item href="{{ route('sales.deliveries.show', $do->id) }}" icon="feather-eye">
-                                            View Details
+                            <td class="ps-4">
+                                <a href="{{ route('sales.deliveries.show', $do->id) }}" class="fw-bold text-primary">
+                                    {{ $do->delivery_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ route('sales.orders.show', $do->sales_order_id) }}" class="fw-semibold text-dark">
+                                    {{ $do->salesOrder->sales_order_number }}
+                                </a>
+                            </td>
+                            <td class="fw-semibold">{{ $do->salesOrder->customer?->name ?? '—' }}</td>
+                            <td class="text-muted">{{ $do->delivery_date->format('d/m/Y') }}</td>
+                            <td class="text-muted">{{ $do->carrier ?: '—' }}</td>
+                            <td class="text-muted font-monospace fs-12">{{ $do->tracking_number ?: '—' }}</td>
+                            <td>
+                                <x-ui.badge :soft="true" :variant="$badgeVariant" class="fs-11 px-2">
+                                    {{ $do->status }}
+                                </x-ui.badge>
+                            </td>
+                            <td class="text-end pe-4">
+                                @php
+                                    $invoiced      = $do->salesOrder?->invoices->where('delivery_order_id', $do->id)->first();
+                                    $invoicePolicy = config('sales.invoice_policy', 'On Dispatch');
+                                    $canInvoice    = ($invoicePolicy === 'On Dispatch')
+                                        ? in_array($do->status, ['Dispatched', 'Delivered', 'Shipped'])
+                                        : ($do->status === 'Delivered');
+                                @endphp
+                                <x-ui.action-dropdown :viewUrl="route('sales.deliveries.show', $do->id)">
+                                    <x-ui.dropdown-item href="{{ route('sales.deliveries.show', $do->id) }}" icon="feather-eye">
+                                        View Details
+                                    </x-ui.dropdown-item>
+                                    @if ($canInvoice && !$invoiced)
+                                        <x-ui.dropdown-item href="{{ route('sales.invoices.create', ['delivery_order_id' => $do->id]) }}" icon="feather-file-text">
+                                            Create Invoice
                                         </x-ui.dropdown-item>
-                                        @if ($do->status === 'Shipped')
-                                            @if (!$invoiced)
-                                                <x-ui.dropdown-item href="{{ route('sales.invoices.create', ['delivery_order_id' => $do->id]) }}" icon="feather-file-text">
-                                                    Create Invoice
-                                                </x-ui.dropdown-item>
-                                            @endif
-                                        @endif
-                                    </x-ui.action-dropdown>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
-                                    <i class="feather-truck fs-1 mb-2 d-block text-gray-300"></i>
-                                    No delivery orders found. Create shipments directly from Confirmed Sales Orders.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+                                    @endif
+                                </x-ui.action-dropdown>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <i class="feather-truck fs-1 d-block text-muted mb-2"></i>
+                                <span class="text-muted fs-13">No delivery orders found. Create shipments directly from Confirmed Sales Orders.</span>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </x-ui.odoo-form-ui>
         </div>
-    </div>
+
+    </x-ui.odoo-form-ui>
+
 @endsection
