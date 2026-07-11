@@ -4,6 +4,7 @@ use App\Domains\Projects\Controllers\MilestoneController;
 use App\Domains\Projects\Controllers\ProjectActivityLogController;
 use App\Domains\Projects\Controllers\ProjectController;
 use App\Domains\Projects\Controllers\ProjectMemberController;
+use App\Domains\Projects\Controllers\TaskController;
 use App\Domains\Projects\Controllers\TaskListController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,5 +50,16 @@ Route::prefix('projects')
                 Route::delete('{taskList}', [TaskListController::class, 'destroy'])->name('destroy');
                 Route::patch('{taskList}/move-up', [TaskListController::class, 'moveUp'])->name('move-up');
                 Route::patch('{taskList}/move-down', [TaskListController::class, 'moveDown'])->name('move-down');
+            });
+
+        Route::prefix('{project}/tasks')
+            ->as('tasks.')
+            ->scopeBindings()
+            ->group(function (): void {
+                Route::post('/', [TaskController::class, 'store'])->name('store');
+                Route::put('{task}', [TaskController::class, 'update'])->name('update');
+                Route::delete('{task}', [TaskController::class, 'destroy'])->name('destroy');
+                Route::patch('{task}/status', [TaskController::class, 'updateStatus'])->name('update-status');
+                Route::patch('{task}/assign', [TaskController::class, 'assign'])->name('assign');
             });
     });

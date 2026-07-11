@@ -5,6 +5,7 @@ namespace App\Domains\Projects\Services;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Repositories\TaskListRepositoryInterface;
+use App\Domains\Projects\Repositories\TaskRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -12,6 +13,7 @@ class TaskListService
 {
     public function __construct(
         private readonly TaskListRepositoryInterface $taskLists,
+        private readonly TaskRepositoryInterface $tasks,
         private readonly ActivityLogService $activity,
     ) {
     }
@@ -75,6 +77,8 @@ class TaskListService
                 null,
                 $taskList,
             );
+
+            $this->tasks->deleteAllForTaskList($taskList->id);
 
             return $this->taskLists->delete($taskList->id);
         });
