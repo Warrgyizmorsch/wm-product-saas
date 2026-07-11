@@ -27,132 +27,125 @@
 @endsection
 
 @section('content')
-    @if ($errors->any())
-        <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-            <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
-            <ul class="mb-0 fs-12 ps-3">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </x-ui.alert>
-        <div class="mb-4"></div>
-    @endif
+    <div class="erp-single-panel bg-white">
+        @if ($errors->any())
+            <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
+                <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
+                <ul class="mb-0 fs-12 ps-3">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
+            <div class="mb-4"></div>
+        @endif
 
-    <div class="row g-4">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between">
-                    <h5 class="card-title mb-0 fw-bold text-dark">
-                        <i class="feather-briefcase me-2 text-primary"></i>{{ $project->project_code }}
-                    </h5>
-                    @if ($project->status === 'Active')
-                        <span class="badge bg-soft-success text-success px-2 py-1 fs-11 fw-semibold">{{ __('projects.statuses.Active') }}</span>
-                    @elseif ($project->status === 'On Hold')
-                        <span class="badge bg-soft-warning text-warning px-2 py-1 fs-11 fw-semibold">{{ __('projects.statuses.On Hold') }}</span>
-                    @elseif ($project->status === 'Completed')
-                        <span class="badge bg-soft-primary text-primary px-2 py-1 fs-11 fw-semibold">{{ __('projects.statuses.Completed') }}</span>
-                    @elseif ($project->status === 'Closed')
-                        <span class="badge bg-soft-dark text-dark px-2 py-1 fs-11 fw-semibold">{{ __('projects.statuses.Closed') }}</span>
-                    @else
-                        <span class="badge bg-soft-secondary text-secondary px-2 py-1 fs-11 fw-semibold">{{ __('projects.statuses.Draft') }}</span>
-                    @endif
-                </div>
-                <div class="card-body">
-                    <div class="row g-4 fs-13">
-                        <div class="col-md-6">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.project_name') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->name }}</span>
-                        </div>
-                        <div class="col-md-6">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.client') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->customer?->name ?: '—' }}</span>
-                        </div>
-                        <div class="col-md-6">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.project_owner') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->owner?->name ?: '—' }}</span>
-                        </div>
-                        <div class="col-md-6">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.project_manager') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->manager?->name ?: '—' }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.start_date') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->start_date?->format('d/m/Y') ?: '—' }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.end_date') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->end_date?->format('d/m/Y') ?: '—' }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.priority') }}</span>
-                            <span class="fw-semibold text-dark">{{ __('projects.priorities.' . $project->priority) }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.billing_method') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->billing_method ? __('projects.billing_methods.' . $project->billing_method) : '—' }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.budget_type') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->budget_type ? __('projects.budget_types.' . $project->budget_type) : '—' }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.budget_amount') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->budget_amount !== null ? number_format((float) $project->budget_amount, 2) : '—' }}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.budget_hours') }}</span>
-                            <span class="fw-semibold text-dark">{{ $project->budget_hours !== null ? number_format((float) $project->budget_hours, 2) : '—' }}</span>
-                        </div>
-                        @if ($project->description)
-                            <div class="col-12">
-                                <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('projects.description') }}</span>
-                                <p class="mb-0 text-dark">{{ $project->description }}</p>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row g-4 mt-1">
-        <div class="col-12">
+        {{-- Header Identity Row --}}
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 pb-3 border-bottom">
+            <h4 class="fw-bold text-dark mb-0">
+                <i class="feather-briefcase me-2 text-primary"></i>{{ $project->project_code }} — {{ $project->name }}
+            </h4>
             @php
-                $activeProjectTab = in_array(request('tab'), ['members', 'milestones', 'tasklists'], true)
-                    ? request('tab')
-                    : (in_array(old('_tasklist_form'), ['add', 'edit'], true) ? 'tasklists'
-                        : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'members'));
-                $projectDetailTabs = [
-                    ['id' => 'tab-members', 'label' => __('projects.members'), 'icon' => 'feather-users', 'active' => $activeProjectTab === 'members'],
-                    ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
-                    ['id' => 'tab-tasklists', 'label' => __('projects.tasklists'), 'icon' => 'feather-list', 'active' => $activeProjectTab === 'tasklists'],
-                ];
+                $projectStatusVariant = match ($project->status) {
+                    'Active' => 'success',
+                    'On Hold' => 'warning',
+                    'Completed' => 'primary',
+                    'Closed' => 'dark',
+                    default => 'secondary',
+                };
             @endphp
-            <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" />
+            <x-ui.badge variant="{{ $projectStatusVariant }}" soft>
+                {{ __('projects.statuses.' . $project->status) }}
+            </x-ui.badge>
+        </div>
 
-            <div class="tab-content mt-3">
-                <div class="tab-pane fade {{ $activeProjectTab === 'members' ? 'show active' : '' }}" id="tab-members" role="tabpanel" aria-labelledby="tab-members-tab">
-                    @include('modules.projects._members')
+        {{-- Identity / Meta Grid --}}
+        <div class="row g-4 mb-4">
+            <div class="col-md-6 border-end">
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.client') }}:</span></div>
+                    <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->customer?->name ?: '—' }}</span></div>
                 </div>
-                <div class="tab-pane fade {{ $activeProjectTab === 'milestones' ? 'show active' : '' }}" id="tab-milestones" role="tabpanel" aria-labelledby="tab-milestones-tab">
-                    @include('modules.projects._milestones')
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.project_owner') }}:</span></div>
+                    <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->owner?->name ?: '—' }}</span></div>
                 </div>
-                <div class="tab-pane fade {{ $activeProjectTab === 'tasklists' ? 'show active' : '' }}" id="tab-tasklists" role="tabpanel" aria-labelledby="tab-tasklists-tab">
-                    @include('modules.projects._tasklists')
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.project_manager') }}:</span></div>
+                    <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->manager?->name ?: '—' }}</span></div>
+                </div>
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.priority') }}:</span></div>
+                    <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ __('projects.priorities.' . $project->priority) }}</span></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.start_date') }} / {{ __('projects.end_date') }}:</span></div>
+                    <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->start_date?->format('d/m/Y') ?: '—' }} – {{ $project->end_date?->format('d/m/Y') ?: '—' }}</span></div>
+                </div>
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.billing_method') }}:</span></div>
+                    <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->billing_method ? __('projects.billing_methods.' . $project->billing_method) : '—' }}</span></div>
+                </div>
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.budget_type') }} / {{ __('projects.budget_amount') }}:</span></div>
+                    <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->budget_type ? __('projects.budget_types.' . $project->budget_type) : '—' }} @if ($project->budget_amount !== null) ({{ number_format((float) $project->budget_amount, 2) }}) @endif</span></div>
+                </div>
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.budget_hours') }}:</span></div>
+                    <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $project->budget_hours !== null ? number_format((float) $project->budget_hours, 2) : '—' }}</span></div>
                 </div>
             </div>
         </div>
+
+        @if ($project->description)
+            <div class="mb-4 bg-light p-3 rounded border border-dashed">
+                <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
+                <p class="mb-0 text-dark fs-13">{{ $project->description }}</p>
+            </div>
+        @endif
+
+        {{-- Tab Navigation --}}
+        @php
+            $activeProjectTab = in_array(request('tab'), ['summary', 'members', 'milestones', 'tasklists'], true)
+                ? request('tab')
+                : (in_array(old('_tasklist_form'), ['add', 'edit'], true) ? 'tasklists'
+                    : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'summary'));
+            $projectDetailTabs = [
+                ['id' => 'tab-summary', 'label' => __('projects.summary'), 'icon' => 'feather-grid', 'active' => $activeProjectTab === 'summary'],
+                ['id' => 'tab-members', 'label' => __('projects.members'), 'icon' => 'feather-users', 'active' => $activeProjectTab === 'members'],
+                ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
+                ['id' => 'tab-tasklists', 'label' => __('projects.tasklists'), 'icon' => 'feather-list', 'active' => $activeProjectTab === 'tasklists'],
+            ];
+        @endphp
+        <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" />
+
+        <div class="tab-content mt-3">
+            <div class="tab-pane fade {{ $activeProjectTab === 'summary' ? 'show active' : '' }}" id="tab-summary" role="tabpanel" aria-labelledby="tab-summary-tab">
+                @include('modules.projects._dashboard-stats')
+                @include('modules.projects._project-widgets')
+            </div>
+            <div class="tab-pane fade {{ $activeProjectTab === 'members' ? 'show active' : '' }}" id="tab-members" role="tabpanel" aria-labelledby="tab-members-tab">
+                @include('modules.projects._members')
+            </div>
+            <div class="tab-pane fade {{ $activeProjectTab === 'milestones' ? 'show active' : '' }}" id="tab-milestones" role="tabpanel" aria-labelledby="tab-milestones-tab">
+                @include('modules.projects._milestones')
+            </div>
+            <div class="tab-pane fade {{ $activeProjectTab === 'tasklists' ? 'show active' : '' }}" id="tab-tasklists" role="tabpanel" aria-labelledby="tab-tasklists-tab">
+                @include('modules.projects._tasklists')
+            </div>
+        </div>
+
+        <x-ui.drawer id="activityLogDrawer" title="Activity History" position="end" style="width: 480px; max-width: 100%;">
+            <div id="activityLogDrawerContent">
+                <div class="text-center py-5 text-muted">
+                    <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+                    <div class="fs-12">{{ __('ui.loading') }}</div>
+                </div>
+            </div>
+        </x-ui.drawer>
     </div>
-
-    <x-ui.drawer id="activityLogDrawer" title="Activity History" position="end" style="width: 480px; max-width: 100%;">
-        <div id="activityLogDrawerContent">
-            <div class="text-center py-5 text-muted">
-                <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
-                <div class="fs-12">{{ __('ui.loading') }}</div>
-            </div>
-        </div>
-    </x-ui.drawer>
 
     @push('scripts')
         <script>

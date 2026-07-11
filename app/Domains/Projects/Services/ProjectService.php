@@ -2,7 +2,10 @@
 
 namespace App\Domains\Projects\Services;
 
+use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Models\Task;
+use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Repositories\ProjectRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +46,79 @@ class ProjectService
         return [
             'total'  => $this->projects->getAll()->count(),
             'active' => $this->projects->countByStatus(Project::STATUS_ACTIVE),
+        ];
+    }
+
+    /**
+     * Build the dashboard stats (task/milestone/member/hours breakdowns) for a
+     * project's details page from collections already loaded by the caller —
+     * this performs no additional queries.
+     */
+    public function dashboardStats(
+        Project $project,
+        Collection $taskLists,
+        Collection $tasksByList,
+        Collection $allTasks,
+        Collection $milestones,
+        Collection $members,
+    ): array {
+        $doneStatuses = [Task::STATUS_COMPLETED, Task::STATUS_CANCELLED];
+        $inProgressStatuses = [Task::STATUS_IN_PROGRESS, Task::STATUS_REVIEW];
+
+        $totalTasks = $allTasks->count();
+        $doneTasks = $allTasks->whereIn('status', $doneStatuses)->count();
+        $inProgressTasks = $allTasks->whereIn('status', $inProgressStatuses)->count();
+
+        $totalMilestones = $milestones->count();
+        $completedMilestones = $milestones->where('status', Milestone::STATUS_COMPLETED)->count();
+        $activeMilestones = $milestones->where('status', Milestone::STATUS_ACTIVE)->count();
+
+        $upcomingMilestones = $milestones
+            ->whereNotIn('status', [Milestone::STATUS_COMPLETED, Milestone::STATUS_CLOSED])
+            ->sortBy('due_date')
+            ->take(5)
+            ->values();
+
+        $hoursTracked = (float) $allTasks->sum(fn (Task $task) => (float) $task->actual_hours);
+        $budgetHours = (float) ($project->budget_hours ?? 0);
+
+        $taskListProgress = $taskLists->mapWithKeys(function (TaskList $taskList) use ($tasksByList, $doneStatuses) {
+            $listTasks = $tasksByList->get($taskList->id, collect());
+            $total = $listTasks->count();
+            $done = $listTasks->whereIn('status', $doneStatuses)->count();
+
+            return [$taskList->id => [
+                'total'   => $total,
+                'done'    => $done,
+                'percent' => $total > 0 ? (int) round($done / $total * 100) : 0,
+            ]];
+        });
+
+        return [
+            'tasks' => [
+                'total'       => $totalTasks,
+                'done'        => $doneTasks,
+                'in_progress' => $inProgressTasks,
+                'todo'        => max($totalTasks - $doneTasks - $inProgressTasks, 0),
+                'percent'     => $totalTasks > 0 ? (int) round($doneTasks / $totalTasks * 100) : 0,
+            ],
+            'milestones' => [
+                'total'     => $totalMilestones,
+                'completed' => $completedMilestones,
+                'active'    => $activeMilestones,
+                'percent'   => $totalMilestones > 0 ? (int) round($completedMilestones / $totalMilestones * 100) : 0,
+                'upcoming'  => $upcomingMilestones,
+            ],
+            'members' => [
+                'total'  => $members->count(),
+                'active' => $members->where('is_active', true)->count(),
+            ],
+            'hours' => [
+                'tracked' => $hoursTracked,
+                'budget'  => $budgetHours,
+                'percent' => $budgetHours > 0 ? (int) round(min($hoursTracked / $budgetHours, 1) * 100) : null,
+            ],
+            'task_lists' => $taskListProgress,
         ];
     }
 
