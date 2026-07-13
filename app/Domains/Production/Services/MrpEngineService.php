@@ -2,14 +2,12 @@
 
 namespace App\Domains\Production\Services;
 
-use App\Domains\Production\Models\ProductionPlan;
-use App\Domains\Production\Models\ProductionPlanRequirement;
-use App\Domains\Production\Models\ProductionPlanOperation;
+use App\Domains\Inventory\Models\ProductWarehouseStock;
 use App\Domains\Production\Models\ProductionBom;
-use App\Domains\Production\Models\ProductionBomItem;
+use App\Domains\Production\Models\ProductionPlan;
+use App\Domains\Production\Models\ProductionPlanOperation;
+use App\Domains\Production\Models\ProductionPlanRequirement;
 use App\Domains\Production\Models\Routing;
-use App\Domains\Production\Models\RoutingOperation;
-use App\Domains\Inventory\Models\Product;
 use Illuminate\Support\Facades\DB;
 
 class MrpEngineService
@@ -43,7 +41,7 @@ class MrpEngineService
                 if ($routing) {
                     foreach ($routing->operations as $op) {
                         $totalMinutes = $op->setup_time_minutes + ($op->processing_time_minutes * $plan->quantity);
-                        
+
                         // Scale costs per minute from parent rates
                         ProductionPlanOperation::create([
                             'tenant_id' => $plan->tenant_id,
@@ -82,7 +80,7 @@ class MrpEngineService
         ?int $sourceItemId
     ): void {
         $bom = ProductionBom::withoutGlobalScopes()->with('items.material')->find($bomId);
-        if (!$bom) {
+        if (! $bom) {
             return;
         }
 
@@ -91,10 +89,10 @@ class MrpEngineService
             $scrapFactor = 1.0 + ($item->material_scrap_percentage / 100);
             $requiredQty = $parentQty * $item->quantity * $scrapFactor;
 
-            // Prep values (stock default 0)
-            $available = 0.0;
-            $reserved = 0.0;
-            $shortage = $requiredQty;
+            $stockSnapshot = $this->getInventorySnapshot($plan->tenant_id, $item->material_id);
+            $available = $stockSnapshot['available'];
+            $reserved = $stockSnapshot['reserved'];
+            $shortage = max(0.0, $requiredQty - $available);
 
             // Save snapshot requirement
             ProductionPlanRequirement::create([
@@ -109,15 +107,15 @@ class MrpEngineService
                 'shortage_quantity' => $shortage,
                 'uom_id' => $item->uom_id,
                 'source_item_id' => $productId,
-                'status' => 'pending',
+                'status' => $shortage > 0 ? 'shortage' : 'available',
             ]);
 
             // If component is semi-finished or finished, check for child BOM
             if ($item->material->type === 'semi_finished' || $item->material->type === 'finished_good') {
                 $childBomId = $item->child_bom_id;
-                
+
                 // Fallback to default approved BOM if no specific child BOM link is set
-                if (!$childBomId) {
+                if (! $childBomId) {
                     $defaultChildBom = ProductionBom::withoutGlobalScopes()
                         ->where('tenant_id', $plan->tenant_id)
                         ->where('product_id', $item->material_id)
@@ -138,6 +136,23 @@ class MrpEngineService
                 }
             }
         }
+    }
+
+    /**
+     * Snapshot live inventory across all warehouses for the product.
+     */
+    private function getInventorySnapshot(int $tenantId, int $productId): array
+    {
+        $stock = ProductWarehouseStock::query()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->selectRaw('COALESCE(SUM(available_qty), 0) as available_qty, COALESCE(SUM(reserved_qty), 0) as reserved_qty')
+            ->first();
+
+        return [
+            'available' => max(0.0, (float) ($stock?->available_qty ?? 0.0)),
+            'reserved' => max(0.0, (float) ($stock?->reserved_qty ?? 0.0)),
+        ];
     }
 
     /**
@@ -173,7 +188,7 @@ class MrpEngineService
 
         foreach ($operations as $op) {
             $totalRequiredMinutes += $op->total_time_minutes;
-            
+
             // Labor + Machine costs
             if ($op->routingOperation) {
                 $laborCost = $op->total_time_minutes * (float) $op->routingOperation->labor_cost_rate;

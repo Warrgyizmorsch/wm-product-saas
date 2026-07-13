@@ -34,14 +34,14 @@
         </form>
     @endif
 
-    @if(!$plan->isFrozen())
+    @can('runMrp', $plan)
         <form method="POST" action="{{ route('production.plans.run-mrp', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-warning text-dark">
-                <i class="feather-cpu me-2"></i>Run MRP Engine
+                <i class="feather-cpu me-2"></i>{{ $plan->isMrpGenerated() ? 'Refresh MRP Snapshot' : 'Run MRP Engine' }}
             </button>
         </form>
-    @endif
+    @endcan
 
     @if($plan->isApproved() || $plan->isMrpGenerated())
         <form method="POST" action="{{ route('production.plans.create-order', $plan->id) }}" class="d-inline me-2">
@@ -226,14 +226,14 @@
                     <i class="feather-cpu fs-32 mb-2 d-block text-muted"></i>
                     <p class="mb-2 fw-semibold">No snapshot material requirements recorded.</p>
                     <p class="fs-12 mb-3">Run the MRP Engine to explode the BOM and populate required components.</p>
-                    @if(!$plan->isFrozen())
+                    @can('runMrp', $plan)
                         <form method="POST" action="{{ route('production.plans.run-mrp', $plan->id) }}">
                             @csrf
                             <button type="submit" class="btn btn-warning text-dark px-4 btn-sm">
                                 <i class="feather-play me-2"></i>Run MRP Engine Now
                             </button>
                         </form>
-                    @endif
+                    @endcan
                 </div>
             @else
                 <h5 class="fw-bold text-dark mb-3">Material Requirements Snapshot</h5>
@@ -253,20 +253,34 @@
                         </thead>
                         <tbody>
                             @foreach($plan->requirements as $req)
-                                <tr>
-                                    <td class="fw-bold">{{ $req->bom_level }}</td>
+                                @php
+                                    $level = (int) $req->bom_level;
+                                    $padding = max(0, ($level - 1) * 24);
+                                    $hasShortage = (float) $req->shortage_quantity > 0;
+                                    $isChild = $level > 1;
+                                    $rowClass = $hasShortage ? 'bg-soft-danger' : ($isChild ? 'table-light-soft text-muted' : '');
+                                    $componentClass = $hasShortage ? 'fw-bold text-danger' : ($isChild ? 'fw-normal text-dark' : 'fw-bold text-dark');
+                                    $skuClass = $hasShortage ? 'text-danger opacity-75 font-monospace fs-10' : 'text-muted font-monospace fs-10';
+                                @endphp
+                                <tr class="{{ $rowClass }}">
+                                    <td class="fw-bold {{ $hasShortage ? 'text-danger' : '' }}">{{ $level }}</td>
                                     <td>
-                                        <div class="d-flex flex-column">
-                                            <span class="fw-bold text-dark">{{ $req->product->name }}</span>
-                                            <small class="text-muted font-monospace fs-10">{{ $req->product->sku }}</small>
+                                        <div style="padding-left: {{ $padding }}px;" class="d-flex align-items-start">
+                                            @if($isChild)
+                                                <i class="feather-corner-down-right {{ $hasShortage ? 'text-danger' : 'text-muted' }} me-2 mt-1" style="font-size: 11px;"></i>
+                                            @endif
+                                            <div class="d-flex flex-column">
+                                                <span class="{{ $componentClass }}">{{ $req->product->name }}</span>
+                                                <small class="{{ $skuClass }}">{{ $req->product->sku }}</small>
+                                            </div>
                                         </div>
                                     </td>
-                                    <td class="text-end fw-semibold text-dark">{{ number_format($req->required_quantity, 2) }}</td>
-                                    <td class="text-end text-muted">{{ number_format($req->available_quantity, 2) }}</td>
-                                    <td class="text-end text-muted">{{ number_format($req->reserved_quantity, 2) }}</td>
+                                    <td class="text-end fw-semibold {{ $hasShortage ? 'text-danger' : 'text-dark' }}">{{ number_format($req->required_quantity, 2) }}</td>
+                                    <td class="text-end {{ $hasShortage ? 'text-danger' : 'text-muted' }}">{{ number_format($req->available_quantity, 2) }}</td>
+                                    <td class="text-end {{ $hasShortage ? 'text-danger' : 'text-muted' }}">{{ number_format($req->reserved_quantity, 2) }}</td>
                                     <td class="text-end text-danger fw-bold">{{ number_format($req->shortage_quantity, 2) }}</td>
-                                    <td>{{ $req->uom ? $req->uom->code : 'PCS' }}</td>
-                                    <td class="text-muted">{{ $req->sourceItem ? $req->sourceItem->name : '—' }}</td>
+                                    <td class="{{ $hasShortage ? 'text-danger' : '' }}">{{ $req->uom ? $req->uom->code : 'PCS' }}</td>
+                                    <td class="{{ $hasShortage ? 'text-danger' : 'text-muted' }}">{{ $req->sourceItem ? $req->sourceItem->name : '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
