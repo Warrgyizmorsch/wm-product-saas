@@ -149,17 +149,18 @@
                                 </span>
                             </td>
                             <td>
-                                @if ($project->status === 'Active')
-                                    <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold">{{ __('projects.statuses.Active') }}</span>
-                                @elseif ($project->status === 'On Hold')
-                                    <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold">{{ __('projects.statuses.On Hold') }}</span>
-                                @elseif ($project->status === 'Completed')
-                                    <span class="badge bg-soft-primary text-primary px-2 py-0.5 fs-11 fw-semibold">{{ __('projects.statuses.Completed') }}</span>
-                                @elseif ($project->status === 'Closed')
-                                    <span class="badge bg-soft-dark text-dark px-2 py-0.5 fs-11 fw-semibold">{{ __('projects.statuses.Closed') }}</span>
-                                @else
-                                    <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11 fw-semibold">{{ __('projects.statuses.Draft') }}</span>
-                                @endif
+                                @php
+                                    $projectStatusVariant = match ($project->status) {
+                                        'Active' => 'success',
+                                        'On Hold' => 'warning',
+                                        'Completed' => 'primary',
+                                        'Closed' => 'dark',
+                                        default => 'secondary',
+                                    };
+                                @endphp
+                                <x-ui.badge variant="{{ $projectStatusVariant }}" soft class="px-2 py-0.5 fs-11 fw-semibold">
+                                    {{ __('projects.statuses.' . $project->status) }}
+                                </x-ui.badge>
                             </td>
                             <td>{{ $project->start_date?->format('d/m/Y') ?: '—' }}</td>
                             <td>{{ $project->end_date?->format('d/m/Y') ?: '—' }}</td>

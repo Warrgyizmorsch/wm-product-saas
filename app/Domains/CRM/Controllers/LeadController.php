@@ -13,6 +13,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use App\Exports\LeadSampleExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class LeadController extends Controller
 {
@@ -77,6 +79,16 @@ class LeadController extends Controller
         $this->authorize('viewAny', Lead::class);
 
         return view('modules.crm.leads.track-status');
+    }
+
+    /**
+     * Download the sample leads Excel sheet.
+     */
+    public function downloadSample()
+    {
+        $this->authorize('viewAny', Lead::class);
+
+        return Excel::download(new LeadSampleExport, 'lead_sample.xlsx');
     }
 
     /**

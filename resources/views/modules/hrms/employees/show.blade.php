@@ -2320,16 +2320,27 @@
                                 <x-ui.odoo-form-ui type="input" label="Amount (₹)" name="amount" inputType="number" step="0.01" placeholder="0.00" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Payroll Month" name="payroll_month" placeholder="YYYY-MM (e.g. 2026-07)" :required="true" />
+                                <x-ui.odoo-form-ui type="select" label="Payroll Month" name="payroll_month" select2-selector="default" :required="true">
+                                    <option value="">Select Payroll Month</option>
+                                    @for ($i = -6; $i <= 6; $i++)
+                                        @php
+                                            $month = now()->addMonths($i);
+                                            $val = $month->format('Y-m');
+                                            $label = $month->format('F Y');
+                                            $selected = ($i === 0) ? 'selected' : '';
+                                        @endphp
+                                        <option value="{{ $val }}" {{ $selected }}>{{ $label }}</option>
+                                    @endfor
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" rows="3" placeholder="Bonus details, adjustment notes..." />
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Add Component</button>
+                    <div class="modal-footer bg-light py-2 gap-2 justify-content-end">
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Close</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Add Component</button>
                     </div>
                 </form>
             </div>
@@ -2364,16 +2375,27 @@
                                 <x-ui.odoo-form-ui type="input" label="Deduction Value / Amount" name="penalty_amount" inputType="number" step="0.01" placeholder="e.g. 0.50 (for half-day)" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Payroll Month" name="payroll_month" placeholder="YYYY-MM (e.g. 2026-07)" :required="true" />
+                                <x-ui.odoo-form-ui type="select" label="Payroll Month" name="payroll_month" select2-selector="default" :required="true">
+                                    <option value="">Select Payroll Month</option>
+                                    @for ($i = -6; $i <= 6; $i++)
+                                        @php
+                                            $month = now()->addMonths($i);
+                                            $val = $month->format('Y-m');
+                                            $label = $month->format('F Y');
+                                            $selected = ($i === 0) ? 'selected' : '';
+                                        @endphp
+                                        <option value="{{ $val }}" {{ $selected }}>{{ $label }}</option>
+                                    @endfor
+                                </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" rows="3" placeholder="Late arrival note, log timestamps..." />
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-danger">Log Penalty</button>
+                    <div class="modal-footer bg-light py-2 gap-2 justify-content-end">
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Close</button>
+                        <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">Log Penalty</button>
                     </div>
                 </form>
             </div>

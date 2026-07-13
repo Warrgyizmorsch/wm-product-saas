@@ -76,23 +76,27 @@ class ProjectController extends Controller
         $canManageTaskLists = auth()->user()->can('manage', [TaskList::class, $project]);
         $canCreateTasks = auth()->user()->can('create', [Task::class, $project]);
 
+        $members = $this->members->list($project);
+        $milestones = $this->milestones->list($project);
         $taskLists = $this->taskLists->list($project);
         $allTasks = $this->tasks->list($project);
         $tasksByList = $allTasks->groupBy('task_list_id');
 
         return view('modules.projects.show', [
             'project'             => $project,
-            'members'             => $this->members->list($project),
+            'members'             => $members,
             'canManageMembers'    => $canManageMembers,
-            'milestones'          => $this->milestones->list($project),
+            'milestones'          => $milestones,
             'canManageMilestones' => $canManageMilestones,
             'taskLists'           => $taskLists,
             'canManageTaskLists'  => $canManageTaskLists,
             'tasksByList'         => $tasksByList,
             'allTasks'            => $allTasks->keyBy('id'),
             'canCreateTasks'      => $canCreateTasks,
+            'dashboard'           => $this->projects->dashboardStats($project, $taskLists, $tasksByList, $allTasks, $milestones, $members),
+            'recentActivities'    => $this->activity->forProject($project, 5),
             'activeMembers'       => ($canManageMembers || $canManageMilestones || $canManageTaskLists || $canCreateTasks)
-                ? $this->members->list($project)->where('is_active', true)
+                ? $members->where('is_active', true)
                 : collect(),
             'tenantUsers'         => ($canManageMembers || $canManageMilestones || $canManageTaskLists)
                 ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
