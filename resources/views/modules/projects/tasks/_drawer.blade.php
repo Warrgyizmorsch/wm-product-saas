@@ -1,55 +1,27 @@
 <x-ui.drawer id="taskDrawer" title="{{ __('projects.task_details') }}" position="end" style="width: 480px; max-width: 100%;">
-    <div class="mb-3">
-        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.task_title') }}</div>
-        <div id="taskDetailTitle" class="fw-semibold text-dark"></div>
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+        <div class="min-w-0">
+            <h5 id="taskDetailTitle" class="fw-bold mb-1"></h5>
+            <div id="taskDetailTaskListWrap" class="fs-12 text-muted"></div>
+        </div>
+        <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+            <span id="taskDetailStatus"></span>
+            <span id="taskDetailPriority"></span>
+        </div>
     </div>
 
     <div class="mb-3" id="taskDetailDescriptionWrap">
-        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.description') }}</div>
-        <div id="taskDetailDescription" class="text-dark"></div>
+        <div id="taskDetailDescription" class="text-muted fs-13"></div>
     </div>
 
-    <div class="mb-3">
-        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.task_list') }}</div>
-        <div id="taskDetailTaskList" class="text-dark"></div>
-    </div>
-
-    <div class="row mb-3">
-        <div class="col-6">
-            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.task_assignee') }}</div>
-            <div id="taskDetailAssignee" class="text-dark"></div>
+    <div class="border rounded-3 p-3 mb-3 bg-light">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold fs-13">{{ __('projects.progress') }}</span>
+            <span id="taskProgressSummary" class="fs-12 text-muted"></span>
         </div>
-        <div class="col-6">
-            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.task_reviewer') }}</div>
-            <div id="taskDetailReviewer" class="text-dark"></div>
+        <div class="progress" style="height: 8px;">
+            <div id="taskProgressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
         </div>
-    </div>
-
-    <div class="row mb-3">
-        <div class="col-6">
-            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.priority') }}</div>
-            <div id="taskDetailPriority" class="text-dark"></div>
-        </div>
-        <div class="col-6">
-            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.status') }}</div>
-            <div id="taskDetailStatus"></div>
-        </div>
-    </div>
-
-    <div class="row mb-3">
-        <div class="col-6">
-            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.start_date') }}</div>
-            <div id="taskDetailStartDate" class="text-dark"></div>
-        </div>
-        <div class="col-6">
-            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.due_date') }}</div>
-            <div id="taskDetailDueDate" class="text-dark"></div>
-        </div>
-    </div>
-
-    <div class="mb-3">
-        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.estimated_hours') }}</div>
-        <div id="taskDetailEstimatedHours" class="text-dark"></div>
     </div>
 
     <form id="taskDeleteForm" method="POST" action="" class="d-none">
@@ -57,29 +29,84 @@
         @method('DELETE')
     </form>
 
-    <div id="taskSubtasksSection" class="d-none border-top pt-3 mt-3">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-            <h6 class="fw-bold mb-0">{{ __('projects.subtasks') }}</h6>
-            <span id="taskSubtasksProgress" class="badge bg-soft-secondary text-secondary fs-11"></span>
+    <div class="accordion mb-3" id="taskDetailAccordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#taskDetailsCollapse" aria-expanded="false">
+                    {{ __('projects.details') }}
+                </button>
+            </h2>
+            <div id="taskDetailsCollapse" class="accordion-collapse collapse" data-bs-parent="#taskDetailAccordion">
+                <div class="accordion-body">
+                    <div class="row row-cols-2 g-3">
+                        <div class="col">
+                            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.task_assignee') }}</div>
+                            <div id="taskDetailAssignee" class="text-dark"></div>
+                        </div>
+                        <div class="col">
+                            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.task_reviewer') }}</div>
+                            <div id="taskDetailReviewer" class="text-dark"></div>
+                        </div>
+                        <div class="col">
+                            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.estimated_hours') }}</div>
+                            <div id="taskDetailEstimatedHours" class="text-dark"></div>
+                        </div>
+                        <div class="col">
+                            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.start_date') }}</div>
+                            <div id="taskDetailStartDate" class="text-dark"></div>
+                        </div>
+                        <div class="col">
+                            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.due_date') }}</div>
+                            <div id="taskDetailDueDate" class="text-dark"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="taskSubtasksList" class="mb-2"></div>
-        <form id="taskSubtaskAddForm" method="POST" action="" class="d-flex gap-2">
-            @csrf
-            <input type="text" name="title" class="form-control form-control-sm" placeholder="{{ __('projects.subtask_title_placeholder') }}" required>
-            <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
-        </form>
-    </div>
 
-    <div id="taskDependenciesSection" class="d-none border-top pt-3 mt-3">
-        <h6 class="fw-bold mb-2">{{ __('projects.dependencies') }}</h6>
-        <div id="taskDependenciesList" class="mb-2"></div>
-        <form id="taskDependencyAddForm" method="POST" action="" class="d-flex gap-2">
-            @csrf
-            <select name="depends_on_task_id" id="taskDependencyOptions" class="form-select form-select-sm" required>
-                <option value="">{{ __('projects.select_option') }}</option>
-            </select>
-            <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
-        </form>
+        <div id="taskSubtasksSection" class="accordion-item d-none">
+            <h2 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#taskSubtasksCollapse" aria-expanded="true">
+                    <span class="d-flex align-items-center justify-content-between w-100 me-2">
+                        <span class="fw-bold">{{ __('projects.subtasks') }}</span>
+                        <span id="taskSubtasksProgress" class="badge bg-soft-secondary text-secondary fs-11 me-2"></span>
+                    </span>
+                </button>
+            </h2>
+            <div id="taskSubtasksCollapse" class="accordion-collapse collapse show" data-bs-parent="#taskDetailAccordion">
+                <div class="accordion-body">
+                    <div id="taskSubtasksList" class="mb-2"></div>
+                    <form id="taskSubtaskAddForm" method="POST" action="" class="d-flex gap-2">
+                        @csrf
+                        <input type="text" name="title" class="form-control form-control-sm" placeholder="{{ __('projects.subtask_title_placeholder') }}" required>
+                        <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="taskDependenciesSection" class="accordion-item d-none">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#taskDependenciesCollapse" aria-expanded="false">
+                    <span class="d-flex align-items-center justify-content-between w-100 me-2">
+                        <span class="fw-bold">{{ __('projects.dependencies') }}</span>
+                        <span id="taskDependenciesCount" class="badge bg-soft-secondary text-secondary fs-11 me-2"></span>
+                    </span>
+                </button>
+            </h2>
+            <div id="taskDependenciesCollapse" class="accordion-collapse collapse" data-bs-parent="#taskDetailAccordion">
+                <div class="accordion-body">
+                    <div id="taskDependenciesList" class="mb-2"></div>
+                    <form id="taskDependencyAddForm" method="POST" action="" class="d-flex gap-2">
+                        @csrf
+                        <select name="depends_on_task_id" id="taskDependencyOptions" class="form-select form-select-sm" required>
+                            <option value="">{{ __('projects.select_option') }}</option>
+                        </select>
+                        <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">{{ __('projects.add') }}</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     <form id="taskSubtaskToggleForm" method="POST" action="" class="d-none">
@@ -104,9 +131,6 @@
         <button type="button" class="btn btn-outline-danger" onclick="deleteCurrentTask()">
             <i class="feather feather-trash-2 me-1"></i>{{ __('projects.remove') }}
         </button>
-        <button type="button" class="btn btn-light-brand" onclick="cloneCurrentTask()">
-            <i class="feather feather-copy me-1"></i>{{ __('projects.clone') }}
-        </button>
         <button type="button" class="btn btn-primary" onclick="editCurrentTask()">
             {{ __('projects.edit_task') }}
         </button>
@@ -124,6 +148,13 @@
         'Cancelled': 'danger',
     };
 
+    var taskPriorityVariants = {
+        'Low': 'secondary',
+        'Medium': 'warning',
+        'High': 'danger',
+        'Critical': 'danger',
+    };
+
     var taskStatusLabels = @js(collect(\App\Domains\Projects\Models\Task::STATUSES)->mapWithKeys(fn ($status) => [$status => __('projects.task_statuses.' . $status)]));
     var taskPriorityLabels = @js(collect(\App\Domains\Projects\Models\Task::PRIORITIES)->mapWithKeys(fn ($priority) => [$priority => __('projects.priorities.' . $priority)]));
 
@@ -133,6 +164,10 @@
 
         document.getElementById('taskDetailTitle').textContent = data.title || '—';
 
+        var taskListWrap = document.getElementById('taskDetailTaskListWrap');
+        taskListWrap.textContent = data.taskListName || '';
+        taskListWrap.classList.toggle('d-none', !data.taskListName);
+
         var descriptionWrap = document.getElementById('taskDetailDescriptionWrap');
         if (data.description) {
             descriptionWrap.classList.remove('d-none');
@@ -141,23 +176,31 @@
             descriptionWrap.classList.add('d-none');
         }
 
-        document.getElementById('taskDetailTaskList').textContent = data.taskListName || '—';
         document.getElementById('taskDetailAssignee').textContent = data.assigneeName || '—';
         document.getElementById('taskDetailReviewer').textContent = data.reviewerName || '—';
-        document.getElementById('taskDetailPriority').textContent = (data.priority && taskPriorityLabels[data.priority]) || data.priority || '—';
         document.getElementById('taskDetailStartDate').textContent = data.startDateDisplay || '—';
         document.getElementById('taskDetailDueDate').textContent = data.dueDateDisplay || '—';
         document.getElementById('taskDetailEstimatedHours').textContent = data.estimatedHours || '—';
 
         var statusEl = document.getElementById('taskDetailStatus');
         if (data.status) {
-            var variant = taskStatusVariants[data.status] || 'secondary';
-            var label = taskStatusLabels[data.status] || data.status;
-            statusEl.innerHTML = '<span class="badge bg-' + variant + '-soft text-' + variant + '">' + label + '</span>';
+            var statusVariant = taskStatusVariants[data.status] || 'secondary';
+            var statusLabel = taskStatusLabels[data.status] || data.status;
+            statusEl.innerHTML = '<span class="badge bg-' + statusVariant + '-soft text-' + statusVariant + '">' + statusLabel + '</span>';
         } else {
-            statusEl.textContent = '—';
+            statusEl.innerHTML = '';
         }
 
+        var priorityEl = document.getElementById('taskDetailPriority');
+        if (data.priority) {
+            var priorityVariant = taskPriorityVariants[data.priority] || 'secondary';
+            var priorityLabel = taskPriorityLabels[data.priority] || data.priority;
+            priorityEl.innerHTML = '<span class="badge bg-' + priorityVariant + '-soft text-' + priorityVariant + '">' + priorityLabel + '</span>';
+        } else {
+            priorityEl.innerHTML = '';
+        }
+
+        renderTaskProgress(data);
         renderTaskSubtasks(data);
         renderTaskDependencies(data);
 
@@ -181,15 +224,17 @@
         openTaskModal('edit', currentTaskData);
     }
 
-    function cloneCurrentTask() {
-        if (!currentTaskData) return;
+    function renderTaskProgress(data) {
+        var bar = document.getElementById('taskProgressBar');
+        var summary = document.getElementById('taskProgressSummary');
+        var subtasks = (data && data.subtasks) || [];
+        var completed = subtasks.filter(function (s) { return s.isCompleted; }).length;
+        var percent = subtasks.length ? Math.round((completed / subtasks.length) * 100) : 0;
 
-        var cloneData = Object.assign({}, currentTaskData, {
-            title: currentTaskData.title ? currentTaskData.title + @js(' ' . __('projects.clone_suffix')) : '',
-        });
-
-        hideTaskDetailsDrawer();
-        openTaskModal('add', cloneData);
+        bar.style.width = percent + '%';
+        summary.textContent = subtasks.length
+            ? completed + ' / ' + subtasks.length + ' ' + @js(__('projects.completed')) + ' (' + percent + '%)'
+            : '0%';
     }
 
     function renderTaskSubtasks(data) {
@@ -206,9 +251,7 @@
 
         var subtasks = data.subtasks || [];
         var completed = subtasks.filter(function (s) { return s.isCompleted; }).length;
-        progress.textContent = subtasks.length
-            ? completed + '/' + subtasks.length + ' (' + Math.round((completed / subtasks.length) * 100) + '%)'
-            : '0%';
+        progress.textContent = completed + '/' + subtasks.length;
 
         list.innerHTML = '';
         subtasks.forEach(function (subtask) {
@@ -238,9 +281,9 @@
             remove.className = 'btn btn-link text-danger btn-sm p-0 flex-shrink-0';
             remove.innerHTML = '<i class="feather-x"></i>';
             remove.onclick = function () {
-                if (confirm(@js(__('projects.confirm_remove_subtask')))) {
+                confirmAction(@js(__('projects.confirm_remove_subtask')), function () {
                     submitHiddenForm('taskSubtaskDeleteForm', subtask.deleteUrl);
-                }
+                });
             };
 
             row.appendChild(checkbox);
@@ -257,6 +300,7 @@
         var list = document.getElementById('taskDependenciesList');
         var addForm = document.getElementById('taskDependencyAddForm');
         var select = document.getElementById('taskDependencyOptions');
+        var count = document.getElementById('taskDependenciesCount');
 
         if (!data) {
             section.classList.add('d-none');
@@ -265,6 +309,7 @@
         section.classList.remove('d-none');
 
         var dependencies = data.dependencies || [];
+        count.textContent = dependencies.length;
         list.innerHTML = '';
         dependencies.forEach(function (dependency) {
             var row = document.createElement('div');
@@ -279,9 +324,9 @@
             remove.className = 'btn btn-link text-danger btn-sm p-0 flex-shrink-0';
             remove.innerHTML = '<i class="feather-x"></i>';
             remove.onclick = function () {
-                if (confirm(@js(__('projects.confirm_remove_dependency')))) {
+                confirmAction(@js(__('projects.confirm_remove_dependency')), function () {
                     submitHiddenForm('taskDependencyDeleteForm', dependency.deleteUrl);
-                }
+                });
             };
 
             row.appendChild(label);
@@ -309,10 +354,11 @@
 
     function deleteCurrentTask() {
         if (!currentTaskData || !currentTaskData.deleteUrl) return;
-        if (!confirm(@js(__('projects.confirm_remove_task')))) return;
 
-        var form = document.getElementById('taskDeleteForm');
-        form.action = currentTaskData.deleteUrl;
-        form.submit();
+        confirmAction(@js(__('projects.confirm_remove_task')), function () {
+            var form = document.getElementById('taskDeleteForm');
+            form.action = currentTaskData.deleteUrl;
+            form.submit();
+        });
     }
 </script>

@@ -90,10 +90,11 @@
 
     function deleteCurrentTaskList() {
         if (!currentTaskListData || !currentTaskListData.deleteUrl) return;
-        if (!confirm(@js(__('projects.confirm_remove_tasklist')))) return;
 
-        var form = document.getElementById('taskListDeleteForm');
-        form.action = currentTaskListData.deleteUrl;
-        form.submit();
+        confirmAction(@js(__('projects.confirm_remove_tasklist')), function () {
+            var form = document.getElementById('taskListDeleteForm');
+            form.action = currentTaskListData.deleteUrl;
+            form.submit();
+        });
     }
 </script>

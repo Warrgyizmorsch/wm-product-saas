@@ -127,10 +127,11 @@
 
     function deleteCurrentMilestone() {
         if (!currentMilestoneData || !currentMilestoneData.deleteUrl) return;
-        if (!confirm(@js(__('projects.confirm_remove_milestone')))) return;
 
-        var form = document.getElementById('milestoneDeleteForm');
-        form.action = currentMilestoneData.deleteUrl;
-        form.submit();
+        confirmAction(@js(__('projects.confirm_remove_milestone')), function () {
+            var form = document.getElementById('milestoneDeleteForm');
+            form.action = currentMilestoneData.deleteUrl;
+            form.submit();
+        });
     }
 </script>
