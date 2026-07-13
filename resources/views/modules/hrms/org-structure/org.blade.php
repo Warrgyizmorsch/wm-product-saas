@@ -4,6 +4,34 @@
 @section('page-title', 'HR Settings')
 @section('breadcrumb', 'HRMS / Settings')
 
+@section('page-actions')
+    <div id="add-btn-legal-entities" class="org-add-btn-wrapper">
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCompanyModal">
+            Add Legal Entity
+        </x-ui.button>
+    </div>
+    <div id="add-btn-business-units" class="org-add-btn-wrapper d-none">
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addBuModal">
+            Add Business Unit
+        </x-ui.button>
+    </div>
+    <div id="add-btn-branches" class="org-add-btn-wrapper d-none">
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addBranchModal">
+            Add Branch
+        </x-ui.button>
+    </div>
+    <div id="add-btn-departments" class="org-add-btn-wrapper d-none">
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDeptModal">
+            Add Department
+        </x-ui.button>
+    </div>
+    <div id="add-btn-designations" class="org-add-btn-wrapper d-none">
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDesigModal">
+            Add Designation
+        </x-ui.button>
+    </div>
+@endsection
+
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
@@ -48,6 +76,7 @@
                 flex-grow: 1;
                 padding: 24px 30px;
                 background-color: #f8fafc;
+                min-width: 0;
             }
         }
 
@@ -230,6 +259,13 @@
                 document.body.appendChild(modal);
             });
 
+            // Toggle Add buttons in header on tab change
+            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+                const targetTabId = e.target.getAttribute('aria-controls');
+                $('.org-add-btn-wrapper').addClass('d-none');
+                $('#add-btn-' + targetTabId).removeClass('d-none');
+            });
+
             const urlParams = new URLSearchParams(window.location.search);
             const tabParam = urlParams.get('tab');
             const companyFormMode = @json(old('form_mode'));
@@ -241,6 +277,263 @@
                     }
                 }, 100);
             }
+
+            // AJAX Quick Search, Sort, Filter, and Pagination for Organization Structure
+            let searchTimeout = null;
+            let activeOrgRequest = null;
+
+            function syncOrgForms(params, tabId) {
+                const prefix = {
+                    'legal-entities': 'co_',
+                    'business-units': 'bu_',
+                    'branches': 'br_',
+                    'departments': 'dp_',
+                    'designations': 'ds_'
+                }[tabId];
+
+                if (!prefix) return;
+
+                const fields = [prefix + 'search', prefix + 'status', prefix + 'sort'];
+                if (tabId === 'business-units') fields.push('bu_company_id');
+                if (tabId === 'branches') { fields.push('br_company_id'); fields.push('br_business_unit_id'); }
+                if (tabId === 'departments') { fields.push('dp_company_id'); fields.push('dp_business_unit_id'); fields.push('dp_branch_id'); }
+                if (tabId === 'designations') fields.push('ds_department_id');
+
+                fields.forEach(name => {
+                    document.querySelectorAll(`[name="${name}"]`).forEach(field => {
+                        // Skip the active search input so we don't disrupt active typing
+                        if (field === document.activeElement) return;
+
+                        field.value = params.get(name) || '';
+                        if (field.tagName === 'SELECT' && $(field).hasClass('select2-hidden-accessible')) {
+                            $(field).trigger('change.select2');
+                        }
+                    });
+                });
+            }
+
+            function syncSortLinks(params, tabId) {
+                const prefix = {
+                    'legal-entities': 'co_',
+                    'business-units': 'bu_',
+                    'branches': 'br_',
+                    'departments': 'dp_',
+                    'designations': 'ds_'
+                }[tabId];
+
+                if (!prefix) return;
+
+                const sortParam = prefix + 'sort';
+                const currentSort = params.get(sortParam) || 'name_asc';
+
+                const tabPane = document.getElementById(tabId);
+                if (!tabPane) return;
+
+                tabPane.querySelectorAll('.dropdown-item[href*="' + sortParam + '="]').forEach(link => {
+                    const urlObj = new URL(link.href, window.location.origin);
+                    const sortVal = urlObj.searchParams.get(sortParam);
+
+                    link.classList.remove('active');
+                    const existingCheck = link.querySelector('.feather-check');
+                    if (existingCheck) {
+                        existingCheck.remove();
+                    }
+
+                    if (sortVal === currentSort) {
+                        link.classList.add('active');
+                        const checkIcon = document.createElement('i');
+                        checkIcon.className = 'feather-check ms-3';
+                        link.appendChild(checkIcon);
+                    }
+                });
+            }
+
+            function refreshOrgTabList(url, tabId, options) {
+                const targetUrl = url instanceof URL ? url : new URL(url, window.location.origin);
+
+                if (activeOrgRequest) {
+                    activeOrgRequest.abort();
+                }
+
+                const controller = new AbortController();
+                activeOrgRequest = controller;
+
+                const tabPane = document.getElementById(tabId);
+                const targetIds = {
+                    'legal-entities': {
+                        tbody: 'companiesTableBody',
+                        pagination: 'companiesPaginationWrapper'
+                    },
+                    'business-units': {
+                        tbody: 'businessUnitsTableBody',
+                        pagination: 'businessUnitsPaginationWrapper'
+                    },
+                    'branches': {
+                        tbody: 'branchesTableBody',
+                        pagination: 'branchesPaginationWrapper'
+                    },
+                    'departments': {
+                        tbody: 'departmentsTableBody',
+                        pagination: 'departmentsPaginationWrapper'
+                    },
+                    'designations': {
+                        tbody: 'designationsTableBody',
+                        pagination: 'designationsPaginationWrapper'
+                    }
+                }[tabId];
+
+                if (tabPane) {
+                    tabPane.classList.add('is-loading');
+                }
+
+                fetch(targetUrl.toString(), {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    signal: controller.signal,
+                })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Unable to refresh list.');
+                    }
+                    return response.text();
+                })
+                .then(function (html) {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    
+                    if (targetIds) {
+                        const newTbody = doc.getElementById(targetIds.tbody);
+                        const oldTbody = document.getElementById(targetIds.tbody);
+                        const newPagination = doc.getElementById(targetIds.pagination);
+                        const oldPagination = document.getElementById(targetIds.pagination);
+
+                        if (newTbody && oldTbody) {
+                            oldTbody.innerHTML = newTbody.innerHTML;
+                        }
+                        if (newPagination && oldPagination) {
+                            oldPagination.innerHTML = newPagination.innerHTML;
+                        }
+                    }
+
+                    // Sync rest of the fields/dropdowns and active sorting icons
+                    syncOrgForms(targetUrl.searchParams, tabId);
+                    syncSortLinks(targetUrl.searchParams, tabId);
+
+                    // Push state to update browser URL
+                    history.pushState(null, '', targetUrl.toString());
+                })
+                .catch(function (error) {
+                    if (error.name !== 'AbortError') {
+                        window.location.href = targetUrl.toString();
+                    }
+                })
+                .finally(function () {
+                    if (activeOrgRequest === controller) {
+                        if (tabPane) {
+                            tabPane.classList.remove('is-loading');
+                        }
+                        activeOrgRequest = null;
+                    }
+                });
+            }
+
+            // 1. Debounced search input handler
+            $(document).on('input', 'input[name$="_search"]', function () {
+                const form = this.closest('form');
+                if (!form) return;
+                const tabId = form.querySelector('input[name="tab"]').value;
+                const url = new URL(form.action || window.location.href);
+                
+                const formData = new FormData(form);
+                for (const [key, val] of formData.entries()) {
+                    url.searchParams.set(key, val);
+                }
+
+                // Reset page parameter for this tab on new search
+                const pageParam = {
+                    'legal-entities': 'co_page',
+                    'business-units': 'bu_page',
+                    'branches': 'br_page',
+                    'departments': 'dp_page',
+                    'designations': 'ds_page'
+                }[tabId];
+                if (pageParam) {
+                    url.searchParams.delete(pageParam);
+                }
+
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function () {
+                    refreshOrgTabList(url, tabId);
+                }, 250);
+            });
+
+            // 2. Intercept GET form submissions (search/filters)
+            $(document).on('submit', '#orgTabsContent form', function (event) {
+                const form = this;
+                if (form.method && form.method.toLowerCase() !== 'get') {
+                    return;
+                }
+                event.preventDefault();
+                const tabId = form.querySelector('input[name="tab"]').value;
+                const url = new URL(form.action || window.location.href);
+                
+                const formData = new FormData(form);
+                for (const [key, val] of formData.entries()) {
+                    url.searchParams.set(key, val);
+                }
+
+                const pageParam = {
+                    'legal-entities': 'co_page',
+                    'business-units': 'bu_page',
+                    'branches': 'br_page',
+                    'departments': 'dp_page',
+                    'designations': 'ds_page'
+                }[tabId];
+                if (pageParam) {
+                    url.searchParams.delete(pageParam);
+                }
+
+                refreshOrgTabList(url, tabId);
+                
+                // Close the filter dropdown menu safely
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
+            });
+
+            // 3. Intercept Sort, Reset and Pagination links
+            $(document).on('click', '#orgTabsContent a[href]', function (event) {
+                const href = this.getAttribute('href');
+                if (!href || href.startsWith('javascript:')) return;
+
+                const urlObj = new URL(href, window.location.origin);
+                const tabId = urlObj.searchParams.get('tab');
+                const supportedTabs = ['legal-entities', 'business-units', 'branches', 'departments', 'designations'];
+
+                if (!tabId || !supportedTabs.includes(tabId)) return;
+
+                event.preventDefault();
+                refreshOrgTabList(urlObj, tabId);
+            });
+
+            // Initialize Select2 on all filter dropdown selects to follow the theme's design
+            function initFilterSelects() {
+                $('.erp-filter-dropdown').each(function() {
+                    const dropdown = $(this);
+                    const menu = dropdown.find('.dropdown-menu');
+                    dropdown.find('select').each(function() {
+                        const select = $(this);
+                        if (select.hasClass('select2-hidden-accessible')) {
+                            select.select2('destroy');
+                        }
+                        select.select2({
+                            theme: 'bootstrap-5',
+                            width: '100%',
+                            dropdownParent: menu
+                        });
+                    });
+                });
+            }
+            initFilterSelects();
 
             if (companyFormMode === 'add_company') {
                 setTimeout(function() {

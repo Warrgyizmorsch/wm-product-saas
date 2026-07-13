@@ -53,7 +53,7 @@
             <span>{{ $label }}</span>
         @endif
     </x-ui.icon-btn>
-    <div class="dropdown-menu dropdown-menu-end p-3 shadow-lg">
+    <div class="dropdown-menu dropdown-menu-end theme-filter-dropdown-menu shadow-lg">
         {{ $slot }}
     </div>
 </div>

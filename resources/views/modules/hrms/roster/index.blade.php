@@ -56,6 +56,7 @@
                 flex-grow: 1;
                 padding: 24px 30px;
                 background-color: #f8fafc;
+                min-width: 0;
             }
         }
 
@@ -238,6 +239,78 @@
                                 <div class="row">
                                     <div class="col-12">
                                         <x-ui.card title="Shifts" stretch bodyClass="p-0">
+                                            <x-slot name="headerAction">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftSearchForm" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px;">
+                                                        <input type="hidden" name="tab" value="shifts">
+                                                        <input type="hidden" name="shift_sort" value="{{ $shiftSort }}">
+                                                        <input type="hidden" name="shift_status" value="{{ $shiftStatus }}">
+                                                        <input type="hidden" name="shift_overtime" value="{{ $shiftOvertime }}">
+                                                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                                                        <input type="text" name="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search shifts..." value="{{ $shiftSearch }}" style="box-shadow: none; height: 32px;">
+                                                    </form>
+
+                                                    <x-ui.sort-dropdown label="SORT">
+                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'name_asc']) }}">
+                                                            <span>Name (A-Z)</span>
+                                                            @if($shiftSort === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                                                        </a>
+                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'name_desc']) }}">
+                                                            <span>Name (Z-A)</span>
+                                                            @if($shiftSort === 'name_desc') <i class="feather-check ms-3"></i> @endif
+                                                        </a>
+                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'code_asc']) }}">
+                                                            <span>Code (A-Z)</span>
+                                                            @if($shiftSort === 'code_asc') <i class="feather-check ms-3"></i> @endif
+                                                        </a>
+                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'code_desc']) }}">
+                                                            <span>Code (Z-A)</span>
+                                                            @if($shiftSort === 'code_desc') <i class="feather-check ms-3"></i> @endif
+                                                        </a>
+                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'start_asc']) }}">
+                                                            <span>Start Time (Asc)</span>
+                                                            @if($shiftSort === 'start_asc') <i class="feather-check ms-3"></i> @endif
+                                                        </a>
+                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'start_desc']) }}">
+                                                            <span>Start Time (Desc)</span>
+                                                            @if($shiftSort === 'start_desc') <i class="feather-check ms-3"></i> @endif
+                                                        </a>
+                                                    </x-ui.sort-dropdown>
+
+                                                    <x-ui.filter label="FILTER">
+                                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                                        <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftFilterForm">
+                                                            <input type="hidden" name="tab" value="shifts">
+                                                            <input type="hidden" name="shift_search" value="{{ $shiftSearch }}">
+                                                            <input type="hidden" name="shift_sort" value="{{ $shiftSort }}">
+
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
+                                                                <select name="shift_status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                                                    <option value="">All Statuses</option>
+                                                                    <option value="1" @selected($shiftStatus === '1')>Active</option>
+                                                                    <option value="0" @selected($shiftStatus === '0')>Inactive</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">OVERTIME</label>
+                                                                <select name="shift_overtime" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                                                    <option value="">All</option>
+                                                                    <option value="1" @selected($shiftOvertime === '1')>Allowed</option>
+                                                                    <option value="0" @selected($shiftOvertime === '0')>Not Allowed</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div class="d-flex gap-2 justify-content-end mt-4">
+                                                                <a href="{{ route('hrms.roster.index', ['tab' => 'shifts']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">RESET</a>
+                                                                <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3">APPLY FILTERS</button>
+                                                            </div>
+                                                        </form>
+                                                    </x-ui.filter>
+                                                </div>
+                                            </x-slot>
+
                                             <div class="table-responsive">
                                                 <table class="table table-hover mb-0 align-middle">
                                                     <thead class="table-light">
@@ -867,7 +940,11 @@
                             buSelect.empty();
                             filteredBUs.forEach(bu => {
                                 const isSelected = currentBuVal.includes(bu.value);
-                                buSelect.append(new Option(bu.text, bu.value, isSelected, isSelected));
+                                const newBuOption = document.createElement('option');
+                            newBuOption.text = bu.text;
+                            newBuOption.value = bu.value;
+                            newBuOption.selected = isSelected;
+                            buSelect.append(newBuOption);
                             });
                             buSelect.trigger('change.select2');
 
@@ -876,7 +953,11 @@
                             deptSelect.empty();
                             filteredDepts.forEach(dept => {
                                 const isSelected = currentDeptVal.includes(dept.value);
-                                deptSelect.append(new Option(dept.text, dept.value, isSelected, isSelected));
+                                const newDeptOption = document.createElement('option');
+                            newDeptOption.text = dept.text;
+                            newDeptOption.value = dept.value;
+                            newDeptOption.selected = isSelected;
+                            deptSelect.append(newDeptOption);
                             });
                             deptSelect.trigger('change.select2');
                             filterEmployees(prefix);
@@ -889,7 +970,11 @@
                             branchSelect.empty();
                             filteredBranches.forEach(br => {
                                 const isSelected = currentBranchVal.includes(br.value);
-                                branchSelect.append(new Option(br.text, br.value, isSelected, isSelected));
+                                const newBranchOption = document.createElement('option');
+                            newBranchOption.text = br.text;
+                            newBranchOption.value = br.value;
+                            newBranchOption.selected = isSelected;
+                            branchSelect.append(newBranchOption);
                             });
                             branchSelect.trigger('change.select2');
                             filterEmployees(prefix);
@@ -1080,6 +1165,34 @@
                     });
                 });
             }
+
+            let shiftSearchTimeout = null;
+
+            $(document).on('input', '#shiftSearchForm input[name="shift_search"]', function () {
+                clearTimeout(shiftSearchTimeout);
+                const form = this.closest('form');
+                if (!form) return;
+
+                shiftSearchTimeout = setTimeout(function () {
+                    const url = new URL(form.action || window.location.href);
+                    const formData = new FormData(form);
+                    for (const [key, value] of formData.entries()) {
+                        url.searchParams.set(key, value);
+                    }
+                    window.location.href = url.toString();
+                }, 250);
+            });
+
+            $(document).on('submit', '#shiftFilterForm', function (event) {
+                event.preventDefault();
+                const form = this;
+                const url = new URL(form.action || window.location.href);
+                const formData = new FormData(form);
+                for (const [key, value] of formData.entries()) {
+                    url.searchParams.set(key, value);
+                }
+                window.location.href = url.toString();
+            });
         });
     </script>
 @endsection
