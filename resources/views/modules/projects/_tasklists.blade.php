@@ -3,7 +3,7 @@
         <i class="feather-list me-2 text-primary"></i>{{ __('projects.tasklists') }}
     </h5>
     @if ($canManageTaskLists)
-        <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListDrawer('add')">
+        <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListModal('add')">
             <i class="feather-plus me-1"></i>{{ __('projects.add_tasklist') }}
         </button>
     @endif
@@ -19,7 +19,7 @@
         <h6 class="fw-bold text-dark mb-1">{{ __('projects.no_tasklists') }}</h6>
         <p class="fs-12 text-muted mb-3">{{ __('projects.no_tasklists_hint') }}</p>
         @if ($canManageTaskLists)
-            <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListDrawer('add')">
+            <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListModal('add')">
                 <i class="feather-plus me-1"></i>{{ __('projects.add_tasklist') }}
             </button>
         @endif
@@ -27,6 +27,7 @@
 @endforelse
 
 @if ($canManageTaskLists)
+    @include('modules.projects.tasklists._modal')
     @include('modules.projects.tasklists._drawer')
 
     @if ($errors->any() && in_array(old('_tasklist_form'), ['add', 'edit'], true))
@@ -34,7 +35,7 @@
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
                     @if (old('_tasklist_form') === 'edit')
-                        openTaskListDrawer('edit', {
+                        openTaskListModal('edit', {
                             id: {{ (int) old('_tasklist_id') }},
                             updateUrl: @js(route('projects.tasklists.update', [$project, (int) old('_tasklist_id')])),
                             deleteUrl: @js(route('projects.tasklists.destroy', [$project, (int) old('_tasklist_id')])),
@@ -44,7 +45,7 @@
                             milestoneId: @js(old('milestone_id')),
                         });
                     @else
-                        openTaskListDrawer('add', {
+                        openTaskListModal('add', {
                             name: @js(old('name')),
                             description: @js(old('description')),
                             ownerId: @js(old('owner_id')),
@@ -58,6 +59,7 @@
 @endif
 
 @if ($canCreateTasks)
+    @include('modules.projects.tasks._modal')
     @include('modules.projects.tasks._drawer')
 
     @if ($errors->any() && in_array(old('_task_form'), ['add', 'edit'], true))
@@ -65,7 +67,7 @@
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
                     @if (old('_task_form') === 'edit')
-                        openTaskDrawer('edit', {
+                        openTaskModal('edit', {
                             id: {{ (int) old('_task_id') }},
                             updateUrl: @js(route('projects.tasks.update', [$project, (int) old('_task_id')])),
                             deleteUrl: @js(route('projects.tasks.destroy', [$project, (int) old('_task_id')])),
@@ -82,7 +84,7 @@
                             estimatedHours: @js(old('estimated_hours')),
                         });
                     @else
-                        openTaskDrawer('add', {
+                        openTaskModal('add', {
                             taskListId: @js(old('task_list_id')),
                             title: @js(old('title')),
                             description: @js(old('description')),

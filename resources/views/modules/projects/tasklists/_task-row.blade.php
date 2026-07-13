@@ -2,21 +2,26 @@
 
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 py-2 {{ !$loop->last ? 'border-bottom' : '' }}">
     <div @if ($canManageTask) role="button" style="cursor: pointer;"
-            onclick="openTaskDrawer('edit', {
+            onclick="openTaskDetailsDrawer({
                 id: {{ $task->id }},
                 updateUrl: @js(route('projects.tasks.update', [$project, $task])),
                 deleteUrl: @js(route('projects.tasks.destroy', [$project, $task])),
                 statusUrl: @js(route('projects.tasks.update-status', [$project, $task])),
                 assignUrl: @js(route('projects.tasks.assign', [$project, $task])),
                 taskListId: {{ $task->task_list_id }},
+                taskListName: @js($task->taskList?->name),
                 title: @js($task->title),
                 description: @js($task->description),
                 assigneeId: @js($task->assignee_id),
+                assigneeName: @js($task->assignee?->name),
                 reviewerId: @js($task->reviewer_id),
+                reviewerName: @js($task->reviewer?->name),
                 priority: @js($task->priority),
                 status: @js($task->status),
                 startDate: @js(optional($task->start_date)->format('Y-m-d')),
                 dueDate: @js(optional($task->due_date)->format('Y-m-d')),
+                startDateDisplay: @js(optional($task->start_date)->format('d/m/Y')),
+                dueDateDisplay: @js(optional($task->due_date)->format('d/m/Y')),
                 estimatedHours: @js($task->estimated_hours),
                 subtaskStoreUrl: @js(route('projects.tasks.subtasks.store', [$project, $task])),
                 dependencyStoreUrl: @js(route('projects.tasks.dependencies.store', [$project, $task])),

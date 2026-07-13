@@ -1,18 +1,40 @@
-<x-ui.drawer id="milestoneDrawer" title="{{ __('projects.add_milestone') }}" position="end" style="width: 480px; max-width: 100%;">
-    <div id="milestoneActionsBar" class="d-none justify-content-end gap-2 mb-3">
-        <button type="button" class="btn btn-light-brand btn-sm" onclick="cloneCurrentMilestone()">
-            <i class="feather feather-copy me-1"></i>{{ __('projects.clone') }}
-        </button>
-        <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteCurrentMilestone()">
-            <i class="feather feather-trash-2 me-1"></i>{{ __('projects.remove') }}
-        </button>
+<x-ui.drawer id="milestoneDrawer" title="{{ __('projects.milestone_details') }}" position="end" style="width: 480px; max-width: 100%;">
+    <div class="mb-3">
+        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.milestone_name') }}</div>
+        <div id="milestoneDetailName" class="fw-semibold text-dark"></div>
     </div>
 
-    <form id="milestoneForm" method="POST" action="{{ isset($project) ? route('projects.milestones.store', $project) : '' }}">
-        @csrf
-        <input type="hidden" name="_method" id="milestoneMethodField" value="POST">
-        @include('modules.projects.milestones._form')
-    </form>
+    <div class="mb-3" id="milestoneDetailDescriptionWrap">
+        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.description') }}</div>
+        <div id="milestoneDetailDescription" class="text-dark"></div>
+    </div>
+
+    <div class="mb-3">
+        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.milestone_owner') }}</div>
+        <div id="milestoneDetailOwner" class="text-dark"></div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-6">
+            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.start_date') }}</div>
+            <div id="milestoneDetailStartDate" class="text-dark"></div>
+        </div>
+        <div class="col-6">
+            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.due_date') }}</div>
+            <div id="milestoneDetailDueDate" class="text-dark"></div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-6">
+            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.status') }}</div>
+            <div id="milestoneDetailStatus"></div>
+        </div>
+        <div class="col-6">
+            <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.completion_percentage') }}</div>
+            <div id="milestoneDetailCompletion" class="text-dark"></div>
+        </div>
+    </div>
 
     <form id="milestoneDeleteForm" method="POST" action="" class="d-none">
         @csrf
@@ -20,63 +42,57 @@
     </form>
 
     <x-slot name="footer">
-        <button type="button" class="btn btn-light-brand" data-bs-dismiss="offcanvas">{{ __('projects.cancel') }}</button>
-        <button type="submit" form="milestoneForm" id="milestoneSubmitBtn" class="btn btn-primary">{{ __('projects.create') }}</button>
+        <button type="button" class="btn btn-outline-danger" onclick="deleteCurrentMilestone()">
+            <i class="feather feather-trash-2 me-1"></i>{{ __('projects.remove') }}
+        </button>
+        <button type="button" class="btn btn-light-brand" onclick="cloneCurrentMilestone()">
+            <i class="feather feather-copy me-1"></i>{{ __('projects.clone') }}
+        </button>
+        <button type="button" class="btn btn-primary" onclick="editCurrentMilestone()">
+            {{ __('projects.edit_milestone') }}
+        </button>
     </x-slot>
 </x-ui.drawer>
 
 <script>
     var currentMilestoneData = null;
 
-    function openMilestoneDrawer(mode, data) {
+    var milestoneStatusVariants = {
+        'Active': 'success',
+        'On Hold': 'warning',
+        'Completed': 'primary',
+        'Closed': 'dark',
+    };
+
+    var milestoneStatusLabels = @js(collect(\App\Domains\Projects\Models\Milestone::STATUSES)->mapWithKeys(fn ($status) => [$status => __('projects.statuses.' . $status)]));
+
+    function openMilestoneDetailsDrawer(data) {
         data = data || {};
-        currentMilestoneData = mode === 'edit' ? data : null;
+        currentMilestoneData = data;
 
-        var form = document.getElementById('milestoneForm');
-        var methodField = document.getElementById('milestoneMethodField');
-        var modeField = document.getElementById('milestone_form_mode');
-        var idField = document.getElementById('milestone_form_id');
-        var titleEl = document.getElementById('milestoneDrawerLabel');
-        var submitBtn = document.getElementById('milestoneSubmitBtn');
-        var actionsBar = document.getElementById('milestoneActionsBar');
+        document.getElementById('milestoneDetailName').textContent = data.name || '—';
 
-        if (mode === 'edit') {
-            form.action = data.updateUrl;
-            methodField.value = 'PUT';
-            modeField.value = 'edit';
-            idField.value = data.id;
-            if (titleEl) titleEl.textContent = @js(__('projects.edit_milestone'));
-            if (submitBtn) submitBtn.textContent = @js(__('projects.save_changes'));
-            if (actionsBar) {
-                actionsBar.classList.remove('d-none');
-                actionsBar.classList.add('d-flex');
-            }
+        var descriptionWrap = document.getElementById('milestoneDetailDescriptionWrap');
+        if (data.description) {
+            descriptionWrap.classList.remove('d-none');
+            document.getElementById('milestoneDetailDescription').textContent = data.description;
         } else {
-            form.action = data.storeUrl || @js(isset($project) ? route('projects.milestones.store', $project) : '');
-            methodField.value = 'POST';
-            modeField.value = 'add';
-            idField.value = '';
-            if (titleEl) titleEl.textContent = @js(__('projects.add_milestone'));
-            if (submitBtn) submitBtn.textContent = @js(__('projects.create'));
-            if (actionsBar) {
-                actionsBar.classList.remove('d-flex');
-                actionsBar.classList.add('d-none');
-            }
+            descriptionWrap.classList.add('d-none');
         }
 
-        // A fresh "Add Milestone" click passes no data at all; cloning/editing
-        // always passes explicit (possibly empty) date keys, so only a truly
-        // fresh add defaults the dates to today.
-        var isFreshAdd = mode !== 'edit' && !('startDate' in data) && !('dueDate' in data);
-        var today = new Date().toISOString().slice(0, 10);
+        document.getElementById('milestoneDetailOwner').textContent = data.ownerName || '—';
+        document.getElementById('milestoneDetailStartDate').textContent = data.startDateDisplay || '—';
+        document.getElementById('milestoneDetailDueDate').textContent = data.dueDateDisplay || '—';
+        document.getElementById('milestoneDetailCompletion').textContent = (data.completionPercentage ?? 0) + '%';
 
-        setMilestoneFieldValue('milestone_name', data.name || '');
-        setMilestoneFieldValue('milestone_description', data.description || '');
-        setMilestoneFieldValue('milestone_start_date', isFreshAdd ? today : (data.startDate || ''));
-        setMilestoneFieldValue('milestone_due_date', isFreshAdd ? today : (data.dueDate || ''));
-        setMilestoneFieldValue('milestone_status', data.status || 'Draft');
-        setMilestoneFieldValue('milestone_completion_percentage', mode === 'edit' ? (data.completionPercentage ?? 0) : 0);
-        setMilestoneOwner(data.ownerId);
+        var statusEl = document.getElementById('milestoneDetailStatus');
+        if (data.status) {
+            var variant = milestoneStatusVariants[data.status] || 'secondary';
+            var label = milestoneStatusLabels[data.status] || data.status;
+            statusEl.innerHTML = '<span class="badge bg-' + variant + '-soft text-' + variant + '">' + label + '</span>';
+        } else {
+            statusEl.textContent = '—';
+        }
 
         var drawerEl = document.getElementById('milestoneDrawer');
         if (drawerEl && window.bootstrap) {
@@ -84,32 +100,18 @@
         }
     }
 
-    function setMilestoneFieldValue(id, value) {
-        var el = document.getElementById(id);
-        if (el) el.value = value;
+    function hideMilestoneDetailsDrawer() {
+        var drawerEl = document.getElementById('milestoneDrawer');
+        if (drawerEl && window.bootstrap) {
+            var instance = bootstrap.Offcanvas.getInstance(drawerEl);
+            if (instance) instance.hide();
+        }
     }
 
-    (function () {
-        var completionInput = document.getElementById('milestone_completion_percentage');
-        if (!completionInput) return;
-
-        completionInput.addEventListener('input', function () {
-            if (completionInput.value === '') return;
-
-            var clamped = Math.min(100, Math.max(0, Number(completionInput.value)));
-            if (!Number.isNaN(clamped) && Number(completionInput.value) !== clamped) {
-                completionInput.value = clamped;
-            }
-        });
-    })();
-
-    function setMilestoneOwner(value) {
-        var el = document.getElementById('milestone_owner_id');
-        if (!el) return;
-        el.value = value || '';
-        if (window.jQuery && jQuery(el).data('select2')) {
-            jQuery(el).trigger('change');
-        }
+    function editCurrentMilestone() {
+        if (!currentMilestoneData) return;
+        hideMilestoneDetailsDrawer();
+        openMilestoneModal('edit', currentMilestoneData);
     }
 
     function cloneCurrentMilestone() {
@@ -119,7 +121,8 @@
             name: currentMilestoneData.name ? currentMilestoneData.name + @js(' ' . __('projects.clone_suffix')) : '',
         });
 
-        openMilestoneDrawer('add', cloneData);
+        hideMilestoneDetailsDrawer();
+        openMilestoneModal('add', cloneData);
     }
 
     function deleteCurrentMilestone() {

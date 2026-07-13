@@ -9,14 +9,16 @@
             <i class="feather-list text-muted mt-1"></i>
             <div>
                 <div @if ($canManageTaskLists) role="button" style="cursor: pointer;"
-                        onclick="openTaskListDrawer('edit', {
+                        onclick="openTaskListDetailsDrawer({
                             id: {{ $taskList->id }},
                             updateUrl: @js(route('projects.tasklists.update', [$project, $taskList])),
                             deleteUrl: @js(route('projects.tasklists.destroy', [$project, $taskList])),
                             name: @js($taskList->name),
                             description: @js($taskList->description),
                             ownerId: @js($taskList->owner_id),
-                            milestoneId: @js($taskList->milestone_id)
+                            ownerName: @js($taskList->owner?->name),
+                            milestoneId: @js($taskList->milestone_id),
+                            milestoneName: @js($taskList->milestone?->name)
                         })"
                     @endif class="fw-semibold text-dark fs-14">
                     {{ $taskList->name }}
@@ -54,7 +56,7 @@
             @endif
 
             @if ($canCreateTasks)
-                <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" onclick="openTaskDrawer('add', { taskListId: {{ $taskList->id }} })">
+                <button type="button" class="btn btn-outline-primary btn-sm text-nowrap" onclick="openTaskModal('add', { taskListId: {{ $taskList->id }} })">
                     <i class="feather-plus me-1"></i>{{ __('projects.add_task') }}
                 </button>
             @endif
@@ -79,7 +81,7 @@
 
                 <x-ui.action-dropdown id="taskListActions{{ $taskList->id }}">
                     <li>
-                        <a class="dropdown-item" href="javascript:void(0);" onclick="openTaskListDrawer('edit', {
+                        <a class="dropdown-item" href="javascript:void(0);" onclick="openTaskListModal('edit', {
                                 id: {{ $taskList->id }},
                                 updateUrl: @js(route('projects.tasklists.update', [$project, $taskList])),
                                 deleteUrl: @js(route('projects.tasklists.destroy', [$project, $taskList])),

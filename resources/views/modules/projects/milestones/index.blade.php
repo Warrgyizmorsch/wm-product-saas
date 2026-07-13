@@ -74,15 +74,18 @@
                     <tbody>
                         @forelse ($milestones as $milestone)
                             <tr @can('update', $milestone) role="button" style="cursor: pointer;"
-                                    onclick="openMilestoneDrawer('edit', {
+                                    onclick="openMilestoneDetailsDrawer({
                                         id: {{ $milestone->id }},
                                         updateUrl: @js(route('projects.milestones.update', [$milestone->project, $milestone->id])),
                                         deleteUrl: @js(route('projects.milestones.destroy', [$milestone->project, $milestone->id])),
                                         name: @js($milestone->name),
                                         description: @js($milestone->description),
                                         ownerId: @js($milestone->owner_id),
+                                        ownerName: @js($milestone->owner?->name),
                                         startDate: @js($milestone->start_date?->format('Y-m-d')),
                                         dueDate: @js($milestone->due_date?->format('Y-m-d')),
+                                        startDateDisplay: @js($milestone->start_date?->format('d/m/Y')),
+                                        dueDateDisplay: @js($milestone->due_date?->format('d/m/Y')),
                                         status: @js($milestone->status),
                                         completionPercentage: {{ $milestone->completion_percentage }}
                                     })"
@@ -143,5 +146,6 @@
         </div>
     </div>
 
+    @include('modules.projects.milestones._modal')
     @include('modules.projects.milestones._drawer')
 @endsection
