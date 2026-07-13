@@ -17,6 +17,7 @@ use Illuminate\View\View;
 use App\Domains\Sales\Models\DeliveryOrder;
 use App\Domains\Sales\Models\DeliveryOrderItem;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class SalesOrderController extends Controller
 {
@@ -25,13 +26,41 @@ class SalesOrderController extends Controller
     ) {
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', SalesOrder::class);
 
-        return view('modules.sales.orders.index', [
-            'orders' => $this->salesOrders->latest(),
-        ]);
+        $query = SalesOrder::query()->with(['customer', 'quotation']);
+
+        // Search Keywords
+        if ($search = $request->input('search')) {
+            $query->where(function($q) use ($search) {
+                $q->where('sales_order_number', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function($custQ) use ($search) {
+                      $custQ->where('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Status Filter
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'order_date');
+        $sortOrder = $request->input('sort_order', 'desc');
+        
+        $allowedSorts = ['sales_order_number', 'order_date', 'total_amount', 'status'];
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        $orders = $query->paginate(10)->withQueryString();
+
+        return view('modules.sales.orders.index', compact('orders'));
     }
 
     public function create(Request $request): View
@@ -125,6 +154,25 @@ class SalesOrderController extends Controller
         return view('modules.sales.orders.show', [
             'order' => $order,
         ]);
+    }
+
+    public function downloadPdf(int $id)
+    {
+        $order = SalesOrder::with([
+            'customer', 
+            'salesPerson', 
+            'quotation', 
+            'items.product', 
+            'items.warehouse',
+        ])->findOrFail($id);
+
+        $this->authorize('view', $order);
+
+        $pdf = Pdf::loadView('modules.sales.orders.pdf', [
+            'order' => $order,
+        ]);
+
+        return $pdf->download("SalesOrder_{$order->sales_order_number}.pdf");
     }
 
     public function edit(int $id): View
@@ -252,7 +300,7 @@ class SalesOrderController extends Controller
             return $delivery;
         });
 
-        return redirect()->route('sales.deliveries.show', $delivery->id)
+        return redirect()->route('sales.orders.show', $order->id)
             ->with('success', 'Sales Order confirmed and Delivery Order generated successfully!');
     }
 

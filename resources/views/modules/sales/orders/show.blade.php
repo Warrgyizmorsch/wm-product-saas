@@ -6,8 +6,8 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <a href="{{ route('sales.orders.index') }}" class="btn btn-light d-print-none">
-            <i class="feather-arrow-left me-2"></i>Back to List
+        <a href="{{ route('sales.orders.index') }}" class="btn d-print-none d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0;" data-bs-toggle="tooltip" title="Back to List">
+            <i class="feather-arrow-left text-dark fs-16"></i>
         </a>
         
         @if ($order->status === 'Draft')
@@ -19,20 +19,6 @@
             </form>
         @endif
 
-        @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-            <a href="{{ route('sales.deliveries.create', ['sales_order_id' => $order->id]) }}" class="btn btn-primary d-print-none">
-                <i class="feather-truck me-2"></i>Create Delivery
-            </a>
-            @php
-                $hasManufactureItems = $order->items->contains(fn($item) => $item->product?->supplier_method === 'manufacture');
-            @endphp
-            @if ($hasManufactureItems)
-                <a href="{{ route('production.orders.create', ['sales_order_id' => $order->id]) }}" class="btn btn-warning d-print-none">
-                    <i class="feather-cpu me-2"></i>Create MO
-                </a>
-            @endif
-        @endif
-
         @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
             <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none" onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
                 @csrf
@@ -41,14 +27,14 @@
                 </button>
             </form>
             
-            <a href="{{ route('sales.orders.edit', $order->id) }}" class="btn btn-light border d-print-none">
-                <i class="feather-edit-2 me-2"></i>Edit
+            <a href="{{ route('sales.orders.edit', $order->id) }}" class="btn d-print-none d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0;" data-bs-toggle="tooltip" title="Edit Sales Order">
+                <i class="feather-edit-2 text-dark fs-16"></i>
             </a>
         @endif
 
-        <button onclick="window.print()" class="btn btn-outline-primary d-print-none">
-            <i class="feather-printer me-2"></i>Print / Download
-        </button>
+        <a href="{{ route('sales.orders.download', $order->id) }}" class="btn d-print-none d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0;" data-bs-toggle="tooltip" title="Print / Download PDF">
+            <i class="feather-printer text-dark fs-16"></i>
+        </a>
     </div>
 @endsection
 
@@ -92,37 +78,164 @@
             ['id' => 'tab-order', 'label' => 'Sales Order Details', 'active' => true, 'icon' => 'feather-shopping-cart'],
             ['id' => 'tab-deliveries', 'label' => 'Delivery Orders (' . $order->deliveries->count() . ')', 'active' => false, 'icon' => 'feather-truck'],
             ['id' => 'tab-invoices', 'label' => 'Invoices (' . $order->invoices->count() . ')', 'active' => false, 'icon' => 'feather-file-text'],
-            ['id' => 'tab-payments', 'label' => 'Payments & Advances (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
+            ['id' => 'tab-payments', 'label' => 'Payments (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
             ['id' => 'tab-returns', 'label' => 'Returns (' . $order->returns->count() . ')', 'active' => false, 'icon' => 'feather-rotate-ccw'],
-            ['id' => 'tab-production', 'label' => 'Manufacturing Orders (MO) (' . ($order->productionOrders ?? collect())->count() . ')', 'active' => false, 'icon' => 'feather-cpu'],
         ];
     @endphp
 
+@once
+    @push('styles')
+        <style>
+            .so-status-pipeline {
+                display: inline-flex;
+                align-items: center;
+                border-radius: 4px;
+                overflow: hidden;
+                border: 1px solid #cbd5e1;
+                background-color: #f1f5f9;
+            }
+            .so-status-pipeline .pipeline-step {
+                position: relative;
+                padding: 6px 14px 6px 24px;
+                background-color: #f1f5f9;
+                color: #64748b;
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                border: none;
+                outline: none;
+                transition: all 0.2s ease;
+                display: inline-flex;
+                align-items: center;
+            }
+            .so-status-pipeline .pipeline-step:first-child {
+                padding-left: 14px;
+                border-top-left-radius: 3px;
+                border-bottom-left-radius: 3px;
+            }
+            .so-status-pipeline .pipeline-step:last-child {
+                padding-right: 14px;
+                border-top-right-radius: 3px;
+                border-bottom-right-radius: 3px;
+            }
+            /* Right pointing arrowhead */
+            .so-status-pipeline .pipeline-step::after {
+                content: "";
+                position: absolute;
+                top: 0;
+                right: -10px;
+                width: 0;
+                height: 0;
+                border-top: 14px solid transparent;
+                border-bottom: 14px solid transparent;
+                border-left: 10px solid #f1f5f9;
+                z-index: 10;
+                transition: all 0.2s ease;
+            }
+            /* Left cutout */
+            .so-status-pipeline .pipeline-step::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 0;
+                height: 0;
+                border-top: 14px solid transparent;
+                border-bottom: 14px solid transparent;
+                border-left: 10px solid #ffffff;
+                z-index: 5;
+            }
+            .so-status-pipeline .pipeline-step:first-child::before {
+                display: none;
+            }
+            /* Active stage */
+            .so-status-pipeline .pipeline-step.active {
+                background-color: #3454d1;
+                color: #ffffff;
+            }
+            .so-status-pipeline .pipeline-step.active::after {
+                border-left-color: #3454d1;
+            }
+            /* Completed/previous stage */
+            .so-status-pipeline .pipeline-step.completed {
+                background-color: #cbd5e1;
+                color: #475569;
+            }
+            .so-status-pipeline .pipeline-step.completed::after {
+                border-left-color: #cbd5e1;
+            }
+            /* Scrollable tabs overrides */
+            #salesOrderTabs {
+                flex-wrap: nowrap !important;
+                overflow-x: auto !important;
+                scrollbar-width: none; /* Firefox */
+                -ms-overflow-style: none; /* IE 10+ */
+            }
+            #salesOrderTabs::-webkit-scrollbar {
+                display: none; /* Safari and Chrome */
+            }
+            #salesOrderTabs .nav-item {
+                flex-shrink: 0 !important;
+            }
+        </style>
+    @endpush
+@endonce
+
     <div class="card border-0 shadow-sm print-area">
-        <div class="card-header bg-white border-bottom py-0 px-4 d-print-none">
-            <x-ui.horizontal-tabs id="salesOrderTabs" :tabs="$soTabs" />
+        <div class="card-header bg-white border-bottom py-0 px-4 d-print-none d-flex justify-content-between align-items-center flex-wrap gap-2" style="min-height: 48px;">
+            <div class="d-flex align-items-center" style="max-width: 100%; overflow: hidden;">
+                <x-ui.horizontal-tabs id="salesOrderTabs" :tabs="$soTabs" class="border-0 mb-0" />
+            </div>
+            
+            <!-- Custom Chevron Status Pipeline -->
+            <div class="so-status-pipeline my-2 d-print-none" style="margin-left: auto;">
+                @php
+                    $statuses = ['Draft', 'Confirmed', 'Shipped'];
+                    if ($order->status === 'Partially Shipped') {
+                        array_splice($statuses, 2, 0, 'Partially Shipped');
+                    }
+                    if ($order->status === 'Cancelled') {
+                        $statuses[] = 'Cancelled';
+                    }
+                    $currentIndex = array_search($order->status, $statuses);
+                @endphp
+                @foreach($statuses as $index => $state)
+                    @php
+                        $stepClass = '';
+                        if ($order->status === $state) {
+                            $stepClass = 'active';
+                        } elseif ($currentIndex !== false && $index < $currentIndex) {
+                            $stepClass = 'completed';
+                        }
+                    @endphp
+                    <span class="pipeline-step {{ $stepClass }}">
+                        {{ $state }}
+                    </span>
+                @endforeach
+            </div>
         </div>
         
         <div class="card-body p-0">
             <div class="tab-content">
                 <!-- TAB 1: Sales Order Details -->
-                <div class="tab-pane fade show active p-5" id="tab-order">
+                <div class="tab-pane fade show active p-4" id="tab-order">
                     <!-- Header section -->
-                    <div class="row align-items-center mb-5">
+                    <div class="row align-items-center mb-4">
                         <div class="col-sm-6 text-start">
                             <div class="d-flex align-items-center">
-                                <div class="avatar-text avatar-lg bg-primary text-white fs-3 fw-bold me-3 shadow">
+                                <div class="avatar-text avatar-lg bg-primary text-white fs-4 fw-bold me-3 shadow" style="border-radius: 4px; width: 40px; height: 40px;">
                                     {{ strtoupper(substr(tenant() ? tenant()->name : 'ERP', 0, 1)) }}
                                 </div>
                                 <div>
-                                    <h3 class="fw-bold text-dark mb-0">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h3>
-                                    <p class="text-muted mb-0 fs-12">Official Sales Order Document</p>
+                                    <h4 class="fw-bold text-dark mb-0 fs-15">{{ tenant() ? tenant()->name : 'SaaS ERP Workspace' }}</h4>
+                                    <p class="text-muted mb-0 fs-11">Official Sales Order Document</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-sm-6 text-sm-end mt-4 mt-sm-0">
-                            <h4 class="fw-bold text-primary mb-1">SALES ORDER</h4>
-                            <span class="fs-14 fw-bold text-dark d-block">No: {{ $order->sales_order_number }}</span>
+                        <div class="col-sm-6 text-sm-end mt-3 mt-sm-0 text-start text-sm-end">
+                            <h5 class="fw-bold text-primary mb-1" style="letter-spacing: 0.5px; font-size: 14px;">SALES ORDER</h5>
+                            <span class="fs-13 fw-bold text-dark d-block">No: {{ $order->sales_order_number }}</span>
                             @php
                                 $badgeClass = 'bg-soft-secondary text-secondary';
                                 if ($order->status === 'Confirmed') $badgeClass = 'bg-soft-info text-info';
@@ -130,116 +243,124 @@
                                 elseif ($order->status === 'Shipped') $badgeClass = 'bg-soft-success text-success';
                                 elseif ($order->status === 'Cancelled') $badgeClass = 'bg-soft-danger text-danger';
                             @endphp
-                            <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 mt-1">{{ $order->status }}</span>
+                            <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-10 fw-semibold rounded-pill mt-1">{{ $order->status }}</span>
                         </div>
                     </div>
 
-                    <hr class="my-4">
+                    <hr class="my-3">
 
                     <!-- Meta details (Customer / Dates) -->
-                    <div class="row mb-5">
-                        <div class="col-sm-4 text-start mb-3 mb-sm-0">
+                    <div class="row mb-4 text-start g-3">
+                        <div class="col-sm-4 text-start mb-2 mb-sm-0">
                             <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Customer Info</span>
-                            <h5 class="fw-bold text-dark mb-1">{{ $order->customer?->name ?? '—' }}</h5>
-                            <p class="text-muted mb-1 fs-13"><i class="feather-mail me-2"></i>{{ $order->customer?->email ?: '—' }}</p>
-                            <p class="text-muted mb-0 fs-13"><i class="feather-phone me-2"></i>{{ $order->customer?->phone ?: '—' }}</p>
+                            <h6 class="fw-bold text-dark mb-1.5 fs-13">{{ $order->customer?->name ?? '—' }}</h6>
+                            <p class="text-muted mb-1 fs-12">Email: {{ $order->customer?->email ?: '—' }}</p>
+                            <p class="text-muted mb-0 fs-12">Phone: {{ $order->customer?->phone ?: '—' }}</p>
                         </div>
-                        <div class="col-sm-4 text-start mb-3 mb-sm-0">
+                        <div class="col-sm-4 text-start mb-2 mb-sm-0">
                             <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Order Schedule</span>
-                            <p class="text-dark mb-1 fs-13"><strong>Order Date:</strong> {{ $order->order_date ? $order->order_date->format('d/m/Y') : '—' }}</p>
-                            <p class="text-dark mb-1 fs-13"><strong>Est. Shipment:</strong> {{ $order->shipment_date ? $order->shipment_date->format('d/m/Y') : 'Not Scheduled' }}</p>
-                            <p class="text-dark mb-0 fs-13"><strong>Payment Terms:</strong> {{ $order->payment_terms ?: 'Due on Receipt' }}</p>
+                            <p class="text-dark mb-1 fs-12"><strong>Order Date:</strong> <span class="text-muted ms-1">{{ $order->order_date ? $order->order_date->format('d/m/Y') : '—' }}</span></p>
+                            <p class="text-dark mb-1 fs-12"><strong>Est. Shipment:</strong> <span class="text-muted ms-1">{{ $order->shipment_date ? $order->shipment_date->format('d/m/Y') : 'Not Scheduled' }}</span></p>
+                            <p class="text-dark mb-0 fs-12"><strong>Payment Terms:</strong> <span class="text-muted ms-1">{{ $order->payment_terms ?: 'Due on Receipt' }}</span></p>
                         </div>
-                        <div class="col-sm-4 text-sm-end">
+                        <div class="col-sm-4 text-sm-end text-start">
                             <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Reference Details</span>
                             @if($order->quotation)
-                                <p class="text-dark mb-1 fs-13"><strong>Quotation Ref:</strong> <a href="{{ route('crm.quotations.show', $order->quotation_id) }}" class="fw-bold text-primary">{{ $order->quotation->quotation_number }}</a></p>
+                                <p class="text-dark mb-1 fs-12"><strong>Quotation Ref:</strong> <a href="{{ route('crm.quotations.show', $order->quotation_id) }}" class="fw-bold text-primary ms-1">{{ $order->quotation->quotation_number }}</a></p>
                             @endif
                             @if($order->salesPerson)
-                                <p class="text-dark mb-0 fs-13"><strong>Sales Rep:</strong> {{ $order->salesPerson->name }}</p>
+                                <p class="text-dark mb-0 fs-12"><strong>Sales Rep:</strong> <span class="text-muted ms-1">{{ $order->salesPerson->name }}</span></p>
                             @endif
                         </div>
                     </div>
 
                     <!-- Addresses grid -->
-                    <div class="row g-4 mb-5 border-top border-bottom py-4 bg-light-50">
-                        <div class="col-6 text-start">
-                            <h6 class="fw-bold text-dark fs-12 text-uppercase mb-2">Billing Address</h6>
-                            <p class="text-muted fs-13 mb-0" style="white-space: pre-line;">{{ $order->billing_address ?: 'No billing address provided.' }}</p>
-                        </div>
-                        <div class="col-6 text-start">
-                            <h6 class="fw-bold text-dark fs-12 text-uppercase mb-2">Shipping Address</h6>
-                            <p class="text-muted fs-13 mb-0" style="white-space: pre-line;">{{ $order->shipping_address ?: 'No shipping address provided.' }}</p>
+                    <div class="row mb-4 text-start">
+                        <div class="col-12">
+                            <div class="border p-3 bg-light bg-opacity-50" style="border-radius: 6px !important; border-color: #cbd5e1 !important;">
+                                <div class="row g-3">
+                                    <div class="col-md-6 text-start">
+                                        <h6 class="fw-bold text-dark fs-12 text-uppercase mb-2" style="letter-spacing: 0.5px;">Billing Address</h6>
+                                        <p class="text-muted fs-12 mb-0" style="white-space: pre-line; line-height: 1.5;">{{ $order->billing_address ?: 'No billing address provided.' }}</p>
+                                    </div>
+                                    <div class="col-md-6 text-start">
+                                        <h6 class="fw-bold text-dark fs-12 text-uppercase mb-2" style="letter-spacing: 0.5px;">Shipping Address</h6>
+                                        <p class="text-muted fs-12 mb-0" style="white-space: pre-line; line-height: 1.5;">{{ $order->shipping_address ?: 'No shipping address provided.' }}</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
+
                     <!-- Items Table -->
-                    <div class="table-responsive mb-5">
-                        <table class="table table-bordered align-middle">
-                            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                    <div class="table-responsive mb-4 border rounded" style="border-radius: 4px; border-color: #cbd5e1 !important;">
+                        <table class="table table-hover table-sm table-bordered align-middle mb-0 text-start">
+                            <thead class="table-light fs-10 text-uppercase fw-bold text-muted" style="border-bottom: 2px solid #cbd5e1;">
                                 <tr>
-                                    <th class="ps-3" style="width: 5%;">#</th>
-                                    <th style="width: 25%;">Product Details</th>
-                                    <th style="width: 15%;">Warehouse</th>
-                                    <th class="text-center" style="width: 10%;">Qty</th>
-                                    <th class="text-end" style="width: 15%;">Unit Price (₹)</th>
-                                    <th class="text-end" style="width: 10%;">Tax Rate</th>
-                                    <th class="text-end" style="width: 10%;">Discount (₹)</th>
-                                    <th class="text-end pe-3" style="width: 15%;">Amount (₹)</th>
+                                    <th class="ps-3 py-2 text-center" style="width: 4%;">#</th>
+                                    <th class="py-2 ps-3" style="width: 38%;">Product Details</th>
+                                    <th class="py-2 text-center" style="width: 15%;">Warehouse</th>
+                                    <th class="text-center py-2" style="width: 7%;">Qty</th>
+                                    <th class="text-end py-2 pe-3" style="width: 11%;">Unit Price</th>
+                                    <th class="text-end py-2 pe-3" style="width: 9%;">Tax Rate</th>
+                                    <th class="text-end py-2 pe-3" style="width: 8%;">Discount</th>
+                                    <th class="text-end pe-4 py-2" style="width: 13%;">Amount</th>
                                 </tr>
                             </thead>
-                            <tbody class="fs-13 text-dark">
+                            <tbody class="fs-12 text-dark">
                                 @foreach ($order->items as $index => $item)
                                     <tr>
-                                        <td class="ps-3 text-muted text-center">{{ $index + 1 }}</td>
-                                        <td>
-                                            <div class="d-flex align-items-center justify-content-between">
+                                        <td class="ps-3 text-muted text-center py-1.5">{{ $index + 1 }}</td>
+                                        <td class="py-1.5 ps-3">
+                                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-1">
                                                 <div>
                                                     <strong class="text-dark">{{ $item->item_name }}</strong>
                                                     @if($item->product?->sku)
-                                                        <small class="text-muted d-block mt-0.5">SKU: {{ $item->product->sku }}</small>
+                                                        <span class="text-muted ms-1" style="font-size: 10px;">(SKU: {{ $item->product->sku }})</span>
                                                     @endif
                                                     @if($item->description)
-                                                        <small class="text-muted d-block mt-0.5">{{ $item->description }}</small>
+                                                        <small class="text-muted d-block mt-0.5 font-italic" style="font-size: 10px;">{{ $item->description }}</small>
                                                     @endif
                                                 </div>
-                                                <div class="text-end">
+                                                <div class="text-end ms-2">
                                                     @php
                                                         $method = $item->product?->supplier_method ?? 'buy';
                                                     @endphp
                                                     @if ($method === 'manufacture')
-                                                        <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold d-inline-block">Manufacture</span>
+                                                        <span class="badge bg-soft-warning text-warning px-1.5 py-0.2 fs-9 fw-semibold rounded-pill">Manufacture</span>
                                                         @php
                                                             $linkedMo = $order->productionOrders->firstWhere('sales_order_item_id', $item->id);
                                                         @endphp
                                                         @if ($linkedMo)
-                                                            <div class="mt-1">
-                                                                <a href="{{ route('production.orders.show', $linkedMo->id) }}" class="text-primary fw-bold fs-11">
-                                                                    <i class="feather-cpu me-1"></i>{{ $linkedMo->order_number }}
+                                                            <div class="mt-0.5">
+                                                                <a href="{{ route('production.orders.show', $linkedMo->id) }}" class="text-primary fw-bold fs-9 bg-soft-primary px-1 py-0.2 rounded border border-primary border-opacity-10">
+                                                                    <i class="feather-cpu" style="font-size: 8px;"></i> {{ $linkedMo->order_number }}
                                                                 </a>
-                                                                <span class="badge bg-soft-secondary text-secondary px-1 py-0.2 fs-10">{{ ucfirst($linkedMo->status) }}</span>
                                                             </div>
                                                         @endif
                                                     @else
-                                                        <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold d-inline-block">Buy</span>
+                                                        <span class="badge bg-soft-success text-success px-1.5 py-0.2 fs-9 fw-semibold rounded-pill">Buy</span>
                                                     @endif
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>
-                                            {{ $item->warehouse?->name ?: '—' }}
+                                        <td class="py-1.5 text-center">
+                                            <div class="d-inline-flex align-items-center text-muted" style="font-size: 11px;">
+                                                {{ $item->warehouse?->name ?: '—' }}
+                                            </div>
                                         </td>
-                                        <td class="text-center">{{ $item->quantity }}</td>
-                                        <td class="text-end">₹{{ number_format($item->unit_price, 2) }}</td>
-                                        <td class="text-end">{{ number_format($item->tax_rate, 2) }}%</td>
-                                        <td class="text-end">
+                                        <td class="text-center fw-semibold py-1.5">{{ $item->quantity }}</td>
+                                        <td class="text-end text-muted py-1.5 pe-3">₹{{ number_format($item->unit_price, 2) }}</td>
+                                        <td class="text-end text-muted py-1.5 pe-3">{{ number_format($item->tax_rate, 2) }}%</td>
+                                        <td class="text-end text-muted py-1.5 pe-3">
                                             @if($item->discount > 0)
                                                 ₹{{ number_format($item->discount, 2) }}
                                             @else
                                                 —
                                             @endif
                                         </td>
-                                        <td class="text-end pe-3 fw-semibold">₹{{ number_format($item->amount, 2) }}</td>
+                                        <td class="text-end pe-4 fw-bold text-dark py-1.5">₹{{ number_format($item->amount, 2) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -247,64 +368,68 @@
                     </div>
 
                     <!-- Totals & Calculations -->
-                    <div class="row g-4">
+                    <div class="row g-4 text-start">
                         <div class="col-sm-7 text-start">
                             @if($order->terms_conditions)
-                                <h6 class="fw-bold text-dark mb-2 fs-12 text-uppercase">Terms & Conditions</h6>
-                                <p class="text-muted fs-12 mb-4" style="white-space: pre-line;">{{ $order->terms_conditions }}</p>
+                                <div class="mb-3">
+                                    <h6 class="fw-bold text-dark mb-1.5 fs-12 text-uppercase" style="letter-spacing: 0.5px;">Terms & Conditions</h6>
+                                    <div class="text-muted fs-11 terms-conditions-content">{!! $order->terms_conditions !!}</div>
+                                </div>
                             @endif
 
                             @if($order->notes)
-                                <h6 class="fw-bold text-dark mb-2 fs-12 text-uppercase">Internal Notes / Remarks</h6>
-                                <p class="text-muted fs-12 mb-0" style="white-space: pre-line;">{{ $order->notes }}</p>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-1.5 fs-12 text-uppercase" style="letter-spacing: 0.5px;">Internal Notes / Remarks</h6>
+                                    <p class="text-muted fs-11 mb-0" style="white-space: pre-line; line-height: 1.4;">{{ $order->notes }}</p>
+                                </div>
                             @endif
                         </div>
                         <div class="col-sm-5">
                             <div class="border p-3 rounded bg-light">
-                                <div class="d-flex justify-content-between mb-2">
+                                <div class="d-flex justify-content-between mb-1.5 fs-12">
                                     <span class="text-muted">Subtotal:</span>
-                                    <span class="fw-bold text-dark">₹{{ number_format($order->subtotal, 2) }}</span>
+                                    <span class="fw-semibold text-dark">₹{{ number_format($order->subtotal, 2) }}</span>
                                 </div>
-                                <div class="d-flex justify-content-between mb-2">
+                                <div class="d-flex justify-content-between mb-1.5 fs-12">
                                     <span class="text-muted">Tax total (GST):</span>
-                                    <span class="fw-bold text-dark">₹{{ number_format($order->tax, 2) }}</span>
+                                    <span class="fw-semibold text-dark">₹{{ number_format($order->tax, 2) }}</span>
                                 </div>
                                 @if($order->discount > 0)
-                                    <div class="d-flex justify-content-between mb-2 text-danger">
+                                    <div class="d-flex justify-content-between mb-1.5 fs-12 text-danger">
                                         <span>Discount:</span>
                                         <span>-₹{{ number_format($order->discount, 2) }}</span>
                                     </div>
                                 @endif
                                 @if($order->shipping_charges > 0)
-                                    <div class="d-flex justify-content-between mb-2">
+                                    <div class="d-flex justify-content-between mb-1.5 fs-12">
                                         <span class="text-muted">Shipping Charges:</span>
-                                        <span class="fw-bold text-dark">₹{{ number_format($order->shipping_charges, 2) }}</span>
+                                        <span class="fw-semibold text-dark">₹{{ number_format($order->shipping_charges, 2) }}</span>
                                     </div>
                                 @endif
                                 @if($order->adjustment != 0)
-                                    <div class="d-flex justify-content-between mb-2">
+                                    <div class="d-flex justify-content-between mb-1.5 fs-12">
                                         <span class="text-muted">Adjustment:</span>
-                                        <span class="fw-bold text-dark">₹{{ number_format($order->adjustment, 2) }}</span>
+                                        <span class="fw-semibold text-dark">₹{{ number_format($order->adjustment, 2) }}</span>
                                     </div>
                                 @endif
                                 <hr class="my-2">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span class="fs-15 fw-bold text-dark">Total Amount:</span>
-                                    <span class="fs-15 fw-bold text-primary">₹{{ number_format($order->total_amount, 2) }}</span>
+                                    <span class="fs-13 fw-bold text-dark">Total Amount:</span>
+                                    <span class="fs-13 fw-bold text-primary">₹{{ number_format($order->total_amount, 2) }}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Signature block -->
-                    <div class="row mt-5 pt-4">
+                    <div class="row mt-4 pt-3 border-top">
                         <div class="col-6 text-start">
-                            <p class="fs-11 text-muted mb-0">For queries regarding fulfillment, please refer to the sales department.</p>
+                            <p class="fs-10 text-muted mb-0">For queries regarding fulfillment, please refer to the sales department.</p>
                         </div>
                         <div class="col-6 text-end">
-                            <div class="d-inline-block text-center" style="width: 200px;">
-                                <hr class="mb-1 mt-5">
-                                <span class="fs-11 text-muted text-uppercase fw-semibold">Authorized Signature</span>
+                            <div class="d-inline-block text-center" style="width: 180px;">
+                                <hr class="mb-1 mt-3">
+                                <span class="fs-10 text-muted text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Authorized Signature</span>
                             </div>
                         </div>
                     </div>
@@ -552,77 +677,6 @@
                     </div>
                 </div>
 
-                <!-- TAB 6: Manufacturing Orders (MO) -->
-                <div class="tab-pane fade" id="tab-production">
-                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
-                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-cpu me-2 text-primary"></i>Manufacturing Orders (MO)</h5>
-                        @php
-                            $hasManufactureItems = $order->items->contains(fn($item) => $item->product?->supplier_method === 'manufacture');
-                        @endphp
-                        @if (($order->status === 'Confirmed' || $order->status === 'Partially Shipped') && $hasManufactureItems)
-                            <x-ui.button href="{{ route('production.orders.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
-                                Create MO
-                            </x-ui.button>
-                        @endif
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
-                                <tr>
-                                    <th class="ps-4">MO Number</th>
-                                    <th>Target Product</th>
-                                    <th class="text-end">Qty Ordered</th>
-                                    <th class="text-end">Qty Produced</th>
-                                    <th>Start Date</th>
-                                    <th>End Date</th>
-                                    <th>Status</th>
-                                    <th class="text-end pe-4">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="fs-13 text-dark">
-                                @forelse ($order->productionOrders ?? [] as $mo)
-                                    @php
-                                        $moBadge = 'bg-soft-secondary text-secondary';
-                                        if ($mo->status === 'completed') $moBadge = 'bg-soft-success text-success';
-                                        elseif ($mo->status === 'released') $moBadge = 'bg-soft-info text-info';
-                                        elseif ($mo->status === 'in_progress') $moBadge = 'bg-soft-warning text-warning';
-                                        elseif ($mo->status === 'cancelled') $moBadge = 'bg-soft-danger text-danger';
-                                    @endphp
-                                    <tr>
-                                        <td class="ps-4 fw-bold">
-                                            <a href="{{ route('production.orders.show', $mo->id) }}" class="text-primary">{{ $mo->order_number }}</a>
-                                        </td>
-                                        <td>
-                                            <span class="fw-bold">{{ $mo->product?->name }}</span>
-                                            @if ($mo->product?->sku)
-                                                <small class="text-muted d-block">SKU: {{ $mo->product->sku }}</small>
-                                            @endif
-                                        </td>
-                                        <td class="text-end fw-semibold">{{ (int)$mo->quantity_ordered }}</td>
-                                        <td class="text-end text-muted">{{ (int)$mo->quantity_produced }}</td>
-                                        <td>{{ $mo->start_date ? $mo->start_date->format('d/m/Y') : '—' }}</td>
-                                        <td>{{ $mo->end_date ? $mo->end_date->format('d/m/Y') : '—' }}</td>
-                                        <td>
-                                            <span class="badge {{ $moBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ ucfirst($mo->status) }}</span>
-                                        </td>
-                                        <td class="text-end pe-4">
-                                            <x-ui.button href="{{ route('production.orders.show', $mo->id) }}" variant="outline-primary" size="sm" class="fw-bold">
-                                                View MO
-                                            </x-ui.button>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="8" class="text-center py-5 text-muted">
-                                            <i class="feather-cpu fs-1 mb-2 d-block text-gray-300"></i>
-                                            No manufacturing orders created for this Sales Order yet.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -630,6 +684,14 @@
 
 @push('styles')
     <style>
+        .terms-conditions-content p {
+            margin-bottom: 4px !important;
+            line-height: 1.4 !important;
+        }
+        .terms-conditions-content p:last-child {
+            margin-bottom: 0 !important;
+        }
+
         @media print {
             @page {
                 margin: 0 !important;

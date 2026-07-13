@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class QuotationController extends Controller
 {
@@ -110,6 +111,23 @@ class QuotationController extends Controller
         return view('modules.crm.quotations.show', [
             'quotation' => $quotation,
         ]);
+    }
+
+    public function downloadPdf(int $id)
+    {
+        $quotation = $this->quotations->find($id);
+
+        if (!$quotation) {
+            abort(404, 'Quotation not found.');
+        }
+
+        $this->authorize('view', $quotation);
+
+        $pdf = Pdf::loadView('modules.crm.quotations.pdf', [
+            'quotation' => $quotation,
+        ]);
+
+        return $pdf->download("Quotation_{$quotation->quotation_number}.pdf");
     }
 
     public function edit(int $id)

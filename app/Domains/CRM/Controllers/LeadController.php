@@ -14,6 +14,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use App\Exports\LeadSampleExport;
+use App\Exports\LeadExport;
+use App\Imports\LeadImport;
 use Maatwebsite\Excel\Facades\Excel;
 
 class LeadController extends Controller
@@ -89,6 +91,42 @@ class LeadController extends Controller
         $this->authorize('viewAny', Lead::class);
 
         return Excel::download(new LeadSampleExport, 'lead_sample.xlsx');
+    }
+
+    /**
+     * Import leads from Excel/CSV file.
+     */
+    public function import(Request $request)
+    {
+        $this->authorize('create', Lead::class);
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt',
+        ]);
+
+        try {
+            Excel::import(new LeadImport, $request->file('file'));
+            return redirect()->route('crm.leads.index')->with('success', 'Leads imported successfully!');
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errors = [];
+            foreach ($failures as $failure) {
+                $errors[] = "Row {$failure->row()}: " . implode(', ', $failure->errors());
+            }
+            return redirect()->route('crm.leads.index')->withErrors($errors);
+        } catch (\Exception $e) {
+            return redirect()->route('crm.leads.index')->withErrors(['file' => 'Failed to import file: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Export all leads to Excel file.
+     */
+    public function export()
+    {
+        $this->authorize('viewAny', Lead::class);
+
+        return Excel::download(new LeadExport, 'leads_export.xlsx');
     }
 
     /**

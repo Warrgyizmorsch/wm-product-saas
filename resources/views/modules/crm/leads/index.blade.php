@@ -18,6 +18,19 @@
     @endphp
 
     <div class="erp-single-panel">
+        @if (session('success'))
+            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
+        @endif
+        @if ($errors->any())
+            <div class="alert alert-danger mb-3 alert-dismissible fade show fs-12 py-2" role="alert">
+                <ul class="mb-0 ps-3 text-start">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
+            </div>
+        @endif
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
             <h5 class="fw-bold text-dark mb-0">Leads Listing</h5>
@@ -104,7 +117,7 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
                         <li>
-                            <a href="javascript:void(0);" class="dropdown-item" onclick="alert('Export Excel UI action triggered! (Mock functionality)');">
+                            <a href="{{ route('crm.leads.export') }}" class="dropdown-item">
                                 <i class="feather-download me-2 text-muted fs-12"></i>Export Excel
                             </a>
                         </li>
@@ -273,7 +286,7 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <div class="mt-auto pt-3">
+        <div class="c pt-3">
             <x-ui.pagination 
                 :currentPage="$leads->currentPage()" 
                 :totalPages="$leads->lastPage()" 
@@ -282,16 +295,16 @@
         </div>
     </div>
 
-    {{-- Import Leads Modal (Pure UI Mock) --}}
-    <x-ui.modal id="importLeadsModal" title="Import Leads via CSV" submitText="Import File" :centered="true">
-        <form method="POST" action="javascript:void(0);" enctype="multipart/form-data" id="importLeadsForm">
+    {{-- Import Leads Modal --}}
+    <x-ui.modal id="importLeadsModal" title="Import Leads via Excel/CSV" submitText="Import File" :centered="true">
+        <form method="POST" action="{{ route('crm.leads.import') }}" enctype="multipart/form-data" id="importLeadsForm">
             @csrf
-            <p class="fs-13 text-muted mb-3">Upload a CSV file containing lead records. Make sure the headers match the column names in the sample template file.</p>
-            <x-ui.odoo-form-ui type="file" name="file" label="CSV File" required placeholder="Choose CSV file..." />
+            <p class="fs-13 text-muted mb-3">Upload an Excel (.xlsx, .xls) or CSV (.csv) file containing lead records. Make sure the headers match the column names in the sample template file.</p>
+            <x-ui.odoo-form-ui type="file" name="file" label="Excel/CSV File" required placeholder="Choose file..." />
         </form>
         <x-slot name="footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-primary" onclick="alert('Import File UI triggered! (Mock UI demo)'); $('#importLeadsModal').modal('hide');">Import File</button>
+            <button type="submit" form="importLeadsForm" class="btn btn-primary">Import File</button>
         </x-slot>
     </x-ui.modal>
 @endsection

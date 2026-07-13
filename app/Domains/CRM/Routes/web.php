@@ -17,6 +17,10 @@ Route::prefix('crm')
             ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])
             ->name('leads.downloadSample');
+        Route::post('leads/import', [LeadController::class, 'import'])
+            ->name('leads.import');
+        Route::get('leads/export', [LeadController::class, 'export'])
+            ->name('leads.export');
         Route::get('leads/{lead}', [LeadController::class, 'show'])
             ->name('leads.show');
         Route::post('leads', [LeadController::class, 'store'])
@@ -62,6 +66,7 @@ Route::prefix('crm')
         Route::get('quotations/create', [QuotationController::class, 'create'])->name('quotations.create');
         Route::post('quotations', [QuotationController::class, 'store'])->name('quotations.store');
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->name('quotations.show');
+        Route::get('quotations/{quotation}/download', [QuotationController::class, 'downloadPdf'])->name('quotations.download');
         Route::get('quotations/{quotation}/edit', [QuotationController::class, 'edit'])->name('quotations.edit');
         Route::put('quotations/{quotation}', [QuotationController::class, 'update'])->name('quotations.update');
         Route::patch('quotations/{quotation}/status', [QuotationController::class, 'updateStatus'])->name('quotations.updateStatus');
