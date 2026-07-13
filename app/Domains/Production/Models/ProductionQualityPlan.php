@@ -3,8 +3,8 @@
 namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
-use App\Models\User;
 use App\Domains\Inventory\Models\Product;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,6 +29,10 @@ class ProductionQualityPlan extends BaseModel
         'approved_by',
         'approved_at',
         'esignature',
+    ];
+
+    protected $casts = [
+        'approved_at' => 'datetime',
     ];
 
     public function product(): BelongsTo

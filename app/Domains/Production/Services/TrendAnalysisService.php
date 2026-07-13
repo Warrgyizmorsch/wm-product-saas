@@ -18,7 +18,7 @@ class TrendAnalysisService
     public function getOeeTrend(int $tenantId, string $period = 'daily', array $filters = []): array
     {
         $start = empty($filters['date_start']) ? Carbon::today()->subDays(6) : Carbon::parse($filters['date_start']);
-        $end   = empty($filters['date_end']) ? Carbon::today()->endOfDay() : Carbon::parse($filters['date_end']);
+        $end = empty($filters['date_end']) ? Carbon::today()->endOfDay() : Carbon::parse($filters['date_end']);
 
         $labels = [];
         $oeeData = [];
@@ -30,45 +30,44 @@ class TrendAnalysisService
 
         foreach ($periodRange as $date) {
             $dayStart = $date->copy()->startOfDay();
-            $dayEnd   = $period === 'daily' ? $date->copy()->endOfDay() : $date->copy()->addWeek()->endOfDay();
-            
+            $dayEnd = $period === 'daily' ? $date->copy()->endOfDay() : $date->copy()->addWeek()->endOfDay();
+
             $labels[] = $date->format($period === 'daily' ? 'd M' : '\W\k W');
 
-            if (!empty($filters['machine_id'])) {
-                $metrics = $this->oeeService->calculateForMachine($tenantId, (int)$filters['machine_id'], $dayStart, $dayEnd);
-            } elseif (!empty($filters['work_center_id'])) {
-                $metrics = $this->oeeService->calculateForWorkCenter($tenantId, (int)$filters['work_center_id'], $dayStart, $dayEnd);
+            if (! empty($filters['machine_id'])) {
+                $metrics = $this->oeeService->calculateForMachine($tenantId, (int) $filters['machine_id'], $dayStart, $dayEnd);
+            } elseif (! empty($filters['work_center_id'])) {
+                $metrics = $this->oeeService->calculateForWorkCenter($tenantId, (int) $filters['work_center_id'], $dayStart, $dayEnd);
             } else {
-                // Default: Average OEE calculation for tenant
-                $metrics = ['oee' => 75.0, 'availability' => 80.0, 'performance' => 90.0, 'quality' => 98.0];
+                $metrics = ['oee' => 0.0, 'availability' => 0.0, 'performance' => 0.0, 'quality' => 0.0];
             }
 
-            $oeeData[]   = $metrics['oee'];
+            $oeeData[] = $metrics['oee'];
             $availData[] = $metrics['availability'] ?? 0;
-            $perfData[]  = $metrics['performance'] ?? 0;
-            $qualData[]  = $metrics['quality'] ?? 0;
+            $perfData[] = $metrics['performance'] ?? 0;
+            $qualData[] = $metrics['quality'] ?? 0;
         }
 
         return [
-            'labels'   => $labels,
+            'labels' => $labels,
             'datasets' => [
                 [
                     'label' => 'OEE %',
-                    'data'  => $oeeData,
+                    'data' => $oeeData,
                 ],
                 [
                     'label' => 'Availability %',
-                    'data'  => $availData,
+                    'data' => $availData,
                 ],
                 [
                     'label' => 'Performance %',
-                    'data'  => $perfData,
+                    'data' => $perfData,
                 ],
                 [
                     'label' => 'Quality %',
-                    'data'  => $qualData,
+                    'data' => $qualData,
                 ],
-            ]
+            ],
         ];
     }
 
@@ -78,7 +77,7 @@ class TrendAnalysisService
     public function getProductionTrend(int $tenantId, string $period = 'daily', array $filters = []): array
     {
         $start = empty($filters['date_start']) ? Carbon::today()->subDays(6) : Carbon::parse($filters['date_start']);
-        $end   = empty($filters['date_end']) ? Carbon::today()->endOfDay() : Carbon::parse($filters['date_end']);
+        $end = empty($filters['date_end']) ? Carbon::today()->endOfDay() : Carbon::parse($filters['date_end']);
 
         $labels = [];
         $planned = [];
@@ -88,29 +87,29 @@ class TrendAnalysisService
 
         foreach ($periodRange as $date) {
             $labels[] = $date->format('d M');
-            
+
             $dayFilters = array_merge($filters, [
                 'date_start' => $date->copy()->startOfDay()->toDateTimeString(),
-                'date_end'   => $date->copy()->endOfDay()->toDateTimeString()
+                'date_end' => $date->copy()->endOfDay()->toDateTimeString(),
             ]);
 
             $stats = $this->kpiService->getProductionSummary($tenantId, $dayFilters);
-            $planned[] = $stats['planned_quantity'] ?: 100.0; // dummy base fallback if zero
-            $actual[]  = $stats['actual_quantity'] ?: 85.0;
+            $planned[] = $stats['planned_quantity'] ?? 0.0;
+            $actual[] = $stats['actual_quantity'] ?? 0.0;
         }
 
         return [
-            'labels'   => $labels,
+            'labels' => $labels,
             'datasets' => [
                 [
                     'label' => 'Planned Quantity',
-                    'data'  => $planned,
+                    'data' => $planned,
                 ],
                 [
                     'label' => 'Actual Quantity',
-                    'data'  => $actual,
-                ]
-            ]
+                    'data' => $actual,
+                ],
+            ],
         ];
     }
 
@@ -120,7 +119,7 @@ class TrendAnalysisService
     public function getDowntimeTrend(int $tenantId, string $period = 'daily', array $filters = []): array
     {
         $start = empty($filters['date_start']) ? Carbon::today()->subDays(6) : Carbon::parse($filters['date_start']);
-        $end   = empty($filters['date_end']) ? Carbon::today()->endOfDay() : Carbon::parse($filters['date_end']);
+        $end = empty($filters['date_end']) ? Carbon::today()->endOfDay() : Carbon::parse($filters['date_end']);
 
         $labels = [];
         $downtimes = [];
@@ -129,25 +128,23 @@ class TrendAnalysisService
 
         foreach ($periodRange as $date) {
             $labels[] = $date->format('d M');
-            
+
             $dayFilters = array_merge($filters, [
                 'date_start' => $date->copy()->startOfDay()->toDateTimeString(),
-                'date_end'   => $date->copy()->endOfDay()->toDateTimeString()
+                'date_end' => $date->copy()->endOfDay()->toDateTimeString(),
             ]);
 
-            $stats = $this->kpiService->getScrapAndRejects($tenantId, $dayFilters);
-            // Simulating downtime percentage
-            $downtimes[] = round(max(5.0, min(35.0, 100.0 - $stats['yield'])), 2);
+            $downtimes[] = 0.0;
         }
 
         return [
-            'labels'   => $labels,
+            'labels' => $labels,
             'datasets' => [
                 [
                     'label' => 'Downtime %',
-                    'data'  => $downtimes,
-                ]
-            ]
+                    'data' => $downtimes,
+                ],
+            ],
         ];
     }
 }

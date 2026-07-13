@@ -2,14 +2,14 @@
 
 namespace App\Domains\Production\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionCapa;
 use App\Domains\Production\Models\ProductionNcr;
+use App\Domains\Production\Requests\CapaRcaRequest;
+use App\Domains\Production\Requests\StoreCapaRequest;
 use App\Domains\Production\Services\CapaService;
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
-use App\Domains\Production\Requests\StoreCapaRequest;
-use App\Domains\Production\Requests\CapaRcaRequest;
 
 class CapaController extends Controller
 {
@@ -26,10 +26,10 @@ class CapaController extends Controller
             ->with(['ncr.order', 'owner']);
 
         if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
+            $search = '%'.$request->input('search').'%';
             $query->where(function ($q) use ($search) {
                 $q->where('capa_number', 'like', $search)
-                  ->orWhere('corrective_action', 'like', $search);
+                    ->orWhere('corrective_action', 'like', $search);
             });
         }
 
@@ -40,10 +40,10 @@ class CapaController extends Controller
         $sortBy = $request->input('sort_by', 'id');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        if (!in_array($sortBy, ['id', 'capa_number', 'status', 'target_date'])) {
+        if (! in_array($sortBy, ['id', 'capa_number', 'status', 'target_date'])) {
             $sortBy = 'id';
         }
-        if (!in_array($sortOrder, ['asc', 'desc'])) {
+        if (! in_array($sortOrder, ['asc', 'desc'])) {
             $sortOrder = 'desc';
         }
 
@@ -86,8 +86,9 @@ class CapaController extends Controller
     public function saveRca(CapaRcaRequest $request, int $id)
     {
         $this->authorize('manage', ProductionCapa::class);
+        $tenantId = require_tenant_id();
 
-        $this->capaService->recordRca($id, $request->input('five_whys'), $request->input('fishbone'));
+        $this->capaService->recordRca($id, $request->input('five_whys'), $request->input('fishbone'), $tenantId);
 
         return redirect()->back()->with('success', 'Root cause analysis logged.');
     }
@@ -95,12 +96,14 @@ class CapaController extends Controller
     public function close(Request $request, int $id)
     {
         $this->authorize('approve', ProductionCapa::class);
+        $tenantId = require_tenant_id();
         $userId = auth()->id();
         $review = $request->input('effectiveness_review') ?: 'Verified effective.';
         $signature = $request->input('esignature') ?: 'CAPA-CLOSE-SIGN';
 
         try {
-            $this->capaService->closeCapa($id, $userId, $review, $signature);
+            $this->capaService->closeCapa($id, $userId, $review, $signature, $tenantId);
+
             return redirect()->back()->with('success', 'CAPA closed successfully.');
         } catch (\InvalidArgumentException $e) {
             return redirect()->back()->with('error', $e->getMessage());

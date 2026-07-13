@@ -2,20 +2,27 @@
 
 namespace Tests\Feature;
 
+use App\Domains\CRM\Models\Customer;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
+use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomItem;
 use App\Domains\Production\Models\ProductionOrder;
-use App\Domains\Production\Models\ProductionOrderOperation;
-use App\Domains\Production\Models\ProductionOrderReservation;
+use App\Domains\Production\Models\ProductionOrderRequest;
 use App\Domains\Production\Models\ProductionPlan;
 use App\Domains\Production\Models\ProductionPlanOperation;
 use App\Domains\Production\Models\ProductionPlanRequirement;
 use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Services\ProductionCostVarianceService;
+use App\Domains\Sales\Models\DeliveryOrder;
+use App\Domains\Sales\Models\DeliveryOrderItem;
+use App\Domains\Sales\Models\SalesOrder;
+use App\Domains\Sales\Models\SalesOrderItem;
+use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -25,13 +32,21 @@ class ProductionOrderTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private int $tenantId;
+
     private Product $finishedGood;
+
     private Product $rawMaterial;
+
     private Uom $uom;
+
     private WorkCenter $workCenter;
+
     private Machine $machine;
+
     private ProductionBom $bom;
+
     private Routing $routing;
 
     protected function setUp(): void
@@ -39,7 +54,7 @@ class ProductionOrderTest extends TestCase
         parent::setUp();
 
         // Create Tenant
-        $tenant = \App\Models\Tenant::create([
+        $tenant = Tenant::create([
             'name' => 'Order Test Tenant',
             'slug' => 'order-test',
             'status' => 'active',
@@ -62,177 +77,262 @@ class ProductionOrderTest extends TestCase
         // Setup base data
         $this->uom = Uom::create([
             'tenant_id' => $this->tenantId,
-            'name'      => 'Units',
-            'code'      => 'PCS',
-            'type'      => 'reference'
+            'name' => 'Units',
+            'code' => 'PCS',
+            'type' => 'reference',
         ]);
 
         $this->finishedGood = Product::create([
             'tenant_id' => $this->tenantId,
-            'name'      => 'E-Bike Model X',
-            'sku'       => 'FG-BIKE-X',
-            'type'      => 'finished_good',
+            'name' => 'E-Bike Model X',
+            'sku' => 'FG-BIKE-X',
+            'type' => 'finished_good',
             'unit_cost' => 500.00,
-            'status'    => 'active',
+            'status' => 'active',
         ]);
 
         $this->rawMaterial = Product::create([
             'tenant_id' => $this->tenantId,
-            'name'      => 'Aluminum Frame Tubes',
-            'sku'       => 'RM-TUBE-01',
-            'type'      => 'raw_material',
+            'name' => 'Aluminum Frame Tubes',
+            'sku' => 'RM-TUBE-01',
+            'type' => 'raw_material',
             'unit_cost' => 45.00,
-            'status'    => 'active',
+            'status' => 'active',
         ]);
 
         $this->workCenter = WorkCenter::create([
-            'tenant_id'     => $this->tenantId,
-            'name'          => 'Welding Work Center',
-            'code'          => 'WC-WELD',
-            'overhead_rate' => 60.00 // $60/hr = $1/min
+            'tenant_id' => $this->tenantId,
+            'name' => 'Welding Work Center',
+            'code' => 'WC-WELD',
+            'overhead_rate' => 60.00, // $60/hr = $1/min
         ]);
 
         $this->machine = Machine::create([
-            'tenant_id'      => $this->tenantId,
+            'tenant_id' => $this->tenantId,
             'work_center_id' => $this->workCenter->id,
-            'name'           => 'TIG Welding machine',
-            'code'           => 'MC-TIG-01',
-            'status'         => 'active'
+            'name' => 'TIG Welding machine',
+            'code' => 'MC-TIG-01',
+            'status' => 'active',
         ]);
 
         // Create Master BOM
         $this->bom = ProductionBom::create([
-            'tenant_id'      => $this->tenantId,
-            'product_id'     => $this->finishedGood->id,
-            'bom_number'     => 'BOM-BIKE-001',
-            'bom_name'       => 'E-Bike Standard BOM',
-            'bom_type'       => 'manufacturing',
-            'base_quantity'  => 1.0,
-            'base_uom_id'    => $this->uom->id,
-            'version'        => '1.0.0',
-            'status'         => 'approved',
+            'tenant_id' => $this->tenantId,
+            'product_id' => $this->finishedGood->id,
+            'bom_number' => 'BOM-BIKE-001',
+            'bom_name' => 'E-Bike Standard BOM',
+            'bom_type' => 'manufacturing',
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uom->id,
+            'version' => '1.0.0',
+            'status' => 'approved',
             'effective_date' => date('Y-m-d'),
         ]);
 
         ProductionBomItem::create([
-            'tenant_id'                 => $this->tenantId,
-            'bom_id'                    => $this->bom->id,
-            'material_id'               => $this->rawMaterial->id,
-            'quantity'                  => 2.0,
-            'uom_id'                    => $this->uom->id,
-            'material_scrap_percentage' => 10.0
+            'tenant_id' => $this->tenantId,
+            'bom_id' => $this->bom->id,
+            'material_id' => $this->rawMaterial->id,
+            'quantity' => 2.0,
+            'uom_id' => $this->uom->id,
+            'material_scrap_percentage' => 10.0,
         ]);
 
         // Create Master Routing
         $this->routing = Routing::create([
-            'tenant_id'      => $this->tenantId,
-            'product_id'     => $this->finishedGood->id,
+            'tenant_id' => $this->tenantId,
+            'product_id' => $this->finishedGood->id,
             'routing_number' => 'RT-BIKE-001',
-            'name'           => 'Frame Welding Route',
-            'version'        => '1.0.0',
-            'status'         => 'active'
+            'name' => 'Frame Welding Route',
+            'version' => '1.0.0',
+            'status' => 'active',
         ]);
 
         RoutingOperation::create([
-            'tenant_id'                 => $this->tenantId,
-            'routing_id'                => $this->routing->id,
-            'sequence'                  => 1,
-            'operation_number'          => 'OP-010',
-            'name'                      => 'TIG Welding Jointing',
-            'work_center_id'            => $this->workCenter->id,
-            'machine_id'                => $this->machine->id,
-            'setup_time_minutes'        => 10.0,
-            'processing_time_minutes'   => 20.0,
-            'labor_cost_rate'           => 1.50, // $1.50 per min
-            'machine_cost_rate'         => 2.00  // $2.00 per min
+            'tenant_id' => $this->tenantId,
+            'routing_id' => $this->routing->id,
+            'sequence' => 1,
+            'operation_number' => 'OP-010',
+            'name' => 'TIG Welding Jointing',
+            'work_center_id' => $this->workCenter->id,
+            'machine_id' => $this->machine->id,
+            'setup_time_minutes' => 10.0,
+            'processing_time_minutes' => 20.0,
+            'labor_cost_rate' => 1.50, // $1.50 per min
+            'machine_cost_rate' => 2.00,  // $2.00 per min
         ]);
 
         RoutingOperation::create([
-            'tenant_id'                 => $this->tenantId,
-            'routing_id'                => $this->routing->id,
-            'sequence'                  => 2,
-            'operation_number'          => 'OP-020',
-            'name'                      => 'Finishing Quality Inspection',
-            'work_center_id'            => $this->workCenter->id,
-            'setup_time_minutes'        => 5.0,
-            'processing_time_minutes'   => 10.0,
-            'labor_cost_rate'           => 1.00,
-            'machine_cost_rate'         => 0.00
+            'tenant_id' => $this->tenantId,
+            'routing_id' => $this->routing->id,
+            'sequence' => 2,
+            'operation_number' => 'OP-020',
+            'name' => 'Finishing Quality Inspection',
+            'work_center_id' => $this->workCenter->id,
+            'setup_time_minutes' => 5.0,
+            'processing_time_minutes' => 10.0,
+            'labor_cost_rate' => 1.00,
+            'machine_cost_rate' => 0.00,
         ]);
     }
 
     public function test_can_create_direct_order_from_active_engineering_masters(): void
     {
         $response = $this->post(route('production.orders.store'), [
-            'product_id'       => $this->finishedGood->id,
+            'product_id' => $this->finishedGood->id,
             'quantity_ordered' => 5.0,
-            'start_date'       => date('Y-m-d'),
-            'end_date'         => date('Y-m-d', strtotime('+5 days')),
-            'description'      => 'Test direct order creation'
+            'start_date' => date('Y-m-d'),
+            'end_date' => date('Y-m-d', strtotime('+5 days')),
+            'description' => 'Test direct order creation',
         ]);
 
         $response->assertRedirect();
         $this->assertDatabaseHas('production_orders', [
-            'tenant_id'        => $this->tenantId,
-            'product_id'       => $this->finishedGood->id,
+            'tenant_id' => $this->tenantId,
+            'product_id' => $this->finishedGood->id,
             'quantity_ordered' => 5.0,
-            'status'           => 'draft'
+            'status' => 'draft',
         ]);
 
         $order = ProductionOrder::orderBy('id', 'desc')->first();
 
         // Assert operations were frozen and snapshotted correctly
         $this->assertCount(2, $order->operations);
-        
+
         // Assert reservations were calculated correctly
         // (BOM qty 2.0 * Order qty 5.0) * (1 + 10% scrap) = 11.0
         $this->assertCount(1, $order->reservations);
         $this->assertEquals(11.0, $order->reservations->first()->quantity_planned);
     }
 
+    public function test_can_create_direct_order_from_draft_production_order_request(): void
+    {
+        $customer = Customer::create([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Request Customer',
+            'email' => 'request-customer@example.com',
+        ]);
+        $warehouse = Warehouse::create([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Main Store',
+            'code' => 'MAIN',
+            'status' => 'active',
+        ]);
+        $salesOrder = SalesOrder::create([
+            'tenant_id' => $this->tenantId,
+            'customer_id' => $customer->id,
+            'sales_order_number' => '1001',
+            'order_date' => today(),
+            'status' => 'Confirmed',
+            'total_amount' => 1000,
+        ]);
+        $salesOrderItem = SalesOrderItem::create([
+            'sales_order_id' => $salesOrder->id,
+            'product_id' => $this->finishedGood->id,
+            'warehouse_id' => $warehouse->id,
+            'item_name' => $this->finishedGood->name,
+            'quantity' => 4,
+            'unit_price' => 250,
+            'amount' => 1000,
+        ]);
+        $delivery = DeliveryOrder::create([
+            'tenant_id' => $this->tenantId,
+            'sales_order_id' => $salesOrder->id,
+            'delivery_number' => 'DO-1001',
+            'delivery_date' => today(),
+            'status' => 'Waiting Production',
+        ]);
+        $deliveryItem = DeliveryOrderItem::create([
+            'delivery_order_id' => $delivery->id,
+            'sales_order_item_id' => $salesOrderItem->id,
+            'product_id' => $this->finishedGood->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 4,
+            'quantity_ordered' => 4,
+            'quantity_reserved' => 0,
+            'status' => 'Waiting Production',
+        ]);
+        $productionRequest = ProductionOrderRequest::create([
+            'tenant_id' => $this->tenantId,
+            'delivery_order_item_id' => $deliveryItem->id,
+            'product_id' => $this->finishedGood->id,
+            'quantity_requested' => 4,
+            'status' => 'draft',
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->get(route('production.orders.create'))
+            ->assertOk()
+            ->assertSee('SO-1001')
+            ->assertSee('DO-1001')
+            ->assertSee((string) $productionRequest->id);
+
+        $response = $this->post(route('production.orders.store'), [
+            'production_order_request_id' => $productionRequest->id,
+            'product_id' => $this->finishedGood->id,
+            'quantity_ordered' => 4,
+            'start_date' => date('Y-m-d'),
+            'end_date' => date('Y-m-d', strtotime('+5 days')),
+        ]);
+
+        $response->assertRedirect();
+        $productionRequest->refresh();
+
+        $order = ProductionOrder::orderByDesc('id')->first();
+        $this->assertEquals($order->id, $productionRequest->production_order_id);
+        $this->assertEquals('production-order-created', $productionRequest->status);
+        $this->assertEquals($salesOrder->id, $order->sales_order_id);
+        $this->assertEquals($salesOrderItem->id, $order->sales_order_item_id);
+        $this->assertEquals(4.0, $order->quantity_ordered);
+
+        $this->get(route('production.orders.create'))
+            ->assertOk()
+            ->assertDontSee('DO-1001');
+    }
+
     public function test_can_convert_approved_production_plan_to_order(): void
     {
         // 1. Create a dummy approved production plan
         $plan = ProductionPlan::create([
-            'tenant_id'   => $this->tenantId,
+            'tenant_id' => $this->tenantId,
             'plan_number' => 'PLN-2026-000001',
-            'name'        => 'E-Bike Target Plan',
-            'product_id'  => $this->finishedGood->id,
-            'bom_id'      => $this->bom->id,
-            'routing_id'  => $this->routing->id,
-            'quantity'    => 10.0,
-            'start_date'  => date('Y-m-d'),
-            'end_date'    => date('Y-m-d', strtotime('+3 days')),
-            'status'      => 'approved',
-            'created_by'  => $this->user->id
+            'name' => 'E-Bike Target Plan',
+            'product_id' => $this->finishedGood->id,
+            'bom_id' => $this->bom->id,
+            'routing_id' => $this->routing->id,
+            'quantity' => 10.0,
+            'start_date' => date('Y-m-d'),
+            'end_date' => date('Y-m-d', strtotime('+3 days')),
+            'status' => 'approved',
+            'created_by' => $this->user->id,
         ]);
 
         ProductionPlanRequirement::create([
-            'tenant_id'          => $this->tenantId,
+            'tenant_id' => $this->tenantId,
             'production_plan_id' => $plan->id,
-            'product_id'         => $this->rawMaterial->id,
-            'required_quantity'  => 22.0,
-            'uom_id'             => $this->uom->id,
-            'bom_level'          => 1
+            'product_id' => $this->rawMaterial->id,
+            'required_quantity' => 22.0,
+            'uom_id' => $this->uom->id,
+            'bom_level' => 1,
         ]);
 
         ProductionPlanOperation::create([
-            'tenant_id'               => $this->tenantId,
-            'production_plan_id'      => $plan->id,
-            'sequence'                => 1,
-            'operation_number'        => 'OP-010',
-            'name'                    => 'Test Welding',
-            'work_center_id'          => $this->workCenter->id,
-            'setup_time_minutes'      => 10.0,
+            'tenant_id' => $this->tenantId,
+            'production_plan_id' => $plan->id,
+            'sequence' => 1,
+            'operation_number' => 'OP-010',
+            'name' => 'Test Welding',
+            'work_center_id' => $this->workCenter->id,
+            'setup_time_minutes' => 10.0,
             'processing_time_minutes' => 200.0,
-            'total_time_minutes'      => 210.0
+            'total_time_minutes' => 210.0,
         ]);
 
         // 2. Trigger creation
         $response = $this->post(route('production.plans.create-order', $plan->id));
 
         $response->assertRedirect();
-        
+
         // 3. Verify order & status
         $plan->refresh();
         $this->assertEquals('released', $plan->status);
@@ -240,7 +340,7 @@ class ProductionOrderTest extends TestCase
         $order = ProductionOrder::orderBy('id', 'desc')->first();
         $this->assertEquals($plan->id, $order->production_plan_id);
         $this->assertEquals(10.0, $order->quantity_ordered);
-        
+
         $this->assertCount(1, $order->reservations);
         $this->assertEquals(22.0, $order->reservations->first()->quantity_planned);
 
@@ -259,13 +359,13 @@ class ProductionOrderTest extends TestCase
         // Issue raw materials
         $response = $this->post(route('production.orders.issue', $order->id), [
             'reservation_id' => $reservation->id,
-            'quantity'       => 5.0,
-            'remarks'        => 'Standard Issue'
+            'quantity' => 5.0,
+            'remarks' => 'Standard Issue',
         ]);
 
         $response->assertRedirect();
         $reservation->refresh();
-        
+
         $this->assertEquals(5.0, $reservation->quantity_issued);
         // Reserved quantity drops from 11.0 to 6.0
         $this->assertEquals(6.0, $reservation->quantity_reserved);
@@ -273,8 +373,8 @@ class ProductionOrderTest extends TestCase
         // Return unused raw materials
         $response = $this->post(route('production.orders.return', $order->id), [
             'reservation_id' => $reservation->id,
-            'quantity'       => 2.0,
-            'remarks'        => 'Unused return'
+            'quantity' => 2.0,
+            'remarks' => 'Unused return',
         ]);
 
         $response->assertRedirect();
@@ -297,31 +397,31 @@ class ProductionOrderTest extends TestCase
 
         // Log partial progress on first operation -> transitions status to Running
         $response = $this->post(route('production.orders.log-progress', $order->id), [
-            'operation_id'         => $op1->id,
-            'quantity_produced'    => 2.0,
-            'quantity_rejected'    => 0.0,
-            'quantity_scrapped'    => 0.0,
+            'operation_id' => $op1->id,
+            'quantity_produced' => 2.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 0.0,
             'setup_minutes_logged' => 5,
-            'run_minutes_logged'   => 40,
-            'complete_operation'   => 0
+            'run_minutes_logged' => 40,
+            'complete_operation' => 0,
         ]);
 
         $response->assertRedirect();
         $op1->refresh();
         $order->refresh();
-        
+
         $this->assertEquals('running', $op1->status);
         $this->assertEquals('in_progress', $order->status); // Parent automatically moved to In Progress
 
         // Complete the first operation
         $response = $this->post(route('production.orders.log-progress', $order->id), [
-            'operation_id'         => $op1->id,
-            'quantity_produced'    => 3.0,
-            'quantity_rejected'    => 0.0,
-            'quantity_scrapped'    => 0.0,
+            'operation_id' => $op1->id,
+            'quantity_produced' => 3.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 0.0,
             'setup_minutes_logged' => 5,
-            'run_minutes_logged'   => 60,
-            'complete_operation'   => 1
+            'run_minutes_logged' => 60,
+            'complete_operation' => 1,
         ]);
 
         $op1->refresh();
@@ -335,19 +435,19 @@ class ProductionOrderTest extends TestCase
     public function test_can_log_scrap_rework_and_finished_goods_receipt(): void
     {
         $order = $this->createDirectOrderHelper();
-        
+
         // Release order
         $this->post(route('production.orders.release', $order->id));
 
         // Log scrap
         $response = $this->post(route('production.orders.log-scrap', $order->id), [
             'quantity' => 1.5,
-            'reason'   => 'Deformed material'
+            'reason' => 'Deformed material',
         ]);
         $response->assertRedirect();
         $this->assertDatabaseHas('production_order_scraps', [
             'production_order_id' => $order->id,
-            'quantity'            => 1.5
+            'quantity' => 1.5,
         ]);
 
         $order->refresh();
@@ -356,11 +456,11 @@ class ProductionOrderTest extends TestCase
         // Receive Finished Goods
         $response = $this->post(route('production.orders.receive-fg', $order->id), [
             'quantity_received' => 3.0,
-            'quality_status'    => 'passed',
-            'remarks'           => 'First batch fg'
+            'quality_status' => 'passed',
+            'remarks' => 'First batch fg',
         ]);
         $response->assertRedirect();
-        
+
         $order->refresh();
         $this->assertEquals(3.0, $order->quantity_produced);
     }
@@ -376,26 +476,26 @@ class ProductionOrderTest extends TestCase
         // Issue 10 units of material (unit cost = 45) -> Actual Material Cost = 450
         $this->post(route('production.orders.issue', $order->id), [
             'reservation_id' => $res->id,
-            'quantity'       => 10.0,
+            'quantity' => 10.0,
         ]);
 
         // Log execution: 120 minutes setup + run
         // OP-010: Labor rate = 1.50, Machine rate = 2.00, Overhead rate = 1.00 per min.
         // Total Actual Op Cost = 120 * (1.50 + 2.00 + 1.00) = 540
         $this->post(route('production.orders.log-progress', $order->id), [
-            'operation_id'         => $op->id,
-            'quantity_produced'    => 5.0,
-            'quantity_rejected'    => 0.0,
-            'quantity_scrapped'    => 0.0,
+            'operation_id' => $op->id,
+            'quantity_produced' => 5.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 0.0,
             'setup_minutes_logged' => 20,
-            'run_minutes_logged'   => 100,
-            'complete_operation'   => 1
+            'run_minutes_logged' => 100,
+            'complete_operation' => 1,
         ]);
 
         $order->refresh();
 
         // Get variance cost analysis from show controller
-        $costs = (new \App\Domains\Production\Services\ProductionCostVarianceService())->getCostAnalysis($order);
+        $costs = (new ProductionCostVarianceService)->getCostAnalysis($order);
 
         $this->assertEquals(450.0, $costs['material']['actual']);
         $this->assertEquals(180.0, $costs['labor']['actual']); // 120m * 1.50
@@ -408,7 +508,7 @@ class ProductionOrderTest extends TestCase
         $order = $this->createDirectOrderHelper();
 
         // Create user in another tenant
-        $otherTenant = \App\Models\Tenant::create([
+        $otherTenant = Tenant::create([
             'name' => 'Other Tenant',
             'slug' => 'other-tenant',
             'status' => 'active',
@@ -425,7 +525,7 @@ class ProductionOrderTest extends TestCase
 
         // Attempting to view order should fail (or block if testing)
         $response = $this->get(route('production.orders.show', $order->id));
-        
+
         // Gates are bypassed in local dev unless environment is set to testing
         if (app()->environment('testing')) {
             $response->assertStatus(403);
@@ -437,12 +537,12 @@ class ProductionOrderTest extends TestCase
     private function createDirectOrderHelper(): ProductionOrder
     {
         $this->actingAs($this->user);
-        
+
         $this->post(route('production.orders.store'), [
-            'product_id'       => $this->finishedGood->id,
+            'product_id' => $this->finishedGood->id,
             'quantity_ordered' => 5.0,
-            'start_date'       => date('Y-m-d'),
-            'end_date'         => date('Y-m-d', strtotime('+5 days')),
+            'start_date' => date('Y-m-d'),
+            'end_date' => date('Y-m-d', strtotime('+5 days')),
         ]);
 
         return ProductionOrder::orderBy('id', 'desc')->first();
