@@ -45,8 +45,9 @@
             }
             .settings-content-col {
                 flex-grow: 1;
-                padding: 24px 30px;
+                padding: 24px 24px 24px 16px;
                 background-color: #f8fafc;
+                min-width: 0;
             }
         }
 
@@ -62,6 +63,151 @@
                 width: 100%;
                 padding: 0 15px;
             }
+        }
+
+        /* Theme styles for Sort/Filter buttons and Search Input */
+        .theme-btn-style {
+            background-color: #fff !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #0f172a !important;
+            border-radius: 8px !important;
+            padding: 8px 16px !important;
+            font-weight: 500 !important;
+            font-size: 13px !important;
+            height: 36px !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        .theme-btn-style:hover,
+        .theme-btn-style:focus,
+        .theme-btn-style:active {
+            background-color: #f1f5f9 !important;
+            border-color: #94a3b8 !important;
+            color: #0f172a !important;
+        }
+        .theme-search-container {
+            position: relative !important;
+            width: 100% !important;
+        }
+        .theme-search-container i {
+            position: absolute !important;
+            left: 16px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            color: #64748b !important;
+            font-size: 14px !important;
+        }
+        .theme-search-input {
+            background-color: #f1f5f9 !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            padding: 8px 16px 8px 40px !important;
+            font-size: 13px !important;
+            height: 40px !important;
+            width: 100% !important;
+            outline: none !important;
+            transition: all 0.2s ease-in-out !important;
+        }
+        .theme-search-input:focus {
+            background-color: #fff !important;
+            border-color: var(--bs-primary) !important;
+            box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.1) !important;
+        }
+
+        /* Theme Filter Dropdown Styles to match Odoo/Saas screenshot */
+        .theme-filter-dropdown-menu {
+            min-width: 320px !important;
+            padding: 24px !important;
+            border-radius: 12px !important;
+            border: 1px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+            z-index: 1050 !important;
+        }
+        .theme-filter-header {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            font-size: 14px !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+            margin-bottom: 20px !important;
+            text-transform: capitalize !important;
+        }
+        .theme-filter-header i {
+            font-size: 16px !important;
+        }
+        .theme-filter-group {
+            margin-bottom: 20px !important;
+        }
+        .theme-filter-label {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: #475569 !important;
+            letter-spacing: 0.5px !important;
+            margin-bottom: 6px !important;
+            text-transform: uppercase !important;
+            display: block !important;
+        }
+        .theme-filter-field {
+            border: none !important;
+            border-bottom: 1px solid #ced4da !important;
+            border-radius: 0 !important;
+            padding: 8px 0 !important;
+            font-size: 13px !important;
+            background-color: transparent !important;
+            color: #1e293b !important;
+            width: 100% !important;
+            box-shadow: none !important;
+            outline: none !important;
+            transition: all 0.2s ease-in-out !important;
+            cursor: pointer !important;
+        }
+        .theme-filter-field:focus {
+            border-bottom-color: #2563eb !important;
+        }
+        .theme-filter-footer {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            margin-top: 24px !important;
+        }
+        .theme-filter-apply-btn {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border: none !important;
+            border-radius: 6px !important;
+            padding: 10px 16px !important;
+            font-weight: 600 !important;
+            font-size: 12px !important;
+            letter-spacing: 0.5px !important;
+            text-transform: uppercase !important;
+            flex: 1 !important;
+            transition: all 0.2s ease-in-out !important;
+            cursor: pointer !important;
+            text-align: center !important;
+        }
+        .theme-filter-apply-btn:hover {
+            background-color: #0f172a !important;
+        }
+        .theme-filter-reset-btn {
+            background-color: #f1f5f9 !important;
+            color: #334155 !important;
+            border: none !important;
+            border-radius: 6px !important;
+            padding: 10px 16px !important;
+            font-weight: 600 !important;
+            font-size: 12px !important;
+            letter-spacing: 0.5px !important;
+            text-transform: uppercase !important;
+            flex: 1 !important;
+            transition: all 0.2s ease-in-out !important;
+            cursor: pointer !important;
+            text-align: center !important;
+            text-decoration: none !important;
+        }
+        .theme-filter-reset-btn:hover {
+            background-color: #e2e8f0 !important;
+            color: #0f172a !important;
         }
 
         /* Settings Subsidebar Items */
@@ -147,20 +293,97 @@
                             Add Pay Group
                         </x-ui.button>
                     </x-slot>
-
                     <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PAY GROUPS LIST -->
-                        <div class="col-md-3 col-12 border-end">
+                        <div class="col-md-4 col-12 border-end">
+                            <!-- Search, Sort & Filter Panel -->
+                            <div class="p-3 border-bottom bg-light-soft">
+                                <!-- Sort & Filter Buttons (Side-by-Side at the top) -->
+                                <div class="d-flex gap-2 mb-3">
+                                    <!-- Sort Dropdown -->
+                                    <div class="dropdown flex-fill">
+                                        <button class="btn theme-btn-style w-100 d-flex align-items-center justify-content-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="feather-bar-chart"></i>
+                                            <span>SORT</span>
+                                        </button>
+                                        <ul class="dropdown-menu shadow-sm w-100" style="font-size: 12px; min-width: 160px;">
+                                            <li><a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortPayGroups('name_asc', this); event.preventDefault();">Name (A-Z)</a></li>
+                                            <li><a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortPayGroups('name_desc', this); event.preventDefault();">Name (Z-A)</a></li>
+                                            <li><a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortPayGroups('newest', this); event.preventDefault();">Newest First</a></li>
+                                        </ul>
+                                    </div>
+
+                                    <!-- Filter Dropdown -->
+                                    <div class="dropdown flex-fill">
+                                        <button class="btn theme-btn-style w-100 d-flex align-items-center justify-content-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="feather-filter"></i>
+                                            <span>FILTER</span>
+                                        </button>
+                                        <div class="dropdown-menu theme-filter-dropdown-menu shadow-sm">
+                                            <div class="theme-filter-header">
+                                                <i class="feather-sliders text-primary"></i>
+                                                <span>Filter Options</span>
+                                            </div>
+                                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
+                                                @if(request()->filled('pay_group_id'))
+                                                    <input type="hidden" name="pay_group_id" value="{{ request('pay_group_id') }}">
+                                                @endif
+                                                @if(request()->filled('tab'))
+                                                    <input type="hidden" name="tab" value="{{ request('tab') }}">
+                                                @endif
+                                                
+                                                <div class="theme-filter-group">
+                                                    <label class="theme-filter-label">Status</label>
+                                                    <select name="pg_status" id="pg_filter_status" class="theme-filter-field">
+                                                        <option value="">All Statuses</option>
+                                                        <option value="1" @selected(request('pg_status') === '1')>Active</option>
+                                                        <option value="0" @selected(request('pg_status') === '0')>Inactive</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="theme-filter-group">
+                                                    <label class="theme-filter-label">Company</label>
+                                                    <select name="pg_company" id="pg_filter_company" class="theme-filter-field">
+                                                        <option value="">All Companies</option>
+                                                        @foreach($companies as $company)
+                                                            <option value="{{ $company->id }}" @selected(request('pg_company') == $company->id)>{{ $company->company_name }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+
+                                                <div class="theme-filter-footer">
+                                                    <button type="submit" class="theme-filter-apply-btn">Apply Filters</button>
+                                                    <a href="{{ route('hrms.salary-structure.index', ['pay_group_id' => request('pay_group_id'), 'tab' => request('tab')]) }}" class="theme-filter-reset-btn">Reset</a>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Search Input (Below the buttons) -->
+                                <div class="theme-search-container">
+                                    <i class="feather-search"></i>
+                                    <input type="text" id="payGroupSearch" class="theme-search-input" placeholder="Search pay groups...">
+                                </div>
+                            </div>
+
                             <div class="list-group list-group-flush rounded-0" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
                                 @forelse($payGroups as $pg)
                                     @php
                                         $isActive = $selectedPayGroup && $selectedPayGroup->id === $pg->id;
                                     @endphp
                                     <a href="{{ route('hrms.salary-structure.index', ['pay_group_id' => $pg->id, 'tab' => request()->get('tab', 'structures')]) }}" 
-                                       class="list-group-item list-group-item-action py-3 px-4 plan-item {{ $isActive ? 'active' : '' }}">
+                                       class="list-group-item list-group-item-action py-3 px-4 plan-item {{ $isActive ? 'active' : '' }}"
+                                       data-name="{{ strtolower($pg->name) }}"
+                                       data-status="{{ $pg->status ? 'active' : 'inactive' }}"
+                                       data-company-id="{{ $pg->company_id }}"
+                                       data-created-at="{{ $pg->created_at ? $pg->created_at->timestamp : 0 }}">
                                         <span class="fw-bold {{ $isActive ? 'text-primary' : 'text-dark' }}" style="font-size: 14px;">
                                             {{ $pg->name }}
                                         </span>
+                                        <div class="fs-11 text-muted text-capitalize mt-1">
+                                            {{ $pg->status ? 'Active' : 'Inactive' }} &bull; {{ $pg->company ? $pg->company->company_name : 'No Company' }}
+                                        </div>
                                     </a>
                                 @empty
                                     <div class="text-center py-5 text-muted px-3">
@@ -172,7 +395,7 @@
                         </div>
 
                         <!-- RIGHT COLUMN: SELECTED PAY GROUP DETAILS & CONFIGURATION TABS -->
-                        <div class="col-md-9 col-12">
+                        <div class="col-md-8 col-12">
                             @if($selectedPayGroup)
                                 <div class="p-4">
                                     <!-- Selected Pay Group Details -->
@@ -284,6 +507,17 @@
                 document.body.appendChild(modal);
             });
 
+            // Client-side instant filter for left sidebar Pay Groups
+            const payGroupSearchInput = document.getElementById('payGroupSearch');
+            if (payGroupSearchInput) {
+                payGroupSearchInput.addEventListener('input', filterPayGroups);
+            }
+
+            // Auto submit theme filter form on radio/select changes
+            $(document).on('change', '.theme-filter-form input[type="radio"], .theme-filter-form select', function() {
+                $(this).closest('form').submit();
+            });
+
             // Track tab changes in URL params
             $('#salaryStructureTabs button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
                 const tabId = e.target.id.replace('-tab', '');
@@ -348,7 +582,91 @@
                     $select.select2(options);
                 });
             });
+
+            // Global bulletproof dropdown toggle handler for standard & custom dropdown buttons
+            $(document).on('click', '[data-bs-toggle="dropdown"], .sort-toggle-custom, .filter-toggle-custom', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                var button = $(this);
+                var parent = button.closest('.dropdown, .erp-sort-dropdown, .erp-filter-dropdown');
+                var menu = parent.find('.dropdown-menu');
+                
+                if (menu.hasClass('show')) {
+                    menu.attr('style', 'display: none !important;');
+                    parent.removeClass('show');
+                    menu.removeClass('show');
+                } else {
+                    // Close all other dropdown menus
+                    $('.dropdown-menu').attr('style', 'display: none !important;').removeClass('show');
+                    $('.dropdown, .erp-sort-dropdown, .erp-filter-dropdown').removeClass('show');
+                    
+                    // Show this one
+                    parent.addClass('show');
+                    menu.addClass('show');
+                    
+                    var minWidth = menu.css('min-width') || '200px';
+                    var padding = menu.css('padding') || '8px';
+                    menu.attr('style', 'display: block !important; position: absolute !important; right: 0 !important; left: auto !important; min-width: ' + minWidth + ' !important; padding: ' + padding + ' !important; background-color: #fff !important; border: 1px solid #cbd5e1 !important; border-radius: 8px !important; z-index: 1050 !important; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;');
+                }
+            });
+            
+            // Close dropdowns when clicking outside
+            $(document).on('click', function(e) {
+                if (!$(e.target).closest('.dropdown, .erp-sort-dropdown, .erp-filter-dropdown').length) {
+                    $('.dropdown-menu').attr('style', 'display: none !important;').removeClass('show');
+                    $('.dropdown, .erp-sort-dropdown, .erp-filter-dropdown').removeClass('show');
+                }
+            });
         });
+
+        function filterPayGroups() {
+            const search = document.getElementById('payGroupSearch').value.toLowerCase().trim();
+            const statusRadio = document.querySelector('input[name="pg_filter_status"]:checked');
+            const status = statusRadio ? statusRadio.value : 'all';
+            const companySelect = document.getElementById('pg_filter_company');
+            const companyId = companySelect ? companySelect.value : 'all';
+            
+            document.querySelectorAll('.plan-item').forEach(item => {
+                const name = item.getAttribute('data-name') || '';
+                const itemStatus = item.getAttribute('data-status') || '';
+                const itemCompanyId = item.getAttribute('data-company-id') || '';
+                
+                const matchesSearch = name.includes(search);
+                const matchesStatus = (status === 'all') || (itemStatus === status);
+                const matchesCompany = (companyId === 'all') || (itemCompanyId === companyId);
+                
+                if (matchesSearch && matchesStatus && matchesCompany) {
+                    item.style.setProperty('display', '', 'important');
+                } else {
+                    item.style.setProperty('display', 'none', 'important');
+                }
+            });
+        }
+        
+        function sortPayGroups(criteria, element) {
+            // Toggle active class on sort options
+            element.closest('.dropdown-menu').querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            
+            const list = document.querySelector('.list-group-flush');
+            if (!list) return;
+            const items = Array.from(list.querySelectorAll('.plan-item'));
+            
+            items.sort((a, b) => {
+                if (criteria === 'name_asc') {
+                    return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
+                } else if (criteria === 'name_desc') {
+                    return b.getAttribute('data-name').localeCompare(a.getAttribute('data-name'));
+                } else if (criteria === 'newest') {
+                    return parseInt(b.getAttribute('data-created-at') || 0) - parseInt(a.getAttribute('data-created-at') || 0);
+                }
+                return 0;
+            });
+            
+            // Re-append in sorted order
+            items.forEach(item => list.appendChild(item));
+        }
     </script>
 @endsection
 

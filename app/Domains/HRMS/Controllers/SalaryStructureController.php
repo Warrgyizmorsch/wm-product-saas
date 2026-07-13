@@ -17,7 +17,14 @@ class SalaryStructureController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $companies = Company::all();
-        $payGroups = PayGroup::with(['company'])->get();
+        $payGroupsQuery = PayGroup::with(['company']);
+        if ($request->filled('pg_status')) {
+            $payGroupsQuery->where('status', $request->get('pg_status'));
+        }
+        if ($request->filled('pg_company')) {
+            $payGroupsQuery->where('company_id', $request->get('pg_company'));
+        }
+        $payGroups = $payGroupsQuery->get();
         
         $selectedPayGroupId = $request->get('pay_group_id');
         $selectedPayGroup = null;
@@ -41,9 +48,92 @@ class SalaryStructureController extends Controller
             $salaryStructuresQuery->whereNull('pay_group_id');
         }
 
+        if ($request->filled('struct_search')) {
+            $structSearch = $request->get('struct_search');
+            $salaryStructuresQuery->where('name', 'like', "%{$structSearch}%");
+        }
+
+        if ($request->filled('struct_status')) {
+            $structStatus = $request->get('struct_status');
+            $salaryStructuresQuery->where('status', $structStatus);
+        }
+
+        if ($request->filled('struct_sort')) {
+            $structSort = $request->get('struct_sort');
+            if ($structSort === 'name_asc') {
+                $salaryStructuresQuery->orderBy('name', 'asc');
+            } elseif ($structSort === 'name_desc') {
+                $salaryStructuresQuery->orderBy('name', 'desc');
+            } elseif ($structSort === 'min_ctc_asc') {
+                $salaryStructuresQuery->orderBy('min_ctc', 'asc');
+            } elseif ($structSort === 'min_ctc_desc') {
+                $salaryStructuresQuery->orderBy('min_ctc', 'desc');
+            } elseif ($structSort === 'max_ctc_asc') {
+                $salaryStructuresQuery->orderBy('max_ctc', 'asc');
+            } elseif ($structSort === 'max_ctc_desc') {
+                $salaryStructuresQuery->orderBy('max_ctc', 'desc');
+            }
+        }
+
         $salaryComponents = $salaryComponentsQuery->get();
+        
         $recurringComponents = $salaryComponents->filter(fn($c) => !$c->is_adhoc);
+        if ($request->filled('rec_status')) {
+            $recStatus = $request->get('rec_status');
+            $recurringComponents = $recurringComponents->filter(fn($c) => (string) $c->status === (string) $recStatus);
+        }
+        if ($request->filled('rec_type')) {
+            $recType = $request->get('rec_type');
+            $recurringComponents = $recurringComponents->filter(fn($c) => $c->type === $recType);
+        }
+        if ($request->filled('rec_search')) {
+            $recSearch = strtolower($request->get('rec_search'));
+            $recurringComponents = $recurringComponents->filter(fn($c) => 
+                str_contains(strtolower($c->name), $recSearch) || 
+                str_contains(strtolower($c->code), $recSearch)
+            );
+        }
+        if ($request->filled('rec_sort')) {
+            $recSort = $request->get('rec_sort');
+            if ($recSort === 'name_asc') {
+                $recurringComponents = $recurringComponents->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE);
+            } elseif ($recSort === 'name_desc') {
+                $recurringComponents = $recurringComponents->sortByDesc('name', SORT_NATURAL | SORT_FLAG_CASE);
+            } elseif ($recSort === 'code_asc') {
+                $recurringComponents = $recurringComponents->sortBy('code', SORT_NATURAL | SORT_FLAG_CASE);
+            } elseif ($recSort === 'code_desc') {
+                $recurringComponents = $recurringComponents->sortByDesc('code', SORT_NATURAL | SORT_FLAG_CASE);
+            }
+        }
+
         $adhocComponents = $salaryComponents->filter(fn($c) => $c->is_adhoc);
+        if ($request->filled('adhoc_status')) {
+            $adhocStatus = $request->get('adhoc_status');
+            $adhocComponents = $adhocComponents->filter(fn($c) => (string) $c->status === (string) $adhocStatus);
+        }
+        if ($request->filled('adhoc_type')) {
+            $adhocType = $request->get('adhoc_type');
+            $adhocComponents = $adhocComponents->filter(fn($c) => $c->type === $adhocType);
+        }
+        if ($request->filled('adhoc_search')) {
+            $adhocSearch = strtolower($request->get('adhoc_search'));
+            $adhocComponents = $adhocComponents->filter(fn($c) => 
+                str_contains(strtolower($c->name), $adhocSearch) || 
+                str_contains(strtolower($c->code), $adhocSearch)
+            );
+        }
+        if ($request->filled('adhoc_sort')) {
+            $adhocSort = $request->get('adhoc_sort');
+            if ($adhocSort === 'name_asc') {
+                $adhocComponents = $adhocComponents->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE);
+            } elseif ($adhocSort === 'name_desc') {
+                $adhocComponents = $adhocComponents->sortByDesc('name', SORT_NATURAL | SORT_FLAG_CASE);
+            } elseif ($adhocSort === 'code_asc') {
+                $adhocComponents = $adhocComponents->sortBy('code', SORT_NATURAL | SORT_FLAG_CASE);
+            } elseif ($adhocSort === 'code_desc') {
+                $adhocComponents = $adhocComponents->sortByDesc('code', SORT_NATURAL | SORT_FLAG_CASE);
+            }
+        }
 
         $salaryStructures = $salaryStructuresQuery->get();
 

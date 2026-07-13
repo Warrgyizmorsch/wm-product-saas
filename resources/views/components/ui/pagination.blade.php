@@ -2,7 +2,9 @@
     'currentPage' => 1,
     'totalPages' => 1,
     'totalResults' => 0,
-    'perPage' => 10
+    'perPage' => 10,
+    'pageParam' => 'page',
+    'tab' => null
 ])
 
 @once
@@ -70,12 +72,17 @@
     @endpush
 @endonce
 
+@php
+    $activeTab = $tab ?: request()->query('tab');
+    $queryParams = $activeTab ? ['tab' => $activeTab] : [];
+@endphp
+
 @if($totalPages > 1)
 <div class="erp-pagination-container" {{ $attributes }}>
     <ul class="erp-pagination">
         <!-- Previous Page Link -->
         <li class="page-item {{ $currentPage <= 1 ? 'disabled' : '' }}">
-            <a class="page-link" href="{{ $currentPage <= 1 ? 'javascript:void(0);' : request()->fullUrlWithQuery(['page' => $currentPage - 1]) }}" aria-label="Previous">
+            <a class="page-link" href="{{ $currentPage <= 1 ? 'javascript:void(0);' : request()->fullUrlWithQuery(array_merge($queryParams, [$pageParam => $currentPage - 1])) }}" aria-label="Previous">
                 <i class="feather-chevron-left"></i>
             </a>
         </li>
@@ -83,13 +90,13 @@
         <!-- Page Numbers -->
         @for ($i = 1; $i <= $totalPages; $i++)
             <li class="page-item {{ $currentPage == $i ? 'active' : '' }}">
-                <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $i]) }}">{{ $i }}</a>
+                <a class="page-link" href="{{ request()->fullUrlWithQuery(array_merge($queryParams, [$pageParam => $i])) }}">{{ $i }}</a>
             </li>
         @endfor
 
         <!-- Next Page Link -->
         <li class="page-item {{ $currentPage >= $totalPages ? 'disabled' : '' }}">
-            <a class="page-link" href="{{ $currentPage >= $totalPages ? 'javascript:void(0);' : request()->fullUrlWithQuery(['page' => $currentPage + 1]) }}" aria-label="Next">
+            <a class="page-link" href="{{ $currentPage >= $totalPages ? 'javascript:void(0);' : request()->fullUrlWithQuery(array_merge($queryParams, [$pageParam => $currentPage + 1])) }}" aria-label="Next">
                 <i class="feather-chevron-right"></i>
             </a>
         </li>

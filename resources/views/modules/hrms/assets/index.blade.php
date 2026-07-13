@@ -39,6 +39,7 @@
                 flex-grow: 1;
                 padding: 24px 30px;
                 background-color: #f8fafc;
+                min-width: 0;
             }
         }
 
@@ -539,7 +540,8 @@
                                     </div>
                                 </form>
                             </div>
-
+                        </div>
+                        <div class="card-body p-0">
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0 text-center">
                                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">

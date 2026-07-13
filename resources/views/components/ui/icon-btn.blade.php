@@ -37,17 +37,24 @@
     @push('styles')
         <style>
             .erp-icon-btn--transparent-dark {
-                background-color: transparent !important;
-                border: 1px solid #212529 !important;
-                color: #212529 !important;
+                background-color: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                color: #0f172a !important;
+                border-radius: 8px !important;
                 transition: all 0.2s ease-in-out;
+                font-weight: 500 !important;
+                font-size: 13px !important;
+                height: 36px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 8px !important;
             }
             .erp-icon-btn--transparent-dark:hover,
             .erp-icon-btn--transparent-dark:focus,
             .erp-icon-btn--transparent-dark:active {
-                background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
-                border-color: var(--bs-primary) !important;
-                color: var(--bs-primary) !important;
+                background-color: #f1f5f9 !important;
+                border-color: #94a3b8 !important;
+                color: #0f172a !important;
             }
         </style>
     @endpush

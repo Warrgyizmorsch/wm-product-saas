@@ -47,6 +47,7 @@
                 flex-grow: 1;
                 padding: 24px 30px;
                 background-color: #f8fafc;
+                min-width: 0;
             }
         }
 

@@ -1,9 +1,9 @@
 @php
-    $companies = $companies ?? \App\Domains\HRMS\Models\Company::all();
-    $businessUnits = $businessUnits ?? \App\Domains\HRMS\Models\BusinessUnit::all();
-    $branches = $branches ?? \App\Domains\HRMS\Models\Branch::all();
-    $departments = $departments ?? \App\Domains\HRMS\Models\Department::all();
-    $employees = $employees ?? \App\Domains\HRMS\Models\Employee::all();
+    $companies = $companiesList ?? $companies ?? \App\Domains\HRMS\Models\Company::all();
+    $businessUnits = $businessUnitsList ?? $businessUnits ?? \App\Domains\HRMS\Models\BusinessUnit::all();
+    $branches = $branchesList ?? $branches ?? \App\Domains\HRMS\Models\Branch::all();
+    $departments = $departmentsList ?? $departments ?? \App\Domains\HRMS\Models\Department::all();
+    $employees = $employeesList ?? $employees ?? \App\Domains\HRMS\Models\Employee::all();
     $salaryComponents = $salaryComponents ?? \App\Domains\HRMS\Models\SalaryComponent::all();
 @endphp
 
