@@ -123,7 +123,7 @@
             <div class="col-7 text-start">
                 @if($quotation->terms_conditions)
                     <h6 class="fw-bold text-dark mb-2 fs-12 text-uppercase">Terms & Conditions</h6>
-                    <p class="text-muted fs-12 mb-4" style="white-space: pre-line;">{{ $quotation->terms_conditions }}</p>
+                    <div class="text-muted fs-12 mb-4 terms-conditions-content">{!! $quotation->terms_conditions !!}</div>
                 @endif
 
                 @if($quotation->notes)
@@ -175,6 +175,14 @@
 
 @push('styles')
     <style>
+        .terms-conditions-content p {
+            margin-bottom: 4px !important;
+            line-height: 1.4 !important;
+        }
+        .terms-conditions-content p:last-child {
+            margin-bottom: 0 !important;
+        }
+
         @media print {
             @page {
                 margin: 0 !important;

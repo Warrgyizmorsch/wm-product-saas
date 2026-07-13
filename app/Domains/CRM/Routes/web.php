@@ -15,6 +15,8 @@ Route::prefix('crm')
             ->name('leads.index');
         Route::get('leads/track-status', [LeadController::class, 'trackStatus'])
             ->name('leads.trackStatus');
+        Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])
+            ->name('leads.downloadSample');
         Route::get('leads/{lead}', [LeadController::class, 'show'])
             ->name('leads.show');
         Route::post('leads', [LeadController::class, 'store'])

@@ -704,7 +704,9 @@
                                 
                                 @if (request()->has('create_quotation') || old('form_type') === 'quotation_create')
                                     <!-- CREATE QUOTATION FORM -->
-                                    <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm" novalidate>
+                                    <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
+                                        <div class="card-body p-3">
+                                            <form action="{{ route('crm.quotations.store') }}" method="POST" id="quotationForm" novalidate>
                                         @csrf
                                         <input type="hidden" name="lead_id" value="{{ $lead->id }}">
                                         <input type="hidden" name="form_type" value="quotation_create">
@@ -790,7 +792,7 @@
                                          <div class="row mt-4 pt-3 border-top text-dark fs-13">
                                              <div class="col-md-8">
                                                  <div class="pe-md-4">
-                                                     <x-ui.odoo-form-ui type="textarea" label="Terms & Conditions" name="terms_conditions" rows="3" placeholder="Define payment terms, delivery schedules, etc." :errorText="$errors->first('terms_conditions')">{{ old('terms_conditions') }}</x-ui.odoo-form-ui>
+                                                     <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions') !!}</x-ui.odoo-form-ui>
                                                      <x-ui.odoo-form-ui type="textarea" label="Notes" name="notes" rows="2" placeholder="Internal remarks or custom notes..." :errorText="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
                                                  </div>
                                              </div>
@@ -819,9 +821,13 @@
                                             <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Quotation</button>
                                         </div>
                                     </form>
+                                </div>
+                            </div>
 
-                                @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation)
-                                    <!-- EDIT QUOTATION FORM -->
+                        @elseif ((request()->has('edit_quotation') || old('form_type') === 'quotation_edit') && $activeQuotation)
+                            <!-- EDIT QUOTATION FORM -->
+                            <div class="card border shadow-sm" style="border-radius: 4px; border-color: #e2e8f0 !important; background-color: #ffffff;">
+                                <div class="card-body p-3">
                                     <form action="{{ route('crm.quotations.update', $activeQuotation->id) }}" method="POST" id="quotationForm" novalidate>
                                         @csrf
                                         @method('PUT')
@@ -927,7 +933,7 @@
                                         <div class="row mt-4 pt-3 border-top text-dark fs-13">
                                             <div class="col-md-8">
                                                 <div class="pe-md-4">
-                                                    <x-ui.odoo-form-ui type="textarea" label="Terms & Conditions" name="terms_conditions" rows="3" placeholder="Define payment terms, delivery schedules, etc." :errorText="$errors->first('terms_conditions')">{{ old('terms_conditions', $activeQuotation->terms_conditions) }}</x-ui.odoo-form-ui>
+                                                    <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $activeQuotation->terms_conditions) !!}</x-ui.odoo-form-ui>
                                                     <x-ui.odoo-form-ui type="textarea" label="Notes" name="notes" rows="2" placeholder="Internal remarks or custom notes..." :errorText="$errors->first('notes')">{{ old('notes', $activeQuotation->notes) }}</x-ui.odoo-form-ui>
                                                 </div>
                                             </div>
@@ -956,8 +962,10 @@
                                             <button type="submit" class="btn btn-md btn-primary py-2 px-5 fw-bold shadow-sm fs-12" style="background-color: #1e40af; border-color: #1e40af;">Save Changes</button>
                                         </div>
                                     </form>
+                                </div>
+                            </div>
 
-                                @elseif ($activeQuotation)
+                        @elseif ($activeQuotation)
                                     <!-- VIEW QUOTATION DETAILS -->
                                     <div class="odoo-sheet rounded border p-4 bg-white" id="quotation-print-area">
                                         <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4 flex-wrap gap-2 d-print-none">
@@ -1092,7 +1100,7 @@
                                                     @if($activeQuotation->terms_conditions)
                                                         <div class="mb-3">
                                                             <div class="fw-bold text-muted fs-11 text-uppercase mb-1">Terms & Conditions</div>
-                                                            <div class="text-dark fs-12 p-2 border bg-light-50 rounded" style="white-space: pre-wrap; line-height: 1.5; font-family: 'Inter', sans-serif;">{{ $activeQuotation->terms_conditions }}</div>
+                                                            <div class="text-dark fs-12 p-2 border bg-light-50 rounded terms-conditions-content" style="line-height: 1.5; font-family: 'Inter', sans-serif;">{!! $activeQuotation->terms_conditions !!}</div>
                                                         </div>
                                                     @endif
                                                     @if($activeQuotation->notes)
@@ -1245,6 +1253,15 @@
     <link class="d-print-none" rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link class="d-print-none" rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
+        /* Quill Editor terms spacing layout adjustments */
+        .terms-conditions-content p {
+            margin-bottom: 4px !important;
+            line-height: 1.4 !important;
+        }
+        .terms-conditions-content p:last-child {
+            margin-bottom: 0 !important;
+        }
+
         /* Zoho CRM Inspired Premium Styles */
         .zoho-header-banner {
             background-color: #ffffff;
