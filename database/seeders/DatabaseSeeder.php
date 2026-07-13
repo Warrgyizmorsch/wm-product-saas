@@ -47,7 +47,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RbacSeeder::class,
             InventoryMasterDemoSeeder::class,
-            FurnitureManufacturingDemoSeeder::class
+            FurnitureManufacturingDemoSeeder::class,
+            HrmsDemoSeeder::class,
         ]);
     }
 }
