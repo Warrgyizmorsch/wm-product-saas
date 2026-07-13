@@ -5,7 +5,6 @@ namespace App\Domains\Production\Services;
 use App\Domains\Production\Models\ProductionCapa;
 use App\Domains\Production\Models\ProductionNcr;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class CapaService
 {
@@ -19,24 +18,30 @@ class CapaService
     public function createCapa(int $tenantId, array $data): ProductionCapa
     {
         return ProductionCapa::create(array_merge($data, [
-            'tenant_id'   => $tenantId,
-            'capa_number' => 'CAPA-' . strtoupper(uniqid()),
-            'status'      => 'draft',
+            'tenant_id' => $tenantId,
+            'capa_number' => 'CAPA-'.strtoupper(uniqid()),
+            'status' => 'draft',
         ]));
     }
 
     /**
      * Save RCA (5 Whys and Fishbone) details.
      */
-    public function recordRca(int $capaId, array $fiveWhys, array $fishbone): void
+    public function recordRca(int $capaId, array $fiveWhys, array $fishbone, ?int $tenantId = null): void
     {
-        $capa = ProductionCapa::findOrFail($capaId);
+        $capa = ProductionCapa::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->findOrFail($capaId);
+
+        if ($capa->status === 'closed') {
+            throw new \InvalidArgumentException('Closed CAPAs cannot be updated.');
+        }
 
         $capa->update([
-            'status'            => 'active',
+            'status' => 'active',
             'rca_analysis_json' => [
                 'five_whys' => $fiveWhys,
-                'fishbone'  => $fishbone,
+                'fishbone' => $fishbone,
             ],
         ]);
     }
@@ -44,27 +49,33 @@ class CapaService
     /**
      * Close CAPA with effectiveness verification and e-signature.
      */
-    public function closeCapa(int $capaId, int $userId, string $effectivenessReview, string $signature): void
+    public function closeCapa(int $capaId, int $userId, string $effectivenessReview, string $signature, ?int $tenantId = null): void
     {
-        $capa = ProductionCapa::findOrFail($capaId);
+        $capa = ProductionCapa::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->findOrFail($capaId);
 
         if (empty($effectivenessReview)) {
-            throw new \InvalidArgumentException("Effectiveness review is required to close a CAPA.");
+            throw new \InvalidArgumentException('Effectiveness review is required to close a CAPA.');
+        }
+
+        if ($capa->status === 'closed') {
+            return;
         }
 
         $capa->update([
-            'status'               => 'closed',
+            'status' => 'closed',
             'effectiveness_review' => $effectivenessReview,
-            'closed_by'            => $userId,
-            'closed_at'            => Carbon::now(),
-            'esignature_closed'    => hash('sha256', $userId . $capaId . 'closed' . now()->timestamp),
+            'closed_by' => $userId,
+            'closed_at' => Carbon::now(),
+            'esignature_closed' => hash('sha256', $userId.$capaId.'closed'.now()->timestamp),
         ]);
 
         $this->eventService->writeEvent($capa->tenant_id, [
-            'event_type'   => 'CAPA Closed',
-            'title'        => 'CAPA Effectiveness Verified',
-            'description'  => "CAPA {$capa->capa_number} closed successfully.",
-            'severity'     => 'success',
+            'event_type' => 'CAPA Closed',
+            'title' => 'CAPA Effectiveness Verified',
+            'description' => "CAPA {$capa->capa_number} closed successfully.",
+            'severity' => 'success',
             'event_source' => 'CapaService',
         ]);
     }

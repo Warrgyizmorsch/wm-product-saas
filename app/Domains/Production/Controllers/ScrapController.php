@@ -2,11 +2,11 @@
 
 namespace App\Domains\Production\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionScrapDisposal;
-use App\Domains\Production\Services\ScrapService;
-use Illuminate\Http\Request;
 use App\Domains\Production\Requests\StoreScrapRequest;
+use App\Domains\Production\Services\ScrapService;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 
 class ScrapController extends Controller
 {
@@ -41,8 +41,9 @@ class ScrapController extends Controller
     public function approve(Request $request, int $id)
     {
         $this->authorize('approve', ProductionScrapDisposal::class);
+        $tenantId = require_tenant_id();
         $userId = auth()->id();
-        $this->scrapService->approveDisposal($id, $userId);
+        $this->scrapService->approveDisposal($id, $userId, $tenantId);
 
         return redirect()->back()->with('success', 'Scrap disposal approved.');
     }

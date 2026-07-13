@@ -2,13 +2,13 @@
 
 namespace App\Domains\Production\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionQualityPlan;
-use App\Domains\Production\Services\QualityInspectionService;
-use Illuminate\Http\Request;
-use App\Domains\Production\Requests\StoreQualityInspectionRequest;
 use App\Domains\Production\Requests\QualityInspectionResultsRequest;
+use App\Domains\Production\Requests\StoreQualityInspectionRequest;
+use App\Domains\Production\Services\QualityInspectionService;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 
 class QualityInspectionController extends Controller
 {
@@ -25,8 +25,8 @@ class QualityInspectionController extends Controller
             ->with(['plan', 'order']);
 
         if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
-            $query->whereHas('plan', function($pq) use ($search) {
+            $search = '%'.$request->input('search').'%';
+            $query->whereHas('plan', function ($pq) use ($search) {
                 $pq->where('name', 'like', $search);
             });
         }
@@ -42,10 +42,10 @@ class QualityInspectionController extends Controller
         $sortBy = $request->input('sort_by', 'id');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        if (!in_array($sortBy, ['id', 'stage', 'status', 'result'])) {
+        if (! in_array($sortBy, ['id', 'stage', 'status', 'result'])) {
             $sortBy = 'id';
         }
-        if (!in_array($sortOrder, ['asc', 'desc'])) {
+        if (! in_array($sortOrder, ['asc', 'desc'])) {
             $sortOrder = 'desc';
         }
 
@@ -89,8 +89,9 @@ class QualityInspectionController extends Controller
     public function saveResults(QualityInspectionResultsRequest $request, int $id)
     {
         $this->authorize('manage', ProductionQualityInspection::class);
+        $tenantId = require_tenant_id();
 
-        $this->inspectionService->recordResults($id, $request->input('results'));
+        $this->inspectionService->recordResults($id, $request->input('results'), $tenantId);
 
         return redirect()->back()->with('success', 'Inspection results recorded and submitted.');
     }
@@ -98,10 +99,11 @@ class QualityInspectionController extends Controller
     public function approve(Request $request, int $id)
     {
         $this->authorize('approve', ProductionQualityInspection::class);
+        $tenantId = require_tenant_id();
         $userId = auth()->id();
         $signature = $request->input('esignature') ?: 'SIGNED';
 
-        $this->inspectionService->approveInspection($id, $userId, $signature);
+        $this->inspectionService->approveInspection($id, $userId, $signature, $tenantId);
 
         return redirect()->back()->with('success', 'Inspection approved and audited.');
     }

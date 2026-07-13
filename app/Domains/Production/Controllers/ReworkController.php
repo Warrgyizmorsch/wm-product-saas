@@ -2,12 +2,11 @@
 
 namespace App\Domains\Production\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionReworkOrder;
-use App\Domains\Production\Models\ProductionReworkOperation;
-use App\Domains\Production\Services\ReworkService;
-use Illuminate\Http\Request;
 use App\Domains\Production\Requests\CompleteReworkOperationRequest;
+use App\Domains\Production\Services\ReworkService;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 
 class ReworkController extends Controller
 {
@@ -24,7 +23,7 @@ class ReworkController extends Controller
             ->with(['ncr', 'originalOrder']);
 
         if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
+            $search = '%'.$request->input('search').'%';
             $query->where(function ($q) use ($search) {
                 $q->where('rework_number', 'like', $search);
             });
@@ -37,10 +36,10 @@ class ReworkController extends Controller
         $sortBy = $request->input('sort_by', 'id');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        if (!in_array($sortBy, ['id', 'rework_number', 'status', 'cost_estimate', 'actual_cost'])) {
+        if (! in_array($sortBy, ['id', 'rework_number', 'status', 'cost_estimate', 'actual_cost'])) {
             $sortBy = 'id';
         }
-        if (!in_array($sortOrder, ['asc', 'desc'])) {
+        if (! in_array($sortOrder, ['asc', 'desc'])) {
             $sortOrder = 'desc';
         }
 
@@ -63,7 +62,8 @@ class ReworkController extends Controller
     public function startOp(Request $request, int $id)
     {
         $this->authorize('manage', ProductionReworkOrder::class);
-        $this->reworkService->startOperation($id);
+        $tenantId = require_tenant_id();
+        $this->reworkService->startOperation($id, $tenantId);
 
         return redirect()->back()->with('success', 'Rework operation started.');
     }
@@ -71,9 +71,10 @@ class ReworkController extends Controller
     public function completeOp(CompleteReworkOperationRequest $request, int $id)
     {
         $this->authorize('manage', ProductionReworkOrder::class);
+        $tenantId = require_tenant_id();
         $data = $request->validated();
 
-        $this->reworkService->completeOperation($id, $data);
+        $this->reworkService->completeOperation($id, $data, $tenantId);
 
         return redirect()->back()->with('success', 'Rework operation completed.');
     }

@@ -2,27 +2,28 @@
 
 namespace App\Domains\Sales\Controllers;
 
-use App\Domains\Sales\Models\SalesOrder;
+use App\Domains\Inventory\Models\ProductWarehouseStock;
+use App\Domains\Inventory\Models\SerialNumber;
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Services\StockService;
+use App\Domains\Production\Models\ProductionOrderRequest;
 use App\Domains\Sales\Models\DeliveryOrder;
 use App\Domains\Sales\Models\DeliveryOrderItem;
 use App\Domains\Sales\Models\DispatchOrder;
 use App\Domains\Sales\Models\DispatchOrderItem;
+use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Services\DeliveryOrderService;
-use App\Domains\Inventory\Models\Warehouse;
-use App\Domains\Inventory\Models\SerialNumber;
-use App\Domains\Inventory\Models\Batch;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class DeliveryOrderController extends Controller
 {
     public function __construct(
         private readonly DeliveryOrderService $deliveryService,
-    ) {
-    }
+    ) {}
 
     public function index(): View
     {
@@ -43,11 +44,11 @@ class DeliveryOrderController extends Controller
         $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->findOrFail($salesOrderId);
 
         // Filter items to show only 'buy' items for Delivery Order
-        $salesOrder->setRelation('items', $salesOrder->items->filter(function($item) {
-            return !$item->product || $item->product->supplier_method === 'buy' || is_null($item->product->supplier_method);
+        $salesOrder->setRelation('items', $salesOrder->items->filter(function ($item) {
+            return ! $item->product || $item->product->supplier_method === 'buy' || is_null($item->product->supplier_method);
         }));
 
-        if (!in_array($salesOrder->status, ['Confirmed', 'Partially Shipped'])) {
+        if (! in_array($salesOrder->status, ['Confirmed', 'Partially Shipped'])) {
             abort(400, 'Deliveries can only be created for Confirmed or Partially Shipped Sales Orders.');
         }
 
@@ -55,7 +56,7 @@ class DeliveryOrderController extends Controller
         $shippedQuantities = [];
         foreach ($salesOrder->items as $item) {
             $shippedQuantities[$item->id] = DeliveryOrderItem::query()
-                ->whereHas('deliveryOrder', function($q) {
+                ->whereHas('deliveryOrder', function ($q) {
                     $q->where('status', 'Shipped');
                 })
                 ->where('sales_order_item_id', $item->id)
@@ -66,13 +67,13 @@ class DeliveryOrderController extends Controller
 
         // Calculate available stock map for these products across all warehouses
         $productIds = $salesOrder->items->pluck('product_id')->filter()->unique()->toArray();
-        $stocks = \App\Domains\Inventory\Models\ProductWarehouseStock::query()
+        $stocks = ProductWarehouseStock::query()
             ->whereIn('product_id', $productIds)
             ->get();
 
         $stockMap = [];
         foreach ($stocks as $stock) {
-            $stockMap[$stock->product_id][$stock->warehouse_id] = (float)$stock->available_qty;
+            $stockMap[$stock->product_id][$stock->warehouse_id] = (float) $stock->available_qty;
         }
 
         return view('modules.sales.deliveries.create', [
@@ -89,13 +90,13 @@ class DeliveryOrderController extends Controller
         $this->authorize('create', DeliveryOrder::class);
 
         $validated = $request->validate([
-            'sales_order_id'   => ['required', 'exists:sales_orders,id'],
-            'delivery_number'  => ['required', 'string', 'max:255'],
-            'delivery_date'    => ['required', 'date'],
-            'carrier'          => ['nullable', 'string', 'max:255'],
-            'tracking_number'  => ['nullable', 'string', 'max:255'],
-            'notes'            => ['nullable', 'string'],
-            'items'            => ['required', 'array'],
+            'sales_order_id' => ['required', 'exists:sales_orders,id'],
+            'delivery_number' => ['required', 'string', 'max:255'],
+            'delivery_date' => ['required', 'date'],
+            'carrier' => ['nullable', 'string', 'max:255'],
+            'tracking_number' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
+            'items' => ['required', 'array'],
             'items.*.quantity' => ['required', 'numeric', 'min:0'],
             'items.*.warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'items.*.batch_id' => ['nullable', 'integer', 'exists:batches,id'],
@@ -103,6 +104,7 @@ class DeliveryOrderController extends Controller
 
         try {
             $delivery = $this->deliveryService->create($validated, $request->input('items', []));
+
             return redirect()
                 ->route('sales.deliveries.show', $delivery->id)
                 ->with('success', 'Delivery Order successfully created!');
@@ -125,7 +127,7 @@ class DeliveryOrderController extends Controller
 
         foreach ($delivery->items as $item) {
             $warehouseId = $item->warehouse_id ?: $defaultWarehouseId;
-            $item->available_qty = $warehouseId ? \App\Domains\Inventory\Services\StockService::getAvailableStock($item->product_id, $warehouseId) : 0;
+            $item->available_qty = $warehouseId ? StockService::getAvailableStock($item->product_id, $warehouseId) : 0;
         }
 
         $itemAllocations = [];
@@ -141,13 +143,13 @@ class DeliveryOrderController extends Controller
     public function updateWarehouse(Request $request, int $itemId)
     {
         $item = DeliveryOrderItem::findOrFail($itemId);
-        $warehouseId = (int)$request->input('warehouse_id');
+        $warehouseId = (int) $request->input('warehouse_id');
 
         $item->update([
             'warehouse_id' => $warehouseId,
         ]);
 
-        $availableStock = \App\Domains\Inventory\Services\StockService::getAvailableStock($item->product_id, $warehouseId);
+        $availableStock = StockService::getAvailableStock($item->product_id, $warehouseId);
 
         return response()->json([
             'success' => true,
@@ -158,7 +160,7 @@ class DeliveryOrderController extends Controller
     public function reserveQty(Request $request, int $itemId)
     {
         $item = DeliveryOrderItem::with('deliveryOrder')->findOrFail($itemId);
-        $qtyToReserve = (float)$request->input('quantity_reserve');
+        $qtyToReserve = (float) $request->input('quantity_reserve');
 
         if ($qtyToReserve <= 0) {
             return back()->with('error', 'Reserve quantity must be greater than 0.');
@@ -168,14 +170,14 @@ class DeliveryOrderController extends Controller
         $productId = $item->product_id;
         $tenantId = $item->deliveryOrder->tenant_id;
 
-        $availableStock = \App\Domains\Inventory\Services\StockService::getAvailableStock($productId, $warehouseId);
+        $availableStock = StockService::getAvailableStock($productId, $warehouseId);
 
         if ($qtyToReserve > $availableStock) {
             return back()->with('error', "Cannot reserve {$qtyToReserve}. Only {$availableStock} is available in this warehouse.");
         }
 
         // Adjust reservation in DB via StockService
-        \App\Domains\Inventory\Services\StockService::reserveStock(
+        StockService::reserveStock(
             $tenantId,
             $productId,
             $warehouseId,
@@ -201,7 +203,7 @@ class DeliveryOrderController extends Controller
     public function mockIndent(Request $request, int $itemId)
     {
         $item = DeliveryOrderItem::with('deliveryOrder')->findOrFail($itemId);
-        $qtyToRequest = (float)$request->input('quantity_request');
+        $qtyToRequest = (float) $request->input('quantity_request');
 
         $item->update([
             'status' => 'Waiting Purchase',
@@ -214,45 +216,62 @@ class DeliveryOrderController extends Controller
 
     public function mockMo(Request $request, int $itemId)
     {
-        $item = DeliveryOrderItem::with('deliveryOrder')->findOrFail($itemId);
+        $tenantId = require_tenant_id();
+        $item = DeliveryOrderItem::with('deliveryOrder')
+            ->whereHas('deliveryOrder', fn ($query) => $query->where('tenant_id', $tenantId))
+            ->findOrFail($itemId);
 
-        $orderedQty  = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
-        $reservedQty = (float)$item->quantity_reserved;
+        $orderedQty = (float) ($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
+        $reservedQty = (float) $item->quantity_reserved;
         $shortageQty = max(0, $orderedQty - $reservedQty);
 
-        $qtyToMfg = (float)$request->input('quantity_mfg', $shortageQty > 0 ? $shortageQty : $orderedQty);
+        $qtyToMfg = (float) $request->input('quantity_mfg', $shortageQty > 0 ? $shortageQty : $orderedQty);
 
         if ($qtyToMfg <= 0) {
             return back()->withErrors(['quantity_mfg' => 'Quantity to manufacture must be greater than 0.']);
         }
 
-        DB::transaction(function () use ($item, $qtyToMfg, $request) {
-            // Create a Production Order Request in draft status
-            \App\Domains\Production\Models\ProductionOrderRequest::create([
-                'tenant_id'              => $item->deliveryOrder->tenant_id,
-                'delivery_order_item_id' => $item->id,
-                'product_id'             => $item->product_id,
-                'quantity_requested'     => $qtyToMfg,
-                'status'                 => 'draft',
-                'notes'                  => $request->input('notes') ?? "Requested from DO {$item->deliveryOrder->delivery_number}",
-                'created_by'             => auth()->id(),
-            ]);
+        try {
+            DB::transaction(function () use ($item, $qtyToMfg, $request, $tenantId) {
+                $existingRequest = ProductionOrderRequest::where('tenant_id', $tenantId)
+                    ->where('delivery_order_item_id', $item->id)
+                    ->whereNotIn('status', ['rejected', 'completed', 'cancelled'])
+                    ->lockForUpdate()
+                    ->first();
 
-            // Update delivery order item status
-            $item->update([
-                'status' => 'Waiting Production',
-            ]);
+                if ($existingRequest) {
+                    throw new \InvalidArgumentException('A production request already exists for this delivery line.');
+                }
 
-            $this->updateOverallDeliveryStatus($item->deliveryOrder);
-        });
+                // Create a Production Order Request in draft status
+                ProductionOrderRequest::create([
+                    'tenant_id' => $tenantId,
+                    'delivery_order_item_id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'quantity_requested' => $qtyToMfg,
+                    'status' => 'draft',
+                    'notes' => $request->input('notes') ?? "Requested from DO {$item->deliveryOrder->delivery_number}",
+                    'created_by' => auth()->id(),
+                ]);
 
-        return back()->with('success', "Manufacturing Request submitted successfully. Line status set to Waiting Production.");
+                // Update delivery order item status
+                $item->update([
+                    'status' => 'Waiting Production',
+                ]);
+
+                $this->updateOverallDeliveryStatus($item->deliveryOrder);
+            });
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['quantity_mfg' => $e->getMessage()]);
+        }
+
+        return back()->with('success', 'Manufacturing Request submitted successfully. Line status set to Waiting Production.');
     }
 
     public function startPicking(int $id)
     {
         $delivery = DeliveryOrder::findOrFail($id);
-        
+
         DB::transaction(function () use ($delivery) {
             $delivery->update(['status' => 'Picked']);
             foreach ($delivery->items as $item) {
@@ -266,7 +285,7 @@ class DeliveryOrderController extends Controller
     public function pack(int $id)
     {
         $delivery = DeliveryOrder::findOrFail($id);
-        
+
         DB::transaction(function () use ($delivery) {
             $delivery->update(['status' => 'Packed']);
             foreach ($delivery->items as $item) {
@@ -298,15 +317,17 @@ class DeliveryOrderController extends Controller
             foreach ($delivery->items as $doItem) {
                 $doItem->update(['status' => 'Dispatched']);
 
-                if (!$doItem->product_id || $doItem->product->type === 'Service') continue;
+                if (! $doItem->product_id || $doItem->product->type === 'Service') {
+                    continue;
+                }
 
                 $tenantId = $delivery->tenant_id;
                 $productId = $doItem->product_id;
                 $warehouseId = $doItem->warehouse_id;
-                $qty = (float)$doItem->quantity_ordered;
+                $qty = (float) $doItem->quantity_ordered;
 
                 // Release stock reservation
-                \App\Domains\Inventory\Services\StockService::releaseStock(
+                StockService::releaseStock(
                     $tenantId,
                     $productId,
                     $warehouseId,
@@ -317,7 +338,7 @@ class DeliveryOrderController extends Controller
                 );
 
                 // Record actual stock outflow
-                \App\Domains\Inventory\Services\StockService::recordOutflow(
+                StockService::recordOutflow(
                     $tenantId,
                     $productId,
                     $warehouseId,
@@ -359,14 +380,16 @@ class DeliveryOrderController extends Controller
 
         // Validate serial number allocations
         foreach ($delivery->items as $item) {
-            if (!$item->product_id || $item->product->type === 'Service') continue;
+            if (! $item->product_id || $item->product->type === 'Service') {
+                continue;
+            }
 
             if ($item->product->track_serial_number) {
                 $serials = $allocations[$item->id]['serials'] ?? [];
                 $serials = array_filter(array_map('trim', $serials));
 
-                if (count($serials) != (int)$item->quantity) {
-                    return back()->withErrors(["Please select exactly " . (int)$item->quantity . " serial number(s) for item: " . $item->product->name]);
+                if (count($serials) != (int) $item->quantity) {
+                    return back()->withErrors(['Please select exactly '.(int) $item->quantity.' serial number(s) for item: '.$item->product->name]);
                 }
 
                 // Check that selected serials belong to this product, warehouse and are available/reserved
@@ -378,13 +401,14 @@ class DeliveryOrderController extends Controller
                     ->count();
 
                 if ($validCount != count($serials)) {
-                    return back()->withErrors(["One or more selected serial numbers for product '" . $item->product->name . "' are invalid or already sold."]);
+                    return back()->withErrors(["One or more selected serial numbers for product '".$item->product->name."' are invalid or already sold."]);
                 }
             }
         }
 
         try {
             $this->deliveryService->ship($delivery, $allocations);
+
             return redirect()
                 ->route('sales.deliveries.show', $delivery->id)
                 ->with('success', 'Delivery shipped successfully! Inventory updated.');
@@ -401,6 +425,7 @@ class DeliveryOrderController extends Controller
 
         try {
             $this->deliveryService->cancel($delivery);
+
             return back()->with('success', 'Delivery Order cancelled successfully.');
         } catch (\Exception $e) {
             return back()->withErrors([$e->getMessage()]);
@@ -416,12 +441,12 @@ class DeliveryOrderController extends Controller
         $delivery = DeliveryOrder::with('items.product', 'items.warehouse', 'salesOrder')->findOrFail($deliveryId);
 
         $request->validate([
-            'carrier'        => 'nullable|string|max:255',
-            'tracking_number'=> 'nullable|string|max:255',
+            'carrier' => 'nullable|string|max:255',
+            'tracking_number' => 'nullable|string|max:255',
             'vehicle_number' => 'nullable|string|max:100',
-            'driver_name'    => 'nullable|string|max:150',
-            'driver_phone'   => 'nullable|string|max:20',
-            'notes'          => 'nullable|string',
+            'driver_name' => 'nullable|string|max:150',
+            'driver_phone' => 'nullable|string|max:20',
+            'notes' => 'nullable|string',
         ]);
 
         $dispatchOrder = DB::transaction(function () use ($delivery, $request) {
@@ -432,41 +457,43 @@ class DeliveryOrderController extends Controller
 
             $nextNum = 1;
             if ($lastNumber && preg_match('/(\d+)$/', $lastNumber, $matches)) {
-                $nextNum = (int)$matches[1] + 1;
+                $nextNum = (int) $matches[1] + 1;
             }
-            $dispatchNumber = 'DSP-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $dispatchNumber = 'DSP-'.str_pad($nextNum, 4, '0', STR_PAD_LEFT);
 
             $dispatchOrder = DispatchOrder::create([
-                'tenant_id'         => $delivery->tenant_id,
+                'tenant_id' => $delivery->tenant_id,
                 'delivery_order_id' => $delivery->id,
-                'sales_order_id'    => $delivery->sales_order_id,
-                'dispatch_number'   => $dispatchNumber,
-                'dispatch_date'     => now()->toDateString(),
-                'carrier'           => $request->input('carrier'),
-                'tracking_number'   => $request->input('tracking_number'),
-                'vehicle_number'    => $request->input('vehicle_number'),
-                'driver_name'       => $request->input('driver_name'),
-                'driver_phone'      => $request->input('driver_phone'),
-                'status'            => 'Pending',
-                'notes'             => $request->input('notes'),
+                'sales_order_id' => $delivery->sales_order_id,
+                'dispatch_number' => $dispatchNumber,
+                'dispatch_date' => now()->toDateString(),
+                'carrier' => $request->input('carrier'),
+                'tracking_number' => $request->input('tracking_number'),
+                'vehicle_number' => $request->input('vehicle_number'),
+                'driver_name' => $request->input('driver_name'),
+                'driver_phone' => $request->input('driver_phone'),
+                'status' => 'Pending',
+                'notes' => $request->input('notes'),
             ]);
 
             foreach ($delivery->items as $doItem) {
-                $orderedQty  = (float)($doItem->quantity_ordered > 0 ? $doItem->quantity_ordered : $doItem->quantity);
-                $reservedQty = (float)$doItem->quantity_reserved;
+                $orderedQty = (float) ($doItem->quantity_ordered > 0 ? $doItem->quantity_ordered : $doItem->quantity);
+                $reservedQty = (float) $doItem->quantity_reserved;
 
                 // Dispatch whatever qty we have (reserved first, else full ordered qty)
                 $dispatchQty = $reservedQty > 0 ? $reservedQty : $orderedQty;
 
-                if ($dispatchQty <= 0) continue;
+                if ($dispatchQty <= 0) {
+                    continue;
+                }
 
                 DispatchOrderItem::create([
-                    'dispatch_order_id'     => $dispatchOrder->id,
-                    'delivery_order_item_id'=> $doItem->id,
-                    'product_id'            => $doItem->product_id,
-                    'warehouse_id'          => $doItem->warehouse_id,
-                    'quantity_ordered'      => $orderedQty,
-                    'quantity_dispatched'   => $dispatchQty,
+                    'dispatch_order_id' => $dispatchOrder->id,
+                    'delivery_order_item_id' => $doItem->id,
+                    'product_id' => $doItem->product_id,
+                    'warehouse_id' => $doItem->warehouse_id,
+                    'quantity_ordered' => $orderedQty,
+                    'quantity_dispatched' => $dispatchQty,
                 ]);
             }
 

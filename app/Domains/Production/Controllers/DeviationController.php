@@ -2,11 +2,11 @@
 
 namespace App\Domains\Production\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionDeviation;
-use App\Domains\Production\Services\DeviationService;
-use Illuminate\Http\Request;
 use App\Domains\Production\Requests\StoreDeviationRequest;
+use App\Domains\Production\Services\DeviationService;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 
 class DeviationController extends Controller
 {
@@ -41,10 +41,11 @@ class DeviationController extends Controller
     public function approve(Request $request, int $id)
     {
         $this->authorize('approve', ProductionDeviation::class);
+        $tenantId = require_tenant_id();
         $userId = auth()->id();
         $signature = $request->input('esignature') ?: 'DEV-APPROVE-SIGN';
 
-        $this->deviationService->approveDeviation($id, $userId, $signature);
+        $this->deviationService->approveDeviation($id, $userId, $signature, $tenantId);
 
         return redirect()->back()->with('success', 'Deviation approved.');
     }
