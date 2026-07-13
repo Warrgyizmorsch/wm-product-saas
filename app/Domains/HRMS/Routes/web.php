@@ -43,6 +43,9 @@ Route::prefix('hrms')
         Route::delete('/employees/documents/{document}', [\App\Domains\HRMS\Controllers\EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
 
         Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+        Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.import');
+        Route::get('/employees/export', [EmployeeController::class, 'export'])->name('employees.export');
+        Route::get('/employees/import/template', [EmployeeController::class, 'downloadTemplate'])->name('employees.import.template');
         Route::post('/employees/store', [EmployeeController::class, 'store'])->name('employees.store');
         Route::post('/employees/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
         Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');

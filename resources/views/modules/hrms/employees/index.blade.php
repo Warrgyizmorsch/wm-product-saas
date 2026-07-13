@@ -5,9 +5,17 @@
 @section('breadcrumb', 'HRMS / Employees')
 
 @section('page-actions')
-    <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
-        Create Employee
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importEmployeeModal" class="fw-bold text-uppercase">
+            Import
+        </x-ui.button>
+        <x-ui.button variant="outline-primary" icon="feather-download" href="{{ route('hrms.employees.export') }}" class="fw-bold text-uppercase">
+            Export
+        </x-ui.button>
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addEmployeeModal" class="fw-bold text-uppercase">
+            Create Employee
+        </x-ui.button>
+    </div>
 @endsection
 
 @push('styles')
@@ -87,6 +95,46 @@
 
 @section('content')
     <style>
+        .btn-outline-primary {
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-outline-primary:hover,
+        .btn-outline-primary:focus,
+        .btn-outline-primary:active {
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+        }
+
+        /* Import uploader custom styling */
+        .erp-custom-file-upload {
+            display: block;
+            width: 100%;
+        }
+        .erp-custom-file-upload .file-upload-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #ced4da;
+            border-radius: 12px;
+            padding: 24px 16px;
+            background-color: #f8fafc;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            width: 100%;
+        }
+        .erp-custom-file-upload .file-upload-label:hover {
+            background-color: #f1f5f9;
+            border-color: var(--bs-primary);
+            color: var(--bs-primary);
+        }
+
         .employee-page {
             padding: 24px;
             background-color: #f8fafc;
@@ -501,6 +549,52 @@
             </div>
     </div>
 
+    <!-- IMPORT EMPLOYEE MODAL -->
+    <div class="modal fade" id="importEmployeeModal" tabindex="-1" aria-labelledby="importEmployeeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="importEmployeeModalLabel">
+                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>Import Employees
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('hrms.employees.import') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body text-start">
+                        <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="feather-info text-primary fs-15"></i>
+                                <span class="fw-bold">Excel Import Instructions</span>
+                            </div>
+                            <span class="text-muted leading-relaxed">
+                                Please download our official import template. Ensure the <code>full_name</code> column is filled for each row. Company, Department, and Designation will be resolved by name (and created if not found).
+                            </span>
+                            <div class="mt-1">
+                                <a href="{{ route('hrms.employees.import.template') }}" class="btn btn-xs btn-soft-primary d-inline-flex align-items-center fw-bold py-1.5 px-3" style="border-radius: 6px; font-size: 11px;">
+                                    <i class="feather-download me-1.5 fs-12"></i> Download XLSX Template
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="erp-custom-file-upload">
+                                <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="employee_import_file">
+                                    <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
+                                    <span class="file-text text-muted" id="import_file_text">Select Excel File (.xlsx)</span>
+                                    <input type="file" name="file" id="employee_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('import_file_text').innerText = this.files[0]?.name || 'Select Excel File (.xlsx)'">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 gap-2">
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Import File</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="addEmployeeModal" tabindex="-1" aria-labelledby="addEmployeeModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content border-0 shadow-lg">
@@ -568,8 +662,9 @@
             const attendancePenalties = @json($attendancePenaltiesJson);
             const addEmployeeModal = document.getElementById('addEmployeeModal');
             const editEmployeeModal = document.getElementById('editEmployeeModal');
+            const importEmployeeModal = document.getElementById('importEmployeeModal');
 
-            [addEmployeeModal, editEmployeeModal].forEach(function (modal) {
+            [addEmployeeModal, editEmployeeModal, importEmployeeModal].forEach(function (modal) {
                 if (modal && modal.parentElement !== document.body) {
                     document.body.appendChild(modal);
                 }

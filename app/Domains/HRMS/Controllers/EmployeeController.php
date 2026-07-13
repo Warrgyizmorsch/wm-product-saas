@@ -14,6 +14,7 @@ use App\Domains\HRMS\Models\SalaryStructure;
 use App\Domains\HRMS\Models\LeavePlan;
 use App\Domains\HRMS\Models\AttendancePenalty;
 use App\Http\Controllers\Controller;
+use App\Domains\HRMS\Helpers\XlsxHelper;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -702,4 +703,294 @@ class EmployeeController extends Controller
             ->route('hrms.employees.show', [$employee->id, 'tab' => 'history'])
             ->with('success', 'Employment history record deleted successfully.');
     }
+
+    /**
+     * Export all employees to Excel (.xlsx) format
+     */
+    public function export()
+    {
+        $headers = [
+            'Employee ID',
+            'Full Name',
+            'Personal Email',
+            'Office Email',
+            'Mobile Number',
+            'Gender',
+            'Marital Status',
+            'Employment Type',
+            'Date of Joining',
+            'Date of Birth',
+            'Current Salary',
+            'Experience (Years)',
+            'Qualification',
+            'Company Name',
+            'Department Name',
+            'Designation Name',
+            'Status'
+        ];
+
+        $employees = Employee::with(['company', 'department', 'designation'])->get();
+        $data = [];
+
+        foreach ($employees as $emp) {
+            $data[] = [
+                $emp->employee_id,
+                $emp->full_name,
+                $emp->personal_email,
+                $emp->office_email,
+                $emp->personal_mobile_number,
+                $emp->gender,
+                $emp->marital_status,
+                $emp->employment_type,
+                $emp->date_of_joining ? $emp->date_of_joining->format('Y-m-d') : '',
+                $emp->date_of_birth ? $emp->date_of_birth->format('Y-m-d') : '',
+                $emp->current_salary,
+                $emp->experience,
+                $emp->qualification,
+                $emp->company?->company_name,
+                $emp->department?->name,
+                $emp->designation?->name,
+                $emp->status ? 'Active' : 'Inactive'
+            ];
+        }
+
+        return XlsxHelper::export($headers, $data, 'employees_export_' . now()->format('Y-m-d') . '.xlsx');
+    }
+
+    /**
+     * Download XLSX Template for Employee Import
+     */
+    public function downloadTemplate()
+    {
+        $headers = [
+            'full_name',
+            'personal_email',
+            'office_email',
+            'personal_mobile_number',
+            'date_of_joining',
+            'date_of_birth',
+            'gender',
+            'marital_status',
+            'employment_type',
+            'current_salary',
+            'experience',
+            'qualification',
+            'company_name',
+            'department_name',
+            'designation_name'
+        ];
+
+        $data = [
+            [
+                'John Doe',
+                'john.doe@gmail.com',
+                'johnd@acme.com',
+                '9876543210',
+                '2026-07-11',
+                '1995-05-15',
+                'male',
+                'single',
+                'full-time',
+                55000,
+                3.5,
+                'Bachelor of Engineering',
+                'Acme Corporation',
+                'Engineering',
+                'Software Engineer'
+            ]
+        ];
+
+        return XlsxHelper::export($headers, $data, 'employees_import_template.xlsx');
+    }
+
+    /**
+     * Import employees from XLSX file
+     */
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file',
+        ]);
+
+        try {
+            $filePath = $request->file('file')->getRealPath();
+            $rows = XlsxHelper::import($filePath);
+
+            if (empty($rows)) {
+                return redirect()->back()->with('error', 'The Excel file is empty.');
+            }
+
+            // The first row contains the headers
+            $headers = array_shift($rows);
+            $headers = array_map(function($h) {
+                // Lowercase, trim, remove BOM, replace spaces/dashes with underscores, keep alphanumeric/underscores
+                $h = strtolower(trim(preg_replace('/[\x{FEFF}\x{FFFE}]/u', '', $h)));
+                $h = str_replace([' ', '-'], '_', $h);
+                $h = preg_replace('/[^a-z0-9_]/', '', $h);
+
+                // Map common human-friendly export names to system fields
+                if ($h === 'full_name' || $h === 'fullname' || $h === 'name') {
+                    return 'full_name';
+                }
+                if ($h === 'personal_email' || $h === 'email') {
+                    return 'personal_email';
+                }
+                if ($h === 'mobile_number' || $h === 'personal_mobile_number' || $h === 'phone_number' || $h === 'phone' || $h === 'mobile') {
+                    return 'personal_mobile_number';
+                }
+                if ($h === 'experience_years' || $h === 'experience') {
+                    return 'experience';
+                }
+                return $h;
+            }, $headers);
+
+            $headerMap = array_flip($headers);
+
+            // Required field validation
+            if (!isset($headerMap['full_name'])) {
+                return redirect()->back()->with('error', "Required column 'full_name' is missing in the Excel file.");
+            }
+
+            $importedCount = 0;
+            $errors = [];
+            $rowNumber = 1; // headers shifted
+
+            \DB::beginTransaction();
+            foreach ($rows as $row) {
+                $rowNumber++;
+                
+                // Skip empty rows
+                if (empty(array_filter($row))) {
+                    continue;
+                }
+
+                // Pad row if it has fewer elements than headers
+                if (count($row) < count($headers)) {
+                    $row = array_pad($row, count($headers), '');
+                }
+
+                $data = [];
+                foreach ($headerMap as $field => $index) {
+                    $data[$field] = isset($row[$index]) && $row[$index] !== '' ? trim($row[$index]) : null;
+                }
+
+                // 1. Resolve Company
+                $companyId = null;
+                if (!empty($data['company_name'])) {
+                    $company = Company::where('company_name', 'like', $data['company_name'])->first();
+                    if (!$company) {
+                        $company = Company::first();
+                    }
+                    $companyId = $company?->id;
+                } else {
+                    $company = Company::first();
+                    $companyId = $company?->id;
+                }
+
+                if (!$companyId) {
+                    $errors[] = "Row {$rowNumber}: No valid company found. Please configure a company first.";
+                    continue;
+                }
+
+                // 2. Resolve Department
+                $departmentId = null;
+                if (!empty($data['department_name'])) {
+                    $dept = Department::where('name', 'like', $data['department_name'])
+                        ->where('company_id', $companyId)
+                        ->first();
+                    if (!$dept) {
+                        // Generate a clean department code from its name
+                        $cleanName = preg_replace('/[^A-Za-z0-9]/', '', $data['department_name']);
+                        $deptCode = strtoupper(substr($cleanName, 0, 10));
+                        if (empty($deptCode)) {
+                            $deptCode = 'DEPT-' . rand(100, 999);
+                        }
+
+                        // Ensure uniqueness in the database
+                        $originalCode = $deptCode;
+                        $counter = 1;
+                        while (Department::where('code', $deptCode)->exists()) {
+                            $deptCode = substr($originalCode, 0, 7) . $counter;
+                            $counter++;
+                        }
+
+                        $dept = Department::create([
+                            'company_id' => $companyId,
+                            'name' => $data['department_name'],
+                            'code' => $deptCode,
+                            'status' => true
+                        ]);
+                    }
+                    $departmentId = $dept->id;
+                }
+
+                // 3. Resolve Designation
+                $designationId = null;
+                if (!empty($data['designation_name'])) {
+                    $desg = Designation::where('name', 'like', $data['designation_name']);
+                    if ($departmentId) {
+                        $desg = $desg->where('department_id', $departmentId);
+                    }
+                    $desg = $desg->first();
+                    if (!$desg) {
+                        $desg = Designation::create([
+                            'department_id' => $departmentId,
+                            'name' => $data['designation_name'],
+                            'status' => true
+                        ]);
+                    }
+                    $designationId = $desg->id;
+                }
+
+                $employeeData = [
+                    'company_id' => $companyId,
+                    'department_id' => $departmentId,
+                    'designation_id' => $designationId,
+                    'full_name' => $data['full_name'],
+                    'personal_email' => $data['personal_email'] ?? null,
+                    'office_email' => $data['office_email'] ?? null,
+                    'personal_mobile_number' => $data['personal_mobile_number'] ?? null,
+                    'gender' => isset($data['gender']) ? strtolower($data['gender']) : 'male',
+                    'marital_status' => isset($data['marital_status']) ? strtolower($data['marital_status']) : 'single',
+                    'employment_type' => isset($data['employment_type']) ? strtolower($data['employment_type']) : 'full-time',
+                    'current_salary' => isset($data['current_salary']) ? floatval($data['current_salary']) : 0,
+                    'experience' => isset($data['experience']) ? floatval($data['experience']) : 0,
+                    'qualification' => $data['qualification'] ?? null,
+                    'status' => true
+                ];
+
+                if (!empty($data['date_of_joining'])) {
+                    try {
+                        $employeeData['date_of_joining'] = \Carbon\Carbon::parse($data['date_of_joining'])->format('Y-m-d');
+                    } catch (\Exception $e) {
+                        $employeeData['date_of_joining'] = now()->format('Y-m-d');
+                    }
+                } else {
+                    $employeeData['date_of_joining'] = now()->format('Y-m-d');
+                }
+
+                if (!empty($data['date_of_birth'])) {
+                    try {
+                        $employeeData['date_of_birth'] = \Carbon\Carbon::parse($data['date_of_birth'])->format('Y-m-d');
+                    } catch (\Exception $e) {}
+                }
+
+                Employee::create($employeeData);
+                $importedCount++;
+            }
+
+            \DB::commit();
+
+            if (count($errors) > 0) {
+                return redirect()->back()->with('success', "Import completed: {$importedCount} employees imported successfully. Warnings: " . implode(', ', $errors));
+            }
+
+            return redirect()->back()->with('success', "{$importedCount} employees imported successfully.");
+
+        } catch (\Exception $e) {
+            \DB::rollBack();
+            return redirect()->back()->with('error', 'Error reading Excel file: ' . $e->getMessage());
+        }
+    }
 }
+
