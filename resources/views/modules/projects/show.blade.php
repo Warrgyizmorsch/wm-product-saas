@@ -13,7 +13,7 @@
             <i class="feather-edit-2 me-2"></i>{{ __('projects.edit') }}
         </a>
         <form action="{{ route('projects.destroy', $project) }}" method="POST"
-              onsubmit="return confirm('{{ __('projects.confirm_delete') }}');">
+              onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
             @csrf
             @method('DELETE')
             <button type="submit" class="btn btn-danger">

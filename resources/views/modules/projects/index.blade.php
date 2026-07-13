@@ -173,7 +173,7 @@
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirm('{{ __('projects.confirm_delete') }}');">
+                                        <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="dropdown-item text-danger">

@@ -84,7 +84,6 @@
     <script src="{{ asset('assets/vendors/js/vendors.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/moment.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/daterangepicker.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/bootstrap.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/nxlNavigation.min.js') }}"></script>
@@ -286,6 +285,97 @@
                         form.prepend('<div class="alert alert-danger mb-3">' + (xhr.responseJSON?.message || 'An error occurred.') + '</div>');
                     }
                 }
+            });
+        }
+    </script>
+
+    <!-- Global confirmation modal, replacing native window.confirm() dialogs throughout the app.
+         Bootstrap's modal stacks at z-index 1055, above offcanvas drawers (1051), so it always
+         renders correctly on top even when triggered from inside an open drawer. -->
+    <div class="modal fade" id="globalConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="globalConfirmModalTitle">{{ __('ui.confirm_title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="globalConfirmModalMessage" class="mb-0"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal" id="globalConfirmModalCancelBtn">{{ __('ui.confirm_cancel') }}</button>
+                    <button type="button" class="btn btn-danger" id="globalConfirmModalConfirmBtn">{{ __('ui.confirm_yes') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function confirmAction(message, onConfirm, options) {
+            options = options || {};
+
+            var modalEl = document.getElementById('globalConfirmModal');
+            if (!modalEl || !window.bootstrap) {
+                // Fallback if the modal markup or Bootstrap JS failed to load for any reason.
+                if (window.confirm(message) && typeof onConfirm === 'function') {
+                    onConfirm();
+                }
+                return;
+            }
+
+            document.getElementById('globalConfirmModalTitle').textContent = options.title || @js(__('ui.confirm_title'));
+            document.getElementById('globalConfirmModalMessage').textContent = message;
+
+            var cancelBtn = document.getElementById('globalConfirmModalCancelBtn');
+            cancelBtn.textContent = options.cancelButtonText || @js(__('ui.confirm_cancel'));
+
+            var confirmBtn = document.getElementById('globalConfirmModalConfirmBtn');
+            confirmBtn.textContent = options.confirmButtonText || @js(__('ui.confirm_yes'));
+            confirmBtn.className = 'btn ' + (options.confirmButtonClass || 'btn-danger');
+
+            // Clone-and-replace clears any listener bound by a previous confirmAction() call.
+            var freshConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(freshConfirmBtn, confirmBtn);
+
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            freshConfirmBtn.addEventListener('click', function () {
+                modal.hide();
+                if (typeof onConfirm === 'function') {
+                    onConfirm();
+                }
+            }, { once: true });
+
+            modal.show();
+        }
+
+        // Helper for plain <form onsubmit="return confirmFormSubmit(event, '...')"> usages.
+        function confirmFormSubmit(event, message, options) {
+            event.preventDefault();
+            var form = event.target;
+            confirmAction(message, function () {
+                form.submit();
+            }, options);
+            return false;
+        }
+
+        // Toast helper for AJAX flows, mirroring the config used by the x-ui.toast component
+        // (which only fires from server-rendered session flash on full page loads).
+        function showAppToast(type, message) {
+            if (typeof Swal === 'undefined' || !message) return;
+
+            Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 5000,
+                timerProgressBar: true,
+                didOpen: function (toast) {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            }).fire({
+                icon: type,
+                title: message
             });
         }
     </script>

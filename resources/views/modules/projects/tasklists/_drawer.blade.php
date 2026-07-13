@@ -1,15 +1,23 @@
-<x-ui.drawer id="taskListDrawer" title="{{ __('projects.add_tasklist') }}" position="end" style="width: 480px; max-width: 100%;">
-    <div id="taskListActionsBar" class="d-none justify-content-end gap-2 mb-3">
-        <button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteCurrentTaskList()">
-            <i class="feather feather-trash-2 me-1"></i>{{ __('projects.remove') }}
-        </button>
+<x-ui.drawer id="taskListDrawer" title="{{ __('projects.tasklist_details') }}" position="end" style="width: 480px; max-width: 100%;">
+    <div class="mb-3">
+        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.tasklist_name') }}</div>
+        <div id="taskListDetailName" class="fw-semibold text-dark"></div>
     </div>
 
-    <form id="taskListForm" method="POST" action="{{ isset($project) ? route('projects.tasklists.store', $project) : '' }}">
-        @csrf
-        <input type="hidden" name="_method" id="taskListMethodField" value="POST">
-        @include('modules.projects.tasklists._form')
-    </form>
+    <div class="mb-3" id="taskListDetailDescriptionWrap">
+        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.description') }}</div>
+        <div id="taskListDetailDescription" class="text-dark"></div>
+    </div>
+
+    <div class="mb-3">
+        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.milestone') }}</div>
+        <div id="taskListDetailMilestone" class="text-dark"></div>
+    </div>
+
+    <div class="mb-3">
+        <div class="fs-11 text-uppercase text-muted fw-bold mb-1">{{ __('projects.tasklist_owner') }}</div>
+        <div id="taskListDetailOwner" class="text-dark"></div>
+    </div>
 
     <form id="taskListDeleteForm" method="POST" action="" class="d-none">
         @csrf
@@ -17,54 +25,37 @@
     </form>
 
     <x-slot name="footer">
-        <button type="button" class="btn btn-light-brand" data-bs-dismiss="offcanvas">{{ __('projects.cancel') }}</button>
-        <button type="submit" form="taskListForm" id="taskListSubmitBtn" class="btn btn-primary">{{ __('projects.create') }}</button>
+        <button type="button" class="btn btn-outline-danger" onclick="deleteCurrentTaskList()">
+            <i class="feather feather-trash-2 me-1"></i>{{ __('projects.remove') }}
+        </button>
+        <button type="button" class="btn btn-light-brand" onclick="cloneCurrentTaskList()">
+            <i class="feather feather-copy me-1"></i>{{ __('projects.clone') }}
+        </button>
+        <button type="button" class="btn btn-primary" onclick="editCurrentTaskList()">
+            {{ __('projects.edit_tasklist') }}
+        </button>
     </x-slot>
 </x-ui.drawer>
 
 <script>
     var currentTaskListData = null;
 
-    function openTaskListDrawer(mode, data) {
+    function openTaskListDetailsDrawer(data) {
         data = data || {};
-        currentTaskListData = mode === 'edit' ? data : null;
+        currentTaskListData = data;
 
-        var form = document.getElementById('taskListForm');
-        var methodField = document.getElementById('taskListMethodField');
-        var modeField = document.getElementById('tasklist_form_mode');
-        var idField = document.getElementById('tasklist_form_id');
-        var titleEl = document.getElementById('taskListDrawerLabel');
-        var submitBtn = document.getElementById('taskListSubmitBtn');
-        var actionsBar = document.getElementById('taskListActionsBar');
+        document.getElementById('taskListDetailName').textContent = data.name || '—';
 
-        if (mode === 'edit') {
-            form.action = data.updateUrl;
-            methodField.value = 'PUT';
-            modeField.value = 'edit';
-            idField.value = data.id;
-            if (titleEl) titleEl.textContent = @js(__('projects.edit_tasklist'));
-            if (submitBtn) submitBtn.textContent = @js(__('projects.save_changes'));
-            if (actionsBar) {
-                actionsBar.classList.remove('d-none');
-                actionsBar.classList.add('d-flex');
-            }
+        var descriptionWrap = document.getElementById('taskListDetailDescriptionWrap');
+        if (data.description) {
+            descriptionWrap.classList.remove('d-none');
+            document.getElementById('taskListDetailDescription').textContent = data.description;
         } else {
-            form.action = data.storeUrl || @js(isset($project) ? route('projects.tasklists.store', $project) : '');
-            methodField.value = 'POST';
-            modeField.value = 'add';
-            idField.value = '';
-            if (titleEl) titleEl.textContent = @js(__('projects.add_tasklist'));
-            if (submitBtn) submitBtn.textContent = @js(__('projects.create'));
-            if (actionsBar) {
-                actionsBar.classList.remove('d-flex');
-                actionsBar.classList.add('d-none');
-            }
+            descriptionWrap.classList.add('d-none');
         }
 
-        setTaskListFieldValue('tasklist_name', data.name || '');
-        setTaskListFieldValue('tasklist_description', data.description || '');
-        setTaskListMilestone(data.milestoneId);
-        setTaskListOwner(data.ownerId);
+        document.getElementById('taskListDetailMilestone').textContent = data.milestoneName || '—';
+        document.getElementById('taskListDetailOwner').textContent = data.ownerName || '—';
 
         var drawerEl = document.getElementById('taskListDrawer');
         if (drawerEl && window.bootstrap) {
@@ -72,35 +63,38 @@
         }
     }
 
-    function setTaskListFieldValue(id, value) {
-        var el = document.getElementById(id);
-        if (el) el.value = value;
-    }
-
-    function setTaskListMilestone(value) {
-        var el = document.getElementById('tasklist_milestone_id');
-        if (!el) return;
-        el.value = value || '';
-        if (window.jQuery && jQuery(el).data('select2')) {
-            jQuery(el).trigger('change');
+    function hideTaskListDetailsDrawer() {
+        var drawerEl = document.getElementById('taskListDrawer');
+        if (drawerEl && window.bootstrap) {
+            var instance = bootstrap.Offcanvas.getInstance(drawerEl);
+            if (instance) instance.hide();
         }
     }
 
-    function setTaskListOwner(value) {
-        var el = document.getElementById('tasklist_owner_id');
-        if (!el) return;
-        el.value = value || '';
-        if (window.jQuery && jQuery(el).data('select2')) {
-            jQuery(el).trigger('change');
-        }
+    function editCurrentTaskList() {
+        if (!currentTaskListData) return;
+        hideTaskListDetailsDrawer();
+        openTaskListModal('edit', currentTaskListData);
+    }
+
+    function cloneCurrentTaskList() {
+        if (!currentTaskListData) return;
+
+        var cloneData = Object.assign({}, currentTaskListData, {
+            name: currentTaskListData.name ? currentTaskListData.name + @js(' ' . __('projects.clone_suffix')) : '',
+        });
+
+        hideTaskListDetailsDrawer();
+        openTaskListModal('add', cloneData);
     }
 
     function deleteCurrentTaskList() {
         if (!currentTaskListData || !currentTaskListData.deleteUrl) return;
-        if (!confirm(@js(__('projects.confirm_remove_tasklist')))) return;
 
-        var form = document.getElementById('taskListDeleteForm');
-        form.action = currentTaskListData.deleteUrl;
-        form.submit();
+        confirmAction(@js(__('projects.confirm_remove_tasklist')), function () {
+            var form = document.getElementById('taskListDeleteForm');
+            form.action = currentTaskListData.deleteUrl;
+            form.submit();
+        });
     }
 </script>

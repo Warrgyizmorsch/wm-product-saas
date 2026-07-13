@@ -11,7 +11,7 @@
         <i class="feather-flag me-2 text-primary"></i>{{ __('projects.milestones') }}
     </h5>
     @if ($canManageMilestones)
-        <button type="button" class="btn btn-primary btn-sm" onclick="openMilestoneDrawer('add')">
+        <button type="button" class="btn btn-primary btn-sm" onclick="openMilestoneModal('add')">
             <i class="feather-plus me-1"></i>{{ __('projects.add_milestone') }}
         </button>
     @endif
@@ -31,15 +31,18 @@
     <tbody>
         @forelse ($paginatedMilestones as $milestone)
             <tr @if ($canManageMilestones) role="button" style="cursor: pointer;"
-                    onclick="openMilestoneDrawer('edit', {
+                    onclick="openMilestoneDetailsDrawer({
                         id: {{ $milestone->id }},
                         updateUrl: @js(route('projects.milestones.update', [$project, $milestone->id])),
                         deleteUrl: @js(route('projects.milestones.destroy', [$project, $milestone->id])),
                         name: @js($milestone->name),
                         description: @js($milestone->description),
                         ownerId: @js($milestone->owner_id),
+                        ownerName: @js($milestone->owner?->name),
                         startDate: @js($milestone->start_date?->format('Y-m-d')),
                         dueDate: @js($milestone->due_date?->format('Y-m-d')),
+                        startDateDisplay: @js($milestone->start_date?->format('d/m/Y')),
+                        dueDateDisplay: @js($milestone->due_date?->format('d/m/Y')),
                         status: @js($milestone->status),
                         completionPercentage: {{ $milestone->completion_percentage }}
                     })"
@@ -174,6 +177,7 @@
 @endpush
 
 @if ($canManageMilestones)
+    @include('modules.projects.milestones._modal')
     @include('modules.projects.milestones._drawer')
 
     @if ($errors->any() && in_array(old('_milestone_form'), ['add', 'edit'], true))
@@ -181,7 +185,7 @@
             <script>
                 document.addEventListener('DOMContentLoaded', function () {
                     @if (old('_milestone_form') === 'edit')
-                        openMilestoneDrawer('edit', {
+                        openMilestoneModal('edit', {
                             id: {{ (int) old('_milestone_id') }},
                             updateUrl: @js(route('projects.milestones.update', [$project, (int) old('_milestone_id')])),
                             deleteUrl: @js(route('projects.milestones.destroy', [$project, (int) old('_milestone_id')])),
@@ -194,7 +198,7 @@
                             completionPercentage: @js(old('completion_percentage')),
                         });
                     @else
-                        openMilestoneDrawer('add', {
+                        openMilestoneModal('add', {
                             name: @js(old('name')),
                             description: @js(old('description')),
                             ownerId: @js(old('owner_id')),

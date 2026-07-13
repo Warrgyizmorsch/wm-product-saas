@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Collection;
 
 interface TaskRepositoryInterface
 {
-    public function getForProject(int $projectId): Collection;
+    public function getForProject(int $projectId, array $filters = []): Collection;
 
     public function getForTaskList(int $taskListId): Collection;
 

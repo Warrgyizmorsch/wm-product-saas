@@ -7,11 +7,31 @@ use Illuminate\Database\Eloquent\Collection;
 
 class TaskRepository implements TaskRepositoryInterface
 {
-    public function getForProject(int $projectId): Collection
+    public function getForProject(int $projectId, array $filters = []): Collection
     {
-        return Task::query()
+        $query = Task::query()
             ->with(['taskList', 'milestone', 'assignee', 'reviewer', 'subTasks.assignee', 'dependencies.dependsOn'])
-            ->where('project_id', $projectId)
+            ->where('project_id', $projectId);
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $escaped = addcslashes($search, '\\%_');
+            $query->whereRaw('title like ? escape ?', ['%' . $escaped . '%', '\\']);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['priority'])) {
+            $query->where('priority', $filters['priority']);
+        }
+
+        if (!empty($filters['assignee_id'])) {
+            $query->where('assignee_id', $filters['assignee_id']);
+        }
+
+        return $query
             ->orderBy('position')
             ->orderBy('id')
             ->get();

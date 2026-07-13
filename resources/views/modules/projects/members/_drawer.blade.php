@@ -103,19 +103,21 @@
 
     function toggleCurrentMemberActive() {
         if (!currentMemberData || !currentMemberData.toggleActiveUrl) return;
-        if (!confirm(@js(__('projects.confirm_toggle_active')))) return;
 
-        var form = document.getElementById('memberToggleActiveForm');
-        form.action = currentMemberData.toggleActiveUrl;
-        form.submit();
+        confirmAction(@js(__('projects.confirm_toggle_active')), function () {
+            var form = document.getElementById('memberToggleActiveForm');
+            form.action = currentMemberData.toggleActiveUrl;
+            form.submit();
+        });
     }
 
     function deleteCurrentMember() {
         if (!currentMemberData || !currentMemberData.deleteUrl) return;
-        if (!confirm(@js(__('projects.confirm_remove_member')))) return;
 
-        var form = document.getElementById('memberDeleteForm');
-        form.action = currentMemberData.deleteUrl;
-        form.submit();
+        confirmAction(@js(__('projects.confirm_remove_member')), function () {
+            var form = document.getElementById('memberDeleteForm');
+            form.action = currentMemberData.deleteUrl;
+            form.submit();
+        });
     }
 </script>
