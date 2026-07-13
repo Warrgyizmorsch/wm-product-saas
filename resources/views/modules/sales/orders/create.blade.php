@@ -108,8 +108,8 @@
                         </tbody>
                     </x-ui.odoo-form-ui>
                 </div>
-                <div class="mt-2.5">
-                    <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow">
+                <div class="mt-3">
+                    <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
                         <i class="feather-plus me-1"></i>Add a product
                     </button>
                 </div>
@@ -120,8 +120,7 @@
                 <div class="col-md-7">
                     <div class="pe-md-4">
                         <div class="mb-3">
-                            <label class="fw-semibold text-muted mb-1 fs-12">Terms & Conditions</label>
-                            <textarea name="terms_conditions" class="form-control" rows="3" placeholder="Define payment terms, delivery schedules, etc." style="border-radius: 4px; font-size: 13px;">{{ old('terms_conditions', $prefillQuotation?->terms_conditions) }}</textarea>
+                            <x-ui.odoo-form-ui type="editor" label="Terms & Conditions" name="terms_conditions" editorHeight="ht-150" :errorText="$errors->first('terms_conditions')">{!! old('terms_conditions', $prefillQuotation?->terms_conditions) !!}</x-ui.odoo-form-ui>
                         </div>
                         <div class="mb-3">
                             <label class="fw-semibold text-muted mb-1 fs-12">Internal Notes</label>
