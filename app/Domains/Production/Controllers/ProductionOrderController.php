@@ -5,6 +5,7 @@ namespace App\Domains\Production\Controllers;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionOrderRequest;
 use App\Domains\Production\Models\ProductionOrderReservation;
 use App\Domains\Production\Requests\StoreProductionOrderRequest;
 use App\Domains\Production\Requests\UpdateProductionOrderRequest;
@@ -74,6 +75,17 @@ class ProductionOrderController extends Controller
         $salesOrderId = $request->query('sales_order_id');
         $salesOrder = null;
         $salesOrderItems = collect();
+        $tenantId = require_tenant_id();
+        $productionOrderRequests = ProductionOrderRequest::where('tenant_id', $tenantId)
+            ->where('status', 'draft')
+            ->whereNull('production_order_id')
+            ->with([
+                'product',
+                'deliveryOrderItem.deliveryOrder.salesOrder.customer',
+                'deliveryOrderItem.salesOrderItem.salesOrder',
+            ])
+            ->orderByDesc('id')
+            ->get();
 
         if ($salesOrderId) {
             $salesOrder = SalesOrder::with(['items.product'])->findOrFail($salesOrderId);
@@ -85,7 +97,7 @@ class ProductionOrderController extends Controller
             $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
         }
 
-        return view('modules.production.orders.create', compact('products', 'salesOrder', 'salesOrderItems'));
+        return view('modules.production.orders.create', compact('products', 'salesOrder', 'salesOrderItems', 'productionOrderRequests'));
     }
 
     public function store(StoreProductionOrderRequest $request)

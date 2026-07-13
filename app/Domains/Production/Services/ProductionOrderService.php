@@ -128,6 +128,21 @@ class ProductionOrderService
     public function createDirect(array $data, int $tenantId, ?int $userId = null): ProductionOrder
     {
         return DB::transaction(function () use ($data, $tenantId, $userId) {
+            $selectedRequest = null;
+            if (! empty($data['production_order_request_id'])) {
+                $selectedRequest = ProductionOrderRequest::where('tenant_id', $tenantId)
+                    ->where('status', 'draft')
+                    ->whereNull('production_order_id')
+                    ->with(['deliveryOrderItem.deliveryOrder'])
+                    ->lockForUpdate()
+                    ->findOrFail($data['production_order_request_id']);
+
+                $data['product_id'] = $selectedRequest->product_id;
+                $data['quantity_ordered'] = $selectedRequest->quantity_requested;
+                $data['sales_order_id'] = $selectedRequest->deliveryOrderItem?->deliveryOrder?->sales_order_id;
+                $data['sales_order_item_id'] = $selectedRequest->deliveryOrderItem?->sales_order_item_id;
+            }
+
             $productId = $data['product_id'];
             $quantity = (float) $data['quantity_ordered'];
 
@@ -171,7 +186,12 @@ class ProductionOrderService
                 'created_by' => $userId,
             ]);
 
-            if (! empty($data['sales_order_item_id'])) {
+            if ($selectedRequest) {
+                $selectedRequest->update([
+                    'production_order_id' => $order->id,
+                    'status' => 'production-order-created',
+                ]);
+            } elseif (! empty($data['sales_order_item_id'])) {
                 $request = ProductionOrderRequest::where('tenant_id', $tenantId)
                     ->whereNull('production_order_id')
                     ->whereIn('status', ['draft', 'approved'])
@@ -184,7 +204,7 @@ class ProductionOrderService
                 if ($request) {
                     $request->update([
                         'production_order_id' => $order->id,
-                        'status' => 'approved',
+                        'status' => 'production-order-created',
                     ]);
                 }
             }
