@@ -30,9 +30,9 @@ class TaskService
     ) {
     }
 
-    public function list(Project $project): Collection
+    public function list(Project $project, array $filters = []): Collection
     {
-        return $this->tasks->getForProject($project->id);
+        return $this->tasks->getForProject($project->id, $filters);
     }
 
     public function find(int $id): ?Task

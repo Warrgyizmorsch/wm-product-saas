@@ -109,24 +109,6 @@
         </div>
     </div>
 
-    <form id="taskSubtaskToggleForm" method="POST" action="" class="d-none">
-        @csrf
-        @method('PATCH')
-    </form>
-    <form id="taskSubtaskRenameForm" method="POST" action="" class="d-none">
-        @csrf
-        @method('PUT')
-        <input type="hidden" name="title" id="taskSubtaskRenameTitle">
-    </form>
-    <form id="taskSubtaskDeleteForm" method="POST" action="" class="d-none">
-        @csrf
-        @method('DELETE')
-    </form>
-    <form id="taskDependencyDeleteForm" method="POST" action="" class="d-none">
-        @csrf
-        @method('DELETE')
-    </form>
-
     <x-slot name="footer">
         <button type="button" class="btn btn-outline-danger" onclick="deleteCurrentTask()">
             <i class="feather feather-trash-2 me-1"></i>{{ __('projects.remove') }}
@@ -139,6 +121,16 @@
 
 <script>
     var currentTaskData = null;
+
+    // Single source of truth for drawer data, keyed by task id. The row's onclick
+    // payload only seeds this store on a task's first open; every open after that
+    // (and every successful AJAX mutation, via the shared object reference) reads
+    // the latest in-memory state instead of the page-load snapshot.
+    //
+    // Stores the latest client-side task payload for tasks opened during this page session.
+    // Any future AJAX mutation that updates task fields should also update this store.
+    // Full-page form submissions naturally recreate it after reload.
+    var taskDrawerStore = {};
 
     var taskStatusVariants = {
         'In Progress': 'info',
@@ -160,6 +152,11 @@
 
     function openTaskDetailsDrawer(data) {
         data = data || {};
+
+        if (data.id != null) {
+            data = taskDrawerStore[data.id] || (taskDrawerStore[data.id] = data);
+        }
+
         currentTaskData = data;
 
         document.getElementById('taskDetailTitle').textContent = data.title || '—';
@@ -253,6 +250,7 @@
         var completed = subtasks.filter(function (s) { return s.isCompleted; }).length;
         progress.textContent = completed + '/' + subtasks.length;
 
+        var scrollTop = list.scrollTop;
         list.innerHTML = '';
         subtasks.forEach(function (subtask) {
             var row = document.createElement('div');
@@ -262,7 +260,17 @@
             checkbox.type = 'checkbox';
             checkbox.className = 'form-check-input flex-shrink-0';
             checkbox.checked = !!subtask.isCompleted;
-            checkbox.onchange = function () { submitHiddenForm('taskSubtaskToggleForm', subtask.toggleUrl); };
+            checkbox.onchange = function () {
+                checkbox.disabled = true;
+                drawerRequest(subtask.toggleUrl, 'PATCH')
+                    .then(function (result) {
+                        applySubtasksResult(result);
+                    })
+                    .catch(function () {
+                        checkbox.checked = !checkbox.checked;
+                        checkbox.disabled = false;
+                    });
+            };
 
             var title = document.createElement('input');
             title.type = 'text';
@@ -271,8 +279,15 @@
             if (subtask.isCompleted) title.style.textDecoration = 'line-through';
             title.onblur = function () {
                 if (title.value && title.value !== subtask.title) {
-                    document.getElementById('taskSubtaskRenameTitle').value = title.value;
-                    submitHiddenForm('taskSubtaskRenameForm', subtask.updateUrl);
+                    title.disabled = true;
+                    drawerRequest(subtask.updateUrl, 'PUT', { title: title.value })
+                        .then(function (result) {
+                            applySubtasksResult(result);
+                        })
+                        .catch(function () {
+                            title.value = subtask.title;
+                            title.disabled = false;
+                        });
                 }
             };
 
@@ -282,7 +297,14 @@
             remove.innerHTML = '<i class="feather-x"></i>';
             remove.onclick = function () {
                 confirmAction(@js(__('projects.confirm_remove_subtask')), function () {
-                    submitHiddenForm('taskSubtaskDeleteForm', subtask.deleteUrl);
+                    remove.disabled = true;
+                    drawerRequest(subtask.deleteUrl, 'DELETE')
+                        .then(function (result) {
+                            applySubtasksResult(result);
+                        })
+                        .catch(function () {
+                            remove.disabled = false;
+                        });
                 });
             };
 
@@ -291,8 +313,16 @@
             row.appendChild(remove);
             list.appendChild(row);
         });
+        list.scrollTop = scrollTop;
 
         addForm.action = data.subtaskStoreUrl || '';
+    }
+
+    function applySubtasksResult(result) {
+        currentTaskData.subtasks = result.subtasks || [];
+        renderTaskProgress(currentTaskData);
+        renderTaskSubtasks(currentTaskData);
+        showAppToast('success', result.message);
     }
 
     function renderTaskDependencies(data) {
@@ -310,6 +340,8 @@
 
         var dependencies = data.dependencies || [];
         count.textContent = dependencies.length;
+
+        var scrollTop = list.scrollTop;
         list.innerHTML = '';
         dependencies.forEach(function (dependency) {
             var row = document.createElement('div');
@@ -325,7 +357,14 @@
             remove.innerHTML = '<i class="feather-x"></i>';
             remove.onclick = function () {
                 confirmAction(@js(__('projects.confirm_remove_dependency')), function () {
-                    submitHiddenForm('taskDependencyDeleteForm', dependency.deleteUrl);
+                    remove.disabled = true;
+                    drawerRequest(dependency.deleteUrl, 'DELETE')
+                        .then(function (result) {
+                            applyDependenciesResult(result);
+                        })
+                        .catch(function () {
+                            remove.disabled = false;
+                        });
                 });
             };
 
@@ -333,6 +372,7 @@
             row.appendChild(remove);
             list.appendChild(row);
         });
+        list.scrollTop = scrollTop;
 
         select.innerHTML = '<option value="">' + @js(__('projects.select_option')) + '</option>';
         (data.otherTasks || []).forEach(function (option) {
@@ -345,12 +385,95 @@
         addForm.action = data.dependencyStoreUrl || '';
     }
 
-    function submitHiddenForm(formId, action) {
-        if (!action) return;
-        var form = document.getElementById(formId);
-        form.action = action;
-        form.submit();
+    function applyDependenciesResult(result) {
+        currentTaskData.dependencies = result.dependencies || [];
+        currentTaskData.otherTasks = result.otherTasks || [];
+        renderTaskDependencies(currentTaskData);
+        showAppToast('success', result.message);
     }
+
+    function csrfToken() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.content : '';
+    }
+
+    var drawerRequestInFlight = false;
+
+    // Single fetch helper for all subtask/dependency mutations: keeps the drawer
+    // open, guards against duplicate submits, and surfaces errors as toasts so
+    // callers only need to handle re-rendering their own section on success.
+    function drawerRequest(url, method, body) {
+        if (drawerRequestInFlight) {
+            return Promise.reject(new Error('busy'));
+        }
+        drawerRequestInFlight = true;
+
+        var options = {
+            method: method,
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+        };
+
+        if (body) {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(body);
+        }
+
+        return fetch(url, options)
+            .then(function (response) {
+                return response.json().catch(function () { return {}; }).then(function (data) {
+                    if (!response.ok) {
+                        var errors = data.errors ? Object.values(data.errors) : [];
+                        var message = (errors[0] && errors[0][0]) || data.message || @js(__('projects.something_went_wrong'));
+                        showAppToast('error', message);
+                        throw new Error(message);
+                    }
+                    return data;
+                });
+            })
+            .finally(function () {
+                drawerRequestInFlight = false;
+            });
+    }
+
+    document.getElementById('taskSubtaskAddForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var form = event.target;
+        var input = form.querySelector('input[name="title"]');
+        var button = form.querySelector('button[type="submit"]');
+        if (!input.value || !form.action) return;
+
+        button.disabled = true;
+        drawerRequest(form.action, 'POST', { title: input.value })
+            .then(function (result) {
+                applySubtasksResult(result);
+                input.value = '';
+            })
+            .finally(function () {
+                button.disabled = false;
+            });
+    });
+
+    document.getElementById('taskDependencyAddForm').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var form = event.target;
+        var select = form.querySelector('select[name="depends_on_task_id"]');
+        var button = form.querySelector('button[type="submit"]');
+        if (!select.value || !form.action) return;
+
+        button.disabled = true;
+        drawerRequest(form.action, 'POST', { depends_on_task_id: select.value })
+            .then(function (result) {
+                applyDependenciesResult(result);
+                select.value = '';
+            })
+            .finally(function () {
+                button.disabled = false;
+            });
+    });
 
     function deleteCurrentTask() {
         if (!currentTaskData || !currentTaskData.deleteUrl) return;

@@ -25,25 +25,9 @@
                 estimatedHours: @js($task->estimated_hours),
                 subtaskStoreUrl: @js(route('projects.tasks.subtasks.store', [$project, $task])),
                 dependencyStoreUrl: @js(route('projects.tasks.dependencies.store', [$project, $task])),
-                subtasks: @js($task->subTasks->map(fn ($subTask) => [
-                    'id' => $subTask->id,
-                    'title' => $subTask->title,
-                    'isCompleted' => $subTask->is_completed,
-                    'assigneeId' => $subTask->assignee_id,
-                    'assigneeName' => $subTask->assignee?->name,
-                    'updateUrl' => route('projects.tasks.subtasks.update', [$project, $task, $subTask]),
-                    'toggleUrl' => route('projects.tasks.subtasks.toggle-complete', [$project, $task, $subTask]),
-                    'deleteUrl' => route('projects.tasks.subtasks.destroy', [$project, $task, $subTask]),
-                ])),
-                dependencies: @js($task->dependencies->map(fn ($dependency) => [
-                    'id' => $dependency->id,
-                    'label' => $dependency->dependsOn?->task_code . ' — ' . $dependency->dependsOn?->title,
-                    'deleteUrl' => route('projects.tasks.dependencies.destroy', [$project, $task, $dependency]),
-                ])),
-                otherTasks: @js($allTasks->except($task->id)->map(fn ($otherTask) => [
-                    'id' => $otherTask->id,
-                    'label' => $otherTask->task_code . ' — ' . $otherTask->title,
-                ])->values()),
+                subtasks: @js(\App\Domains\Projects\Support\TaskDrawerPayload::subtasks($project, $task)),
+                dependencies: @js(\App\Domains\Projects\Support\TaskDrawerPayload::dependencies($project, $task)),
+                otherTasks: @js(\App\Domains\Projects\Support\TaskDrawerPayload::otherTasks($task, $allTasks)),
             })"
         @endif class="d-flex align-items-center gap-2 flex-grow-1 text-truncate" style="min-width: 220px;">
         <span class="fs-11 text-muted font-monospace text-nowrap">{{ $task->task_code }}</span>

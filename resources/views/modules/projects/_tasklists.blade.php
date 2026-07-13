@@ -1,27 +1,119 @@
-<div class="d-flex align-items-center justify-content-between mb-3">
+@php
+    $taskFilters = $taskFilters ?? [];
+    $hasActiveTaskFilters = $hasActiveTaskFilters ?? false;
+    $assigneeOptions = $members->where('is_active', true)->sortBy(fn ($member) => $member->user?->name);
+    $visibleTaskLists = $hasActiveTaskFilters
+        ? $taskLists->filter(fn ($taskList) => $tasksByList->get($taskList->id, collect())->isNotEmpty())
+        : $taskLists;
+@endphp
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
     <h5 class="fw-bold text-dark mb-0">
         <i class="feather-list me-2 text-primary"></i>{{ __('projects.tasklists') }}
     </h5>
-    @if ($canManageTaskLists)
-        <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListModal('add')">
-            <i class="feather-plus me-1"></i>{{ __('projects.add_tasklist') }}
-        </button>
-    @endif
-</div>
+    <div class="d-flex align-items-center gap-2">
+        <form method="GET" action="{{ route('projects.show', $project) }}" class="d-inline">
+            <input type="hidden" name="tab" value="tasklists">
+            <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('projects.filter_options') }}</h6>
 
-@forelse ($taskLists as $index => $taskList)
-    @include('modules.projects.tasklists._list-card')
-@empty
-    <div class="text-center py-5">
-        <div class="avatar-text avatar-lg bg-soft-primary text-primary mx-auto mb-3">
-            <i class="feather-list fs-2"></i>
-        </div>
-        <h6 class="fw-bold text-dark mb-1">{{ __('projects.no_tasklists') }}</h6>
-        <p class="fs-12 text-muted mb-3">{{ __('projects.no_tasklists_hint') }}</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.search_keywords') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" placeholder="{{ __('projects.task_search_placeholder') }}" value="{{ $taskFilters['search'] ?? '' }}" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.status') }}</label>
+                        <x-ui.odoo-form-ui type="select" name="status">
+                            <option value="">{{ __('projects.all_statuses') }}</option>
+                            @foreach ($taskStatuses as $statusOption)
+                                <option value="{{ $statusOption }}" @selected(($taskFilters['status'] ?? '') === $statusOption)>
+                                    {{ __('projects.task_statuses.' . $statusOption) }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.priority') }}</label>
+                        <x-ui.odoo-form-ui type="select" name="priority">
+                            <option value="">{{ __('projects.all_priorities') }}</option>
+                            @foreach ($taskPriorities as $priorityOption)
+                                <option value="{{ $priorityOption }}" @selected(($taskFilters['priority'] ?? '') === $priorityOption)>
+                                    {{ __('projects.task_priorities.' . $priorityOption) }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.task_assignee') }}</label>
+                        <x-ui.odoo-form-ui type="select" name="assignee_id" select2Selector="default">
+                            <option value="">{{ __('projects.all_assignees') }}</option>
+                            @foreach ($assigneeOptions as $member)
+                                <option value="{{ $member->user_id }}" @selected((string) ($taskFilters['assignee_id'] ?? '') === (string) $member->user_id)>
+                                    {{ $member->user?->name }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-end mt-4">
+                        <a href="{{ route('projects.show', ['project' => $project, 'tab' => 'tasklists']) }}" class="btn btn-sm btn-light border">{{ __('projects.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('projects.apply_filters') }}</button>
+                    </div>
+                </x-ui.filter>
+        </form>
         @if ($canManageTaskLists)
             <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListModal('add')">
                 <i class="feather-plus me-1"></i>{{ __('projects.add_tasklist') }}
             </button>
+        @endif
+    </div>
+</div>
+
+@if ($hasActiveTaskFilters)
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        @if (!empty($taskFilters['search']))
+            <x-ui.badge variant="secondary" soft>{{ __('projects.search_keywords') }}: "{{ $taskFilters['search'] }}"</x-ui.badge>
+        @endif
+        @if (!empty($taskFilters['status']))
+            <x-ui.badge variant="secondary" soft>{{ __('projects.status') }}: {{ __('projects.task_statuses.' . $taskFilters['status']) }}</x-ui.badge>
+        @endif
+        @if (!empty($taskFilters['priority']))
+            <x-ui.badge variant="secondary" soft>{{ __('projects.priority') }}: {{ __('projects.task_priorities.' . $taskFilters['priority']) }}</x-ui.badge>
+        @endif
+        @if (!empty($taskFilters['assignee_id']))
+            @php $assigneeChip = $assigneeOptions->firstWhere('user_id', (int) $taskFilters['assignee_id']); @endphp
+            <x-ui.badge variant="secondary" soft>{{ __('projects.task_assignee') }}: {{ $assigneeChip->user?->name ?? __('projects.unassigned') }}</x-ui.badge>
+        @endif
+        <a href="{{ route('projects.show', ['project' => $project, 'tab' => 'tasklists']) }}" class="fs-11 text-danger fw-semibold">
+            <i class="feather-x me-1"></i>{{ __('projects.clear_filters') }}
+        </a>
+    </div>
+@endif
+
+@forelse ($visibleTaskLists as $index => $taskList)
+    @include('modules.projects.tasklists._list-card')
+@empty
+    <div class="text-center py-5">
+        <div class="avatar-text avatar-lg bg-soft-primary text-primary mx-auto mb-3">
+            <i class="feather-{{ $hasActiveTaskFilters ? 'search' : 'list' }} fs-2"></i>
+        </div>
+        @if ($hasActiveTaskFilters)
+            <h6 class="fw-bold text-dark mb-1">{{ __('projects.no_matching_tasks') }}</h6>
+            <p class="fs-12 text-muted mb-3">{{ __('projects.no_matching_tasks_hint') }}</p>
+            <a href="{{ route('projects.show', ['project' => $project, 'tab' => 'tasklists']) }}" class="btn btn-light btn-sm border">
+                {{ __('projects.clear_filters') }}
+            </a>
+        @else
+            <h6 class="fw-bold text-dark mb-1">{{ __('projects.no_tasklists') }}</h6>
+            <p class="fs-12 text-muted mb-3">{{ __('projects.no_tasklists_hint') }}</p>
+            @if ($canManageTaskLists)
+                <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListModal('add')">
+                    <i class="feather-plus me-1"></i>{{ __('projects.add_tasklist') }}
+                </button>
+            @endif
         @endif
     </div>
 @endforelse

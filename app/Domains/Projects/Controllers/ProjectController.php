@@ -65,7 +65,7 @@ class ProjectController extends Controller
             ->with('success', 'Project successfully created!');
     }
 
-    public function show(Project $project): View
+    public function show(Project $project, Request $request): View
     {
         $project->load(['customer', 'owner', 'manager']);
 
@@ -82,6 +82,16 @@ class ProjectController extends Controller
         $allTasks = $this->tasks->list($project);
         $tasksByList = $allTasks->groupBy('task_list_id');
 
+        $taskFilters = array_filter(
+            $request->only(['search', 'status', 'priority', 'assignee_id']),
+            fn ($value) => trim((string) $value) !== '',
+        );
+        $hasActiveTaskFilters = $taskFilters !== [];
+
+        $filteredTasksByList = $hasActiveTaskFilters
+            ? $this->tasks->list($project, $taskFilters)->groupBy('task_list_id')
+            : $tasksByList;
+
         return view('modules.projects.show', [
             'project'             => $project,
             'members'             => $members,
@@ -90,8 +100,12 @@ class ProjectController extends Controller
             'canManageMilestones' => $canManageMilestones,
             'taskLists'           => $taskLists,
             'canManageTaskLists'  => $canManageTaskLists,
-            'tasksByList'         => $tasksByList,
+            'tasksByList'         => $filteredTasksByList,
             'allTasks'            => $allTasks->keyBy('id'),
+            'taskFilters'         => $taskFilters,
+            'hasActiveTaskFilters' => $hasActiveTaskFilters,
+            'taskStatuses'        => Task::STATUSES,
+            'taskPriorities'      => Task::PRIORITIES,
             'canCreateTasks'      => $canCreateTasks,
             'dashboard'           => $this->projects->dashboardStats($project, $taskLists, $tasksByList, $allTasks, $milestones, $members),
             'recentActivities'    => $this->activity->forProject($project, 5),
