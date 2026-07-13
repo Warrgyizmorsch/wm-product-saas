@@ -150,4 +150,15 @@ class CrmAuthorizationTest extends TestCase
         $response->assertRedirect(route('crm.leads.index'));
         $this->assertSoftDeleted($lead);
     }
+
+    /** @test */
+    public function authenticated_user_with_lead_view_permission_can_download_sample(): void
+    {
+        $response = $this->actingAs($this->salesManager)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('crm.leads.downloadSample'));
+
+        $response->assertOk();
+        $response->assertHeader('content-disposition', 'attachment; filename=lead_sample.xlsx');
+    }
 }

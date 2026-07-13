@@ -96,6 +96,31 @@
                         </div>
                     </x-ui.filter>
                 </form>
+
+                <!-- Action Dropdown for Import/Export/Download Sample (Action button style) -->
+                <div class="dropdown d-inline-block">
+                    <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" title="Import / Export Options">
+                        <i class="feather feather-paperclip"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
+                        <li>
+                            <a href="javascript:void(0);" class="dropdown-item" onclick="alert('Export Excel UI action triggered! (Mock functionality)');">
+                                <i class="feather-download me-2 text-muted fs-12"></i>Export Excel
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('crm.leads.downloadSample') }}" class="dropdown-item">
+                                <i class="feather-file-text me-2 text-muted fs-12"></i>Download Sample
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a href="javascript:void(0);" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importLeadsModal">
+                                <i class="feather-upload me-2 text-muted fs-12"></i>Import
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -248,10 +273,27 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <div class="mt-4">
-            {{ $leads->links() }}
+        <div class="mt-auto pt-3">
+            <x-ui.pagination 
+                :currentPage="$leads->currentPage()" 
+                :totalPages="$leads->lastPage()" 
+                :totalResults="$leads->total()" 
+                :perPage="$leads->perPage()" />
         </div>
     </div>
+
+    {{-- Import Leads Modal (Pure UI Mock) --}}
+    <x-ui.modal id="importLeadsModal" title="Import Leads via CSV" submitText="Import File" :centered="true">
+        <form method="POST" action="javascript:void(0);" enctype="multipart/form-data" id="importLeadsForm">
+            @csrf
+            <p class="fs-13 text-muted mb-3">Upload a CSV file containing lead records. Make sure the headers match the column names in the sample template file.</p>
+            <x-ui.odoo-form-ui type="file" name="file" label="CSV File" required placeholder="Choose CSV file..." />
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" onclick="alert('Import File UI triggered! (Mock UI demo)'); $('#importLeadsModal').modal('hide');">Import File</button>
+        </x-slot>
+    </x-ui.modal>
 @endsection
 
 @push('styles')
