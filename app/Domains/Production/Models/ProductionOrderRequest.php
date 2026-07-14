@@ -5,8 +5,8 @@ namespace App\Domains\Production\Models;
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Sales\Models\DeliveryOrderItem;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProductionOrderRequest extends BaseModel
 {
@@ -22,6 +22,7 @@ class ProductionOrderRequest extends BaseModel
         'status',
         'notes',
         'created_by',
+        'production_plan_id',
         'production_order_id',
     ];
 
@@ -42,5 +43,10 @@ class ProductionOrderRequest extends BaseModel
     public function productionOrder(): BelongsTo
     {
         return $this->belongsTo(ProductionOrder::class, 'production_order_id');
+    }
+
+    public function productionPlan(): BelongsTo
+    {
+        return $this->belongsTo(ProductionPlan::class, 'production_plan_id');
     }
 }

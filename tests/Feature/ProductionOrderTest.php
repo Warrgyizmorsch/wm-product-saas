@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domains\CRM\Models\Customer;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\ProductWarehouseStock;
 use App\Domains\Inventory\Models\Uom;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Production\Models\Machine;
@@ -48,6 +49,8 @@ class ProductionOrderTest extends TestCase
     private ProductionBom $bom;
 
     private Routing $routing;
+
+    private Warehouse $warehouse;
 
     protected function setUp(): void
     {
@@ -98,6 +101,24 @@ class ProductionOrderTest extends TestCase
             'type' => 'raw_material',
             'unit_cost' => 45.00,
             'status' => 'active',
+        ]);
+
+        $this->warehouse = Warehouse::create([
+            'tenant_id' => $this->tenantId,
+            'name' => 'Production Store',
+            'code' => 'PROD',
+            'status' => 'active',
+            'is_default' => true,
+        ]);
+
+        ProductWarehouseStock::create([
+            'tenant_id' => $this->tenantId,
+            'product_id' => $this->rawMaterial->id,
+            'warehouse_id' => $this->warehouse->id,
+            'quantity' => 100,
+            'reserved_qty' => 0,
+            'available_qty' => 100,
+            'unit_cost' => 45,
         ]);
 
         $this->workCenter = WorkCenter::create([
@@ -203,6 +224,8 @@ class ProductionOrderTest extends TestCase
         // (BOM qty 2.0 * Order qty 5.0) * (1 + 10% scrap) = 11.0
         $this->assertCount(1, $order->reservations);
         $this->assertEquals(11.0, $order->reservations->first()->quantity_planned);
+        $this->assertEquals(11.0, $order->reservations->first()->quantity_reserved);
+        $this->assertEquals($this->warehouse->id, $order->reservations->first()->warehouse_id);
     }
 
     public function test_can_create_direct_order_from_draft_production_order_request(): void
@@ -369,6 +392,7 @@ class ProductionOrderTest extends TestCase
         $this->assertEquals(5.0, $reservation->quantity_issued);
         // Reserved quantity drops from 11.0 to 6.0
         $this->assertEquals(6.0, $reservation->quantity_reserved);
+        $this->assertEquals(95.0, ProductWarehouseStock::firstWhere('product_id', $this->rawMaterial->id)->quantity);
 
         // Return unused raw materials
         $response = $this->post(route('production.orders.return', $order->id), [
@@ -381,6 +405,7 @@ class ProductionOrderTest extends TestCase
         $reservation->refresh();
 
         $this->assertEquals(3.0, $reservation->quantity_issued);
+        $this->assertEquals(97.0, ProductWarehouseStock::firstWhere('product_id', $this->rawMaterial->id)->quantity);
     }
 
     public function test_operation_execution_progress_sequence(): void
@@ -463,6 +488,12 @@ class ProductionOrderTest extends TestCase
 
         $order->refresh();
         $this->assertEquals(3.0, $order->quantity_produced);
+        $this->assertDatabaseHas('product_warehouse_stocks', [
+            'tenant_id' => $this->tenantId,
+            'product_id' => $this->finishedGood->id,
+            'warehouse_id' => $this->warehouse->id,
+            'quantity' => 3.0,
+        ]);
     }
 
     public function test_can_calculate_cost_analysis_variance(): void

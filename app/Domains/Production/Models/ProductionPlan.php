@@ -4,28 +4,36 @@ namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
-use App\Models\User;
+use App\Domains\Sales\Models\SalesOrder;
+use App\Domains\Sales\Models\SalesOrderItem;
 use App\Models\Concerns\Loggable;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 
 class ProductionPlan extends BaseModel
 {
-    use HasFactory, SoftDeletes, Loggable;
+    use HasFactory, Loggable, SoftDeletes;
 
     protected $table = 'production_plans';
 
-    public const STATUS_DRAFT            = 'draft';
+    public const STATUS_DRAFT = 'draft';
+
     public const STATUS_PENDING_APPROVAL = 'pending_approval';
-    public const STATUS_APPROVED         = 'approved';
-    public const STATUS_MRP_GENERATED    = 'mrp_generated';
-    public const STATUS_RELEASED         = 'released';
-    public const STATUS_COMPLETED        = 'completed';
-    public const STATUS_CLOSED           = 'closed';
-    public const STATUS_CANCELLED        = 'cancelled';
+
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_MRP_GENERATED = 'mrp_generated';
+
+    public const STATUS_RELEASED = 'released';
+
+    public const STATUS_COMPLETED = 'completed';
+
+    public const STATUS_CLOSED = 'closed';
+
+    public const STATUS_CANCELLED = 'cancelled';
 
     public const STATUSES = [
         self::STATUS_DRAFT,
@@ -45,6 +53,8 @@ class ProductionPlan extends BaseModel
         'product_id',
         'bom_id',
         'routing_id',
+        'sales_order_id',
+        'sales_order_item_id',
         'quantity',
         'start_date',
         'end_date',
@@ -56,9 +66,9 @@ class ProductionPlan extends BaseModel
     ];
 
     protected $casts = [
-        'quantity'    => 'float',
-        'start_date'  => 'date',
-        'end_date'    => 'date',
+        'quantity' => 'float',
+        'start_date' => 'date',
+        'end_date' => 'date',
         'approved_at' => 'datetime',
     ];
 
@@ -75,6 +85,16 @@ class ProductionPlan extends BaseModel
     public function routing(): BelongsTo
     {
         return $this->belongsTo(Routing::class, 'routing_id')->withoutGlobalScopes();
+    }
+
+    public function salesOrder(): BelongsTo
+    {
+        return $this->belongsTo(SalesOrder::class, 'sales_order_id');
+    }
+
+    public function salesOrderItem(): BelongsTo
+    {
+        return $this->belongsTo(SalesOrderItem::class, 'sales_order_item_id');
     }
 
     public function creator(): BelongsTo

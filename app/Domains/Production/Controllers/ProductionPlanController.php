@@ -2,17 +2,18 @@
 
 namespace App\Domains\Production\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Domains\Production\Models\ProductionPlan;
-use App\Domains\Production\Models\ProductionBom;
-use App\Domains\Production\Models\Routing;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Production\DTO\ProductionPlanDTO;
+use App\Domains\Production\Models\ProductionBom;
+use App\Domains\Production\Models\ProductionOrderRequest;
+use App\Domains\Production\Models\ProductionPlan;
+use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Requests\StoreProductionPlanRequest;
 use App\Domains\Production\Requests\UpdateProductionPlanRequest;
-use App\Domains\Production\Services\ProductionPlanService;
 use App\Domains\Production\Services\MrpEngineService;
 use App\Domains\Production\Services\PlanningValidationService;
+use App\Domains\Production\Services\ProductionPlanService;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -35,13 +36,13 @@ class ProductionPlanController extends Controller
         $query = ProductionPlan::with(['product', 'bom', 'routing']);
 
         if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
+            $search = '%'.$request->input('search').'%';
             $query->where(function ($q) use ($search) {
                 $q->where('plan_number', 'like', $search)
-                  ->orWhere('name', 'like', $search)
-                  ->orWhereHas('product', function ($p) use ($search) {
-                      $p->where('name', 'like', $search)->orWhere('sku', 'like', $search);
-                  });
+                    ->orWhere('name', 'like', $search)
+                    ->orWhereHas('product', function ($p) use ($search) {
+                        $p->where('name', 'like', $search)->orWhere('sku', 'like', $search);
+                    });
             });
         }
 
@@ -60,10 +61,10 @@ class ProductionPlanController extends Controller
         $sortBy = $request->input('sort_by', 'id');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        if (!in_array($sortBy, ['id', 'plan_number', 'name', 'quantity', 'start_date'])) {
+        if (! in_array($sortBy, ['id', 'plan_number', 'name', 'quantity', 'start_date'])) {
             $sortBy = 'id';
         }
-        if (!in_array($sortOrder, ['asc', 'desc'])) {
+        if (! in_array($sortOrder, ['asc', 'desc'])) {
             $sortOrder = 'desc';
         }
 
@@ -83,7 +84,7 @@ class ProductionPlanController extends Controller
         Gate::authorize('create', ProductionPlan::class);
 
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
-        
+
         $tenantId = require_tenant_id();
 
         // Load default BOM and Routing dropdowns
@@ -97,7 +98,19 @@ class ProductionPlanController extends Controller
             ->where('status', 'active')
             ->get();
 
-        return view('modules.production.plans.create', compact('products', 'boms', 'routings'));
+        $productionOrderRequests = ProductionOrderRequest::where('tenant_id', $tenantId)
+            ->where('status', 'draft')
+            ->whereNull('production_plan_id')
+            ->whereNull('production_order_id')
+            ->with([
+                'product',
+                'deliveryOrderItem.deliveryOrder.salesOrder.customer',
+                'deliveryOrderItem.salesOrderItem.salesOrder',
+            ])
+            ->orderByDesc('id')
+            ->get();
+
+        return view('modules.production.plans.create', compact('products', 'boms', 'routings', 'productionOrderRequests'));
     }
 
     public function store(StoreProductionPlanRequest $request)
@@ -109,6 +122,7 @@ class ProductionPlanController extends Controller
         try {
             $tenantId = require_tenant_id();
             $plan = $this->planService->create($dto, $tenantId, Auth::id());
+
             return redirect()
                 ->route('production.plans.show', $plan->id)
                 ->with('success', 'Production Plan created successfully.');
@@ -122,7 +136,7 @@ class ProductionPlanController extends Controller
         $plan = ProductionPlan::with([
             'product', 'bom', 'routing', 'creator', 'approver',
             'requirements.product', 'requirements.uom', 'requirements.sourceItem',
-            'operations.workCenter', 'operations.machine'
+            'operations.workCenter', 'operations.machine',
         ])->findOrFail($id);
 
         Gate::authorize('view', $plan);
@@ -153,7 +167,7 @@ class ProductionPlanController extends Controller
         }
 
         $products = Product::whereIn('type', ['finished_good', 'semi_finished'])->get();
-        
+
         $tenantId = require_tenant_id();
 
         $boms = ProductionBom::withoutGlobalScopes()
@@ -181,6 +195,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->update($id, $dto);
+
             return redirect()
                 ->route('production.plans.show', $plan->id)
                 ->with('success', 'Production Plan updated successfully.');
@@ -197,6 +212,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->delete($id);
+
             return redirect()
                 ->route('production.plans.index')
                 ->with('success', 'Production Plan deleted successfully.');
@@ -214,6 +230,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->submitApproval($id);
+
             return redirect()->back()->with('success', 'Plan submitted for approval.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -227,6 +244,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->approve($id, Auth::id());
+
             return redirect()->back()->with('success', 'Production Plan approved successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -240,6 +258,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->reject($id);
+
             return redirect()->back()->with('success', 'Production Plan rejected and returned to Draft status.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -253,6 +272,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->release($id);
+
             return redirect()->back()->with('success', 'Production Plan released to execution.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -266,6 +286,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->complete($id);
+
             return redirect()->back()->with('success', 'Production Plan completed.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -279,6 +300,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->close($id);
+
             return redirect()->back()->with('success', 'Production Plan closed and archived.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -292,6 +314,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->planService->cancel($id);
+
             return redirect()->back()->with('success', 'Production Plan cancelled.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -307,6 +330,7 @@ class ProductionPlanController extends Controller
 
         try {
             $this->mrpEngine->runMrp($plan);
+
             return redirect()->back()->with('success', 'MRP exploded successfully. Component requirements and capacity operations are saved.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());

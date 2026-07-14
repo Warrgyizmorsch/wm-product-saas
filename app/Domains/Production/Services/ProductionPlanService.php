@@ -2,11 +2,11 @@
 
 namespace App\Domains\Production\Services;
 
-use App\Domains\Production\Models\ProductionPlan;
-use App\Domains\Production\Models\ProductionBom;
-use App\Domains\Production\Models\Routing;
 use App\Domains\Production\DTO\ProductionPlanDTO;
-use App\Domains\Production\Repositories\ProductionBomRepository;
+use App\Domains\Production\Models\ProductionBom;
+use App\Domains\Production\Models\ProductionOrderRequest;
+use App\Domains\Production\Models\ProductionPlan;
+use App\Domains\Production\Models\Routing;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 
@@ -21,11 +21,38 @@ class ProductionPlanService
      */
     public function create(ProductionPlanDTO $dto, int $tenantId, ?int $userId = null): ProductionPlan
     {
+        $request = null;
+        if ($dto->production_order_request_id) {
+            $request = ProductionOrderRequest::where('tenant_id', $tenantId)
+                ->where('status', 'draft')
+                ->whereNull('production_plan_id')
+                ->whereNull('production_order_id')
+                ->with('deliveryOrderItem.deliveryOrder')
+                ->lockForUpdate()
+                ->findOrFail($dto->production_order_request_id);
+
+            $dto = new ProductionPlanDTO(
+                name: $dto->name,
+                product_id: (int) $request->product_id,
+                quantity: (float) $request->quantity_requested,
+                start_date: $dto->start_date,
+                end_date: $dto->end_date,
+                production_order_request_id: $dto->production_order_request_id,
+                sales_order_id: $request->deliveryOrderItem?->deliveryOrder?->sales_order_id,
+                sales_order_item_id: $request->deliveryOrderItem?->sales_order_item_id,
+                bom_id: $dto->bom_id,
+                routing_id: $dto->routing_id,
+                description: $dto->description,
+                plan_number: $dto->plan_number,
+                status: $dto->status,
+            );
+        }
+
         $planNumber = $dto->plan_number ?: $this->numberService->generateNextNumber($tenantId);
 
         // Fetch default approved BOM and active Routing if not provided
         $bomId = $dto->bom_id;
-        if (!$bomId) {
+        if (! $bomId) {
             $defaultBom = ProductionBom::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $dto->product_id)
@@ -35,7 +62,7 @@ class ProductionPlanService
         }
 
         $routingId = $dto->routing_id;
-        if (!$routingId) {
+        if (! $routingId) {
             $defaultRouting = Routing::withoutGlobalScopes()
                 ->where('tenant_id', $tenantId)
                 ->where('product_id', $dto->product_id)
@@ -48,24 +75,35 @@ class ProductionPlanService
         if ($routingId && $dto->status !== 'draft') {
             $routing = Routing::withoutGlobalScopes()->find($routingId);
             if ($routing && $routing->status !== 'active') {
-                throw new InvalidArgumentException("Only active routings can be assigned to production plans.");
+                throw new InvalidArgumentException('Only active routings can be assigned to production plans.');
             }
         }
 
-        return ProductionPlan::create([
-            'tenant_id'   => $tenantId,
+        $plan = ProductionPlan::create([
+            'tenant_id' => $tenantId,
             'plan_number' => $planNumber,
-            'name'        => $dto->name,
-            'product_id'  => $dto->product_id,
-            'bom_id'      => $bomId,
-            'routing_id'  => $routingId,
-            'quantity'    => $dto->quantity,
-            'start_date'  => $dto->start_date,
-            'end_date'    => $dto->end_date,
-            'status'      => ProductionPlan::STATUS_DRAFT,
+            'name' => $dto->name,
+            'product_id' => $dto->product_id,
+            'bom_id' => $bomId,
+            'routing_id' => $routingId,
+            'sales_order_id' => $dto->sales_order_id,
+            'sales_order_item_id' => $dto->sales_order_item_id,
+            'quantity' => $dto->quantity,
+            'start_date' => $dto->start_date,
+            'end_date' => $dto->end_date,
+            'status' => ProductionPlan::STATUS_DRAFT,
             'description' => $dto->description,
-            'created_by'  => $userId,
+            'created_by' => $userId,
         ]);
+
+        if ($request) {
+            $request->update([
+                'production_plan_id' => $plan->id,
+                'status' => 'production-plan-created',
+            ]);
+        }
+
+        return $plan;
     }
 
     /**
@@ -84,7 +122,8 @@ class ProductionPlanService
         unset($updateData['plan_number']);
         unset($updateData['status']);
 
-        $plan->update(array_filter($updateData, fn($val) => !is_null($val)));
+        $plan->update(array_filter($updateData, fn ($val) => ! is_null($val)));
+
         return $plan->fresh();
     }
 
@@ -96,7 +135,7 @@ class ProductionPlanService
         $plan = ProductionPlan::findOrFail($id);
 
         if ($plan->isFrozen()) {
-            throw new InvalidArgumentException("Approved or released Production Plans cannot be deleted.");
+            throw new InvalidArgumentException('Approved or released Production Plans cannot be deleted.');
         }
 
         return $plan->delete();
@@ -109,12 +148,12 @@ class ProductionPlanService
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (!$plan->isDraft()) {
-            throw new InvalidArgumentException("Only Draft plans can be submitted for approval.");
+        if (! $plan->isDraft()) {
+            throw new InvalidArgumentException('Only Draft plans can be submitted for approval.');
         }
 
-        if (!$plan->bom_id || !$plan->routing_id) {
-            throw new InvalidArgumentException("BOM and Routing references must be set before submitting for approval.");
+        if (! $plan->bom_id || ! $plan->routing_id) {
+            throw new InvalidArgumentException('BOM and Routing references must be set before submitting for approval.');
         }
 
         $plan->status = ProductionPlan::STATUS_PENDING_APPROVAL;
@@ -130,8 +169,8 @@ class ProductionPlanService
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (!$plan->isPendingApproval()) {
-            throw new InvalidArgumentException("Only Pending plans can be approved.");
+        if (! $plan->isPendingApproval()) {
+            throw new InvalidArgumentException('Only Pending plans can be approved.');
         }
 
         $plan->status = ProductionPlan::STATUS_APPROVED;
@@ -149,8 +188,8 @@ class ProductionPlanService
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (!$plan->isPendingApproval()) {
-            throw new InvalidArgumentException("Only Pending plans can be rejected.");
+        if (! $plan->isPendingApproval()) {
+            throw new InvalidArgumentException('Only Pending plans can be rejected.');
         }
 
         $plan->status = ProductionPlan::STATUS_DRAFT;
@@ -166,8 +205,8 @@ class ProductionPlanService
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (!$plan->isApproved() && !$plan->isMrpGenerated()) {
-            throw new InvalidArgumentException("Only Approved or MRP Generated plans can be released.");
+        if (! $plan->isApproved() && ! $plan->isMrpGenerated()) {
+            throw new InvalidArgumentException('Only Approved or MRP Generated plans can be released.');
         }
 
         $plan->status = ProductionPlan::STATUS_RELEASED;
@@ -183,8 +222,8 @@ class ProductionPlanService
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (!$plan->isReleased()) {
-            throw new InvalidArgumentException("Only Released plans can be marked as completed.");
+        if (! $plan->isReleased()) {
+            throw new InvalidArgumentException('Only Released plans can be marked as completed.');
         }
 
         $plan->status = ProductionPlan::STATUS_COMPLETED;
@@ -200,8 +239,8 @@ class ProductionPlanService
     {
         $plan = ProductionPlan::findOrFail($id);
 
-        if (!$plan->isCompleted()) {
-            throw new InvalidArgumentException("Only Completed plans can be closed.");
+        if (! $plan->isCompleted()) {
+            throw new InvalidArgumentException('Only Completed plans can be closed.');
         }
 
         $plan->status = ProductionPlan::STATUS_CLOSED;
@@ -218,7 +257,7 @@ class ProductionPlanService
         $plan = ProductionPlan::findOrFail($id);
 
         if ($plan->isClosed() || $plan->isCompleted() || $plan->isCancelled()) {
-            throw new InvalidArgumentException("Completed, closed, or already cancelled plans cannot be cancelled.");
+            throw new InvalidArgumentException('Completed, closed, or already cancelled plans cannot be cancelled.');
         }
 
         $plan->status = ProductionPlan::STATUS_CANCELLED;

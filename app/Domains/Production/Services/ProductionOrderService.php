@@ -2,6 +2,9 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Inventory\Models\ProductWarehouseStock;
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
@@ -40,6 +43,8 @@ class ProductionOrderService
                 'product_id' => $plan->product_id,
                 'bom_id' => $plan->bom_id,
                 'routing_id' => $plan->routing_id,
+                'sales_order_id' => $plan->sales_order_id,
+                'sales_order_item_id' => $plan->sales_order_item_id,
                 'quantity_ordered' => $plan->quantity,
                 'start_date' => $plan->start_date,
                 'end_date' => $plan->end_date,
@@ -49,16 +54,13 @@ class ProductionOrderService
 
             // 2. Clone Planning Requirements -> Order Reservations
             foreach ($plan->requirements as $req) {
-                ProductionOrderReservation::create([
-                    'tenant_id' => $order->tenant_id,
-                    'production_order_id' => $order->id,
-                    'bom_item_id' => $req->bom_item_id,
-                    'product_id' => $req->product_id,
-                    'quantity_planned' => $req->required_quantity,
-                    'quantity_reserved' => $req->required_quantity, // Initial auto-reservation
-                    'quantity_issued' => 0.0000,
-                    'uom_id' => $req->uom_id,
-                ]);
+                $this->createMaterialReservation(
+                    $order,
+                    $req->bom_item_id,
+                    $req->product_id,
+                    (float) $req->required_quantity,
+                    $req->uom_id
+                );
             }
 
             // 3. Clone Planning Operations -> Order Operations (snapshot)
@@ -97,6 +99,14 @@ class ProductionOrderService
             // 4. Progress Production Plan status
             $plan->status = ProductionPlan::STATUS_RELEASED;
             $plan->save();
+
+            ProductionOrderRequest::where('tenant_id', $order->tenant_id)
+                ->where('production_plan_id', $plan->id)
+                ->whereNull('production_order_id')
+                ->update([
+                    'production_order_id' => $order->id,
+                    'status' => 'production-order-created',
+                ]);
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
@@ -218,16 +228,7 @@ class ProductionOrderService
                     $plannedQty *= (1 + ($item->material_scrap_percentage / 100));
                 }
 
-                ProductionOrderReservation::create([
-                    'tenant_id' => $tenantId,
-                    'production_order_id' => $order->id,
-                    'bom_item_id' => $item->id,
-                    'product_id' => $item->material_id,
-                    'quantity_planned' => $plannedQty,
-                    'quantity_reserved' => $plannedQty,
-                    'quantity_issued' => 0.0000,
-                    'uom_id' => $item->uom_id,
-                ]);
+                $this->createMaterialReservation($order, $item->id, $item->material_id, $plannedQty, $item->uom_id);
             }
 
             // 2. Resolve & Snapshot operations directly from Routing operations
@@ -395,6 +396,8 @@ class ProductionOrderService
         }
 
         DB::transaction(function () use ($order, $userId) {
+            $this->releaseInventoryReservations($order);
+
             $order->status = ProductionOrder::STATUS_CANCELLED;
             $order->save();
 
@@ -469,6 +472,8 @@ class ProductionOrderService
         }
 
         DB::transaction(function () use ($order) {
+            $this->releaseInventoryReservations($order);
+
             // Delete child snapshots
             $order->reservations()->delete();
             $order->operations()->delete();
@@ -484,5 +489,92 @@ class ProductionOrderService
 
             $order->delete();
         });
+    }
+
+    private function createMaterialReservation(
+        ProductionOrder $order,
+        ?int $bomItemId,
+        int $productId,
+        float $plannedQty,
+        int $uomId
+    ): ProductionOrderReservation {
+        $warehouseId = $this->resolveReservationWarehouseId($order->tenant_id, $productId);
+        $reservedQty = 0.0;
+
+        $reservation = ProductionOrderReservation::create([
+            'tenant_id' => $order->tenant_id,
+            'production_order_id' => $order->id,
+            'bom_item_id' => $bomItemId,
+            'product_id' => $productId,
+            'warehouse_id' => $warehouseId,
+            'quantity_planned' => $plannedQty,
+            'quantity_reserved' => 0.0000,
+            'quantity_issued' => 0.0000,
+            'uom_id' => $uomId,
+        ]);
+
+        if ($warehouseId) {
+            $availableQty = StockService::getAvailableStock($productId, $warehouseId);
+            $reservedQty = min($plannedQty, $availableQty);
+
+            if ($reservedQty > 0) {
+                StockService::reserveStock(
+                    $order->tenant_id,
+                    $productId,
+                    $warehouseId,
+                    $reservedQty,
+                    'Production Order',
+                    $order->id,
+                    $reservation->id
+                );
+            }
+        }
+
+        $reservation->update(['quantity_reserved' => $reservedQty]);
+
+        return $reservation;
+    }
+
+    private function resolveReservationWarehouseId(int $tenantId, int $productId): ?int
+    {
+        $stock = ProductWarehouseStock::query()
+            ->where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('available_qty', '>', 0)
+            ->orderByDesc('available_qty')
+            ->first();
+
+        if ($stock) {
+            return $stock->warehouse_id;
+        }
+
+        return Warehouse::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_default', true)
+            ->value('id')
+            ?? Warehouse::query()->where('tenant_id', $tenantId)->value('id');
+    }
+
+    private function releaseInventoryReservations(ProductionOrder $order): void
+    {
+        $order->loadMissing('reservations');
+
+        foreach ($order->reservations as $reservation) {
+            if (! $reservation->warehouse_id || $reservation->quantity_reserved <= 0) {
+                continue;
+            }
+
+            StockService::releaseStock(
+                $order->tenant_id,
+                $reservation->product_id,
+                $reservation->warehouse_id,
+                (float) $reservation->quantity_reserved,
+                'Production Order',
+                $order->id,
+                $reservation->id
+            );
+
+            $reservation->update(['quantity_reserved' => 0.0]);
+        }
     }
 }
