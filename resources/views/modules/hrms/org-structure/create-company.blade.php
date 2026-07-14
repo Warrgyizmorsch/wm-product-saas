@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'ORG STRUCTURE | SaaS ERP')
-@section('page-title', 'Create Legal Entities')
-@section('breadcrumb', 'HRMS / Org Structure / Legal Entities / Create')
+@section('title', __('hrms.org_create.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.org_create.title'))
+@section('breadcrumb', 'HRMS / Org Structure / Legal Entities / ' . __('hrms.org_create.title'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('crm.customers.index') }}" variant="light" icon="feather-arrow-left">
-        Back to Customers
+        {{ __('hrms.org_create.back') }}
     </x-ui.button>
 @endsection
 
@@ -20,14 +20,14 @@
                                     @csrf
                                         <div class="mb-4 d-flex align-items-center justify-content-between">
                                             <h5 class="fw-bold mb-0 me-4">
-                                                <span class="d-block mb-2">Company Information:</span>
+                                                <span class="d-block mb-2">{{ __('hrms.org_create.company_info') }}:</span>
                                                 <!-- <span class="fs-12 fw-normal text-muted text-truncate-1-line">Following information is publicly displayed, be careful! </span> -->
                                             </h5>
-                                            <x-ui.button type="submit" variant="light-brand" size="lg">Add New</x-ui.button>
+                                            <x-ui.button type="submit" variant="light-brand" size="lg">{{ __('hrms.org_create.add_new') }}</x-ui.button>
                                         </div>
                                          <!-- Logo Section -->
                                          <div class="mb-4">
-                                             <label class="form-label fw-semibold">Logo: </label>
+                                             <label class="form-label fw-semibold">{{ __('hrms.org.tbl_logo') }}: </label>
                                              <div class="mb-4 mb-md-0 d-flex gap-4 your-brand">
                                                  <div class="wd-100 ht-100 position-relative overflow-hidden border border-gray-2 rounded">
                                                      <img src="{{ asset('assets/images/avatar/1.png') }}" class="upload-pic img-fluid rounded h-100 w-100" alt="">
@@ -37,89 +37,89 @@
                                                      <input class="file-upload" type="file" name="logo" accept="image/*" style="display: none;">
                                                  </div>
                                                  <div class="d-flex flex-column gap-1">
-                                                     <div class="fs-11 text-gray-500 mt-2"># Upload your profile</div>
-                                                     <div class="fs-11 text-gray-500"># Avatar size 150x150</div>
-                                                     <div class="fs-11 text-gray-500"># Max upload size 2mb</div>
-                                                     <div class="fs-11 text-gray-500"># Allowed file types: png, jpg, jpeg</div>
+                                                     <div class="fs-11 text-gray-500 mt-2"># {{ __('hrms.org.tbl_logo') }}</div>
+                                                     <div class="fs-11 text-gray-500">{{ __('hrms.org.avatar_size_150') }}</div>
+                                                     <div class="fs-11 text-gray-500">{{ __('hrms.org.max_upload_2mb') }}</div>
+                                                     <div class="fs-11 text-gray-500">{{ __('hrms.org.allowed_formats') }}</div>
                                                  </div>
                                              </div>
                                          </div>
                                         <!-- Row 1: Company Name & Legal Name -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <x-ui.odoo-form-ui type="input" label="Company Name" name="company_name" id="companyNameInput" :required="true" placeholder="Company Name" :errorText="$errors->first('company_name')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.company_name') }}" name="company_name" id="companyNameInput" :required="true" placeholder="{{ __('hrms.org.company_name') }}" :errorText="$errors->first('company_name')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="Legal Name" name="legal_name" id="legalNameInput" :required="true" placeholder="Legal Name" :errorText="$errors->first('legal_name')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.legal_name') }}" name="legal_name" id="legalNameInput" :required="true" placeholder="{{ __('hrms.org.legal_name') }}" :errorText="$errors->first('legal_name')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 2: GST Number & PAN Number -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <x-ui.odoo-form-ui type="input" label="GST Number" name="gst_number" id="gstNumberInput" placeholder="GST" :errorText="$errors->first('gst_number')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.gst_number') }}" name="gst_number" id="gstNumberInput" placeholder="{{ __('hrms.org.gst_number') }}" :errorText="$errors->first('gst_number')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="PAN Number" name="pan_number" id="panNumberInput" placeholder="PAN" :errorText="$errors->first('pan_number')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.pan_number') }}" name="pan_number" id="panNumberInput" placeholder="{{ __('hrms.org.pan_number') }}" :errorText="$errors->first('pan_number')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 3: CIN Number & Registration Number -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <x-ui.odoo-form-ui type="input" label="CIN Number" name="cin_number" id="cinNumberInput" placeholder="CIN" :errorText="$errors->first('cin_number')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.cin_number') }}" name="cin_number" id="cinNumberInput" placeholder="{{ __('hrms.org.cin_number') }}" :errorText="$errors->first('cin_number')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="Registration Number" name="registration_number" id="registrationNumberInput" placeholder="Registration Number" :errorText="$errors->first('registration_number')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.registration_number') }}" name="registration_number" id="registrationNumberInput" placeholder="{{ __('hrms.org.registration_number') }}" :errorText="$errors->first('registration_number')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 4: Email & Phone -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <x-ui.odoo-form-ui type="input" label="Email" name="email" id="emailInput" placeholder="Email" :errorText="$errors->first('email')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.email') }}" name="email" id="emailInput" placeholder="{{ __('hrms.org.email') }}" :errorText="$errors->first('email')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="Phone" name="phone" id="phoneInput" placeholder="Phone" :errorText="$errors->first('phone')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.phone') }}" name="phone" id="phoneInput" placeholder="{{ __('hrms.org.phone') }}" :errorText="$errors->first('phone')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 5: Website & Postal Code -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <x-ui.odoo-form-ui type="input" label="Website" name="website" id="websiteInput" placeholder="Website" :errorText="$errors->first('website')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.website') }}" name="website" id="websiteInput" placeholder="{{ __('hrms.org.website') }}" :errorText="$errors->first('website')" />
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" id="postalCodeInput" placeholder="Postal Code" :errorText="$errors->first('postal_code')" />
+                                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.postal_code') }}" name="postal_code" id="postalCodeInput" placeholder="{{ __('hrms.org.postal_code') }}" :errorText="$errors->first('postal_code')" />
                                             </div>
                                         </div>
 
                                         <!-- Row 6: Address (Full Width) -->
                                         <div class="mb-4">
-                                            <x-ui.odoo-form-ui type="textarea" label="Address" name="address" id="addressInput" rows="3" placeholder="Address" :errorText="$errors->first('address')" />
+                                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.address') }}" name="address" id="addressInput" rows="3" placeholder="{{ __('hrms.org.address') }}" :errorText="$errors->first('address')" />
                                         </div>
 
                                         <!-- Row 7: City & State -->
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <x-ui.odoo-form-ui type="select" label="City" name="city" id="cityInput" select2-selector="default" class="geo-city" :errorText="$errors->first('city')" data-initial-value="{{ old('city') }}">
-                                                    <option value="">Select City</option>
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.city') }}" name="city" id="cityInput" select2-selector="default" class="geo-city" :errorText="$errors->first('city')" data-initial-value="{{ old('city') }}">
+                                                    <option value="">{{ __('hrms.org.select_city') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="select" label="State" name="state" id="stateInput" select2-selector="default" class="geo-state" :errorText="$errors->first('state')" data-initial-value="{{ old('state') }}">
-                                                    <option value="">Select State</option>
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.state') }}" name="state" id="stateInput" select2-selector="default" class="geo-state" :errorText="$errors->first('state')" data-initial-value="{{ old('state') }}">
+                                                    <option value="">{{ __('hrms.org.select_state') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <x-ui.odoo-form-ui type="select" label="Country" name="country" id="countryInput" select2-selector="country" class="geo-country" :errorText="$errors->first('country')" data-initial-value="{{ old('country', 'United States') }}">
-                                                    <option value="">Select Country</option>
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.country') }}" name="country" id="countryInput" select2-selector="country" class="geo-country" :errorText="$errors->first('country')" data-initial-value="{{ old('country', 'United States') }}">
+                                                    <option value="">{{ __('hrms.org.select_country') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="select" label="Currency" name="currency" :required="true" select2-selector="currency" :errorText="$errors->first('currency')">
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.currency') }}" name="currency" :required="true" select2-selector="currency" :errorText="$errors->first('currency')">
                                                     <option data-currency="af">AFN - Afghan Afghani - ؋</option>
                                                     <option data-currency="al">ALL - Albanian Lek - Lek</option>
                                                     <option data-currency="dz">DZD - Algerian Dinar - دج</option>
@@ -303,14 +303,14 @@
 
                                         <div class="row mb-4">
                                             <div class="col-md-6 mb-3 mb-md-0">
-                                                <x-ui.odoo-form-ui type="select" label="Time Zone" name="time_zone" id="timezoneInput" select2-selector="tzone" class="geo-timezone" :required="true" :errorText="$errors->first('time_zone')" data-initial-value="{{ old('time_zone', 'Asia/Kolkata') }}">
-                                                    <option value="">Select Time Zone</option>
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.timezone') }}" name="time_zone" id="timezoneInput" select2-selector="tzone" class="geo-timezone" :required="true" :errorText="$errors->first('time_zone')" data-initial-value="{{ old('time_zone', 'Asia/Kolkata') }}">
+                                                    <option value="">{{ __('hrms.org.select_timezone') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="col-md-6">
-                                                <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="status" :errorText="$errors->first('status')">
-                                                        <option value="success" data-bg="bg-success" selected>Active</option>
-                                                        <option value="warning" data-bg="bg-warning">Inactive</option>
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" select2-selector="status" :errorText="$errors->first('status')">
+                                                        <option value="success" data-bg="bg-success" selected>{{ __('hrms.employees.frm_status_active') }}</option>
+                                                        <option value="warning" data-bg="bg-warning">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
