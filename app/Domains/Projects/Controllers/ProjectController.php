@@ -45,9 +45,15 @@ class ProjectController extends Controller
             'filters'  => $request->only(['status', 'search']),
         ];
 
-        if (auth()->user()->can('create', Project::class)) {
+        $canCreate = auth()->user()->can('create', Project::class);
+        $canUpdateAny = $data['projects']->contains(fn (Project $project) => auth()->user()->can('update', $project));
+
+        if ($canCreate || $canUpdateAny) {
             $data['customers'] = Customer::query()->orderBy('name')->get();
             $data['users'] = User::query()->orderBy('name')->get();
+        }
+
+        if ($canCreate) {
             $data['nextCode'] = $this->projects->getNextProjectCode();
         }
 
@@ -75,6 +81,7 @@ class ProjectController extends Controller
         $canManageMilestones = auth()->user()->can('manage', [Milestone::class, $project]);
         $canManageTaskLists = auth()->user()->can('manage', [TaskList::class, $project]);
         $canCreateTasks = auth()->user()->can('create', [Task::class, $project]);
+        $canUpdateProject = auth()->user()->can('update', $project);
 
         $members = $this->members->list($project);
         $milestones = $this->milestones->list($project);
@@ -96,6 +103,9 @@ class ProjectController extends Controller
             'project'             => $project,
             'members'             => $members,
             'canManageMembers'    => $canManageMembers,
+            'canUpdateProject'    => $canUpdateProject,
+            'customers'           => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
+            'users'               => $canUpdateProject ? User::query()->orderBy('name')->get() : collect(),
             'milestones'          => $milestones,
             'canManageMilestones' => $canManageMilestones,
             'taskLists'           => $taskLists,
@@ -115,17 +125,6 @@ class ProjectController extends Controller
             'tenantUsers'         => ($canManageMembers || $canManageMilestones || $canManageTaskLists)
                 ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
                 : collect(),
-        ]);
-    }
-
-    public function edit(Project $project): View
-    {
-        $this->authorize('update', $project);
-
-        return view('modules.projects.edit', [
-            'project'   => $project,
-            'customers' => Customer::query()->orderBy('name')->get(),
-            'users'     => User::query()->orderBy('name')->get(),
         ]);
     }
 

@@ -38,16 +38,7 @@ class UpdateProjectRequest extends FormRequest
             'budget_hours'   => ['nullable', 'numeric', 'min:0'],
             'billing_method' => ['nullable', Rule::in(Project::BILLING_METHODS)],
             'priority'       => ['required', Rule::in(Project::PRIORITIES)],
-            'status'         => [
-                'required',
-                // Closed is only reachable via the closure workflow (later milestone)
-                Rule::in([
-                    Project::STATUS_DRAFT,
-                    Project::STATUS_ACTIVE,
-                    Project::STATUS_ON_HOLD,
-                    Project::STATUS_COMPLETED,
-                ]),
-            ],
+            'status'         => ['required', Rule::in(Project::EDITABLE_STATUSES)],
             'description'    => ['nullable', 'string'],
         ];
     }

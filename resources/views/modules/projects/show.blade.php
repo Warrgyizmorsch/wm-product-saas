@@ -9,9 +9,11 @@
         <a href="javascript:void(0);" onclick="openActivityDrawer('{{ route('projects.activity', $project) }}')" class="btn btn-light">
             <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
         </a>
-        <a href="{{ route('projects.edit', $project) }}" class="btn btn-light">
-            <i class="feather-edit-2 me-2"></i>{{ __('projects.edit') }}
-        </a>
+        @can('update', $project)
+            <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#editProjectModal-{{ $project->id }}">
+                <i class="feather-edit-2 me-2"></i>{{ __('projects.edit') }}
+            </button>
+        @endcan
         <form action="{{ route('projects.destroy', $project) }}" method="POST"
               onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
             @csrf
@@ -28,7 +30,10 @@
 
 @section('content')
     <div class="erp-single-panel bg-white">
-        @if ($errors->any())
+        {{-- The edit-project modal shows its own scoped inline errors (see _form-fields.blade.php),
+             so this page-level banner is suppressed for that form to avoid showing the same
+             errors twice. It still covers tasklist/task forms, which don't have inline errorText. --}}
+        @if ($errors->any() && !old('_modal'))
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                 <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
                 <ul class="mb-0 fs-12 ps-3">
@@ -184,4 +189,10 @@
             }
         </script>
     @endpush
+
+    @can('update', $project)
+        @include('modules.projects._edit-modal', ['project' => $project, 'customers' => $customers, 'users' => $users])
+    @endcan
+
+    @include('modules.projects._modal-reopen-script')
 @endsection

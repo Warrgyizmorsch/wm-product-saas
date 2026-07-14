@@ -166,12 +166,14 @@
                             <td>{{ $project->end_date?->format('d/m/Y') ?: '—' }}</td>
                             <td class="text-end">
                                 <x-ui.action-dropdown :viewUrl="route('projects.show', $project)">
-                                    <li>
-                                        <a href="{{ route('projects.edit', $project) }}" class="dropdown-item">
-                                            <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('projects.edit') }}
-                                        </a>
-                                    </li>
-                                    <li><hr class="dropdown-divider"></li>
+                                    @can('update', $project)
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editProjectModal-{{ $project->id }}">
+                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('projects.edit') }}
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                    @endcan
                                     <li>
                                         <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
                                             @csrf
@@ -199,21 +201,21 @@
     </div>
 
     @can('create', \App\Domains\Projects\Models\Project::class)
-        <x-ui.modal id="createProjectModal" title="{{ __('projects.new_project') }}" size="lg" :scrollable="true" :static="true" :showFooter="false">
+        <x-ui.modal id="createProjectModal" title="{{ __('projects.new_project') }}" size="md" :scrollable="true" :static="true" :showFooter="false">
             <form action="{{ route('projects.store') }}" method="POST">
                 @csrf
+                @php $isCreateReopen = old('_modal') === 'createProjectModal'; @endphp
+                <input type="hidden" name="_modal" value="createProjectModal">
+                <input type="hidden" name="owner_id" value="{{ $isCreateReopen ? old('owner_id', auth()->id()) : auth()->id() }}">
+                <input type="hidden" name="start_date" value="{{ $isCreateReopen ? old('start_date', now()->format('Y-m-d')) : now()->format('Y-m-d') }}">
+                <input type="hidden" name="priority" value="{{ $isCreateReopen ? old('priority', \App\Domains\Projects\Models\Project::PRIORITY_MEDIUM) : \App\Domains\Projects\Models\Project::PRIORITY_MEDIUM }}">
+                <input type="hidden" name="status" value="{{ $isCreateReopen ? old('status', \App\Domains\Projects\Models\Project::STATUS_DRAFT) : \App\Domains\Projects\Models\Project::STATUS_DRAFT }}">
 
                 <p class="text-muted fs-12 mb-3">{{ __('projects.code_auto_generated', ['code' => $nextCode]) }}</p>
 
-                @include('modules.projects._form-fields', [
-                    'project' => null,
-                    'statusOptions' => [
-                        \App\Domains\Projects\Models\Project::STATUS_DRAFT,
-                        \App\Domains\Projects\Models\Project::STATUS_ACTIVE,
-                        \App\Domains\Projects\Models\Project::STATUS_ON_HOLD,
-                        \App\Domains\Projects\Models\Project::STATUS_COMPLETED,
-                    ],
-                ])
+                <x-ui.odoo-form-ui type="input" label="{{ __('projects.project_name') }}" name="name"
+                    :value="$isCreateReopen ? old('name') : null" :required="true"
+                    :errorText="$isCreateReopen ? $errors->first('name') : null" />
 
                 <div class="d-flex gap-2 justify-content-end pt-3 border-top mt-4">
                     <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('projects.cancel') }}</button>
@@ -224,4 +226,12 @@
             </form>
         </x-ui.modal>
     @endcan
+
+    @foreach ($paginatedProjects as $project)
+        @can('update', $project)
+            @include('modules.projects._edit-modal', ['project' => $project, 'customers' => $customers ?? collect(), 'users' => $users ?? collect()])
+        @endcan
+    @endforeach
+
+    @include('modules.projects._modal-reopen-script')
 @endsection
