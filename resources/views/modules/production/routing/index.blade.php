@@ -25,11 +25,14 @@
 @endpush
 
 @section('page-actions')
-    @can('create', App\Domains\Production\Models\Routing::class)
-        <a href="{{ route('production.routing.create') }}" class="btn btn-primary">
-            <i class="feather-plus me-2"></i>Create New Routing
-        </a>
-    @endcan
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown type="routings" importModalTarget="#importRoutingsModal" />
+        @can('create', App\Domains\Production\Models\Routing::class)
+            <a href="{{ route('production.routing.create') }}" class="btn btn-primary">
+                <i class="feather-plus me-2"></i>Create New Routing
+            </a>
+        @endcan
+    </div>
 @endsection
 
 @section('content')
@@ -243,4 +246,17 @@
             {{ $routings->links() }}
         </div>
     </div>
+
+    {{-- Import Routings Modal --}}
+    <x-ui.modal id="importRoutingsModal" title="Import Routings via Excel/CSV" submitText="Import File" :centered="true">
+        <form method="POST" action="{{ route('production.import-export.import-preview', 'routings') }}" enctype="multipart/form-data" id="importRoutingsForm">
+            @csrf
+            <p class="fs-13 text-muted mb-3">Upload an Excel (.xlsx, .xls) or CSV (.csv) file containing Routing, Routing Operation, and Material records. Make sure the headers match the column names in the template file.</p>
+            <x-ui.odoo-form-ui type="file" name="file" label="Excel/CSV File" required placeholder="Choose file..." />
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="importRoutingsForm" class="btn btn-primary">Import File</button>
+        </x-slot>
+    </x-ui.modal>
 @endsection

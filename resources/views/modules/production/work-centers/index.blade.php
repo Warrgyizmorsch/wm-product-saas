@@ -26,11 +26,14 @@
 @endpush
 
 @section('page-actions')
-    @can('create', App\Domains\Production\Models\WorkCenter::class)
-        <a href="{{ route('production.work-centers.create') }}" class="btn btn-primary">
-            <i class="feather-plus me-2"></i>Create Work Center
-        </a>
-    @endcan
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown type="work-centers" importModalTarget="#importWorkCentersModal" />
+        @can('create', App\Domains\Production\Models\WorkCenter::class)
+            <a href="{{ route('production.work-centers.create') }}" class="btn btn-primary">
+                <i class="feather-plus me-2"></i>Create Work Center
+            </a>
+        @endcan
+    </div>
 @endsection
 
 @section('content')
@@ -454,4 +457,17 @@
             </div>
         @endif
     </div>
+
+    {{-- Import Work Centers Modal --}}
+    <x-ui.modal id="importWorkCentersModal" title="Import Work Centers via Excel/CSV" submitText="Import File" :centered="true">
+        <form method="POST" action="{{ route('production.import-export.import-preview', 'work-centers') }}" enctype="multipart/form-data" id="importWorkCentersForm">
+            @csrf
+            <p class="fs-13 text-muted mb-3">Upload an Excel (.xlsx, .xls) or CSV (.csv) file containing Work Center records. Make sure the headers match the column names in the template file.</p>
+            <x-ui.odoo-form-ui type="file" name="file" label="Excel/CSV File" required placeholder="Choose file..." />
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="importWorkCentersForm" class="btn btn-primary">Import File</button>
+        </x-slot>
+    </x-ui.modal>
 @endsection

@@ -909,8 +909,10 @@ class SchedulingService
 
         if ($calendar->id) {
             $isHoliday = ProductionCalendarHoliday::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
                 ->where('production_calendar_id', $calendar->id)
                 ->whereDate('holiday_date', $date)
+                ->where('active', true)
                 ->exists();
 
             if ($isHoliday) {

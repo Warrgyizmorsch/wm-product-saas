@@ -18,10 +18,17 @@ class ProductionCalendarHoliday extends BaseModel
         'name',
         'holiday_date',
         'holiday_type',
+        'description',
+        'is_full_day',
+        'start_time',
+        'end_time',
+        'active',
     ];
 
     protected $casts = [
         'holiday_date' => 'date',
+        'is_full_day'  => 'boolean',
+        'active'       => 'boolean',
     ];
 
     public function calendar(): BelongsTo

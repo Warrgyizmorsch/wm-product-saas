@@ -7,6 +7,20 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <style>
+        .erp-thin-table td .select2-container--bootstrap-5 .select2-selection {
+            min-height: 34px !important;
+            height: 34px !important;
+            padding: 3px 8px !important;
+            font-size: 12px !important;
+        }
+        .routing-select2-dropdown {
+            z-index: 2055;
+        }
+        .routing-select2-dropdown .select2-results__options {
+            max-height: 260px;
+        }
+    </style>
 @endpush
 
 @push('scripts')
@@ -103,7 +117,7 @@
                             </thead>
                             <tbody>
                                 <template x-for="(operation, index) in operations" :key="operation.uid">
-                                    <tr>
+                                    <tr class="routing-operation-row" x-init="$nextTick(() => initOperationSelects($el, operation))">
                                         <!-- Sequence -->
                                         <td class="align-middle">
                                             <input type="number" x-bind:name="'operations['+index+'][sequence]'" class="odoo-table-input text-center font-monospace" x-model="operation.sequence" x-bind:readonly="autoSequence" required min="1" />
@@ -127,31 +141,31 @@
                                         
                                         <!-- Operation Type -->
                                         <td class="align-middle">
-                                            <select x-bind:name="'operations['+index+'][operation_type]'" class="odoo-table-select" x-model="operation.operation_type" required>
+                                            <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][operation_type]'" class="odoo-table-select" x-model="operation.operation_type" required select2Selector="default">
                                                 @foreach ($operationTypes as $val => $label)
                                                     <option value="{{ $val }}">{{ $label }}</option>
                                                 @endforeach
-                                            </select>
+                                            </x-ui.odoo-form-ui>
                                         </td>
                                         
                                         <!-- Work Center -->
                                         <td class="align-middle">
-                                            <select x-bind:name="'operations['+index+'][work_center_id]'" class="odoo-table-select" x-model="operation.work_center_id" x-on:change="workCenterChanged(index)" required>
+                                            <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][work_center_id]'" class="odoo-table-select" x-model="operation.work_center_id" required select2Selector="default">
                                                 <option value="">Select Center...</option>
                                                 @foreach ($workCenters as $wc)
                                                     <option value="{{ $wc->id }}">{{ $wc->name }} ({{ $wc->code }})</option>
                                                 @endforeach
-                                            </select>
+                                            </x-ui.odoo-form-ui>
                                         </td>
                                         
                                         <!-- Machine -->
                                         <td class="align-middle">
-                                            <select x-bind:name="'operations['+index+'][machine_id]'" class="odoo-table-select" x-model="operation.machine_id" x-bind:disabled="!operation.work_center_id">
+                                            <x-ui.odoo-form-ui type="select" x-bind:name="'operations['+index+'][machine_id]'" class="odoo-table-select" x-model="operation.machine_id" x-bind:disabled="!operation.work_center_id" select2Selector="default">
                                                 <option value="">No Specific Machine</option>
                                                 <template x-for="m in operation.availableMachines" :key="m.id">
                                                     <option :value="m.id" x-text="m.label" :selected="m.id == operation.machine_id"></option>
                                                 </template>
-                                            </select>
+                                            </x-ui.odoo-form-ui>
                                         </td>
                                         
                                         <!-- Setup Time -->
@@ -221,6 +235,7 @@
                             this.recalculateSequences();
                         }
                     });
+                    this.$nextTick(() => this.initAllOperationSelects());
                 },
 
                 addOperation() {
@@ -242,12 +257,14 @@
                         is_external: false,
                         availableMachines: []
                     });
+                    this.$nextTick(() => this.initAllOperationSelects());
                 },
 
                 removeOperation(index) {
                     if (this.operations.length > 1) {
                         this.operations.splice(index, 1);
                         this.recalculateSequences();
+                        this.$nextTick(() => this.initAllOperationSelects());
                     } else {
                         alert('A process routing requires at least one operation stage.');
                     }
@@ -268,6 +285,7 @@
                     if (clone.work_center_id) {
                         this.loadMachinesForOperation(index + 1);
                     }
+                    this.$nextTick(() => this.initAllOperationSelects());
                 },
 
                 moveUp(index) {
@@ -276,6 +294,7 @@
                         this.operations[index] = this.operations[index - 1];
                         this.operations[index - 1] = temp;
                         this.recalculateSequences();
+                        this.$nextTick(() => this.initAllOperationSelects());
                     }
                 },
 
@@ -285,6 +304,7 @@
                         this.operations[index] = this.operations[index + 1];
                         this.operations[index + 1] = temp;
                         this.recalculateSequences();
+                        this.$nextTick(() => this.initAllOperationSelects());
                     }
                 },
 
@@ -304,6 +324,7 @@
                     if (op.work_center_id) {
                         this.loadMachinesForOperation(index);
                     }
+                    this.$nextTick(() => this.initAllOperationSelects());
                 },
 
                 loadMachinesForOperation(index) {
@@ -312,8 +333,61 @@
                         .then(res => res.json())
                         .then(data => {
                             op.availableMachines = data;
+                            this.$nextTick(() => this.initAllOperationSelects());
                         })
                         .catch(err => console.error('Failed to load machines:', err));
+                },
+
+                initOperationSelects(rowEl, operation) {
+                    var self = this;
+                    $(rowEl).find('[data-select2-selector="default"]').each(function() {
+                        var $select = $(this);
+
+                        if ($select.data('select2-initialized') && $select.hasClass('select2-hidden-accessible')) {
+                            $select.trigger('change.select2');
+                            return;
+                        }
+
+                        if ($select.hasClass('select2-hidden-accessible')) {
+                            $select.select2('destroy');
+                        }
+
+                        $select.data('select2-initialized', true);
+                        $select.select2(self.select2RowOptions());
+                        $select.off('change.routing-operation-select').on('change.routing-operation-select', function() {
+                            var val = $select.val();
+                            var nameAttr = $select.attr('name') || '';
+
+                            if (nameAttr.indexOf('operation_type') !== -1) {
+                                operation.operation_type = val;
+                            } else if (nameAttr.indexOf('work_center_id') !== -1) {
+                                operation.work_center_id = val;
+                                self.workCenterChanged(self.operations.indexOf(operation));
+                            } else if (nameAttr.indexOf('machine_id') !== -1) {
+                                operation.machine_id = val;
+                            }
+
+                            this.dispatchEvent(new Event('input', { bubbles: true }));
+                        });
+                    });
+                },
+
+                initAllOperationSelects() {
+                    var self = this;
+                    $('.routing-operation-row').each(function(index) {
+                        if (self.operations[index]) {
+                            self.initOperationSelects(this, self.operations[index]);
+                        }
+                    });
+                },
+
+                select2RowOptions() {
+                    return {
+                        theme: "bootstrap-5",
+                        width: '100%',
+                        dropdownParent: $('body'),
+                        dropdownCssClass: 'routing-select2-dropdown'
+                    };
                 }
             }
         }
