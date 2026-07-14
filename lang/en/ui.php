@@ -42,6 +42,7 @@ return [
     'home' => 'Home',
     'hrms' => 'HRMS',
     'hrms_payroll' => 'HRMS & Payroll',
+    'inline_edit_add_value' => 'Add value',
     'inventory' => 'Inventory',
     'inventory_purchase' => 'Inventory & Purchase',
     'inventory_value' => 'Inventory Value',

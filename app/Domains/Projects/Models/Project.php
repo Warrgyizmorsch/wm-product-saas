@@ -34,7 +34,31 @@ class Project extends BaseModel
         self::STATUS_CLOSED,
     ];
 
-    public const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
+    // A new project may only start as Draft or Active.
+    public const CREATABLE_STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_ACTIVE,
+    ];
+
+    // Closed is only reachable via the dedicated closure workflow, not the edit form.
+    public const EDITABLE_STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_ACTIVE,
+        self::STATUS_ON_HOLD,
+        self::STATUS_COMPLETED,
+    ];
+
+    public const PRIORITY_LOW = 'Low';
+    public const PRIORITY_MEDIUM = 'Medium';
+    public const PRIORITY_HIGH = 'High';
+    public const PRIORITY_CRITICAL = 'Critical';
+
+    public const PRIORITIES = [
+        self::PRIORITY_LOW,
+        self::PRIORITY_MEDIUM,
+        self::PRIORITY_HIGH,
+        self::PRIORITY_CRITICAL,
+    ];
 
     public const BUDGET_TYPES = ['Fixed', 'Time & Material'];
 

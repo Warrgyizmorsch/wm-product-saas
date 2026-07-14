@@ -62,7 +62,7 @@ class ProjectsLocaleTest extends TestCase
     }
 
     /** @test */
-    public function project_create_form_renders_translated_labels_and_options(): void
+    public function project_quick_create_modal_renders_translated_name_label(): void
     {
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
@@ -71,6 +71,27 @@ class ProjectsLocaleTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Име на проекта');
+    }
+
+    /** @test */
+    public function project_edit_modal_renders_translated_labels_and_options(): void
+    {
+        Project::create([
+            'tenant_id' => $this->tenant->id,
+            'project_code' => 'PRJ-0001',
+            'name' => 'ERP Development',
+            'owner_id' => $this->user->id,
+            'start_date' => now(),
+            'priority' => 'High',
+            'status' => 'Active',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->withSession(['locale' => 'bg'])
+            ->get(route('projects.index'));
+
+        $response->assertOk();
         $response->assertSee('Приоритет');
         // Priority option label is translated, but the underlying value stays English
         $response->assertSee('value="High"', false);

@@ -150,6 +150,23 @@ class ProjectsAuthorizationTest extends TestCase
     }
 
     /** @test */
+    public function read_only_user_cannot_update_a_project_field_inline(): void
+    {
+        $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('projects.store'), $this->validProjectPayload());
+
+        $project = Project::withoutGlobalScopes()->where('name', 'ERP Development')->firstOrFail();
+
+        $response = $this->actingAs($this->readOnlyUser)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->patchJson(route('projects.field', $project), ['field' => 'name', 'value' => 'Hijacked Name']);
+
+        $response->assertForbidden();
+        $this->assertSame('ERP Development', $project->fresh()->name);
+    }
+
+    /** @test */
     public function a_project_is_invisible_to_another_tenant_even_by_direct_url(): void
     {
         $this->actingAs($this->tenantOwner)

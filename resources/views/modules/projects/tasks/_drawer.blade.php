@@ -1,12 +1,17 @@
 <x-ui.drawer id="taskDrawer" title="{{ __('projects.task_details') }}" position="end" style="width: 480px; max-width: 100%;">
-    <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
-        <div class="min-w-0">
-            <h5 id="taskDetailTitle" class="fw-bold mb-1"></h5>
-            <div id="taskDetailTaskListWrap" class="fs-12 text-muted"></div>
-        </div>
-        <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
-            <span id="taskDetailStatus"></span>
-            <span id="taskDetailPriority"></span>
+    <div class="mb-3">
+        <h5 id="taskDetailTitle" class="fw-bold mb-1"></h5>
+        <div id="taskDetailTaskListWrap" class="fs-12 text-muted"></div>
+        <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 mt-2 fs-12">
+            <span class="d-flex align-items-center gap-1">
+                <span class="text-muted fw-medium">{{ __('projects.status') }}</span>
+                <span id="taskDetailStatus"></span>
+            </span>
+            <span class="text-muted">&bull;</span>
+            <span class="d-flex align-items-center gap-1">
+                <span class="text-muted fw-medium">{{ __('projects.priority') }}</span>
+                <span id="taskDetailPriority"></span>
+            </span>
         </div>
     </div>
 
@@ -183,7 +188,7 @@
         if (data.status) {
             var statusVariant = taskStatusVariants[data.status] || 'secondary';
             var statusLabel = taskStatusLabels[data.status] || data.status;
-            statusEl.innerHTML = '<span class="badge bg-' + statusVariant + '-soft text-' + statusVariant + '">' + statusLabel + '</span>';
+            statusEl.innerHTML = '<span class="badge bg-soft-' + statusVariant + ' text-' + statusVariant + '">' + statusLabel + '</span>';
         } else {
             statusEl.innerHTML = '';
         }
@@ -192,7 +197,7 @@
         if (data.priority) {
             var priorityVariant = taskPriorityVariants[data.priority] || 'secondary';
             var priorityLabel = taskPriorityLabels[data.priority] || data.priority;
-            priorityEl.innerHTML = '<span class="badge bg-' + priorityVariant + '-soft text-' + priorityVariant + '">' + priorityLabel + '</span>';
+            priorityEl.innerHTML = '<span class="badge bg-soft-' + priorityVariant + ' text-' + priorityVariant + '">' + priorityLabel + '</span>';
         } else {
             priorityEl.innerHTML = '';
         }

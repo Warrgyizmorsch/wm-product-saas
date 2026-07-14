@@ -109,11 +109,6 @@
         @else
             <h6 class="fw-bold text-dark mb-1">{{ __('projects.no_tasklists') }}</h6>
             <p class="fs-12 text-muted mb-3">{{ __('projects.no_tasklists_hint') }}</p>
-            @if ($canManageTaskLists)
-                <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListModal('add')">
-                    <i class="feather-plus me-1"></i>{{ __('projects.add_tasklist') }}
-                </button>
-            @endif
         @endif
     </div>
 @endforelse

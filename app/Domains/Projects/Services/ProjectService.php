@@ -41,6 +41,16 @@ class ProjectService
         return $this->projects->find($id);
     }
 
+    /**
+     * Whether a project may move from one status to another. Exposed so
+     * other write paths (e.g. inline field updates) can enforce the same
+     * transition rules as update() without duplicating the map.
+     */
+    public function canTransition(string $from, string $to): bool
+    {
+        return in_array($to, self::TRANSITIONS[$from] ?? [], true);
+    }
+
     public function summary(): array
     {
         return [
@@ -155,7 +165,7 @@ class ProjectService
         $oldStatus = $project->status;
         $newStatus = $data['status'] ?? $oldStatus;
 
-        if ($newStatus !== $oldStatus && !in_array($newStatus, self::TRANSITIONS[$oldStatus] ?? [], true)) {
+        if ($newStatus !== $oldStatus && !$this->canTransition($oldStatus, $newStatus)) {
             throw ValidationException::withMessages([
                 'status' => "A project cannot move from '{$oldStatus}' to '{$newStatus}'.",
             ]);
@@ -184,6 +194,28 @@ class ProjectService
             }
 
             return $project;
+        });
+    }
+
+    /**
+     * Update a single field on a project (inline-edit). Kept independent of
+     * update()'s status-transition machinery, since none of the fields using
+     * this path today (starting with `name`) participate in that workflow.
+     */
+    public function updateField(Project $project, string $field, mixed $value): mixed
+    {
+        return DB::transaction(function () use ($project, $field, $value) {
+            $project = $this->projects->update($project->id, [$field => $value]);
+
+            $this->activity->record(
+                $project,
+                'project.updated',
+                "Project {$project->project_code} updated",
+                "Project '{$project->name}' details updated",
+                $project,
+            );
+
+            return $project->{$field};
         });
     }
 
