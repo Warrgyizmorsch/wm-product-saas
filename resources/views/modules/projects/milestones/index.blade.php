@@ -73,7 +73,7 @@
                     </thead>
                     <tbody>
                         @forelse ($milestones as $milestone)
-                            <tr @can('update', $milestone) role="button" style="cursor: pointer;"
+                            <tr @if ($milestone->project) @can('update', $milestone) role="button" style="cursor: pointer;"
                                     onclick="openMilestoneDetailsDrawer({
                                         id: {{ $milestone->id }},
                                         updateUrl: @js(route('projects.milestones.update', [$milestone->project, $milestone->id])),
@@ -89,7 +89,7 @@
                                         status: @js($milestone->status),
                                         completionPercentage: {{ $milestone->completion_percentage }}
                                     })"
-                                @endcan>
+                                @endcan @endif>
                                 <td>
                                     <div class="fw-semibold text-dark">{{ $milestone->name }}</div>
                                     @if ($milestone->description)
@@ -97,11 +97,13 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <a href="{{ route('projects.show', $milestone->project) }}" class="fw-semibold text-primary hover-primary" onclick="event.stopPropagation();">
-                                        {{ $milestone->project?->name ?: '—' }}
-                                    </a>
                                     @if ($milestone->project)
+                                        <a href="{{ route('projects.show', $milestone->project) }}" class="fw-semibold text-primary hover-primary" onclick="event.stopPropagation();">
+                                            {{ $milestone->project->name }}
+                                        </a>
                                         <div class="fs-11 text-muted">{{ $milestone->project->project_code }}</div>
+                                    @else
+                                        —
                                     @endif
                                 </td>
                                 <td>{{ $milestone->owner?->name ?: '—' }}</td>

@@ -116,15 +116,15 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
-                        <th style="width: 12%">{{ __('projects.code') }}</th>
-                        <th style="width: 20%">{{ __('projects.name') }}</th>
-                        <th style="width: 15%">{{ __('projects.client') }}</th>
-                        <th style="width: 13%">{{ __('projects.owner') }}</th>
-                        <th style="width: 10%">{{ __('projects.priority') }}</th>
-                        <th style="width: 10%">{{ __('projects.status') }}</th>
-                        <th style="width: 8%">{{ __('projects.start_date') }}</th>
-                        <th style="width: 9%">{{ __('projects.end_date') }}</th>
-                        <th class="text-end" style="width: 10%">{{ __('projects.actions') }}</th>
+                        <th style="width: 12%" class="fw-bold text-dark">{{ __('projects.code') }}</th>
+                        <th style="width: 20%" class="fw-bold text-dark">{{ __('projects.name') }}</th>
+                        <th style="width: 15%" class="fw-bold text-dark">{{ __('projects.client') }}</th>
+                        <th style="width: 13%" class="fw-bold text-dark">{{ __('projects.owner') }}</th>
+                        <th style="width: 10%" class="fw-bold text-dark">{{ __('projects.priority') }}</th>
+                        <th style="width: 10%" class="fw-bold text-dark">{{ __('projects.status') }}</th>
+                        <th style="width: 8%" class="fw-bold text-dark">{{ __('projects.start_date') }}</th>
+                        <th style="width: 9%" class="fw-bold text-dark">{{ __('projects.end_date') }}</th>
+                        <th class="text-end fw-bold text-dark" style="width: 10%">{{ __('projects.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -141,8 +141,8 @@
                             <td>
                                 <span class="fw-semibold text-dark">{{ $project->name }}</span>
                             </td>
-                            <td>{{ $project->customer?->name ?: '—' }}</td>
-                            <td>{{ $project->owner?->name ?: '—' }}</td>
+                            <td class="fw-medium text-dark">{{ $project->customer?->name ?: '—' }}</td>
+                            <td class="fw-medium text-dark">{{ $project->owner?->name ?: '—' }}</td>
                             <td>
                                 <span class="badge {{ in_array($project->priority, ['High', 'Critical']) ? 'bg-soft-danger text-danger' : 'bg-soft-secondary text-secondary' }} px-2 py-0.5 fs-11 fw-semibold">
                                     {{ __('projects.priorities.' . $project->priority) }}
@@ -162,8 +162,8 @@
                                     {{ __('projects.statuses.' . $project->status) }}
                                 </x-ui.badge>
                             </td>
-                            <td>{{ $project->start_date?->format('d/m/Y') ?: '—' }}</td>
-                            <td>{{ $project->end_date?->format('d/m/Y') ?: '—' }}</td>
+                            <td class="fw-medium text-dark">{{ $project->start_date?->format('d/m/Y') ?: '—' }}</td>
+                            <td class="fw-medium text-dark">{{ $project->end_date?->format('d/m/Y') ?: '—' }}</td>
                             <td class="text-end">
                                 <x-ui.action-dropdown :viewUrl="route('projects.show', $project)">
                                     @can('update', $project)
