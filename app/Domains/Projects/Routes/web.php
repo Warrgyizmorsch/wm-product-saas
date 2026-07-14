@@ -20,6 +20,7 @@ Route::prefix('projects')
 
         Route::get('{project}', [ProjectController::class, 'show'])->name('show');
         Route::put('{project}', [ProjectController::class, 'update'])->name('update');
+        Route::patch('{project}/field', [ProjectController::class, 'updateField'])->name('field');
         Route::delete('{project}', [ProjectController::class, 'destroy'])->name('destroy');
 
         Route::get('{project}/activity', [ProjectActivityLogController::class, 'index'])->name('activity');
