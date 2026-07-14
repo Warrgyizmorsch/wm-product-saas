@@ -36,11 +36,22 @@ use App\Domains\Production\Controllers\SerialNumberController;
 use App\Domains\Production\Controllers\ShiftController;
 use App\Domains\Production\Controllers\WorkCenterController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
+use App\Domains\Production\Controllers\ProductionImportExportController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('production')
     ->as('production.')
     ->group(function (): void {
+
+        // ── Import/Export (Centralized Master Data) ───────────────────────────
+        Route::get('import-export/download-template/{type}', [ProductionImportExportController::class, 'downloadTemplate'])
+            ->name('import-export.download-template');
+        Route::post('import-export/import-preview/{type}', [ProductionImportExportController::class, 'importPreview'])
+            ->name('import-export.import-preview');
+        Route::post('import-export/import-confirm/{type}', [ProductionImportExportController::class, 'importConfirm'])
+            ->name('import-export.import-confirm');
+        Route::get('import-export/export/{type}', [ProductionImportExportController::class, 'export'])
+            ->name('import-export.export');
 
         Route::get('track-status', function () {
             abort_unless(app()->environment(['local', 'testing']) || auth()->user()?->role === 'super_admin', 403);
@@ -112,6 +123,9 @@ Route::prefix('production')
         // ── Shifts & Calendars ────────────────────────────────────────────────
         Route::resource('shifts', ShiftController::class)->except(['show']);
         Route::resource('calendars', CalendarController::class)->except(['show']);
+        Route::post('calendars/{calendar}/holidays', [CalendarController::class, 'storeHoliday'])->name('calendars.holidays.store');
+        Route::put('calendars/{calendar}/holidays/{holiday}', [CalendarController::class, 'updateHoliday'])->name('calendars.holidays.update');
+        Route::delete('calendars/{calendar}/holidays/{holiday}', [CalendarController::class, 'destroyHoliday'])->name('calendars.holidays.destroy');
 
         // ── Quality Plans & Operator Skills ───────────────────────────────────
         Route::resource('quality-plans', QualityPlanController::class)->except(['show']);

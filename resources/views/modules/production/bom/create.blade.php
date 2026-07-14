@@ -24,6 +24,12 @@
             padding: 3px 8px !important;
             font-size: 12px !important;
         }
+        .bom-select2-dropdown {
+            z-index: 2055;
+        }
+        .bom-select2-dropdown .select2-results__options {
+            max-height: 260px;
+        }
         .c-pointer {
             cursor: pointer;
         }
@@ -171,13 +177,13 @@
                                 </thead>
                                 <tbody>
                                     <template x-for="(item, index) in items" :key="item.uid">
-                                        <tr x-init="$nextTick(() => initRowSelects($el, item))">
+                                        <tr class="bom-component-row" x-init="$nextTick(() => initRowSelects($el, item))">
                                             <!-- Sequence -->
                                             <td class="fw-bold text-center align-middle" x-text="index + 1"></td>
                                             
                                             <!-- Material Selection -->
                                             <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="select" name="items[][material_id]" x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required data-select2-selector="default" data-master="product" alpineError="errors['items.' + index + '.material_id']">
+                                                <x-ui.odoo-form-ui type="select" name="items[][material_id]" x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required select2Selector="default" data-master="product" alpineError="errors['items.' + index + '.material_id']">
                                                     <option value="">Select Material...</option>
                                                     <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
                                                     @foreach($materials as $material)
@@ -239,7 +245,7 @@
                                             
                                             <!-- UOM -->
                                             <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="select" name="items[][uom_id]" x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required data-select2-selector="default" data-master="uom" alpineError="errors['items.' + index + '.uom_id']">
+                                                <x-ui.odoo-form-ui type="select" name="items[][uom_id]" x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required select2Selector="default" data-master="uom" alpineError="errors['items.' + index + '.uom_id']">
                                                     <option value="">Select UOM...</option>
                                                     <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
                                                     @foreach($uoms as $uom)
@@ -529,16 +535,14 @@
                                 }
                             });
                             if ($select.data('select2')) {
-                                $select.select2({
-                                    theme: "bootstrap-5",
-                                    dropdownParent: $select.closest('.table-responsive')
-                                });
+                                $select.trigger('change.select2');
                             }
                         });
                     });
 
                     // Trigger initial load
                     this.loadOperations();
+                    this.$nextTick(() => this.initAllRowSelects());
                 },
 
                 loadOperations() {
@@ -583,6 +587,7 @@
                         child_bom_versions: [],
                         child_bom_loading: false
                     });
+                    this.$nextTick(() => this.initAllRowSelects());
                 },
 
                 removeItem(index) {
@@ -598,10 +603,9 @@
                     $(rowEl).find('[data-select2-selector="default"]').each(function() {
                         var $select = $(this);
                         
-                        if ($select.data('select2-initialized')) {
+                        if ($select.data('select2-initialized') && $select.hasClass('select2-hidden-accessible')) {
                             return;
                         }
-                        $select.data('select2-initialized', true);
                         
                         // Disable parent product if selected
                         var parentProductId = $('#product_id').val();
@@ -615,11 +619,12 @@
                             });
                         }
 
-                        // Initialize select2 with bootstrap-5 theme
-                        $select.select2({
-                            theme: "bootstrap-5",
-                            dropdownParent: $(rowEl).closest('.table-responsive')
-                        });
+                        if ($select.hasClass('select2-hidden-accessible')) {
+                            $select.select2('destroy');
+                        }
+
+                        $select.data('select2-initialized', true);
+                        $select.select2(self.select2RowOptions());
                         
                         // Capture type on init
                         var nameAttr = $select.attr('name') || '';
@@ -630,7 +635,7 @@
                         }
                         
                         // Sync select2 changes to Alpine.js
-                        $select.on('change.select2', function () {
+                        $select.off('change.bom-row-select').on('change.bom-row-select', function () {
                             var val = $select.val();
                             var nameAttr = $select.attr('name') || '';
                             
@@ -649,6 +654,24 @@
                             this.dispatchEvent(new Event('input', { bubbles: true }));
                         });
                     });
+                },
+
+                initAllRowSelects() {
+                    var self = this;
+                    $('.bom-component-row').each(function(index) {
+                        if (self.items[index]) {
+                            self.initRowSelects(this, self.items[index]);
+                        }
+                    });
+                },
+
+                select2RowOptions() {
+                    return {
+                        theme: "bootstrap-5",
+                        width: '100%',
+                        dropdownParent: $('body'),
+                        dropdownCssClass: 'bom-select2-dropdown'
+                    };
                 },
 
             }));
