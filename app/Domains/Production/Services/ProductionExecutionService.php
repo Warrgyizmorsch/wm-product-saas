@@ -2,6 +2,8 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Models\ProductionOrderProgressLog;
@@ -184,23 +186,30 @@ class ProductionExecutionService
         float $quantity,
         string $qualityStatus = 'passed',
         ?string $remarks = null,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $warehouseId = null
     ): ProductionOrderReceipt {
         if ($quantity <= 0) {
             throw new InvalidArgumentException('Receipt quantity must be greater than zero.');
         }
 
-        return DB::transaction(function () use ($orderId, $quantity, $qualityStatus, $remarks, $userId) {
+        return DB::transaction(function () use ($orderId, $quantity, $qualityStatus, $remarks, $userId, $warehouseId) {
             $order = ProductionOrder::findOrFail($orderId);
 
             if ($order->isClosed() || $order->isCancelled()) {
                 throw new InvalidArgumentException('Cannot receive finished goods on a closed or cancelled order.');
             }
 
+            $warehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);
+            if (! $warehouseId) {
+                throw new InvalidArgumentException('A warehouse is required before receiving finished goods.');
+            }
+
             $receipt = ProductionOrderReceipt::create([
                 'tenant_id' => $order->tenant_id,
                 'production_order_id' => $order->id,
                 'product_id' => $order->product_id,
+                'warehouse_id' => $warehouseId,
                 'quantity_received' => $quantity,
                 'quality_status' => $qualityStatus,
                 'received_by' => $userId,
@@ -211,6 +220,16 @@ class ProductionExecutionService
             // Increment quantity_produced
             $order->quantity_produced += $quantity;
             $order->save();
+
+            StockService::recordInflow(
+                $order->tenant_id,
+                $order->product_id,
+                $warehouseId,
+                $quantity,
+                (float) ($order->product?->unit_cost ?? $order->product?->cost_price ?? 0),
+                'Production Order Receipt',
+                $order->id
+            );
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
@@ -241,5 +260,14 @@ class ProductionExecutionService
         if (! $passedInspectionExists) {
             throw new InvalidArgumentException('This operation requires an approved passed quality inspection before completion.');
         }
+    }
+
+    private function defaultWarehouseId(int $tenantId): ?int
+    {
+        return Warehouse::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_default', true)
+            ->value('id')
+            ?? Warehouse::query()->where('tenant_id', $tenantId)->value('id');
     }
 }

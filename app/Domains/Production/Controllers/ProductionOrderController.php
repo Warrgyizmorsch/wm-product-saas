@@ -3,6 +3,7 @@
 namespace App\Domains\Production\Controllers;
 
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Models\ProductionOrderRequest;
@@ -137,10 +138,10 @@ class ProductionOrderController extends Controller
         $order = ProductionOrder::with([
             'product', 'bom', 'routing', 'creator', 'releaser', 'completer', 'closer',
             'operations.workCenter', 'operations.machine',
-            'reservations.product', 'reservations.uom',
-            'issues.product', 'issues.user',
+            'reservations.product', 'reservations.uom', 'reservations.warehouse',
+            'issues.product', 'issues.user', 'issues.warehouse',
             'progressLogs.operation', 'progressLogs.user', 'progressLogs.machine',
-            'receipts.user',
+            'receipts.user', 'receipts.warehouse',
             'scraps.operation', 'scraps.product', 'scraps.user',
             'reworks.operation', 'reworks.user',
         ])->findOrFail($id);
@@ -149,8 +150,9 @@ class ProductionOrderController extends Controller
 
         // Get variance analysis calculations
         $costs = $this->costService->getCostAnalysis($order);
+        $warehouses = Warehouse::where('tenant_id', $order->tenant_id)->orderByDesc('is_default')->orderBy('name')->get();
 
-        return view('modules.production.orders.show', compact('order', 'costs'));
+        return view('modules.production.orders.show', compact('order', 'costs', 'warehouses'));
     }
 
     public function edit(int $id)
@@ -271,6 +273,7 @@ class ProductionOrderController extends Controller
 
         $request->validate([
             'reservation_id' => 'required|exists:production_order_reservations,id',
+            'warehouse_id' => 'nullable|exists:warehouses,id',
             'quantity' => 'required|numeric|min:0.0001',
             'remarks' => 'nullable|string|max:255',
         ]);
@@ -284,7 +287,8 @@ class ProductionOrderController extends Controller
                 $request->input('reservation_id'),
                 (float) $request->input('quantity'),
                 $request->input('remarks'),
-                Auth::id()
+                Auth::id(),
+                $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null
             );
 
             return redirect()->back()->with('success', 'Material quantity issued successfully.');
@@ -300,6 +304,7 @@ class ProductionOrderController extends Controller
 
         $request->validate([
             'reservation_id' => 'required|exists:production_order_reservations,id',
+            'warehouse_id' => 'nullable|exists:warehouses,id',
             'quantity' => 'required|numeric|min:0.0001',
             'remarks' => 'nullable|string|max:255',
         ]);
@@ -313,7 +318,8 @@ class ProductionOrderController extends Controller
                 $request->input('reservation_id'),
                 (float) $request->input('quantity'),
                 $request->input('remarks'),
-                Auth::id()
+                Auth::id(),
+                $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null
             );
 
             return redirect()->back()->with('success', 'Material returned to warehouse successfully.');
@@ -438,6 +444,7 @@ class ProductionOrderController extends Controller
 
         $request->validate([
             'quantity_received' => 'required|numeric|min:0.0001',
+            'warehouse_id' => 'nullable|exists:warehouses,id',
             'quality_status' => 'required|string|in:passed,quarantine,failed',
             'remarks' => 'nullable|string|max:255',
         ]);
@@ -448,7 +455,8 @@ class ProductionOrderController extends Controller
                 (float) $request->input('quantity_received'),
                 $request->input('quality_status'),
                 $request->input('remarks'),
-                Auth::id()
+                Auth::id(),
+                $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null
             );
 
             return redirect()->back()->with('success', 'Finished goods received successfully.');

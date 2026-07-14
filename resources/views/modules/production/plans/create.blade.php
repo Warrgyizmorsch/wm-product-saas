@@ -14,6 +14,27 @@
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
         $(document).ready(function() {
+            $('#production_order_request_select').on('change', function() {
+                var selectedOption = $(this).find('option:selected');
+                var productId = selectedOption.data('product-id');
+                var qty = selectedOption.data('qty');
+                var salesOrderId = selectedOption.data('sales-order-id');
+                var salesOrderItemId = selectedOption.data('sales-order-item-id');
+
+                if (productId !== undefined && productId !== '') {
+                    $('#product_select').val(productId).trigger('change');
+                }
+                if (qty !== undefined && qty !== '') {
+                    $('input[name="quantity"]').val(qty);
+                }
+                $('#sales_order_id').val(salesOrderId || '');
+                $('#sales_order_item_id').val(salesOrderItemId || '');
+            });
+
+            if ($('#production_order_request_select').val()) {
+                $('#production_order_request_select').trigger('change');
+            }
+
             // Setup AJAX dynamic dropdown triggers
             $('#product_select').on('change', function() {
                 var productId = $(this).val();
@@ -87,6 +108,35 @@
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
                         <x-ui.odoo-form-ui type="input" label="Plan Name" name="name" placeholder="e.g. Q3 E-Bike Production Batch" :value="old('name')" :required="true" />
+
+                        <x-ui.odoo-form-ui type="select" label="Sales Order Request" name="production_order_request_id" id="production_order_request_select">
+                            <option value="">Select Draft Sales Request...</option>
+                            @foreach($productionOrderRequests as $request)
+                                @php
+                                    $deliveryItem = $request->deliveryOrderItem;
+                                    $delivery = $deliveryItem?->deliveryOrder;
+                                    $sales = $delivery?->salesOrder ?? $deliveryItem?->salesOrderItem?->salesOrder;
+                                    $product = $request->product;
+                                @endphp
+                                <option value="{{ $request->id }}"
+                                    data-product-id="{{ $request->product_id }}"
+                                    data-qty="{{ $request->quantity_requested }}"
+                                    data-sales-order-id="{{ $sales?->id }}"
+                                    data-sales-order-item-id="{{ $deliveryItem?->sales_order_item_id }}"
+                                    @selected(old('production_order_request_id') == $request->id)>
+                                    {{ $sales?->sales_order_number ?? 'Sales Order #' . ($sales?->id ?? 'N/A') }}
+                                    @if($delivery)
+                                        / {{ $delivery->delivery_number }}
+                                    @endif
+                                    @if($product)
+                                        — {{ $product->name }} ({{ $product->sku }})
+                                    @endif
+                                    — Qty: {{ rtrim(rtrim(number_format((float) $request->quantity_requested, 4, '.', ''), '0'), '.') }}
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                        <input type="hidden" name="sales_order_id" id="sales_order_id" value="{{ old('sales_order_id') }}">
+                        <input type="hidden" name="sales_order_item_id" id="sales_order_item_id" value="{{ old('sales_order_item_id') }}">
                         
                         <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" id="product_select" :required="true">
                             <option value="">Select Product to Produce</option>
