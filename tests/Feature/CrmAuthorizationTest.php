@@ -161,4 +161,65 @@ class CrmAuthorizationTest extends TestCase
         $response->assertOk();
         $response->assertHeader('content-disposition', 'attachment; filename=lead_sample.xlsx');
     }
+
+    /** @test */
+    public function sales_manager_can_import_leads_successfully(): void
+    {
+        $header = "Company Name,Contact Person,Email,Phone,Expected Amount,Expected Sale Date,Requirement,Industry Type,Source,Country,State,City,Address,Status\n";
+        $row = "Excel Import Co.,John Smith,john.smith@excelimport.test,9876543210,125000.00,2026-10-31,Needs software license,Technology,Web Search,India,Maharashtra,Mumbai,456 Lane,New\n";
+        
+        $csvContent = $header . $row;
+        
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('leads.csv', $csvContent);
+
+        $response = $this->actingAs($this->salesManager)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('crm.leads.import'), [
+                'file' => $file,
+            ]);
+
+        $response->assertRedirect(route('crm.leads.index'));
+        $response->assertSessionHas('success', 'Leads imported successfully!');
+
+        $this->assertDatabaseHas('leads', [
+            'tenant_id' => $this->tenant->id,
+            'company_name' => 'Excel Import Co.',
+            'contact_person' => 'John Smith',
+            'email' => 'john.smith@excelimport.test',
+            'phone' => '9876543210',
+            'expected_amount' => 125000,
+            'expected_sale_date' => '2026-10-31 00:00:00',
+            'requirement' => 'Needs software license',
+            'source' => 'Web Search',
+            'status' => 'New',
+            'lead_owner_id' => $this->salesManager->id,
+        ]);
+    }
+
+    /** @test */
+    public function authenticated_user_with_lead_view_permission_can_export_leads(): void
+    {
+        $product = \App\Domains\Inventory\Models\Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Test Product ERP',
+            'sku' => 'TEST-SKU-123',
+        ]);
+
+        $lead = Lead::create([
+            'tenant_id' => $this->tenant->id,
+            'company_name' => 'Export Target Co.',
+            'contact_person' => 'Jane Smith',
+            'lead_owner_id' => $this->salesManager->id,
+            'product_id' => $product->id,
+            'expected_amount' => 150000,
+            'status' => 'New',
+        ]);
+
+        $response = $this->actingAs($this->salesManager)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('crm.leads.export'));
+
+        $response->assertOk();
+        $response->assertHeader('content-disposition', 'attachment; filename=leads_export.xlsx');
+    }
 }

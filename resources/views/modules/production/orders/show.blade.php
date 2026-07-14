@@ -328,6 +328,7 @@
                     <thead>
                         <tr>
                             <th style="width:30%">Material Component</th>
+                            <th style="width:14%">Warehouse</th>
                             <th style="width:15%" class="text-center">Planned Qty</th>
                             <th style="width:15%" class="text-center">Reserved Qty</th>
                             <th style="width:15%" class="text-center">Issued Qty</th>
@@ -342,6 +343,7 @@
                                     <div class="fw-bold text-dark">{{ $res->product->name }}</div>
                                     <small class="text-muted font-monospace fs-10">{{ $res->product->sku }}</small>
                                 </td>
+                                <td class="text-muted">{{ $res->warehouse?->name ?? 'Not reserved' }}</td>
                                 <td class="text-center fw-semibold text-dark">{{ number_format($res->quantity_planned, 4) }}</td>
                                 <td class="text-center fw-bold" style="color: var(--bs-info);">{{ number_format($res->quantity_reserved, 4) }}</td>
                                 <td class="text-center fw-bold text-success">{{ number_format($res->quantity_issued, 4) }}</td>
@@ -379,6 +381,7 @@
                             <th style="width:13%">Date</th>
                             <th style="width:12%">SKU</th>
                             <th style="width:22%">Product Name</th>
+                            <th style="width:14%">Warehouse</th>
                             <th style="width:10%" class="text-center">Qty</th>
                             <th style="width:10%">Type</th>
                             <th style="width:12%">Operator</th>
@@ -391,6 +394,7 @@
                                 <td class="text-muted">{{ $iss->issued_at->format('Y-m-d H:i') }}</td>
                                 <td class="fw-bold text-dark font-monospace fs-12">{{ $iss->product->sku }}</td>
                                 <td>{{ $iss->product->name }}</td>
+                                <td class="text-muted">{{ $iss->warehouse?->name ?? '—' }}</td>
                                 <td class="text-center fw-bold {{ $iss->quantity_issued < 0 ? 'text-danger' : 'text-success' }}">
                                     {{ number_format($iss->quantity_issued, 4) }}
                                 </td>
@@ -758,6 +762,13 @@
                 @endforeach
             </x-ui.odoo-form-ui>
 
+            <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id">
+                <option value="">Use reservation warehouse</option>
+                @foreach($warehouses as $warehouse)
+                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }} ({{ $warehouse->code }})</option>
+                @endforeach
+            </x-ui.odoo-form-ui>
+
             <x-ui.odoo-form-ui type="input" label="Issue Qty" name="quantity" inputType="number" step="0.0001" :required="true" />
             
             <x-ui.odoo-form-ui type="input" label="Remarks" name="remarks" />
@@ -778,6 +789,13 @@
                     <option value="{{ $res->id }}">
                         {{ $res->product->name }} ({{ $res->product->sku }}) — Issued: {{ number_format($res->quantity_issued, 2) }}
                     </option>
+                @endforeach
+            </x-ui.odoo-form-ui>
+
+            <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id">
+                <option value="">Use reservation warehouse</option>
+                @foreach($warehouses as $warehouse)
+                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }} ({{ $warehouse->code }})</option>
                 @endforeach
             </x-ui.odoo-form-ui>
 
@@ -802,6 +820,13 @@
             </div>
 
             <x-ui.odoo-form-ui type="input" label="Receipt Qty" name="quantity_received" inputType="number" step="0.0001" :required="true" />
+
+            <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id">
+                <option value="">Use default warehouse</option>
+                @foreach($warehouses as $warehouse)
+                    <option value="{{ $warehouse->id }}">{{ $warehouse->name }} ({{ $warehouse->code }})</option>
+                @endforeach
+            </x-ui.odoo-form-ui>
 
             <x-ui.odoo-form-ui type="select" label="Quality Status" name="quality_status" :required="true">
                 <option value="passed">Passed (Standard Inventory)</option>

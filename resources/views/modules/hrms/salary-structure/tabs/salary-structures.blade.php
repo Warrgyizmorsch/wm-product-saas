@@ -10,13 +10,89 @@
     <div class="col-12">
         <x-ui.card title="Salary Structures (Slabs)" stretch bodyClass="p-0">
             <x-slot name="headerAction">
-                <x-ui.button variant="light" icon="feather-activity" data-bs-toggle="offcanvas" data-bs-target="#ctcCalculatorDrawer" class="me-2">
+                <x-ui.button variant="light" size="sm" icon="feather-activity" data-bs-toggle="offcanvas" data-bs-target="#ctcCalculatorDrawer" class="me-2">
                     CTC Calculator
                 </x-ui.button>
-                <x-ui.button variant="primary" icon="feather-plus" class="add-structure-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-bs-toggle="modal" data-bs-target="#addSalaryStructureModal">
+                <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-structure-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-bs-toggle="modal" data-bs-target="#addSalaryStructureModal">
                     Add Structure
                 </x-ui.button>
             </x-slot>
+
+            <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap">
+                <!-- Search Input (Placed before sort and filter in same line) -->
+                <div class="theme-search-container" style="max-width: 300px;">
+                    <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
+                        <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
+                        <input type="hidden" name="tab" value="structures">
+                        <input type="hidden" name="struct_status" value="{{ request('struct_status') }}">
+                        <input type="hidden" name="struct_sort" value="{{ request('struct_sort') }}">
+                        <i class="feather-search"></i>
+                        <input type="text" name="struct_search" class="theme-search-input" placeholder="Search structures..." value="{{ request('struct_search') }}">
+                    </form>
+                </div>
+
+                <!-- Sort Dropdown -->
+                <x-ui.sort-dropdown label="SORT">
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'name_asc']) }}">
+                        <span>Name (A-Z)</span>
+                        @if(request('struct_sort') === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'name_desc']) }}">
+                        <span>Name (Z-A)</span>
+                        @if(request('struct_sort') === 'name_desc') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'min_ctc_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'min_ctc_asc']) }}">
+                        <span>Min CTC (Low to High)</span>
+                        @if(request('struct_sort') === 'min_ctc_asc') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'min_ctc_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'min_ctc_desc']) }}">
+                        <span>Min CTC (High to Low)</span>
+                        @if(request('struct_sort') === 'min_ctc_desc') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'max_ctc_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'max_ctc_asc']) }}">
+                        <span>Max CTC (Low to High)</span>
+                        @if(request('struct_sort') === 'max_ctc_asc') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'max_ctc_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'max_ctc_desc']) }}">
+                        <span>Max CTC (High to Low)</span>
+                        @if(request('struct_sort') === 'max_ctc_desc') <i class="feather-check ms-3"></i> @endif
+                    </a>
+                </x-ui.sort-dropdown>
+
+                <!-- Filter Dropdown -->
+                <x-ui.filter label="FILTER">
+                    <div class="theme-filter-header">
+                        <i class="feather-sliders text-primary"></i>
+                        <span>Filter Options</span>
+                    </div>
+                    <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
+                        <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
+                        <input type="hidden" name="tab" value="structures">
+                        @if(request()->filled('struct_search'))
+                            <input type="hidden" name="struct_search" value="{{ request('struct_search') }}">
+                        @endif
+                        @if(request()->filled('struct_sort'))
+                            <input type="hidden" name="struct_sort" value="{{ request('struct_sort') }}">
+                        @endif
+                        
+                        <div class="theme-filter-group">
+                            <label class="theme-filter-label">Status</label>
+                            <select name="struct_status" class="theme-filter-field">
+                                <option value="">All Statuses</option>
+                                <option value="1" @selected(request('struct_status') === '1')>Active</option>
+                                <option value="0" @selected(request('struct_status') === '0')>Inactive</option>
+                            </select>
+                        </div>
+                        
+                        <div class="theme-filter-footer">
+                            <button type="submit" class="theme-filter-apply-btn">Apply Filters</button>
+                            <a href="{{ route('hrms.salary-structure.index', ['pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : '', 'tab' => 'structures']) }}" class="theme-filter-reset-btn">Reset</a>
+                        </div>
+                    </form>
+                </x-ui.filter>
+            </div>
 
             <div class="table-responsive">
                 <table class="table table-hover mb-0 align-middle">

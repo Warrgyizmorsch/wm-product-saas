@@ -14,7 +14,7 @@
                 Convert to Sales Order
             </x-ui.button>
         @endif
-        <x-ui.button onclick="window.print()" variant="primary" class="d-print-none" icon="feather-printer">
+        <x-ui.button href="{{ route('crm.quotations.download', $quotation->id) }}" variant="primary" class="d-print-none" icon="feather-printer">
             Print / Download PDF
         </x-ui.button>
     </div>
@@ -71,9 +71,21 @@
         <div class="row mb-5">
             <div class="col-6 text-start">
                 <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Prepared For</span>
-                <h5 class="fw-bold text-dark mb-1">{{ $quotation->customer?->name ?? '—' }}</h5>
-                <p class="text-muted mb-1 fs-13"><i class="feather-mail me-2"></i>{{ $quotation->customer?->email ?: '—' }}</p>
-                <p class="text-muted mb-0 fs-13"><i class="feather-phone me-2"></i>{{ $quotation->customer?->phone ?: '—' }}</p>
+                <h5 class="fw-bold text-dark mb-1">{{ $quotation->customer?->name ?? ($quotation->lead?->company_name ?? '—') }}</h5>
+                <p class="text-muted mb-1 fs-13"><i class="feather-mail me-2"></i>{{ $quotation->customer?->email ?: ($quotation->lead?->email ?: '—') }}</p>
+                <p class="text-muted mb-1 fs-13"><i class="feather-phone me-2"></i>{{ $quotation->customer?->phone ?: ($quotation->lead?->phone ?: '—') }}</p>
+                
+                @if($quotation->lead && ($quotation->lead->address || $quotation->lead->city || $quotation->lead->state || $quotation->lead->country))
+                    <div class="text-muted mt-3 fs-12">
+                        <span class="d-block fw-bold text-uppercase text-muted mb-0.5" style="font-size: 9px; letter-spacing: 0.5px;">Billing Address</span>
+                        @if($quotation->lead->address)
+                            <span class="d-block text-dark">{{ $quotation->lead->address }}</span>
+                        @endif
+                        <span class="d-block text-dark">
+                            {{ implode(', ', array_filter([$quotation->lead->city, $quotation->lead->state, $quotation->lead->country])) }}
+                        </span>
+                    </div>
+                @endif
             </div>
             <div class="col-6 text-end">
                 <span class="text-muted fs-11 text-uppercase fw-semibold d-block mb-2">Quotation Schedule</span>

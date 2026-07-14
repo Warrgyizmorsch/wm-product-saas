@@ -2,14 +2,15 @@
 
 namespace App\Domains\Production\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Domains\Production\Models\ProductionNcr;
-use App\Domains\Production\Services\NcrService;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\WorkCenter;
-use Illuminate\Http\Request;
-use App\Domains\Production\Requests\StoreNcrRequest;
 use App\Domains\Production\Requests\NcrDispositionRequest;
+use App\Domains\Production\Requests\StoreNcrRequest;
+use App\Domains\Production\Services\NcrService;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+
 class NcrController extends Controller
 {
     public function __construct(
@@ -25,10 +26,10 @@ class NcrController extends Controller
             ->with(['order', 'inspection']);
 
         if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
+            $search = '%'.$request->input('search').'%';
             $query->where(function ($q) use ($search) {
                 $q->where('ncr_number', 'like', $search)
-                  ->orWhere('description', 'like', $search);
+                    ->orWhere('description', 'like', $search);
             });
         }
 
@@ -43,10 +44,10 @@ class NcrController extends Controller
         $sortBy = $request->input('sort_by', 'id');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        if (!in_array($sortBy, ['id', 'ncr_number', 'category', 'status'])) {
+        if (! in_array($sortBy, ['id', 'ncr_number', 'category', 'status'])) {
             $sortBy = 'id';
         }
-        if (!in_array($sortOrder, ['asc', 'desc'])) {
+        if (! in_array($sortOrder, ['asc', 'desc'])) {
             $sortOrder = 'desc';
         }
 
@@ -92,20 +93,21 @@ class NcrController extends Controller
     public function disposition(NcrDispositionRequest $request, int $id)
     {
         $this->authorize('manage', ProductionNcr::class);
+        $tenantId = require_tenant_id();
 
         $type = $request->input('disposition_type'); // rework | scrap | use_as_is
-        
+
         $data = $request->only([
-            'original_production_order_id', 
-            'cost_estimate', 
-            'work_center_id', 
-            'category', 
-            'reason_code', 
-            'quantity', 
-            'cost'
+            'original_production_order_id',
+            'cost_estimate',
+            'work_center_id',
+            'category',
+            'reason_code',
+            'quantity',
+            'cost',
         ]);
 
-        $this->ncrService->processDisposition($id, $type, $data);
+        $this->ncrService->processDisposition($id, $type, $data, $tenantId);
 
         return redirect()->back()->with('success', 'Disposition type registered.');
     }
@@ -113,10 +115,11 @@ class NcrController extends Controller
     public function close(Request $request, int $id)
     {
         $this->authorize('approve', ProductionNcr::class);
+        $tenantId = require_tenant_id();
         $userId = auth()->id();
         $signature = $request->input('esignature') ?: 'NCR-CLOSE-SIGN';
 
-        $this->ncrService->closeNcr($id, $userId, $signature);
+        $this->ncrService->closeNcr($id, $userId, $signature, $tenantId);
 
         return redirect()->back()->with('success', 'NCR closed successfully.');
     }

@@ -4,8 +4,9 @@ namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
-use App\Models\User;
+use App\Domains\Sales\Models\DeliveryOrderItem;
 use App\Models\Concerns\Loggable;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductionOrder extends BaseModel
 {
-    use HasFactory, SoftDeletes, Loggable;
+    use HasFactory, Loggable, SoftDeletes;
 
     protected $table = 'production_orders';
 
@@ -24,13 +25,16 @@ class ProductionOrder extends BaseModel
         static::updated(function ($order) {
             if (in_array($order->status, [self::STATUS_COMPLETED, self::STATUS_CLOSED])) {
                 // Find and update linked ProductionOrderRequests
-                $requests = \App\Domains\Production\Models\ProductionOrderRequest::where('production_order_id', $order->id)
-                    ->orWhere(function($query) use ($order) {
-                        if ($order->sales_order_item_id) {
-                            $query->whereHas('deliveryOrderItem', function($q) use ($order) {
-                                $q->where('sales_order_item_id', $order->sales_order_item_id);
+                $requests = ProductionOrderRequest::where('tenant_id', $order->tenant_id)
+                    ->where(function ($query) use ($order) {
+                        $query->where('production_order_id', $order->id)
+                            ->orWhere(function ($query) use ($order) {
+                                if ($order->sales_order_item_id) {
+                                    $query->whereHas('deliveryOrderItem', function ($q) use ($order) {
+                                        $q->where('sales_order_item_id', $order->sales_order_item_id);
+                                    });
+                                }
                             });
-                        }
                     })
                     ->get();
 
@@ -42,11 +46,16 @@ class ProductionOrder extends BaseModel
                 }
 
                 // Fallback for direct delivery order items update
-                $items = \App\Domains\Sales\Models\DeliveryOrderItem::where('production_order_id', $order->id)
-                    ->orWhere(function($query) use ($order) {
-                        if ($order->sales_order_item_id) {
-                            $query->where('sales_order_item_id', $order->sales_order_item_id);
-                        }
+                $items = DeliveryOrderItem::whereHas('deliveryOrder', function ($query) use ($order) {
+                    $query->where('tenant_id', $order->tenant_id);
+                })
+                    ->where(function ($query) use ($order) {
+                        $query->where('production_order_id', $order->id)
+                            ->orWhere(function ($query) use ($order) {
+                                if ($order->sales_order_item_id) {
+                                    $query->where('sales_order_item_id', $order->sales_order_item_id);
+                                }
+                            });
                     })
                     ->get();
 
@@ -57,12 +66,17 @@ class ProductionOrder extends BaseModel
         });
     }
 
-    public const STATUS_DRAFT         = 'draft';
-    public const STATUS_RELEASED      = 'released';
-    public const STATUS_IN_PROGRESS   = 'in_progress';
-    public const STATUS_COMPLETED     = 'completed';
-    public const STATUS_CLOSED        = 'closed';
-    public const STATUS_CANCELLED     = 'cancelled';
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_RELEASED = 'released';
+
+    public const STATUS_IN_PROGRESS = 'in_progress';
+
+    public const STATUS_COMPLETED = 'completed';
+
+    public const STATUS_CLOSED = 'closed';
+
+    public const STATUS_CANCELLED = 'cancelled';
 
     public const STATUSES = [
         self::STATUS_DRAFT,
@@ -105,17 +119,17 @@ class ProductionOrder extends BaseModel
     ];
 
     protected $casts = [
-        'quantity_ordered'  => 'float',
+        'quantity_ordered' => 'float',
         'quantity_produced' => 'float',
         'quantity_rejected' => 'float',
         'quantity_scrapped' => 'float',
-        'start_date'        => 'date',
-        'end_date'          => 'date',
+        'start_date' => 'date',
+        'end_date' => 'date',
         'actual_start_date' => 'datetime',
-        'actual_end_date'   => 'datetime',
-        'released_at'       => 'datetime',
-        'completed_at'      => 'datetime',
-        'closed_at'         => 'datetime',
+        'actual_end_date' => 'datetime',
+        'released_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'closed_at' => 'datetime',
     ];
 
     public function plan(): BelongsTo

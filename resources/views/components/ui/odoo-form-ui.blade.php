@@ -845,11 +845,10 @@
         $fieldId = $id ?? ($name ? str_replace('[]', '', $name) . '_' . uniqid() : 'editor_' . uniqid());
     @endphp
     @if($label)
-        <div class="odoo-form-group align-items-start">
-            <label class="odoo-form-label pt-2" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
+        <div class="mb-3">
+            <label class="fw-bold text-dark mb-1 fs-12 d-block" for="{{ $fieldId }}" style="{{ $required ? 'color: #dc3545 !important;' : '' }}">
                 {{ $label }} @if($required)<span class="text-danger">*</span>@endif
             </label>
-            <div class="flex-grow-1">
     @endif
                 <div class="odoo-editor-wrapper {{ $errorText ? 'is-invalid' : '' }}"
                      @if($alpineError) :class="{{ $alpineError }} ? 'is-invalid border-danger' : ''" @endif>
@@ -869,7 +868,6 @@
                     <div class="text-muted fs-11 mt-1" @if($alpineError) x-show="!{{ $alpineError }}" @endif>{{ $helperText }}</div>
                 @endif
     @if($label)
-            </div>
         </div>
     @endif
 

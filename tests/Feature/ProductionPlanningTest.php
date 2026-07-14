@@ -2,20 +2,27 @@
 
 namespace Tests\Feature;
 
-use App\Models\Tenant;
-use App\Models\User;
+use App\Domains\CRM\Models\Customer;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\ProductWarehouseStock;
 use App\Domains\Inventory\Models\Uom;
-use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionBomItem;
-use App\Domains\Production\Models\Routing;
-use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Models\ProductionOrderRequest;
 use App\Domains\Production\Models\ProductionPlan;
 use App\Domains\Production\Models\ProductionPlanRequirement;
-use App\Domains\Production\Models\ProductionPlanOperation;
-use App\Domains\Production\Services\PlanningValidationService;
+use App\Domains\Production\Models\Routing;
+use App\Domains\Production\Models\RoutingOperation;
+use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Services\MrpEngineService;
+use App\Domains\Production\Services\PlanningValidationService;
+use App\Domains\Sales\Models\DeliveryOrder;
+use App\Domains\Sales\Models\DeliveryOrderItem;
+use App\Domains\Sales\Models\SalesOrder;
+use App\Domains\Sales\Models\SalesOrderItem;
+use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,12 +31,19 @@ class ProductionPlanningTest extends TestCase
     use RefreshDatabase;
 
     private Tenant $tenant;
+
     private User $user;
+
     private Uom $uom;
+
     private Product $finishedGood;
+
     private Product $rawMaterial;
+
     private ProductionBom $bom;
+
     private Routing $routing;
+
     private WorkCenter $workCenter;
 
     protected function setUp(): void
@@ -166,7 +180,7 @@ class ProductionPlanningTest extends TestCase
         // 2. Submit Approval
         $response = $this->actingAs($this->user)
             ->post(route('production.plans.submit', $plan->id));
-        
+
         $this->assertEquals(ProductionPlan::STATUS_PENDING_APPROVAL, $plan->fresh()->status);
 
         // 3. Approve Plan
@@ -208,6 +222,99 @@ class ProductionPlanningTest extends TestCase
         $response = $this->actingAs($this->user)
             ->post(route('production.plans.close', $plan->id));
         $this->assertEquals(ProductionPlan::STATUS_CLOSED, $plan->fresh()->status);
+    }
+
+    public function test_can_create_production_plan_from_draft_sales_order_request(): void
+    {
+        $customer = Customer::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Plan Customer',
+            'email' => 'plan-customer@example.com',
+        ]);
+        $warehouse = Warehouse::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Plan Warehouse',
+            'code' => 'PLAN',
+            'status' => 'active',
+        ]);
+        $salesOrder = SalesOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'customer_id' => $customer->id,
+            'sales_order_number' => '2001',
+            'order_date' => today(),
+            'status' => 'Confirmed',
+            'total_amount' => 500,
+        ]);
+        $salesOrderItem = SalesOrderItem::create([
+            'sales_order_id' => $salesOrder->id,
+            'product_id' => $this->finishedGood->id,
+            'warehouse_id' => $warehouse->id,
+            'item_name' => $this->finishedGood->name,
+            'quantity' => 5,
+            'unit_price' => 100,
+            'amount' => 500,
+        ]);
+        $delivery = DeliveryOrder::create([
+            'tenant_id' => $this->tenant->id,
+            'sales_order_id' => $salesOrder->id,
+            'delivery_number' => 'DO-2001',
+            'delivery_date' => today(),
+            'status' => 'Waiting Production',
+        ]);
+        $deliveryItem = DeliveryOrderItem::create([
+            'delivery_order_id' => $delivery->id,
+            'sales_order_item_id' => $salesOrderItem->id,
+            'product_id' => $this->finishedGood->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 5,
+            'quantity_ordered' => 5,
+            'quantity_reserved' => 0,
+            'status' => 'Waiting Production',
+        ]);
+        $productionRequest = ProductionOrderRequest::create([
+            'tenant_id' => $this->tenant->id,
+            'delivery_order_item_id' => $deliveryItem->id,
+            'product_id' => $this->finishedGood->id,
+            'quantity_requested' => 5,
+            'status' => 'draft',
+            'created_by' => $this->user->id,
+        ]);
+
+        $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'planning-test')
+            ->get(route('production.plans.create'))
+            ->assertOk()
+            ->assertSee('SO-2001')
+            ->assertSee('DO-2001');
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'planning-test')
+            ->post(route('production.plans.store'), [
+                'production_order_request_id' => $productionRequest->id,
+                'name' => 'SO-2001 Production Plan',
+                'product_id' => $this->finishedGood->id,
+                'quantity' => 1,
+                'start_date' => date('Y-m-d'),
+                'end_date' => date('Y-m-d', strtotime('+5 days')),
+                'bom_id' => $this->bom->id,
+                'routing_id' => $this->routing->id,
+            ]);
+
+        $response->assertRedirect();
+        $productionRequest->refresh();
+        $plan = ProductionPlan::orderByDesc('id')->first();
+
+        $this->assertEquals($plan->id, $productionRequest->production_plan_id);
+        $this->assertEquals('production-plan-created', $productionRequest->status);
+        $this->assertEquals($salesOrder->id, $plan->sales_order_id);
+        $this->assertEquals($salesOrderItem->id, $plan->sales_order_item_id);
+        $this->assertEquals(5.0, $plan->quantity);
+
+        $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'planning-test')
+            ->get(route('production.plans.create'))
+            ->assertOk()
+            ->assertDontSee('DO-2001');
     }
 
     /**
@@ -276,6 +383,101 @@ class ProductionPlanningTest extends TestCase
             }
         }
 
-        $this->assertTrue($hasCapacityOverload, "Capacity warning should have been flagged.");
+        $this->assertTrue($hasCapacityOverload, 'Capacity warning should have been flagged.');
+    }
+
+    public function test_mrp_snapshots_inventory_availability_from_warehouse_stock(): void
+    {
+        $warehouse = Warehouse::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Main Warehouse',
+            'code' => 'MAIN',
+            'status' => 'active',
+        ]);
+
+        ProductWarehouseStock::create([
+            'tenant_id' => $this->tenant->id,
+            'product_id' => $this->rawMaterial->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 15,
+            'reserved_qty' => 3,
+            'available_qty' => 12,
+            'unit_cost' => 25,
+        ]);
+
+        $plan = ProductionPlan::create([
+            'tenant_id' => $this->tenant->id,
+            'plan_number' => 'PLN-2026-000300',
+            'name' => 'Inventory Snapshot Batch',
+            'product_id' => $this->finishedGood->id,
+            'bom_id' => $this->bom->id,
+            'routing_id' => $this->routing->id,
+            'quantity' => 10.0,
+            'start_date' => date('Y-m-d'),
+            'end_date' => date('Y-m-d', strtotime('+5 days')),
+            'status' => ProductionPlan::STATUS_APPROVED,
+        ]);
+
+        app(MrpEngineService::class)->runMrp($plan);
+
+        $requirement = ProductionPlanRequirement::where('production_plan_id', $plan->id)
+            ->where('product_id', $this->rawMaterial->id)
+            ->firstOrFail();
+
+        $this->assertEquals(22.0, $requirement->required_quantity);
+        $this->assertEquals(12.0, $requirement->available_quantity);
+        $this->assertEquals(3.0, $requirement->reserved_quantity);
+        $this->assertEquals(10.0, $requirement->shortage_quantity);
+        $this->assertEquals('shortage', $requirement->status);
+    }
+
+    public function test_mrp_can_be_rerun_to_refresh_inventory_snapshot_before_release(): void
+    {
+        $warehouse = Warehouse::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Refill Warehouse',
+            'code' => 'REFILL',
+            'status' => 'active',
+        ]);
+
+        $stock = ProductWarehouseStock::create([
+            'tenant_id' => $this->tenant->id,
+            'product_id' => $this->rawMaterial->id,
+            'warehouse_id' => $warehouse->id,
+            'quantity' => 0,
+            'reserved_qty' => 0,
+            'available_qty' => 0,
+            'unit_cost' => 25,
+        ]);
+
+        $plan = ProductionPlan::create([
+            'tenant_id' => $this->tenant->id,
+            'plan_number' => 'PLN-2026-000301',
+            'name' => 'MRP Refresh Batch',
+            'product_id' => $this->finishedGood->id,
+            'bom_id' => $this->bom->id,
+            'routing_id' => $this->routing->id,
+            'quantity' => 10.0,
+            'start_date' => date('Y-m-d'),
+            'end_date' => date('Y-m-d', strtotime('+5 days')),
+            'status' => ProductionPlan::STATUS_APPROVED,
+        ]);
+
+        app(MrpEngineService::class)->runMrp($plan);
+
+        $this->assertEquals(22.0, $plan->requirements()->firstOrFail()->shortage_quantity);
+
+        $stock->update([
+            'quantity' => 30,
+            'available_qty' => 30,
+        ]);
+
+        app(MrpEngineService::class)->runMrp($plan->fresh());
+
+        $requirement = $plan->requirements()->firstOrFail();
+
+        $this->assertEquals(30.0, $requirement->available_quantity);
+        $this->assertEquals(0.0, $requirement->shortage_quantity);
+        $this->assertEquals('available', $requirement->status);
     }
 }

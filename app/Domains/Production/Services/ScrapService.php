@@ -15,13 +15,13 @@ class ScrapService
     {
         return DB::transaction(function () use ($tenantId, $data) {
             return ProductionScrapDisposal::create([
-                'tenant_id'   => $tenantId,
-                'ncr_id'      => $data['ncr_id'] ?? null,
-                'category'    => $data['category'],
+                'tenant_id' => $tenantId,
+                'ncr_id' => $data['ncr_id'] ?? null,
+                'category' => $data['category'],
                 'reason_code' => $data['reason_code'],
-                'quantity'    => $data['quantity'],
-                'cost'        => $data['cost'] ?? 0.00,
-                'status'      => 'pending_approval',
+                'quantity' => $data['quantity'],
+                'cost' => $data['cost'] ?? 0.00,
+                'status' => 'pending_approval',
             ]);
         });
     }
@@ -29,13 +29,19 @@ class ScrapService
     /**
      * Approve and execute disposal.
      */
-    public function approveDisposal(int $disposalId, int $userId): void
+    public function approveDisposal(int $disposalId, int $userId, ?int $tenantId = null): void
     {
-        DB::transaction(function () use ($disposalId, $userId) {
-            $disposal = ProductionScrapDisposal::findOrFail($disposalId);
+        DB::transaction(function () use ($disposalId, $userId, $tenantId) {
+            $disposal = ProductionScrapDisposal::query()
+                ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+                ->findOrFail($disposalId);
+
+            if ($disposal->status !== 'pending_approval') {
+                throw new \InvalidArgumentException('Only pending scrap disposals can be approved.');
+            }
 
             $disposal->update([
-                'status'      => 'approved',
+                'status' => 'approved',
                 'disposed_at' => Carbon::now(),
                 'disposed_by' => $userId,
             ]);

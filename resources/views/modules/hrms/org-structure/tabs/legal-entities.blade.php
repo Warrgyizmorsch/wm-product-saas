@@ -3,9 +3,60 @@
     <div class="col-12">
         <x-ui.card title="Legal Entities" stretch bodyClass="p-0">
             <x-slot name="headerAction">
-                <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCompanyModal">
-                    Add Legal Entity
-                </x-ui.button>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <!-- Search Form -->
+                    <form method="GET" action="{{ route('hrms.org.index') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px;">
+                        <input type="hidden" name="tab" value="legal-entities">
+                        <input type="hidden" name="co_status" value="{{ $filters['co_status'] }}">
+                        <input type="hidden" name="co_sort" value="{{ $filters['co_sort'] }}">
+                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                        <input type="text" name="co_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search legal entities..." value="{{ $filters['co_search'] }}" style="box-shadow: none; height: 32px;">
+                    </form>
+
+                    <!-- Sort Dropdown -->
+                    <x-ui.sort-dropdown label="SORT">
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['co_sort'] === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'legal-entities', 'co_sort' => 'name_asc']) }}">
+                            <span>Name (A-Z)</span>
+                            @if($filters['co_sort'] === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                        </a>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['co_sort'] === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'legal-entities', 'co_sort' => 'name_desc']) }}">
+                            <span>Name (Z-A)</span>
+                            @if($filters['co_sort'] === 'name_desc') <i class="feather-check ms-3"></i> @endif
+                        </a>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['co_sort'] === 'legal_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'legal-entities', 'co_sort' => 'legal_asc']) }}">
+                            <span>Legal Name (A-Z)</span>
+                            @if($filters['co_sort'] === 'legal_asc') <i class="feather-check ms-3"></i> @endif
+                        </a>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['co_sort'] === 'legal_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'legal-entities', 'co_sort' => 'legal_desc']) }}">
+                            <span>Legal Name (Z-A)</span>
+                            @if($filters['co_sort'] === 'legal_desc') <i class="feather-check ms-3"></i> @endif
+                        </a>
+                    </x-ui.sort-dropdown>
+
+                    <!-- Filter Dropdown -->
+                    <x-ui.filter label="FILTER">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                        <form method="GET" action="{{ route('hrms.org.index') }}">
+                            <input type="hidden" name="tab" value="legal-entities">
+                            <input type="hidden" name="co_search" value="{{ $filters['co_search'] }}">
+                            <input type="hidden" name="co_sort" value="{{ $filters['co_sort'] }}">
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
+                                <select name="co_status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                    <option value="">All Statuses</option>
+                                    <option value="1" @selected($filters['co_status'] === '1')>Active</option>
+                                    <option value="0" @selected($filters['co_status'] === '0')>Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <div class="d-flex gap-2 justify-content-end mt-4">
+                                <a href="{{ route('hrms.org.index', ['tab' => 'legal-entities']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">RESET</a>
+                                <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3 text-white bg-primary border-primary">APPLY FILTERS</button>
+                            </div>
+                        </form>
+                    </x-ui.filter>
+                </div>
             </x-slot>
 
             <div class="table-responsive">
@@ -21,10 +72,10 @@
                             <th width="150" class="text-end">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="companiesTableBody">
                         @foreach($companies as $company)
                         <tr>
-                            <td>{{ $loop->iteration }}</td>
+                            <td>{{ $companies->firstItem() + $loop->index }}</td>
                             <td>
                                 <div class="avatar-image avatar-md rounded bg-light p-1 border border-light overflow-hidden" style="width: 40px; height: 40px; min-width: 40px; min-height: 40px;">
                                     @if($company->logo)
@@ -89,6 +140,23 @@
                         @endif
                     </tbody>
                 </table>
+            </div>
+
+            <div id="companiesPaginationWrapper">
+                @php
+                    $currentPage = $companies->currentPage();
+                    $totalPages = $companies->lastPage();
+                    $totalResults = $companies->total();
+                    $perPage = $companies->perPage();
+                @endphp
+                <x-ui.pagination 
+                    class="px-4 py-3 border-top"
+                    :current-page="$currentPage"
+                    :total-pages="$totalPages"
+                    :total-results="$totalResults"
+                    :per-page="$perPage"
+                    tab="legal-entities"
+                />
             </div>
         </x-ui.card>
     </div>

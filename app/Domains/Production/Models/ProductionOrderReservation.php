@@ -5,6 +5,7 @@ namespace App\Domains\Production\Models;
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Uom;
+use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -17,6 +18,7 @@ class ProductionOrderReservation extends BaseModel
         'production_order_id',
         'bom_item_id',
         'product_id',
+        'warehouse_id',
         'quantity_planned',
         'quantity_reserved',
         'quantity_issued',
@@ -24,9 +26,9 @@ class ProductionOrderReservation extends BaseModel
     ];
 
     protected $casts = [
-        'quantity_planned'  => 'float',
+        'quantity_planned' => 'float',
         'quantity_reserved' => 'float',
-        'quantity_issued'   => 'float',
+        'quantity_issued' => 'float',
     ];
 
     public function order(): BelongsTo
@@ -42,6 +44,11 @@ class ProductionOrderReservation extends BaseModel
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 
     public function uom(): BelongsTo

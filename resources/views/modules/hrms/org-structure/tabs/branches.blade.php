@@ -3,9 +3,86 @@
     <div class="col-12">
         <x-ui.card title="Branches" stretch bodyClass="p-0">
             <x-slot name="headerAction">
-                <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addBranchModal">
-                    Add Branch
-                </x-ui.button>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <!-- Search Form -->
+                    <form method="GET" action="{{ route('hrms.org.index') }}" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px;">
+                        <input type="hidden" name="tab" value="branches">
+                        <input type="hidden" name="br_company_id" value="{{ $filters['br_company_id'] }}">
+                        <input type="hidden" name="br_business_unit_id" value="{{ $filters['br_business_unit_id'] }}">
+                        <input type="hidden" name="br_status" value="{{ $filters['br_status'] }}">
+                        <input type="hidden" name="br_sort" value="{{ $filters['br_sort'] }}">
+                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                        <input type="text" name="br_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search branches..." value="{{ $filters['br_search'] }}" style="box-shadow: none; height: 32px;">
+                    </form>
+
+                    <!-- Sort Dropdown -->
+                    <x-ui.sort-dropdown label="SORT">
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['br_sort'] === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'branches', 'br_sort' => 'name_asc']) }}">
+                            <span>Name (A-Z)</span>
+                            @if($filters['br_sort'] === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                        </a>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['br_sort'] === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'branches', 'br_sort' => 'name_desc']) }}">
+                            <span>Name (Z-A)</span>
+                            @if($filters['br_sort'] === 'name_desc') <i class="feather-check ms-3"></i> @endif
+                        </a>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['br_sort'] === 'code_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'branches', 'br_sort' => 'code_asc']) }}">
+                            <span>Code (A-Z)</span>
+                            @if($filters['br_sort'] === 'code_asc') <i class="feather-check ms-3"></i> @endif
+                        </a>
+                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['br_sort'] === 'code_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'branches', 'br_sort' => 'code_desc']) }}">
+                            <span>Code (Z-A)</span>
+                            @if($filters['br_sort'] === 'code_desc') <i class="feather-check ms-3"></i> @endif
+                        </a>
+                    </x-ui.sort-dropdown>
+
+                    <!-- Filter Dropdown -->
+                    <x-ui.filter label="FILTER">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                        <form method="GET" action="{{ route('hrms.org.index') }}">
+                            <input type="hidden" name="tab" value="branches">
+                            <input type="hidden" name="br_search" value="{{ $filters['br_search'] }}">
+                            <input type="hidden" name="br_sort" value="{{ $filters['br_sort'] }}">
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">PARENT COMPANY</label>
+                                <x-ui.odoo-form-ui type="select" name="br_company_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                    <option value="">All Companies</option>
+                                    @foreach($companiesList as $company)
+                                        <option value="{{ $company->id }}" @selected((string) $filters['br_company_id'] === (string) $company->id)>
+                                            {{ $company->company_name }}
+                                        </option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">BUSINESS UNIT</label>
+                                <x-ui.odoo-form-ui type="select" name="br_business_unit_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                    <option value="">All Business Units</option>
+                                    @foreach($businessUnitsList as $unit)
+                                        <option value="{{ $unit->id }}" @selected((string) $filters['br_business_unit_id'] === (string) $unit->id)>
+                                            {{ $unit->name }}
+                                        </option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
+                                <x-ui.odoo-form-ui type="select" name="br_status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+                                    <option value="">All Statuses</option>
+                                    <option value="1" @selected($filters['br_status'] === '1')>Active</option>
+                                    <option value="0" @selected($filters['br_status'] === '0')>Inactive</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            
+                            <div class="d-flex gap-2 justify-content-end mt-4">
+                                <a href="{{ route('hrms.org.index', ['tab' => 'branches']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">RESET</a>
+                                <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3">APPLY FILTERS</button>
+                            </div>
+                        </form>
+                    </x-ui.filter>
+                </div>
             </x-slot>
 
             <div class="table-responsive">
@@ -13,7 +90,6 @@
                     <thead class="table-light">
                         <tr>
                             <th width="60">#</th>
-                            <!-- <th width="80">Avatar</th> -->
                             <th>Branch Name</th>
                             <th>Branch Code</th>
                             <th>Business Unit</th>
@@ -22,10 +98,10 @@
                             <th width="150" class="text-end">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="branchesTableBody">
                         @foreach($branches as $br)
                         <tr>
-                            <td>{{ $loop->iteration }}</td>
+                            <td>{{ $branches->firstItem() + $loop->index }}</td>
                             <!-- <td>
                                 <div class="avatar-text avatar-md rounded bg-soft-primary text-primary d-flex align-items-center justify-content-center fw-bold fs-12" style="width: 40px; height: 40px; min-width: 40px; min-height: 40px;">
                                     {{ substr($br->name ?? 'BR', 0, 2) }}
@@ -79,6 +155,23 @@
                         @endif
                     </tbody>
                 </table>
+            </div>
+
+            <div id="branchesPaginationWrapper">
+                @php
+                    $currentPage = $branches->currentPage();
+                    $totalPages = $branches->lastPage();
+                    $totalResults = $branches->total();
+                    $perPage = $branches->perPage();
+                @endphp
+                <x-ui.pagination 
+                    class="px-4 py-3 border-top"
+                    :current-page="$currentPage"
+                    :total-pages="$totalPages"
+                    :total-results="$totalResults"
+                    :per-page="$perPage"
+                    tab="branches"
+                />
             </div>
         </x-ui.card>
     </div>

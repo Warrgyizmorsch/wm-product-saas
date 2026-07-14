@@ -35,7 +35,52 @@ class RosterController extends Controller
         $designations = Designation::all();
 
         // 1. Shift Master Data (used in Shifts tab)
-        $shifts = ProductionShift::all();
+        $shiftSearch = $request->string('shift_search')->trim()->value();
+        $shiftSort = $request->string('shift_sort')->value() ?: 'name_asc';
+        $shiftStatus = $request->filled('shift_status') ? $request->string('shift_status')->value() : null;
+        $shiftOvertime = $request->filled('shift_overtime') ? $request->string('shift_overtime')->value() : null;
+
+        $shiftsQuery = ProductionShift::query();
+        if ($shiftSearch !== '') {
+            $shiftsQuery->where(function ($query) use ($shiftSearch): void {
+                $query->where('name', 'like', "%{$shiftSearch}%")
+                    ->orWhere('code', 'like', "%{$shiftSearch}%")
+                    ->orWhere('start_time', 'like', "%{$shiftSearch}%")
+                    ->orWhere('end_time', 'like', "%{$shiftSearch}%");
+            });
+        }
+
+        if ($shiftStatus !== null && $shiftStatus !== '') {
+            $shiftsQuery->where('active', $shiftStatus === '1');
+        }
+
+        if ($shiftOvertime !== null && $shiftOvertime !== '') {
+            $shiftsQuery->where('overtime_allowed', $shiftOvertime === '1');
+        }
+
+        switch ($shiftSort) {
+            case 'name_desc':
+                $shiftsQuery->orderBy('name', 'desc');
+                break;
+            case 'code_asc':
+                $shiftsQuery->orderBy('code', 'asc');
+                break;
+            case 'code_desc':
+                $shiftsQuery->orderBy('code', 'desc');
+                break;
+            case 'start_asc':
+                $shiftsQuery->orderBy('start_time', 'asc');
+                break;
+            case 'start_desc':
+                $shiftsQuery->orderBy('start_time', 'desc');
+                break;
+            case 'name_asc':
+            default:
+                $shiftsQuery->orderBy('name', 'asc');
+                break;
+        }
+
+        $shifts = $shiftsQuery->get();
         $activeShifts = ProductionShift::where('active', true)->get();
 
         // 2. Roster Scheduling Matrix Data
@@ -82,7 +127,7 @@ class RosterController extends Controller
         return view('modules.hrms.roster.index', compact(
             'tab', 'companies', 'businessUnits', 'branches', 'departments', 'designations', 'shifts', 'activeShifts',
             'selectedCompanyId', 'selectedDepartmentId', 'search', 'sortBy', 'startDate', 'dates',
-            'employees', 'rosterMap'
+            'employees', 'rosterMap', 'shiftSearch', 'shiftSort', 'shiftStatus', 'shiftOvertime'
         ));
     }
 

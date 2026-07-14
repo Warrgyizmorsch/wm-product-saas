@@ -36,11 +36,11 @@ class ProductionScanLog extends BaseModel
     {
         switch ($this->entity_type) {
             case 'order':
-                return ProductionOrder::withoutGlobalScopes()->find($this->entity_id)?->order_number ?? '—';
+                return ProductionOrder::withoutGlobalScopes()->where('tenant_id', $this->tenant_id)->find($this->entity_id)?->order_number ?? '—';
             case 'batch':
-                return ProductionBatch::withoutGlobalScopes()->find($this->entity_id)?->batch_number ?? '—';
+                return ProductionBatch::withoutGlobalScopes()->where('tenant_id', $this->tenant_id)->find($this->entity_id)?->batch_number ?? '—';
             case 'serial':
-                return ProductionSerialNumber::withoutGlobalScopes()->find($this->entity_id)?->serial_number ?? '—';
+                return ProductionSerialNumber::withoutGlobalScopes()->where('tenant_id', $this->tenant_id)->find($this->entity_id)?->serial_number ?? '—';
             default:
                 return '—';
         }

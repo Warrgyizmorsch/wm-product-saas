@@ -293,11 +293,11 @@
                                             <div class="col-md-6 pe-md-4">
                                                 <div class="zoho-field-row">
                                                     <div class="zoho-field-label">Lead Owner</div>
-                                                    <div class="zoho-field-value text-dark">
-                                                        <form action="{{ route('crm.leads.updateOwner', $lead->id) }}" method="POST" class="d-inline">
+                                                    <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 250px;">
+                                                        <form action="{{ route('crm.leads.updateOwner', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
                                                             @csrf
                                                             @method('PATCH')
-                                                            <select name="lead_owner_id" class="form-select form-select-sm fw-semibold d-inline-block w-auto py-0.5 px-2 border-0 bg-transparent text-primary" onchange="this.form.submit()" style="box-shadow: none; font-size: 13px; padding-left: 0;">
+                                                            <select class="form-select odoo-select2 owner-select" name="lead_owner_id" style="border-radius:0;">
                                                                 <option value="">Unassigned</option>
                                                                 @foreach($users as $user)
                                                                     <option value="{{ $user->id }}" @selected($lead->lead_owner_id == $user->id)>{{ $user->name }}</option>
@@ -782,7 +782,7 @@
                                                 </table>
                                             </div>
                                             <div class="mt-2.5">
-                                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow">
+                                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
                                                     <i class="feather-plus me-1"></i>Add a product
                                                 </button>
                                             </div>
@@ -923,7 +923,7 @@
                                                 </table>
                                             </div>
                                             <div class="mt-2.5">
-                                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow">
+                                                <button type="button" class="btn btn-xs btn-outline-primary fw-bold" id="addItemRow" style="font-size: 10px; padding: 2px 8px; text-transform: none !important;">
                                                     <i class="feather-plus me-1"></i>Add a product
                                                 </button>
                                             </div>
@@ -971,9 +971,7 @@
                                         <div class="d-flex justify-content-between align-items-center pb-3 border-bottom mb-4 flex-wrap gap-2 d-print-none">
                                             <h4 class="fw-bold text-dark mb-0 fs-16">Quotation Sheet: {{ $activeQuotation->quotation_number }}</h4>
                                             <div class="d-flex flex-wrap gap-2">
-                                                <!-- Hidden Iframe to render exact print format from quotations.show -->
-                                                <iframe id="quotationPrintIframe" src="{{ route('crm.quotations.show', $activeQuotation->id) }}" style="display: none; width: 0; height: 0; border: none;"></iframe>
-                                                <button onclick="printQuotationIframe()" class="btn btn-sm btn-primary" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-printer me-1"></i>Print / Download</button>
+                                                <a href="{{ route('crm.quotations.download', $activeQuotation->id) }}" class="btn btn-sm btn-primary" style="background-color: #1e40af; border-color: #1e40af;"><i class="feather-printer me-1"></i>Print / Download</a>
                                                 <a href="{{ route('crm.quotations.show', $activeQuotation->id) }}" class="btn btn-sm btn-light border"><i class="feather-eye me-1"></i>View Full Quotation</a>
                                                 <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_quotation' => 1]) }}" class="btn btn-sm btn-light border"><i class="feather-edit-2 me-1"></i>Edit Quotation</a>
                                                 @if ($activeQuotation->status === 'Draft' || $activeQuotation->status === 'Quotation Rework')
@@ -1712,15 +1710,7 @@
     <!-- Select2 & Quotation Rows logic -->
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
-<script>
-        function printQuotationIframe() {
-            var iframe = document.getElementById('quotationPrintIframe');
-            if (iframe) {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
-            }
-        }
-
+    <script>
         $(function () {
             // Tab state persistence logic
             var activeTabKey = 'lead_active_tab_' + {{ $lead->id }};
@@ -1851,6 +1841,11 @@
 
             // Auto submit status forms when changed in Select2 status selector
             $('.status-select').on('change', function() {
+                $(this).closest('form').submit();
+            });
+
+            // Auto submit owner forms when changed in Select2 owner selector
+            $('.owner-select').on('change', function() {
                 $(this).closest('form').submit();
             });
 

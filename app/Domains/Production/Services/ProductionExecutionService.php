@@ -2,12 +2,15 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Models\ProductionOrderProgressLog;
 use App\Domains\Production\Models\ProductionOrderReceipt;
-use App\Domains\Production\Models\ProductionOrderScrap;
 use App\Domains\Production\Models\ProductionOrderRework;
+use App\Domains\Production\Models\ProductionOrderScrap;
+use App\Domains\Production\Models\ProductionQualityInspection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -29,7 +32,7 @@ class ProductionExecutionService
         bool $completeOperation = false
     ): ProductionOrderProgressLog {
         return DB::transaction(function () use (
-            $operationId, $produced, $rejected, $scrapped, 
+            $operationId, $produced, $rejected, $scrapped,
             $setupMinutes, $runMinutes, $remarks, $machineId, $userId, $completeOperation
         ) {
             $op = ProductionOrderOperation::findOrFail($operationId);
@@ -37,23 +40,23 @@ class ProductionExecutionService
 
             // 1. Enforce Order state validity
             if ($order->isClosed() || $order->isCompleted() || $order->isCancelled()) {
-                throw new InvalidArgumentException("Cannot log progress on a closed, completed, or cancelled order.");
+                throw new InvalidArgumentException('Cannot log progress on a closed, completed, or cancelled order.');
             }
 
             // 2. Create the progress log entry
             $log = ProductionOrderProgressLog::create([
-                'tenant_id'           => $op->tenant_id,
+                'tenant_id' => $op->tenant_id,
                 'production_order_id' => $op->production_order_id,
-                'operation_id'        => $op->id,
-                'quantity_produced'   => $produced,
-                'quantity_rejected'   => $rejected,
-                'quantity_scrapped'   => $scrapped,
-                'setup_minutes_logged'=> $setupMinutes,
-                'run_minutes_logged'  => $runMinutes,
-                'recorded_by'         => $userId,
-                'recorded_at'         => now(),
-                'machine_id'          => $machineId ?? $op->machine_id,
-                'remarks'             => $remarks,
+                'operation_id' => $op->id,
+                'quantity_produced' => $produced,
+                'quantity_rejected' => $rejected,
+                'quantity_scrapped' => $scrapped,
+                'setup_minutes_logged' => $setupMinutes,
+                'run_minutes_logged' => $runMinutes,
+                'recorded_by' => $userId,
+                'recorded_at' => now(),
+                'machine_id' => $machineId ?? $op->machine_id,
+                'remarks' => $remarks,
             ]);
 
             // 3. Update Operation metrics
@@ -65,6 +68,8 @@ class ProductionExecutionService
 
             // Update operation status
             if ($completeOperation) {
+                $this->ensureQualityGatePassed($op);
+
                 $op->status = ProductionOrderOperation::STATUS_COMPLETED;
                 $op->actual_end_time = now();
 
@@ -108,21 +113,21 @@ class ProductionExecutionService
         ?int $userId = null
     ): ProductionOrderScrap {
         if ($quantity <= 0) {
-            throw new InvalidArgumentException("Scrap quantity must be greater than zero.");
+            throw new InvalidArgumentException('Scrap quantity must be greater than zero.');
         }
 
         return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId) {
             $order = ProductionOrder::findOrFail($orderId);
 
             $scrap = ProductionOrderScrap::create([
-                'tenant_id'                      => $order->tenant_id,
-                'production_order_id'            => $order->id,
-                'production_order_operation_id'  => $operationId,
-                'product_id'                     => $productId,
-                'quantity'                       => $quantity,
-                'reason'                         => $reason,
-                'recorded_by'                    => $userId,
-                'recorded_at'                    => now(),
+                'tenant_id' => $order->tenant_id,
+                'production_order_id' => $order->id,
+                'production_order_operation_id' => $operationId,
+                'product_id' => $productId,
+                'quantity' => $quantity,
+                'reason' => $reason,
+                'recorded_by' => $userId,
+                'recorded_at' => now(),
             ]);
 
             if ($productId === null || $productId === $order->product_id) {
@@ -146,20 +151,20 @@ class ProductionExecutionService
         ?int $userId = null
     ): ProductionOrderRework {
         if ($quantity <= 0) {
-            throw new InvalidArgumentException("Rework quantity must be greater than zero.");
+            throw new InvalidArgumentException('Rework quantity must be greater than zero.');
         }
 
         $order = ProductionOrder::findOrFail($orderId);
 
         return ProductionOrderRework::create([
-            'tenant_id'                      => $order->tenant_id,
-            'production_order_id'            => $order->id,
-            'production_order_operation_id'  => $operationId,
-            'quantity'                       => $quantity,
-            'reason'                         => $reason,
-            'status'                         => 'pending',
-            'recorded_by'                    => $userId,
-            'recorded_at'                    => now(),
+            'tenant_id' => $order->tenant_id,
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $operationId,
+            'quantity' => $quantity,
+            'reason' => $reason,
+            'status' => 'pending',
+            'recorded_by' => $userId,
+            'recorded_at' => now(),
         ]);
     }
 
@@ -181,45 +186,88 @@ class ProductionExecutionService
         float $quantity,
         string $qualityStatus = 'passed',
         ?string $remarks = null,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $warehouseId = null
     ): ProductionOrderReceipt {
         if ($quantity <= 0) {
-            throw new InvalidArgumentException("Receipt quantity must be greater than zero.");
+            throw new InvalidArgumentException('Receipt quantity must be greater than zero.');
         }
 
-        return DB::transaction(function () use ($orderId, $quantity, $qualityStatus, $remarks, $userId) {
+        return DB::transaction(function () use ($orderId, $quantity, $qualityStatus, $remarks, $userId, $warehouseId) {
             $order = ProductionOrder::findOrFail($orderId);
 
             if ($order->isClosed() || $order->isCancelled()) {
-                throw new InvalidArgumentException("Cannot receive finished goods on a closed or cancelled order.");
+                throw new InvalidArgumentException('Cannot receive finished goods on a closed or cancelled order.');
+            }
+
+            $warehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);
+            if (! $warehouseId) {
+                throw new InvalidArgumentException('A warehouse is required before receiving finished goods.');
             }
 
             $receipt = ProductionOrderReceipt::create([
-                'tenant_id'           => $order->tenant_id,
+                'tenant_id' => $order->tenant_id,
                 'production_order_id' => $order->id,
-                'product_id'          => $order->product_id,
-                'quantity_received'   => $quantity,
-                'quality_status'      => $qualityStatus,
-                'received_by'         => $userId,
-                'received_at'         => now(),
-                'remarks'             => $remarks,
+                'product_id' => $order->product_id,
+                'warehouse_id' => $warehouseId,
+                'quantity_received' => $quantity,
+                'quality_status' => $qualityStatus,
+                'received_by' => $userId,
+                'received_at' => now(),
+                'remarks' => $remarks,
             ]);
 
             // Increment quantity_produced
             $order->quantity_produced += $quantity;
             $order->save();
 
-            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
+            StockService::recordInflow(
+                $order->tenant_id,
+                $order->product_id,
+                $warehouseId,
+                $quantity,
+                (float) ($order->product?->unit_cost ?? $order->product?->cost_price ?? 0),
+                'Production Order Receipt',
+                $order->id
+            );
+
+            app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
-                'event_type'          => 'Finished Goods Received',
-                'title'               => 'Finished Goods Received',
-                'description'         => "Received {$quantity} finished goods with quality status '{$qualityStatus}'.",
-                'severity'            => 'success',
-                'event_source'        => 'ProductionExecutionService',
-                'triggered_by'        => $userId,
+                'event_type' => 'Finished Goods Received',
+                'title' => 'Finished Goods Received',
+                'description' => "Received {$quantity} finished goods with quality status '{$qualityStatus}'.",
+                'severity' => 'success',
+                'event_source' => 'ProductionExecutionService',
+                'triggered_by' => $userId,
             ]);
 
             return $receipt;
         });
+    }
+
+    private function ensureQualityGatePassed(ProductionOrderOperation $operation): void
+    {
+        if (! $operation->routingOperation?->quality_required) {
+            return;
+        }
+
+        $passedInspectionExists = ProductionQualityInspection::where('tenant_id', $operation->tenant_id)
+            ->where('production_order_operation_id', $operation->id)
+            ->where('status', 'approved')
+            ->where('result', 'passed')
+            ->exists();
+
+        if (! $passedInspectionExists) {
+            throw new InvalidArgumentException('This operation requires an approved passed quality inspection before completion.');
+        }
+    }
+
+    private function defaultWarehouseId(int $tenantId): ?int
+    {
+        return Warehouse::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_default', true)
+            ->value('id')
+            ?? Warehouse::query()->where('tenant_id', $tenantId)->value('id');
     }
 }
