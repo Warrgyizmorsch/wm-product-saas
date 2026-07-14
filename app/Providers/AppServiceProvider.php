@@ -96,6 +96,36 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Repositories\TaskDependencyRepositoryInterface::class,
             \App\Domains\Projects\Repositories\TaskDependencyRepository::class
         );
+
+        // ── Accounting: Chart of Accounts ─────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\ChartOfAccountRepository::class
+        );
+
+        // ── Accounting: Fiscal Year ────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\FiscalYearRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\FiscalYearRepository::class
+        );
+
+        // ── Accounting: Accounting Period ─────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\AccountingPeriodRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\AccountingPeriodRepository::class
+        );
+
+        // ── Accounting: Journal ────────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\JournalRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\JournalRepository::class
+        );
+
+        // ── Accounting: Tax Rate ───────────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\Accounting\Repositories\TaxRateRepositoryInterface::class,
+            \App\Domains\Accounting\Repositories\TaxRateRepository::class
+        );
     }
 
     public function boot(): void
