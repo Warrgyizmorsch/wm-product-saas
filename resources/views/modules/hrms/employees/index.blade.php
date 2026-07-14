@@ -1,19 +1,19 @@
 @extends('layouts.duralux')
 
-@section('title', 'EMPLOYEE DIRECTORY | SaaS ERP')
-@section('page-title', 'Employee Directory')
+@section('title', __('hrms.employees.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.employees.title'))
 @section('breadcrumb', 'HRMS / Employees')
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importEmployeeModal" class="fw-bold text-uppercase">
-            Import
+            {{ __('hrms.employees.import') }}
         </x-ui.button>
         <x-ui.button variant="outline-primary" icon="feather-download" href="{{ route('hrms.employees.export') }}" class="fw-bold text-uppercase">
-            Export
+            {{ __('hrms.employees.export') }}
         </x-ui.button>
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addEmployeeModal" class="fw-bold text-uppercase">
-            Create Employee
+            {{ __('hrms.employees.create_employee') }}
         </x-ui.button>
     </div>
 @endsection
@@ -337,7 +337,7 @@
                 <!-- Card Header -->
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
                     <div>
-                        <h4 class="fw-bold text-dark mb-0 fs-16">Employee Database</h4>
+                        <h4 class="fw-bold text-dark mb-0 fs-16">{{ __('hrms.employees.database_title') }}</h4>
                     </div>
                     
                     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -353,62 +353,62 @@
                                 type="text" 
                                 name="search" 
                                 class="form-control border-0 bg-transparent p-0 fs-13" 
-                                placeholder="Search employees..." 
+                                placeholder="{{ __('hrms.employees.search_employees') }}" 
                                 value="{{ $filters['search'] }}"
                                 style="box-shadow: none; height: 32px;"
                             >
                         </form>
  
                         <!-- SORT Button -->
-                        <x-ui.sort-dropdown label="SORT">
+                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                             <a class="dropdown-item employee-sort-link d-flex justify-content-between align-items-center py-2 {{ $filters['sort'] === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'name_asc']) }}" data-sort="name_asc">
-                                <span>Name (A-Z)</span>
+                                <span>{{ __('hrms.common.sort_name_asc') }}</span>
                                 @if($filters['sort'] === 'name_asc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <a class="dropdown-item employee-sort-link d-flex justify-content-between align-items-center py-2 {{ $filters['sort'] === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'name_desc']) }}" data-sort="name_desc">
-                                <span>Name (Z-A)</span>
+                                <span>{{ __('hrms.common.sort_name_desc') }}</span>
                                 @if($filters['sort'] === 'name_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <div class="dropdown-divider"></div>
                             <a class="dropdown-item employee-sort-link d-flex justify-content-between align-items-center py-2 {{ $filters['sort'] === 'id_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'id_asc']) }}" data-sort="id_asc">
-                                <span>Employee ID (Asc)</span>
+                                <span>{{ __('hrms.employees.sort_id_asc') }}</span>
                                 @if($filters['sort'] === 'id_asc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <a class="dropdown-item employee-sort-link d-flex justify-content-between align-items-center py-2 {{ $filters['sort'] === 'id_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'id_desc']) }}" data-sort="id_desc">
-                                <span>Employee ID (Desc)</span>
+                                <span>{{ __('hrms.employees.sort_id_desc') }}</span>
                                 @if($filters['sort'] === 'id_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <div class="dropdown-divider"></div>
                             <a class="dropdown-item employee-sort-link d-flex justify-content-between align-items-center py-2 {{ $filters['sort'] === 'doj_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'doj_desc']) }}" data-sort="doj_desc">
-                                <span>Date of Joining (Newest)</span>
+                                <span>{{ __('hrms.employees.sort_doj_desc') }}</span>
                                 @if($filters['sort'] === 'doj_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <a class="dropdown-item employee-sort-link d-flex justify-content-between align-items-center py-2 {{ $filters['sort'] === 'doj_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'doj_asc']) }}" data-sort="doj_asc">
-                                <span>Date of Joining (Oldest)</span>
+                                <span>{{ __('hrms.employees.sort_doj_asc') }}</span>
                                 @if($filters['sort'] === 'doj_asc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <div class="dropdown-divider"></div>
                             <a class="dropdown-item employee-sort-link d-flex justify-content-between align-items-center py-2 {{ $filters['sort'] === 'salary_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'salary_desc']) }}" data-sort="salary_desc">
-                                <span>Salary (High to Low)</span>
+                                <span>{{ __('hrms.employees.sort_salary_desc') }}</span>
                                 @if($filters['sort'] === 'salary_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <a class="dropdown-item employee-sort-link d-flex justify-content-between align-items-center py-2 {{ $filters['sort'] === 'salary_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['sort' => 'salary_asc']) }}" data-sort="salary_asc">
-                                <span>Salary (Low to High)</span>
+                                <span>{{ __('hrms.employees.sort_salary_asc') }}</span>
                                 @if($filters['sort'] === 'salary_asc') <i class="feather-check ms-3"></i> @endif
                             </a>
                         </x-ui.sort-dropdown>
  
                         <!-- FILTER Button -->
-                        <x-ui.filter label="FILTER">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                        <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                             <form method="GET" action="{{ route('hrms.employees.index') }}" id="employeeFilterForm">
                                 <input type="hidden" name="search" value="{{ $filters['search'] }}">
                                 <input type="hidden" name="sort" value="{{ $filters['sort'] }}">
                                 
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">COMPANY</label>
+                                    <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.employees.tbl_company') }}</label>
                                     <select name="company_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
-                                        <option value="">All Companies</option>
+                                        <option value="">{{ __('hrms.common.all_companies') }}</option>
                                         @foreach($companies as $company)
                                             <option value="{{ $company->id }}" @selected((string) $filters['company_id'] === (string) $company->id)>
                                                 {{ $company->company_name }}
@@ -417,9 +417,9 @@
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">DEPARTMENT</label>
+                                    <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.employees.tbl_department') }}</label>
                                     <select name="department_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
-                                        <option value="">All Departments</option>
+                                        <option value="">{{ __('hrms.common.all_departments') }}</option>
                                         @foreach($departments as $department)
                                             <option value="{{ $department->id }}" @selected((string) $filters['department_id'] === (string) $department->id)>
                                                 {{ $department->name }}
@@ -428,16 +428,16 @@
                                     </select>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
+                                    <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.employees.tbl_status') }}</label>
                                     <select name="status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
-                                        <option value="">All Statuses</option>
-                                        <option value="1" @selected($filters['status'] === '1')>Active</option>
-                                        <option value="0" @selected($filters['status'] === '0')>Inactive</option>
+                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                        <option value="1" @selected($filters['status'] === '1')>{{ __('hrms.employees.tbl_status') }} - Active</option>
+                                        <option value="0" @selected($filters['status'] === '0')>{{ __('hrms.employees.tbl_status') }} - Inactive</option>
                                     </select>
                                 </div>
                                 <div class="d-flex gap-2 justify-content-end mt-4">
-                                    <a href="{{ route('hrms.employees.index') }}" class="btn btn-sm btn-light employee-filter-reset text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">RESET</a>
-                                    <button type="submit" class="btn btn-sm employee-filter-apply-btn text-uppercase fw-bold py-2 px-3">APPLY FILTERS</button>
+                                    <a href="{{ route('hrms.employees.index') }}" class="btn btn-sm btn-light employee-filter-reset text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">{{ __('hrms.common.reset') }}</a>
+                                    <button type="submit" class="btn btn-sm employee-filter-apply-btn text-uppercase fw-bold py-2 px-3">{{ __('hrms.common.apply') }}</button>
                                 </div>
                             </form>
                         </x-ui.filter>
@@ -448,13 +448,13 @@
                         <thead class="table-light">
                             <tr>
                                 <th width="70">#</th>
-                                <th>Employee</th>
-                                <th>Employee Code</th>
-                                <th>Department</th>
-                                <th>Designation</th>
-                                <th>Company</th>
-                                <th>Status</th>
-                                <th width="150" class="text-end">Actions</th>
+                                <th>{{ __('hrms.employees.tbl_employee') }}</th>
+                                <th>{{ __('hrms.employees.tbl_code') }}</th>
+                                <th>{{ __('hrms.employees.tbl_department') }}</th>
+                                <th>{{ __('hrms.employees.tbl_designation') }}</th>
+                                <th>{{ __('hrms.employees.tbl_company') }}</th>
+                                <th>{{ __('hrms.employees.tbl_status') }}</th>
+                                <th width="150" class="text-end">{{ __('hrms.employees.tbl_actions') }}</th>
                             </tr>
                         </thead>
                         <tbody id="employeeTableBody">
@@ -492,7 +492,7 @@
                                             <li>
                                                 <a class="dropdown-item" href="{{ route('hrms.employees.show', $employee->id) }}">
                                                     <i class="feather feather-eye me-3"></i>
-                                                    <span>View Profile</span>
+                                                    <span>{{ __('hrms.employees.view_profile') }}</span>
                                                 </a>
                                             </li>
                                             <li>
@@ -502,7 +502,7 @@
                                                     data-employee="{{ base64_encode($employee->toJson()) }}"
                                                 >
                                                     <i class="feather feather-edit-3 me-3"></i>
-                                                    <span>Edit</span>
+                                                    <span>{{ __('hrms.assets.edit') }}</span>
                                                 </a>
                                             </li>
                                             <li>
@@ -511,7 +511,7 @@
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start">
                                                         <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>Delete</span>
+                                                        <span>{{ __('hrms.assets.delete') }}</span>
                                                     </button>
                                                 </form>
                                             </li>
@@ -555,7 +555,7 @@
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="importEmployeeModalLabel">
-                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>Import Employees
+                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.employees.mdl_import_title') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -565,14 +565,14 @@
                         <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="feather-info text-primary fs-15"></i>
-                                <span class="fw-bold">Excel Import Instructions</span>
+                                <span class="fw-bold">{{ __('hrms.employees.mdl_import_instructions') }}</span>
                             </div>
                             <span class="text-muted leading-relaxed">
-                                Please download our official import template. Ensure the <code>full_name</code> column is filled for each row. Company, Department, and Designation will be resolved by name (and created if not found).
+                                {{ __('hrms.employees.mdl_import_instruction_text') }}
                             </span>
                             <div class="mt-1">
                                 <a href="{{ route('hrms.employees.import.template') }}" class="btn btn-xs btn-soft-primary d-inline-flex align-items-center fw-bold py-1.5 px-3" style="border-radius: 6px; font-size: 11px;">
-                                    <i class="feather-download me-1.5 fs-12"></i> Download XLSX Template
+                                    <i class="feather-download me-1.5 fs-12"></i> {{ __('hrms.employees.mdl_download_xlsx') }}
                                 </a>
                             </div>
                         </div>
@@ -580,15 +580,15 @@
                             <div class="erp-custom-file-upload">
                                 <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="employee_import_file">
                                     <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
-                                    <span class="file-text text-muted" id="import_file_text">Select Excel File (.xlsx)</span>
-                                    <input type="file" name="file" id="employee_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('import_file_text').innerText = this.files[0]?.name || 'Select Excel File (.xlsx)'">
+                                    <span class="file-text text-muted" id="import_file_text">{{ __('hrms.employees.mdl_select_xlsx') }}</span>
+                                    <input type="file" name="file" id="employee_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('import_file_text').innerText = this.files[0]?.name || '{{ __('hrms.employees.mdl_select_xlsx') }}'">
                                 </label>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Import File</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_import') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_discard') }}</button>
                     </div>
                 </form>
             </div>
@@ -600,7 +600,7 @@
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold" id="addEmployeeModalLabel">
-                        <i class="feather-user-plus me-2 text-primary"></i>Add Employee
+                        <i class="feather-user-plus me-2 text-primary"></i>{{ __('hrms.employees.create_employee') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -611,8 +611,8 @@
                         @include('modules.hrms.employees.partials.form-fields', ['mode' => 'create'])
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Save Employee</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.employees.mdl_btn_save_employee') }}</button>
                     </div>
                 </form>
             </div>
@@ -624,7 +624,7 @@
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold" id="editEmployeeModalLabel">
-                        <i class="feather-edit-3 me-2 text-primary"></i>Edit Employee
+                        <i class="feather-edit-3 me-2 text-primary"></i>{{ __('hrms.employees.lbl_edit_employee') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -642,8 +642,8 @@
                         @include('modules.hrms.employees.partials.form-fields', ['mode' => 'edit'])
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Update Employee</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.employees.mdl_btn_update_employee') }}</button>
                     </div>
                 </form>
             </div>

@@ -135,7 +135,7 @@ class SalaryStructureController extends Controller
             }
         }
 
-        $salaryStructures = $salaryStructuresQuery->get();
+        $salaryStructures = $salaryStructuresQuery->paginate(10)->withQueryString();
 
         return view('modules.hrms.salary-structure.index', compact('companies', 'payGroups', 'selectedPayGroup', 'salaryComponents', 'recurringComponents', 'adhocComponents', 'salaryStructures'));
     }

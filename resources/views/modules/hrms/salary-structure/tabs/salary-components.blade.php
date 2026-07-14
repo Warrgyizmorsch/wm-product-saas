@@ -30,12 +30,12 @@
 <ul class="nav nav-pills gap-2 border-bottom pb-3 mb-4" id="componentSubTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link {{ request()->get('subtab', 'recurring') === 'recurring' ? 'active' : '' }} px-4 py-2" id="recurring-subtab" data-bs-toggle="tab" data-bs-target="#recurring-pane" type="button" role="tab" aria-controls="recurring-pane" aria-selected="true">
-            Recurring Components
+            {{ __('hrms.salary.recurring_components') }}
         </button>
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link {{ request()->get('subtab') === 'adhoc' ? 'active' : '' }} px-4 py-2" id="adhoc-subtab" data-bs-toggle="tab" data-bs-target="#adhoc-pane" type="button" role="tab" aria-controls="adhoc-pane" aria-selected="false">
-            Ad-hoc Components
+            {{ __('hrms.salary.adhoc_components') }}
         </button>
     </li>
 </ul>
@@ -45,14 +45,14 @@
     <div class="tab-pane fade {{ request()->get('subtab', 'recurring') === 'recurring' ? 'show active' : '' }}" id="recurring-pane" role="tabpanel" aria-labelledby="recurring-subtab">
         <div class="row">
             <div class="col-12">
-                <x-ui.card title="Recurring Components (Fixed CTC)" stretch bodyClass="p-0">
+                <x-ui.card title="{{ __('hrms.salary.recurring_components_fixed') }}" stretch bodyClass="p-0">
                     <x-slot name="headerAction">
                         <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-component-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-is-adhoc="0" data-bs-toggle="modal" data-bs-target="#addSalaryComponentModal">
-                            Add Component
+                            {{ __('hrms.salary.add_component') }}
                         </x-ui.button>
                     </x-slot>
 
-                    <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap">
+                    <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
                         <!-- Search Input (Placed before sort and filter in same line) -->
                         <div class="theme-search-container" style="max-width: 300px;">
                             <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
@@ -90,35 +90,38 @@
 
                         <!-- Filter Dropdown -->
                         <x-ui.filter label="FILTER">
-                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}" class="theme-filter-form">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
                                 <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
                                 <input type="hidden" name="tab" value="components">
                                 <input type="hidden" name="subtab" value="recurring">
                                 <input type="hidden" name="rec_search" value="{{ request('rec_search') }}">
                                 <input type="hidden" name="rec_sort" value="{{ request('rec_sort') }}">
                                 
-                                <h6 class="theme-filter-heading">Status</h6>
-                                <div class="theme-filter-radio-group">
-                                    <div class="theme-filter-radio-item">
-                                        <input type="radio" name="rec_status" id="recStatusAll" value="" @checked(!request()->filled('rec_status'))>
-                                        <label for="recStatusAll">All Statuses</label>
-                                    </div>
-                                    <div class="theme-filter-radio-item">
-                                        <input type="radio" name="rec_status" id="recStatusActive" value="1" @checked(request('rec_status') === '1')>
-                                        <label for="recStatusActive">Active Only</label>
-                                    </div>
-                                    <div class="theme-filter-radio-item">
-                                        <input type="radio" name="rec_status" id="recStatusInactive" value="0" @checked(request('rec_status') === '0')>
-                                        <label for="recStatusInactive">Inactive Only</label>
-                                    </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <x-ui.odoo-form-ui type="select" name="rec_status">
+                                        <option value="">All Statuses</option>
+                                        <option value="1" @selected(request('rec_status') === '1')>Active</option>
+                                        <option value="0" @selected(request('rec_status') === '0')>Inactive</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
-                                <h6 class="theme-filter-heading">Type</h6>
-                                <select name="rec_type" class="theme-filter-select">
-                                    <option value="">All Types</option>
-                                    <option value="earning" @selected(request('rec_type') === 'earning')>Earning</option>
-                                    <option value="deduction" @selected(request('rec_type') === 'deduction')>Deduction</option>
-                                </select>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
+                                    <x-ui.odoo-form-ui type="select" name="rec_type">
+                                        <option value="">All Types</option>
+                                        <option value="earning" @selected(request('rec_type') === 'earning')>Earning</option>
+                                        <option value="deduction" @selected(request('rec_type') === 'deduction')>Deduction</option>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="dropdown-divider my-3"></div>
+
+                                <div class="d-flex gap-2">
+                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
+                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="window.location.href='{{ route('hrms.salary-structure.index', ['pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : '', 'tab' => 'components', 'subtab' => 'recurring']) }}'">Reset</x-ui.button>
+                                </div>
                             </form>
                         </x-ui.filter>
                     </div>
@@ -137,10 +140,10 @@
                             </thead>
                             <tbody>
                                 @forelse($recurringComponents as $sc)
-                                <tr>
+                                <tr class="recurring-component-row">
                                     <td>{{ $loop->iteration }}</td>
-                                    <td><span class="fw-bold text-dark">{{ $sc->name }}</span></td>
-                                    <td><code>{{ $sc->code }}</code></td>
+                                    <td><span class="fw-bold text-dark component-name">{{ $sc->name }}</span></td>
+                                    <td><code class="component-code">{{ $sc->code }}</code></td>
                                     <td>
                                         @if($sc->type == 'earning')
                                             <x-ui.badge variant="success" soft>Earning</x-ui.badge>
@@ -187,6 +190,23 @@
                             </tbody>
                         </table>
                     </div>
+                    @if($salaryComponents instanceof \Illuminate\Pagination\LengthAwarePaginator && $salaryComponents->hasPages())
+                        @php
+                            $currentPage = $salaryComponents->currentPage();
+                            $totalPages = $salaryComponents->lastPage();
+                            $totalResults = $salaryComponents->total();
+                            $perPage = $salaryComponents->perPage();
+                        @endphp
+                        <div class="card-footer bg-white border-top px-4 py-3">
+                            <x-ui.pagination
+                                class="px-0 py-0"
+                                :current-page="$currentPage"
+                                :total-pages="$totalPages"
+                                :total-results="$totalResults"
+                                :per-page="$perPage"
+                            />
+                        </div>
+                    @endif
                 </x-ui.card>
             </div>
         </div>
@@ -203,7 +223,7 @@
                         </x-ui.button>
                     </x-slot>
 
-                    <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap">
+                    <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
                         <!-- Search Input (Placed before sort and filter in same line) -->
                         <div class="theme-search-container" style="max-width: 300px;">
                             <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
@@ -241,35 +261,38 @@
 
                         <!-- Filter Dropdown -->
                         <x-ui.filter label="FILTER">
-                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}" class="theme-filter-form">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
                                 <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
                                 <input type="hidden" name="tab" value="components">
                                 <input type="hidden" name="subtab" value="adhoc">
                                 <input type="hidden" name="adhoc_search" value="{{ request('adhoc_search') }}">
                                 <input type="hidden" name="adhoc_sort" value="{{ request('adhoc_sort') }}">
                                 
-                                <h6 class="theme-filter-heading">Status</h6>
-                                <div class="theme-filter-radio-group">
-                                    <div class="theme-filter-radio-item">
-                                        <input type="radio" name="adhoc_status" id="adhocStatusAll" value="" @checked(!request()->filled('adhoc_status'))>
-                                        <label for="adhocStatusAll">All Statuses</label>
-                                    </div>
-                                    <div class="theme-filter-radio-item">
-                                        <input type="radio" name="adhoc_status" id="adhocStatusActive" value="1" @checked(request('adhoc_status') === '1')>
-                                        <label for="adhocStatusActive">Active Only</label>
-                                    </div>
-                                    <div class="theme-filter-radio-item">
-                                        <input type="radio" name="adhoc_status" id="adhocStatusInactive" value="0" @checked(request('adhoc_status') === '0')>
-                                        <label for="adhocStatusInactive">Inactive Only</label>
-                                    </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <x-ui.odoo-form-ui type="select" name="adhoc_status">
+                                        <option value="">All Statuses</option>
+                                        <option value="1" @selected(request('adhoc_status') === '1')>Active</option>
+                                        <option value="0" @selected(request('adhoc_status') === '0')>Inactive</option>
+                                    </x-ui.odoo-form-ui>
                                 </div>
 
-                                <h6 class="theme-filter-heading">Type</h6>
-                                <select name="adhoc_type" class="theme-filter-select">
-                                    <option value="">All Types</option>
-                                    <option value="earning" @selected(request('adhoc_type') === 'earning')>Earning</option>
-                                    <option value="deduction" @selected(request('adhoc_type') === 'deduction')>Deduction</option>
-                                </select>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
+                                    <x-ui.odoo-form-ui type="select" name="adhoc_type">
+                                        <option value="">All Types</option>
+                                        <option value="earning" @selected(request('adhoc_type') === 'earning')>Earning</option>
+                                        <option value="deduction" @selected(request('adhoc_type') === 'deduction')>Deduction</option>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="dropdown-divider my-3"></div>
+
+                                <div class="d-flex gap-2">
+                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
+                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="window.location.href='{{ route('hrms.salary-structure.index', ['pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : '', 'tab' => 'components', 'subtab' => 'adhoc']) }}'">Reset</x-ui.button>
+                                </div>
                             </form>
                         </x-ui.filter>
                     </div>
@@ -288,10 +311,10 @@
                             </thead>
                             <tbody>
                                 @forelse($adhocComponents as $sc)
-                                <tr>
+                                <tr class="adhoc-component-row">
                                     <td>{{ $loop->iteration }}</td>
-                                    <td><span class="fw-bold text-dark">{{ $sc->name }}</span></td>
-                                    <td><code>{{ $sc->code }}</code></td>
+                                    <td><span class="fw-bold text-dark component-name">{{ $sc->name }}</span></td>
+                                    <td><code class="component-code">{{ $sc->code }}</code></td>
                                     <td>
                                         @if($sc->type == 'earning')
                                             <x-ui.badge variant="success" soft>Earning</x-ui.badge>
@@ -338,6 +361,23 @@
                             </tbody>
                         </table>
                     </div>
+                    @if($salaryComponents instanceof \Illuminate\Pagination\LengthAwarePaginator && $salaryComponents->hasPages())
+                        @php
+                            $currentPage = $salaryComponents->currentPage();
+                            $totalPages = $salaryComponents->lastPage();
+                            $totalResults = $salaryComponents->total();
+                            $perPage = $salaryComponents->perPage();
+                        @endphp
+                        <div class="card-footer bg-white border-top px-4 py-3">
+                            <x-ui.pagination
+                                class="px-0 py-0"
+                                :current-page="$currentPage"
+                                :total-pages="$totalPages"
+                                :total-results="$totalResults"
+                                :per-page="$perPage"
+                            />
+                        </div>
+                    @endif
                 </x-ui.card>
             </div>
         </div>
@@ -353,6 +393,35 @@
             urlParams.set('subtab', subtabId);
             const newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?' + urlParams.toString();
             window.history.pushState({path:newurl}, '', newurl);
+        });
+
+        // Prevent components search forms submit and filter client-side instantly
+        $(document).on('submit', 'form:has(input[name="rec_search"]), form:has(input[name="adhoc_search"])', function(e) {
+            e.preventDefault();
+        });
+        $(document).on('input', 'input[name="rec_search"]', function() {
+            const search = $(this).val().toLowerCase().trim();
+            $('.recurring-component-row').each(function() {
+                const name = $(this).find('.component-name').text().toLowerCase();
+                const code = $(this).find('.component-code').text().toLowerCase();
+                if (name.includes(search) || code.includes(search)) {
+                    $(this).css('display', '');
+                } else {
+                    $(this).css('display', 'none');
+                }
+            });
+        });
+        $(document).on('input', 'input[name="adhoc_search"]', function() {
+            const search = $(this).val().toLowerCase().trim();
+            $('.adhoc-component-row').each(function() {
+                const name = $(this).find('.component-name').text().toLowerCase();
+                const code = $(this).find('.component-code').text().toLowerCase();
+                if (name.includes(search) || code.includes(search)) {
+                    $(this).css('display', '');
+                } else {
+                    $(this).css('display', 'none');
+                }
+            });
         });
 
         // Add Action Trigger to pre-populate pay_group_id and is_adhoc

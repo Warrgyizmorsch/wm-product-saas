@@ -103,6 +103,8 @@ Route::prefix('hrms')
         Route::post('/assets/update/{asset}', [AssetController::class, 'update'])->name('assets.update');
         Route::delete('/assets/delete/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
         Route::post('/assets/category/store', [AssetController::class, 'storeCategory'])->name('assets.category.store');
+        Route::post('/assets/category/update/{assetCategory}', [AssetController::class, 'updateCategory'])->name('assets.category.update');
+        Route::delete('/assets/category/delete/{assetCategory}', [AssetController::class, 'destroyCategory'])->name('assets.category.destroy');
         Route::post('/assets/{asset}/allocate', [AssetController::class, 'allocate'])->name('assets.allocate');
         Route::post('/assets/{asset}/return', [AssetController::class, 'returnAsset'])->name('assets.return');
         Route::post('/assets/requests/store', [AssetController::class, 'storeRequest'])->name('assets.requests.store');

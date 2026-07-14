@@ -9,33 +9,33 @@
 
 <div class="settings-sidebar-panel h-100">
     <div class="settings-sidebar-header py-4 px-4 border-bottom">
-        <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px; letter-spacing: 0.5px;">Settings</h6>
+        <h6 class="fw-bold mb-0 text-dark" style="font-size: 15px; letter-spacing: 0.5px;">{{ __('hrms.sidebar.settings') }}</h6>
     </div>
     <div class="settings-sidebar-body py-3 px-3">
         <div class="nav flex-column nav-pills gap-1" id="settingsSubSidebar" role="tablist" aria-orientation="vertical">
             <a class="nav-link {{ $isOrg ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="org-structure-menu" href="{{ route('hrms.org.index') }}" role="tab" aria-controls="org-structure-pane" aria-selected="{{ $isOrg ? 'true' : 'false' }}">
                 <i class="feather-settings me-3 fs-16"></i>
-                <span>Organization Structure</span>
+                <span>{{ __('hrms.sidebar.org_structure') }}</span>
             </a>
             <a class="nav-link {{ $isSalary ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="salary-structure-menu" href="{{ route('hrms.salary-structure.index') }}" role="tab" aria-controls="salary-structure-pane" aria-selected="{{ $isSalary ? 'true' : 'false' }}">
                 <i class="feather-dollar-sign me-3 fs-16"></i>
-                <span>Salary Structure</span>
+                <span>{{ __('hrms.sidebar.salary_structure') }}</span>
             </a>
             <a class="nav-link {{ $isLeave ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="leave-structure-menu" href="{{ route('hrms.leave-structure.index') }}" role="tab" aria-selected="{{ $isLeave ? 'true' : 'false' }}">
                 <i class="feather-calendar me-3 fs-16"></i>
-                <span>Leave Structure</span>
+                <span>{{ __('hrms.sidebar.leave_structure') }}</span>
             </a>
             <a class="nav-link {{ $isRoster ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="shift-roster-menu" href="{{ route('hrms.roster.index') }}" role="tab" aria-selected="{{ $isRoster ? 'true' : 'false' }}">
                 <i class="feather-clock me-3 fs-16"></i>
-                <span>Shift & Roster</span>
+                <span>{{ __('hrms.sidebar.shift_roster') }}</span>
             </a>
             <a class="nav-link {{ $isPenalty ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="penalization-policy-menu" href="{{ route('hrms.penalization-policy.index') }}" role="tab" aria-selected="{{ $isPenalty ? 'true' : 'false' }}">
                 <i class="feather-alert-octagon me-3 fs-16"></i>
-                <span>Penalization Policy</span>
+                <span>{{ __('hrms.sidebar.penalization_policy') }}</span>
             </a>
             <a class="nav-link {{ $isAsset ? 'active' : '' }} d-flex align-items-center text-start transition-all" id="asset-management-menu" href="{{ route('hrms.assets.index') }}" role="tab" aria-selected="{{ $isAsset ? 'true' : 'false' }}">
                 <i class="feather-package me-3 fs-16"></i>
-                <span>Asset Management</span>
+                <span>{{ __('hrms.sidebar.asset_management') }}</span>
             </a>
         </div>
     </div>

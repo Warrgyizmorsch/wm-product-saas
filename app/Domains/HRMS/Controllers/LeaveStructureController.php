@@ -26,7 +26,15 @@ class LeaveStructureController extends Controller
             $selectedPlan = $leavePlans->first();
         }
 
-        return view('modules.hrms.leave-structure.index', compact('companies', 'leavePlans', 'selectedPlan'));
+        $leaveTypes = collect();
+
+        if ($selectedPlan) {
+            $leaveTypes = $selectedPlan->types()
+                ->paginate(10)
+                ->withQueryString();
+        }
+
+        return view('modules.hrms.leave-structure.index', compact('companies', 'leavePlans', 'leaveTypes', 'selectedPlan'));
     }
 
     public function storePlan(Request $request)

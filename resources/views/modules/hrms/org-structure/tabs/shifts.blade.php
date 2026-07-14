@@ -1,10 +1,10 @@
 <div class="row">
     <!-- List Table Card -->
     <div class="col-12">
-        <x-ui.card title="Shifts" stretch bodyClass="p-0">
+        <x-ui.card title="{{ __('hrms.org.shifts') }}" stretch bodyClass="p-0">
             <x-slot name="headerAction">
                 <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addShiftModal">
-                    Add Shift
+                    {{ __('hrms.org.add_shift') }}
                 </x-ui.button>
             </x-slot>
 
@@ -12,15 +12,15 @@
                 <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th width="60">#</th>
-                            <th>Shift Code</th>
-                            <th>Shift Name</th>
-                            <th>Start Time</th>
-                            <th>End Time</th>
-                            <th>Break Duration</th>
-                            <th>Overtime Allowed</th>
-                            <th>Status</th>
-                            <th width="150" class="text-end">Actions</th>
+                            <th width="60">{{ __('hrms.org.tbl_hash') }}</th>
+                            <th>{{ __('hrms.org.tbl_code') }}</th>
+                            <th>{{ __('hrms.org.tbl_shift_name') }}</th>
+                            <th>{{ __('hrms.employees.lbl_start_time') ?? 'Start Time' }}</th>
+                            <th>{{ __('hrms.employees.lbl_end_time') ?? 'End Time' }}</th>
+                            <th>{{ __('hrms.employees.lbl_break_duration') ?? 'Break Duration' }}</th>
+                            <th>{{ __('hrms.employees.lbl_overtime_allowed') ?? 'Overtime Allowed' }}</th>
+                            <th>{{ __('hrms.org.tbl_status') }}</th>
+                            <th width="150" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -31,41 +31,41 @@
                             <td><span class="fw-bold text-dark">{{ $sf->name }}</span></td>
                             <td><span class="font-monospace text-muted">{{ substr($sf->start_time, 0, 5) }}</span></td>
                             <td><span class="font-monospace text-muted">{{ substr($sf->end_time, 0, 5) }}</span></td>
-                            <td><span>{{ $sf->break_minutes ?? 0 }} mins</span></td>
+                            <td><span>{{ $sf->break_minutes ?? 0 }} {{ __('hrms.employees.lbl_mins') ?? 'mins' }}</span></td>
                             <td>
                                 @if($sf->overtime_allowed)
-                                    <x-ui.badge variant="success" soft>Yes</x-ui.badge>
+                                    <x-ui.badge variant="success" soft>{{ __('hrms.employees.mdl_yes') ?? 'Yes' }}</x-ui.badge>
                                 @else
-                                    <x-ui.badge variant="danger" soft>No</x-ui.badge>
+                                    <x-ui.badge variant="danger" soft>{{ __('hrms.employees.mdl_no') ?? 'No' }}</x-ui.badge>
                                 @endif
                             </td>
                             <td>
                                 @if($sf->active)
-                                    <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                                    <x-ui.badge variant="success" soft>{{ __('hrms.employees.frm_status_active') }}</x-ui.badge>
                                 @else
-                                    <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                                    <x-ui.badge variant="danger" soft>{{ __('hrms.employees.frm_status_inactive') }}</x-ui.badge>
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this shift?');">
+                                <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.org.confirm_delete_shift') }}');">
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end">
-                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-shift" data-bs-toggle="modal" data-bs-target="#viewShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}" title="View Details" data-bs-toggle="tooltip">
+                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-shift" data-bs-toggle="modal" data-bs-target="#viewShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}" title="{{ __('hrms.employees.view_profile') }}" data-bs-toggle="tooltip">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                         <x-ui.action-dropdown>
                                             <li>
                                                 <a class="dropdown-item btn-edit-shift" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}">
                                                     <i class="feather feather-edit-3 me-3"></i>
-                                                    <span>Edit</span>
+                                                    <span>{{ __('hrms.assets.edit') }}</span>
                                                 </a>
                                             </li>
                                             <li class="dropdown-divider"></li>
                                             <li>
                                                 <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                     <i class="feather feather-trash-2 me-3"></i>
-                                                    <span>Delete</span>
+                                                    <span>{{ __('hrms.assets.delete') }}</span>
                                                 </button>
                                             </li>
                                         </x-ui.action-dropdown>
@@ -77,7 +77,7 @@
                         @if($shifts->isEmpty())
                         <tr>
                             <td colspan="9" class="text-center py-5 text-muted">
-                                No Shifts found. Click "Add Shift" to create one.
+                                {{ __('hrms.org.empty_shift') }}
                             </td>
                         </tr>
                         @endif
@@ -109,23 +109,23 @@
                     if (endEl) endEl.innerText = shift.end_time ? shift.end_time.substring(0, 5) : 'N/A';
                     
                     let breakEl = document.getElementById('modal_view_shift_break');
-                    if (breakEl) breakEl.innerText = (shift.break_minutes || 0) + ' mins';
+                    if (breakEl) breakEl.innerText = (shift.break_minutes || 0) + ' {{ __("hrms.employees.lbl_mins") }}';
                     
                     let overtimeEl = document.getElementById('modal_view_shift_overtime');
                     if (overtimeEl) {
                         if (shift.overtime_allowed === true || shift.overtime_allowed === 1 || shift.overtime_allowed === '1') {
-                            overtimeEl.innerHTML = '<span class="badge bg-soft-success text-success">Yes</span>';
+                            overtimeEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.mdl_yes") }}</span>';
                         } else {
-                            overtimeEl.innerHTML = '<span class="badge bg-soft-danger text-danger">No</span>';
+                            overtimeEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.mdl_no") }}</span>';
                         }
                     }
                     
                     let statusEl = document.getElementById('modal_view_shift_status');
                     if (statusEl) {
                         if (shift.active === true || shift.active === 1 || shift.active === '1') {
-                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">Active</span>';
+                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.frm_status_active") }}</span>';
                         } else {
-                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">Inactive</span>';
+                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.frm_status_inactive") }}</span>';
                         }
                     }
                 });

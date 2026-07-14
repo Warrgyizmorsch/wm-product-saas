@@ -1,21 +1,21 @@
 @extends('layouts.duralux')
 
-@section('title', 'SHIFT & ROSTER SETTINGS | SaaS ERP')
-@section('page-title', 'Shift & Roster Management')
-@section('breadcrumb', 'HRMS / Shift & Roster Settings')
+@section('title', __('hrms.roster.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.roster.title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.roster.title'))
 
 @section('page-actions')
     @if($tab === 'shifts')
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addShiftModal">
-            Add Shift
+            {{ __('hrms.roster.add_shift') }}
         </x-ui.button>
     @else
         <div class="d-flex gap-2">
             <x-ui.button variant="danger" icon="feather-trash" data-bs-toggle="modal" data-bs-target="#clearRosterModal">
-                Clear Roster
+                {{ __('hrms.roster.clear_roster') }}
             </x-ui.button>
             <x-ui.button variant="primary" icon="feather-calendar" data-bs-toggle="modal" data-bs-target="#assignRosterModal">
-                Assign Roster
+                {{ __('hrms.roster.assign_roster') }}
             </x-ui.button>
         </div>
     @endif
@@ -240,119 +240,126 @@
                                     <div class="col-12">
                                         <x-ui.card title="Shifts" stretch bodyClass="p-0">
                                             <x-slot name="headerAction">
-                                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                    <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftSearchForm" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px;">
-                                                        <input type="hidden" name="tab" value="shifts">
-                                                        <input type="hidden" name="shift_sort" value="{{ $shiftSort }}">
-                                                        <input type="hidden" name="shift_status" value="{{ $shiftStatus }}">
-                                                        <input type="hidden" name="shift_overtime" value="{{ $shiftOvertime }}">
-                                                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                                        <input type="text" name="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search shifts..." value="{{ $shiftSearch }}" style="box-shadow: none; height: 32px;">
-                                                    </form>
+                                                 <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                     <!-- Search Input (Server-Side Form submission) -->
+                                                     <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftSearchForm" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px; height: 38px;">
+                                                         <input type="hidden" name="tab" value="shifts">
+                                                         <input type="hidden" name="shift_sort" value="{{ $shiftSort }}">
+                                                         <input type="hidden" name="shift_status" value="{{ $shiftStatus }}">
+                                                         <input type="hidden" name="shift_overtime" value="{{ $shiftOvertime }}">
+                                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                                                         <input type="text" name="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search shifts..." value="{{ $shiftSearch }}" style="box-shadow: none; height: 32px; outline: none;">
+                                                     </form>
 
-                                                    <x-ui.sort-dropdown label="SORT">
-                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'name_asc']) }}">
-                                                            <span>Name (A-Z)</span>
-                                                            @if($shiftSort === 'name_asc') <i class="feather-check ms-3"></i> @endif
-                                                        </a>
-                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'name_desc']) }}">
-                                                            <span>Name (Z-A)</span>
-                                                            @if($shiftSort === 'name_desc') <i class="feather-check ms-3"></i> @endif
-                                                        </a>
-                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'code_asc']) }}">
-                                                            <span>Code (A-Z)</span>
-                                                            @if($shiftSort === 'code_asc') <i class="feather-check ms-3"></i> @endif
-                                                        </a>
-                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'code_desc']) }}">
-                                                            <span>Code (Z-A)</span>
-                                                            @if($shiftSort === 'code_desc') <i class="feather-check ms-3"></i> @endif
-                                                        </a>
-                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'start_asc']) }}">
-                                                            <span>Start Time (Asc)</span>
-                                                            @if($shiftSort === 'start_asc') <i class="feather-check ms-3"></i> @endif
-                                                        </a>
-                                                        <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'start_desc']) }}">
-                                                            <span>Start Time (Desc)</span>
-                                                            @if($shiftSort === 'start_desc') <i class="feather-check ms-3"></i> @endif
-                                                        </a>
-                                                    </x-ui.sort-dropdown>
+                                                     <!-- Sort Dropdown -->
+                                                     <x-ui.sort-dropdown label="SORT">
+                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'name_asc', 'shift_page' => 1]) }}">
+                                                             <span>Name (A-Z)</span>
+                                                             @if($shiftSort === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                                                         </a>
+                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'name_desc', 'shift_page' => 1]) }}">
+                                                             <span>Name (Z-A)</span>
+                                                             @if($shiftSort === 'name_desc') <i class="feather-check ms-3"></i> @endif
+                                                         </a>
+                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'code_asc', 'shift_page' => 1]) }}">
+                                                             <span>Code (A-Z)</span>
+                                                             @if($shiftSort === 'code_asc') <i class="feather-check ms-3"></i> @endif
+                                                         </a>
+                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'code_desc', 'shift_page' => 1]) }}">
+                                                             <span>Code (Z-A)</span>
+                                                             @if($shiftSort === 'code_desc') <i class="feather-check ms-3"></i> @endif
+                                                         </a>
+                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'start_asc', 'shift_page' => 1]) }}">
+                                                             <span>Start Time (Asc)</span>
+                                                             @if($shiftSort === 'start_asc') <i class="feather-check ms-3"></i> @endif
+                                                         </a>
+                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'start_desc', 'shift_page' => 1]) }}">
+                                                             <span>Start Time (Desc)</span>
+                                                             @if($shiftSort === 'start_desc') <i class="feather-check ms-3"></i> @endif
+                                                         </a>
+                                                     </x-ui.sort-dropdown>
 
-                                                    <x-ui.filter label="FILTER">
-                                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
-                                                        <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftFilterForm">
-                                                            <input type="hidden" name="tab" value="shifts">
-                                                            <input type="hidden" name="shift_search" value="{{ $shiftSearch }}">
-                                                            <input type="hidden" name="shift_sort" value="{{ $shiftSort }}">
+                                                     <!-- Filter Dropdown -->
+                                                     <x-ui.filter label="FILTER">
+                                                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                                         <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftFilterForm">
+                                                             <input type="hidden" name="tab" value="shifts">
+                                                             <input type="hidden" name="shift_search" value="{{ $shiftSearch }}">
+                                                             <input type="hidden" name="shift_sort" value="{{ $shiftSort }}">
 
-                                                            <div class="mb-3">
-                                                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
-                                                                <select name="shift_status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
-                                                                    <option value="">All Statuses</option>
-                                                                    <option value="1" @selected($shiftStatus === '1')>Active</option>
-                                                                    <option value="0" @selected($shiftStatus === '0')>Inactive</option>
-                                                                </select>
-                                                            </div>
+                                                             <div class="mb-3">
+                                                                 <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
+                                                                 <x-ui.odoo-form-ui type="select" name="shift_status" id="shift_filter_status">
+                                                                     <option value="">All Statuses</option>
+                                                                     <option value="1" @selected($shiftStatus === '1')>Active</option>
+                                                                     <option value="0" @selected($shiftStatus === '0')>Inactive</option>
+                                                                 </x-ui.odoo-form-ui>
+                                                             </div>
 
-                                                            <div class="mb-3">
-                                                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">OVERTIME</label>
-                                                                <select name="shift_overtime" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
-                                                                    <option value="">All</option>
-                                                                    <option value="1" @selected($shiftOvertime === '1')>Allowed</option>
-                                                                    <option value="0" @selected($shiftOvertime === '0')>Not Allowed</option>
-                                                                </select>
-                                                            </div>
+                                                             <div class="mb-3">
+                                                                 <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">OVERTIME</label>
+                                                                 <x-ui.odoo-form-ui type="select" name="shift_overtime" id="shift_filter_overtime">
+                                                                     <option value="">All</option>
+                                                                     <option value="1" @selected($shiftOvertime === '1')>Allowed</option>
+                                                                     <option value="0" @selected($shiftOvertime === '0')>Not Allowed</option>
+                                                                 </x-ui.odoo-form-ui>
+                                                             </div>
 
-                                                            <div class="d-flex gap-2 justify-content-end mt-4">
-                                                                <a href="{{ route('hrms.roster.index', ['tab' => 'shifts']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">RESET</a>
-                                                                <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3">APPLY FILTERS</button>
-                                                            </div>
-                                                        </form>
-                                                    </x-ui.filter>
-                                                </div>
-                                            </x-slot>
+                                                             <div class="d-flex gap-2 justify-content-end mt-4">
+                                                                 <a href="{{ route('hrms.roster.index', ['tab' => 'shifts']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3 border" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border-color: #cbd5e1; color: #475569;">RESET</a>
+                                                                 <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3 roster-filter-apply-btn">APPLY FILTERS</button>
+                                                             </div>
+                                                         </form>
+                                                     </x-ui.filter>
+                                                 </div>
+                                             </x-slot>
 
-                                            <div class="table-responsive">
-                                                <table class="table table-hover mb-0 align-middle">
-                                                    <thead class="table-light">
-                                                        <tr>
-                                                            <th width="60">#</th>
-                                                            <th>Shift Code</th>
-                                                            <th>Shift Name</th>
-                                                            <th>Start Time</th>
-                                                            <th>End Time</th>
-                                                            <th>Break Duration</th>
-                                                            <th>Overtime Allowed</th>
-                                                            <th>Status</th>
-                                                            <th width="150" class="text-end">Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach($shifts as $sf)
-                                                        <tr>
-                                                            <td>{{ $loop->iteration }}</td>
-                                                            <td><code>{{ $sf->code }}</code></td>
-                                                            <td><span class="fw-bold text-dark">{{ $sf->name }}</span></td>
-                                                            <td><span class="font-monospace text-muted">{{ substr($sf->start_time, 0, 5) }}</span></td>
-                                                            <td><span class="font-monospace text-muted">{{ substr($sf->end_time, 0, 5) }}</span></td>
-                                                            <td><span>{{ $sf->break_minutes ?? 0 }} mins</span></td>
-                                                            <td>
-                                                                @if($sf->overtime_allowed)
-                                                                    <x-ui.badge variant="success" soft>Yes</x-ui.badge>
-                                                                @else
-                                                                    <x-ui.badge variant="danger" soft>No</x-ui.badge>
-                                                                @endif
-                                                            </td>
-                                                            <td>
-                                                                @if($sf->active)
-                                                                    <x-ui.badge variant="success" soft>Active</x-ui.badge>
-                                                                @else
-                                                                    <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
-                                                                @endif
-                                                            </td>
-                                                            <td class="text-end">
-                                                                <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this shift?');">
-                                                                    @csrf
-                                                                    @method('DELETE')
+                                             <div class="table-responsive">
+                                                 <table class="table table-hover mb-0 align-middle" id="shiftsTable">
+                                                     <thead class="table-light">
+                                                         <tr>
+                                                             <th width="60">#</th>
+                                                             <th>Shift Code</th>
+                                                             <th>Shift Name</th>
+                                                             <th>Start Time</th>
+                                                             <th>End Time</th>
+                                                             <th>Break Duration</th>
+                                                             <th>Overtime Allowed</th>
+                                                             <th>Status</th>
+                                                             <th width="150" class="text-end">Actions</th>
+                                                         </tr>
+                                                     </thead>
+                                                     <tbody>
+                                                         @foreach($shifts as $sf)
+                                                         <tr class="shift-row"
+                                                             data-name="{{ strtolower($sf->name) }}"
+                                                             data-code="{{ strtolower($sf->code) }}"
+                                                             data-status="{{ $sf->active ? 'active' : 'inactive' }}"
+                                                             data-overtime="{{ $sf->overtime_allowed ? 'allowed' : 'not_allowed' }}">
+                                                             <td class="shift-index-cell">{{ $loop->iteration }}</td>
+                                                             <td><code class="shift-code-label">{{ $sf->code }}</code></td>
+                                                             <td><span class="fw-bold text-dark shift-name-label">{{ $sf->name }}</span></td>
+                                                             <td><span class="font-monospace text-muted">{{ substr($sf->start_time, 0, 5) }}</span></td>
+                                                             <td><span class="font-monospace text-muted">{{ substr($sf->end_time, 0, 5) }}</span></td>
+                                                             <td><span>{{ $sf->break_minutes ?? 0 }} mins</span></td>
+                                                             <td>
+                                                                 @if($sf->overtime_allowed)
+                                                                     <x-ui.badge variant="success" soft>Yes</x-ui.badge>
+                                                                 @else
+                                                                     <x-ui.badge variant="danger" soft>No</x-ui.badge>
+                                                                 @endif
+                                                             </td>
+                                                             <td>
+                                                                 @if($sf->active)
+                                                                     <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                                                                 @else
+                                                                     <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                                                                 @endif
+                                                             </td>
+                                                             <td class="text-end">
+                                                                 <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this shift?');">
+                                                                     @csrf
+                                                                     @method('DELETE')
                                                                     <div class="hstack gap-2 justify-content-end">
                                                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-shift" data-bs-toggle="modal" data-bs-target="#viewShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}" title="View Details" data-bs-toggle="tooltip">
                                                                             <i class="feather feather-eye"></i>
@@ -386,7 +393,22 @@
                                                         @endif
                                                     </tbody>
                                                 </table>
-                                            </div>
+                                             </div>
+                                             @php
+                                                 $currentPage = $shifts->currentPage();
+                                                 $totalPages = $shifts->lastPage();
+                                                 $totalResults = $shifts->total();
+                                                 $perPage = $shifts->perPage();
+                                             @endphp
+                                             <div class="px-4 py-3 border-top bg-light-soft">
+                                                 <x-ui.pagination 
+                                                     :current-page="$currentPage"
+                                                     :total-pages="$totalPages"
+                                                     :total-results="$totalResults"
+                                                     :per-page="$perPage"
+                                                     page-param="shift_page"
+                                                 />
+                                             </div>
                                         </x-ui.card>
                                     </div>
                                 </div>
@@ -426,26 +448,26 @@
 
                                                 <div class="mb-3">
                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">Company</label>
-                                                    <select name="company_id" class="form-select form-select-sm" style="border-color: #cbd5e1; border-radius: 6px;">
+                                                    <x-ui.odoo-form-ui type="select" name="company_id" id="roster_filter_company">
                                                         <option value="">All Companies</option>
                                                         @foreach($companies as $company)
                                                             <option value="{{ $company->id }}" {{ $selectedCompanyId == $company->id ? 'selected' : '' }}>
                                                                 {{ $company->company_name }}
                                                             </option>
                                                         @endforeach
-                                                    </select>
+                                                    </x-ui.odoo-form-ui>
                                                 </div>
 
                                                 <div class="mb-3">
                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">Department</label>
-                                                    <select name="department_id" class="form-select form-select-sm" style="border-color: #cbd5e1; border-radius: 6px;">
+                                                    <x-ui.odoo-form-ui type="select" name="department_id" id="roster_filter_department">
                                                         <option value="">All Departments</option>
                                                         @foreach($departments as $dept)
                                                             <option value="{{ $dept->id }}" data-company-id="{{ $dept->company_id }}" {{ $selectedDepartmentId == $dept->id ? 'selected' : '' }}>
                                                                 {{ $dept->name }}
                                                             </option>
                                                         @endforeach
-                                                    </select>
+                                                    </x-ui.odoo-form-ui>
                                                 </div>
 
                                                 <div class="mb-3">
@@ -540,7 +562,22 @@
                                                 @endif
                                             </tbody>
                                         </table>
-                                    </div>
+                                     </div>
+                                     @php
+                                         $currentPage = $employees->currentPage();
+                                         $totalPages = $employees->lastPage();
+                                         $totalResults = $employees->total();
+                                         $perPage = $employees->perPage();
+                                     @endphp
+                                     <div class="px-4 py-3 border-top bg-light-soft">
+                                         <x-ui.pagination 
+                                             :current-page="$currentPage"
+                                             :total-pages="$totalPages"
+                                             :total-results="$totalResults"
+                                             :per-page="$perPage"
+                                             page-param="roster_page"
+                                         />
+                                     </div>
                                 </x-ui.card>
                             @endif
                         </div>
@@ -822,81 +859,45 @@
                 }
             });
 
-            // 1. TABLE ROW SEARCHING AND SORTING ACTIONS (Vanilla JS)
-            const searchInput = document.getElementById('rosterSearch');
-            const filterSearchInput = document.getElementById('filterSearchInput');
-
-            function applySearch(val) {
-                const searchVal = val.toLowerCase().replace(/\s+/g, ' ').trim();
-                document.querySelectorAll('.roster-grid-table tbody tr').forEach(row => {
-                    const nameEl = row.querySelector('.employee-name-label');
-                    const desgEl = row.querySelector('.employee-designation-label');
-                    if (!nameEl) return;
-
-                    const name = nameEl.textContent.toLowerCase().replace(/\s+/g, ' ').trim();
-                    const desg = desgEl ? desgEl.textContent.toLowerCase().replace(/\s+/g, ' ').trim() : '';
-
-                    if (!searchVal || name.includes(searchVal) || desg.includes(searchVal)) {
-                        row.classList.remove('d-none');
-                    } else {
-                        row.classList.add('d-none');
+            // 1. ROSTER SEARCH AND SORT RELOAD ACTIONS
+            let rosterSearchTimeout = null;
+            $(document).on('input', '#rosterSearch', function() {
+                clearTimeout(rosterSearchTimeout);
+                const form = this.closest('form');
+                rosterSearchTimeout = setTimeout(() => {
+                    const url = new URL(form.action || window.location.href);
+                    const formData = new FormData(form);
+                    for (const [key, value] of formData.entries()) {
+                        url.searchParams.set(key, value);
                     }
-                });
-            }
+                    url.searchParams.set('roster_page', '1'); // Reset page to 1
+                    window.location.href = url.toString();
+                }, 400);
+            });
 
-            if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    applySearch(this.value);
-                });
-                searchInput.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') e.preventDefault();
-                });
-            }
+            $(document).on('click', '.sort-option', function(e) {
+                e.preventDefault();
+                const sortBy = $(this).attr('data-sort');
+                const form = document.getElementById('rosterFilterForm');
+                const url = new URL(form.action || window.location.href);
+                const formData = new FormData(form);
+                for (const [key, value] of formData.entries()) {
+                    url.searchParams.set(key, value);
+                }
+                url.searchParams.set('sort', sortBy);
+                url.searchParams.set('roster_page', '1'); // Reset page to 1
+                window.location.href = url.toString();
+            });
 
-            const sortOptions = document.querySelectorAll('.sort-option');
-            sortOptions.forEach(opt => {
-                opt.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    sortOptions.forEach(o => o.classList.remove('active'));
-                    this.classList.add('active');
-
-                    // Close the dropdown menu
-                    const openMenus = document.querySelectorAll('.dropdown-menu.show, .dropdown.show, .erp-sort-dropdown.show');
-                    openMenus.forEach(menu => menu.classList.remove('show'));
-
-                    const sortBy = this.dataset.sort;
-                    const tbody = document.querySelector('.roster-grid-table tbody');
-                    if (!tbody) return;
-
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
-                    const emptyRow = rows.find(r => r.querySelector('td[colspan]'));
-                    if (emptyRow) return;
-
-                    rows.sort((a, b) => {
-                        const nameAEl = a.querySelector('.employee-name-label');
-                        const nameBEl = b.querySelector('.employee-name-label');
-                        if (!nameAEl || !nameBEl) return 0;
-
-                        const nameA = nameAEl.textContent.toLowerCase().replace(/\s+/g, ' ').trim();
-                        const nameB = nameBEl.textContent.toLowerCase().replace(/\s+/g, ' ').trim();
-
-                        const desgAEl = a.querySelector('.employee-designation-label');
-                        const desgBEl = b.querySelector('.employee-designation-label');
-                        const desgA = desgAEl ? desgAEl.textContent.toLowerCase().replace(/\s+/g, ' ').trim() : '';
-                        const desgB = desgBEl ? desgBEl.textContent.toLowerCase().replace(/\s+/g, ' ').trim() : '';
-
-                        if (sortBy === 'name-asc') {
-                            return nameA.localeCompare(nameB);
-                        } else if (sortBy === 'name-desc') {
-                            return nameB.localeCompare(nameA);
-                        } else if (sortBy === 'designation') {
-                            return desgA.localeCompare(desgB);
-                        }
-                        return 0;
-                    });
-
-                    rows.forEach(r => tbody.appendChild(r));
-                });
+            $(document).on('submit', '#rosterFilterForm', function(e) {
+                e.preventDefault();
+                const url = new URL(this.action || window.location.href);
+                const formData = new FormData(this);
+                for (const [key, value] of formData.entries()) {
+                    url.searchParams.set(key, value);
+                }
+                url.searchParams.set('roster_page', '1'); // Reset page to 1
+                window.location.href = url.toString();
             });
 
             // 2. JQUERY MODAL CASCADE AND SELECT2 INITIALIZATION (Wrapped safely)
@@ -1166,8 +1167,8 @@
                 });
             }
 
+            // Server-side search and filter submission logic for Shifts
             let shiftSearchTimeout = null;
-
             $(document).on('input', '#shiftSearchForm input[name="shift_search"]', function () {
                 clearTimeout(shiftSearchTimeout);
                 const form = this.closest('form');
@@ -1179,8 +1180,9 @@
                     for (const [key, value] of formData.entries()) {
                         url.searchParams.set(key, value);
                     }
+                    url.searchParams.set('shift_page', '1'); // Reset to page 1
                     window.location.href = url.toString();
-                }, 250);
+                }, 400);
             });
 
             $(document).on('submit', '#shiftFilterForm', function (event) {
@@ -1191,6 +1193,7 @@
                 for (const [key, value] of formData.entries()) {
                     url.searchParams.set(key, value);
                 }
+                url.searchParams.set('shift_page', '1'); // Reset to page 1
                 window.location.href = url.toString();
             });
         });

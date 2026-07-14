@@ -1,19 +1,19 @@
 @extends('layouts.duralux')
 
-@section('title', 'EMPLOYEE PROFILE | SaaS ERP')
-@section('page-title', 'Employee Profile')
-@section('breadcrumb', 'HRMS / Employees / Profile')
+@section('title', __('hrms.employees.profile_title') . ' | SaaS ERP')
+@section('page-title', __('hrms.employees.profile_title'))
+@section('breadcrumb', 'HRMS / Employees / ' . __('hrms.employees.profile_title'))
 
 @section('page-actions')
     <div class="d-flex gap-2">
         <x-ui.button href="{{ route('hrms.employees.index') }}" variant="light" icon="feather-arrow-left">
-            Back to Registry
+            {{ __('hrms.employees.back_to_registry') }}
         </x-ui.button>
         <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this employee?');" style="display: inline;">
             @csrf
             @method('DELETE')
             <x-ui.button type="submit" variant="danger" icon="feather-trash-2">
-                Delete Profile
+                {{ __('hrms.employees.delete_profile') }}
             </x-ui.button>
         </form>
     </div>
@@ -955,37 +955,37 @@
         <ul class="nav nav-tabs tab-nav-custom" id="profileTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="true">
-                    <i class="feather-user"></i> Profile Overview
+                    <i class="feather-user"></i> {{ __('hrms.employees.tab_overview') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="compensation-tab" data-bs-toggle="tab" data-bs-target="#compensation-pane" type="button" role="tab" aria-controls="compensation-pane" aria-selected="false">
-                    <i class="feather-dollar-sign"></i> Compensation & Salary
+                    <i class="feather-dollar-sign"></i> {{ __('hrms.employees.tab_compensation') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="leaves-tab" data-bs-toggle="tab" data-bs-target="#leaves-pane" type="button" role="tab" aria-controls="leaves-pane" aria-selected="false">
-                    <i class="feather-calendar"></i> Leaves & Plan
+                    <i class="feather-calendar"></i> {{ __('hrms.employees.tab_leaves') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="penalization-tab" data-bs-toggle="tab" data-bs-target="#penalization-pane" type="button" role="tab" aria-controls="penalization-pane" aria-selected="false">
-                    <i class="feather-alert-triangle"></i> Attendance & Penalties
+                    <i class="feather-alert-triangle"></i> {{ __('hrms.employees.tab_penalties') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents-pane" type="button" role="tab" aria-controls="documents-pane" aria-selected="false">
-                    <i class="feather-file-text"></i> Documents
+                    <i class="feather-file-text"></i> {{ __('hrms.employees.tab_documents') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab" aria-controls="history-pane" aria-selected="false">
-                    <i class="feather-clock"></i> Employment History
+                    <i class="feather-clock"></i> {{ __('hrms.employees.tab_history') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="assets-tab" data-bs-toggle="tab" data-bs-target="#assets-pane" type="button" role="tab" aria-controls="assets-pane" aria-selected="false">
-                    <i class="feather-package"></i> Assigned Assets
+                    <i class="feather-package"></i> {{ __('hrms.employees.tab_assets') }}
                 </button>
             </li>
         </ul>
@@ -998,60 +998,60 @@
                     <div class="col-md-6 col-12">
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-briefcase text-primary"></i> Employment Details</h5>
+                                <h5 class="card-custom-title"><i class="feather-briefcase text-primary"></i> {{ __('hrms.employees.lbl_employment_details') }}</h5>
                             </div>
                             <div class="card-body p-4">
                                 <div class="row g-3">
                                     <div class="col-6">
-                                        <div class="info-label">Company</div>
+                                        <div class="info-label">{{ __('hrms.employees.tbl_company') }}</div>
                                         <div class="info-value">{{ $employee->company?->company_name ?? 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Business Unit</div>
+                                        <div class="info-label">{{ __('hrms.org.business_units') }}</div>
                                         <div class="info-value">{{ $employee->businessUnit?->name ?? 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Branch</div>
+                                        <div class="info-label">{{ __('hrms.org.branches') }}</div>
                                         <div class="info-value">{{ $employee->branch?->name ?? 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Department</div>
+                                        <div class="info-label">{{ __('hrms.employees.tbl_department') }}</div>
                                         <div class="info-value">{{ $employee->department?->name ?? 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Designation</div>
+                                        <div class="info-label">{{ __('hrms.employees.tbl_designation') }}</div>
                                         <div class="info-value">{{ $employee->designation?->name ?? 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Date of Joining</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_doj') }}</div>
                                         <div class="info-value">{{ $employee->date_of_joining ? $employee->date_of_joining->format('d M, Y') : 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Employment Type</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_emp_type') }}</div>
                                         <div class="info-value">{{ $employee->employment_type ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Stage</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_stage') }}</div>
                                         <div class="info-value">{{ $employee->employee_stage ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Reporting Manager</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_manager') }}</div>
                                         <div class="info-value">{{ $employee->reportingManager?->full_name ?? 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Work Shift</div>
+                                        <div class="info-label">{{ __('hrms.org.shifts') }}</div>
                                         <div class="info-value">{{ $employee->shift?->name ?? 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Office Email</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_office_email') }}</div>
                                         <div class="info-value">{{ $employee->office_email ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Probation End Date</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_probation_end') }}</div>
                                         <div class="info-value">{{ $employee->probation_end_date ? $employee->probation_end_date->format('d M, Y') : 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Confirmation Date</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_confirmation_date') }}</div>
                                         <div class="info-value">{{ $employee->confirmation_date ? $employee->confirmation_date->format('d M, Y') : 'N/A' }}</div>
                                     </div>
                                 </div>
@@ -1062,36 +1062,36 @@
                     <div class="col-md-6 col-12">
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-user text-primary"></i> Personal Details</h5>
+                                <h5 class="card-custom-title"><i class="feather-user text-primary"></i> {{ __('hrms.employees.lbl_personal_details') }}</h5>
                             </div>
                             <div class="card-body p-4">
                                 <div class="row g-3">
                                     <div class="col-6">
-                                        <div class="info-label">Gender</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_gender') }}</div>
                                         <div class="info-value">{{ $employee->gender }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Marital Status</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_marital_status') }}</div>
                                         <div class="info-value">{{ $employee->marital_status ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Blood Group</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_blood_group') }}</div>
                                         <div class="info-value">{{ $employee->blood_group ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Diet Preference</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_diet_preference') }}</div>
                                         <div class="info-value">{{ $employee->diet_preference ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Aadhaar Number</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_aadhaar') }}</div>
                                         <div class="info-value">{{ $employee->aadhaar_card_number ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">PAN Number</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_pan') }}</div>
                                         <div class="info-value">{{ $employee->pan_card_number ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-6">
-                                        <div class="info-label">Date of Birth</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_dob') }}</div>
                                         <div class="info-value">{{ $employee->date_of_birth ? $employee->date_of_birth->format('d M, Y') : 'N/A' }}</div>
                                     </div>
                                 </div>
@@ -1102,40 +1102,40 @@
                     <div class="col-12">
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-map-pin text-primary"></i> Contact & Address</h5>
+                                <h5 class="card-custom-title"><i class="feather-map-pin text-primary"></i> {{ __('hrms.employees.lbl_contact_address') }}</h5>
                             </div>
                             <div class="card-body p-4">
                                 <div class="row g-3">
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">Personal Mobile</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_personal_mobile') }}</div>
                                         <div class="info-value">{{ $employee->personal_mobile_number ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">Home Phone</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_home_phone') }}</div>
                                         <div class="info-value">{{ $employee->home_phone ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">City / Postal Code</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_city_postal') }}</div>
                                         <div class="info-value">{{ $employee->city ?: 'N/A' }} {{ $employee->postal_code ? '(' . $employee->postal_code . ')' : '' }}</div>
                                     </div>
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">Emergency Contact Name</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_emergency_contact') }}</div>
                                         <div class="info-value">{{ $employee->emergency_contact_name ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">Emergency Contact Number</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_emergency_number') }}</div>
                                         <div class="info-value">{{ $employee->emergency_contact_number ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">Emergency Contact Relation</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_emergency_relation') }}</div>
                                         <div class="info-value">{{ $employee->emergency_contact_relation ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-md-6 col-12">
-                                        <div class="info-label">Present Address</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_present_address') }}</div>
                                         <div class="info-value text-wrap" style="max-width: 100%;">{{ $employee->present_address ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-md-6 col-12">
-                                        <div class="info-label">Permanent Address</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_permanent_address') }}</div>
                                         <div class="info-value text-wrap" style="max-width: 100%;">{{ $employee->permanent_address ?: 'N/A' }}</div>
                                     </div>
                                 </div>
@@ -1146,20 +1146,20 @@
                     <div class="col-12 mt-4">
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-credit-card text-primary"></i> Bank Account Details</h5>
+                                <h5 class="card-custom-title"><i class="feather-credit-card text-primary"></i> {{ __('hrms.employees.lbl_bank_details') }}</h5>
                             </div>
                             <div class="card-body p-4">
                                 <div class="row g-3">
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">Bank Name</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_bank_name') }}</div>
                                         <div class="info-value">{{ $employee->bank_name ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">Account Number</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_account_number') }}</div>
                                         <div class="info-value">{{ $employee->account_number ?: 'N/A' }}</div>
                                     </div>
                                     <div class="col-md-4 col-12">
-                                        <div class="info-label">IFSC Code</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_ifsc_code') }}</div>
                                         <div class="info-value">{{ $employee->ifsc_code ?: 'N/A' }}</div>
                                     </div>
                                 </div>
@@ -1177,8 +1177,8 @@
                         <div class="card-custom">
                             <div class="card-custom-header">
                                 <div>
-                                    <h5 class="card-custom-title"><i class="feather-dollar-sign text-primary"></i> Computed Salary Components</h5>
-                                    <small class="text-muted d-block mt-1">Calculations based on dynamic slab matching for CTC & Pay Group.</small>
+                                    <h5 class="card-custom-title"><i class="feather-dollar-sign text-primary"></i> {{ __('hrms.employees.lbl_computed_salary') }}</h5>
+                                    <small class="text-muted d-block mt-1">{{ __('hrms.employees.lbl_computed_salary_desc') }}</small>
                                 </div>
                                 @if($salaryStructure)
                                     <span class="badge bg-soft-primary text-primary px-3 py-2 rounded-pill fs-12">
@@ -1186,7 +1186,7 @@
                                     </span>
                                 @else
                                     <span class="badge bg-soft-warning text-warning px-3 py-2 rounded-pill fs-12">
-                                        No Slab Resolved
+                                        {{ __('hrms.employees.lbl_no_slab') }}
                                     </span>
                                 @endif
                             </div>
@@ -1194,13 +1194,13 @@
                                 @if(!$employee->payGroup)
                                     <div class="p-5 text-center text-muted">
                                         <i class="feather-alert-circle fs-32 d-block mb-3 text-warning"></i>
-                                        <div class="fw-bold mb-1">No Pay Group Assigned</div>
-                                        <div>Please edit the employee to assign a Pay Group first.</div>
+                                        <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_pay_group') }}</div>
+                                        <div>{{ __('hrms.employees.lbl_no_pay_group_desc') }}</div>
                                     </div>
                                 @elseif(!$salaryStructure)
                                     <div class="p-5 text-center text-muted">
                                         <i class="feather-alert-octagon fs-32 d-block mb-3 text-danger"></i>
-                                        <div class="fw-bold mb-1">No Salary Slab Match Found</div>
+                                        <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_slab_match') }}</div>
                                         <div>The employee's CTC (₹{{ number_format($employee->current_salary, 2) }}) does not fall inside any Salary Structure slab configured for the <strong>{{ $employee->payGroup->name }}</strong> Pay Group.</div>
                                     </div>
                                 @else
@@ -1209,11 +1209,11 @@
                                         <table class="table table-hover align-middle mb-0">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th>Code / Component</th>
-                                                    <th>Type</th>
-                                                    <th>Rule Formula</th>
-                                                    <th class="text-end">Monthly Value</th>
-                                                    <th class="text-end">Yearly Value</th>
+                                                    <th>{{ __('hrms.employees.tbl_code_component') }}</th>
+                                                    <th>{{ __('hrms.assets.status') }}</th>
+                                                    <th>{{ __('hrms.employees.tbl_formula') }}</th>
+                                                    <th class="text-end">{{ __('hrms.employees.tbl_monthly') }}</th>
+                                                    <th class="text-end">{{ __('hrms.employees.tbl_yearly') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1259,17 +1259,17 @@
                                             </tbody>
                                             <tfoot class="table-light border-top-2">
                                                 <tr>
-                                                    <td colspan="3" class="fw-bold">Total Earnings:</td>
+                                                    <td colspan="3" class="fw-bold">{{ __('hrms.employees.lbl_total_earnings') }}</td>
                                                     <td class="text-end fw-bold text-success">₹{{ number_format($totalEarningsMonthly, 2) }}</td>
                                                     <td class="text-end fw-bold text-success">₹{{ number_format($totalEarningsMonthly * 12, 2) }}</td>
                                                 </tr>
                                                 <tr>
-                                                    <td colspan="3" class="fw-bold">Total Deductions:</td>
+                                                    <td colspan="3" class="fw-bold">{{ __('hrms.employees.lbl_total_deductions') }}</td>
                                                     <td class="text-end fw-bold text-danger">₹{{ number_format($totalDeductionsMonthly, 2) }}</td>
                                                     <td class="text-end fw-bold text-danger">₹{{ number_format($totalDeductionsMonthly * 12, 2) }}</td>
                                                 </tr>
                                                 <tr class="table-primary">
-                                                    <td colspan="3" class="fw-bold">Net Salary (In-Hand):</td>
+                                                    <td colspan="3" class="fw-bold">{{ __('hrms.employees.lbl_net_salary') }}</td>
                                                     <td class="text-end fw-extrabold text-primary">₹{{ number_format(max(0, $totalEarningsMonthly - $totalDeductionsMonthly), 2) }}</td>
                                                     <td class="text-end fw-extrabold text-primary">₹{{ number_format(max(0, $totalEarningsMonthly - $totalDeductionsMonthly) * 12, 2) }}</td>
                                                 </tr>
@@ -1285,7 +1285,7 @@
                     <div class="col-lg-4 col-12">
                         <div class="card-custom mb-4">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-info text-primary"></i> Master Summary</h5>
+                                <h5 class="card-custom-title"><i class="feather-info text-primary"></i> {{ __('hrms.employees.lbl_master_summary') }}</h5>
                             </div>
                             <div class="card-body p-4">
                                 <div class="d-flex flex-column gap-3">
@@ -1294,7 +1294,7 @@
                                         <div class="info-value text-dark">{{ $employee->payGroup?->name ?? 'Not Assigned' }}</div>
                                     </div>
                                     <div>
-                                        <div class="info-label">Annual Cost to Company (CTC)</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_annual_ctc') }}</div>
                                         <div class="info-value text-primary fs-18 fw-bold">₹{{ number_format($employee->current_salary, 2) }}</div>
                                     </div>
                                 </div>
@@ -1303,7 +1303,7 @@
 
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-plus-circle text-primary"></i> Monthly Adhoc Components</h5>
+                                <h5 class="card-custom-title"><i class="feather-plus-circle text-primary"></i> {{ __('hrms.employees.lbl_monthly_adhoc') }}</h5>
                                 <x-ui.button 
                                     type="button" 
                                     variant="soft-primary" 
@@ -1312,22 +1312,22 @@
                                     data-bs-target="#addAdhocModal" 
                                     :disabled="!$employee->pay_group_id"
                                 >
-                                    ADD
+                                    {{ __('hrms.common.add') }}
                                 </x-ui.button>
                             </div>
                             <div class="card-body p-0">
                                 @if($adhocComponents->isEmpty())
                                     <div class="p-4 text-center text-muted fs-13">
-                                        No ad-hoc components (bonuses, variable components) logged yet.
+                                        {{ __('hrms.employees.lbl_no_adhoc_components') }}
                                     </div>
                                 @else
                                     <div class="table-responsive">
                                         <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
                                              <thead class="table-light">
                                                  <tr>
-                                                     <th>Component</th>
-                                                     <th class="text-end">Amount</th>
-                                                     <th class="text-end">Action</th>
+                                                     <th>{{ __('hrms.employees.tbl_component') }}</th>
+                                                     <th class="text-end">{{ __('hrms.employees.tbl_amount') }}</th>
+                                                     <th class="text-end">{{ __('hrms.employees.tbl_action') }}</th>
                                                  </tr>
                                              </thead>
                                              <tbody>
@@ -1342,7 +1342,7 @@
                                                          </td>
                                                          <td class="text-end fw-semibold">₹{{ number_format($adhoc->amount, 2) }}</td>
                                                          <td class="text-end">
-                                                             <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirm('Delete this adhoc component?');">
+                                                             <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirm('{{ __('hrms.employees.confirm_delete_adhoc') }}');">
                                                                  @csrf
                                                                  @method('DELETE')
                                                                  <button type="submit" class="btn btn-link text-danger p-1 m-0" style="text-decoration: none !important; box-shadow: none !important;"><i class="feather-trash-2"></i></button>
@@ -1366,7 +1366,7 @@
                     <div class="col-md-4 col-12">
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-info text-primary"></i> Assigned Leave Plan</h5>
+                                <h5 class="card-custom-title"><i class="feather-info text-primary"></i> {{ __('hrms.employees.lbl_assigned_leave_plan') }}</h5>
                             </div>
                             <div class="card-body p-4">
                                 @if($employee->leavePlan)
@@ -1375,13 +1375,13 @@
                                         <p class="text-muted fs-13 mb-0">{{ $employee->leavePlan->description ?: 'No description provided.' }}</p>
                                     </div>
                                     <div class="border-top pt-3">
-                                        <div class="info-label">Effective From</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_effective_from') }}</div>
                                         <div class="info-value">{{ $employee->leavePlan->effective_from ? $employee->leavePlan->effective_from->format('d M, Y') : 'N/A' }}</div>
                                     </div>
                                 @else
                                     <div class="text-center py-3 text-muted fs-13">
                                         <i class="feather-alert-circle d-block fs-24 mb-2 text-warning"></i>
-                                        No Leave Plan assigned to this employee.
+                                        {{ __('hrms.employees.lbl_no_leave_plan') }}
                                     </div>
                                 @endif
                             </div>
@@ -1391,22 +1391,22 @@
                     <div class="col-md-8 col-12">
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-list text-primary"></i> Leave Allowances & Types</h5>
+                                <h5 class="card-custom-title"><i class="feather-list text-primary"></i> {{ __('hrms.employees.lbl_leave_allowances') }}</h5>
                             </div>
                             <div class="card-body p-0">
                                 @if(!$employee->leavePlan || $employee->leavePlan->types->isEmpty())
                                     <div class="p-5 text-center text-muted">
-                                        No Leave Types configured in the leave plan.
+                                        {{ __('hrms.employees.lbl_no_leave_types') }}
                                     </div>
                                 @else
                                     <div class="table-responsive">
                                         <table class="table table-hover align-middle mb-0">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th>Code / Type Name</th>
-                                                    <th>Category</th>
-                                                    <th class="text-end">Yearly Quota</th>
-                                                    <th class="text-center">Rules</th>
+                                                    <th>{{ __('hrms.employees.tbl_code_type_name') }}</th>
+                                                    <th>{{ __('hrms.employees.tbl_category') }}</th>
+                                                    <th class="text-end">{{ __('hrms.employees.tbl_yearly_quota') }}</th>
+                                                    <th class="text-center">{{ __('hrms.employees.tbl_rules') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1456,29 +1456,29 @@
                     <div class="col-lg-8 col-12">
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-list text-primary"></i> Attendance Penalization History</h5>
+                                <h5 class="card-custom-title"><i class="feather-list text-primary"></i> {{ __('hrms.employees.lbl_penalization_history') }}</h5>
                                 <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addPenaltyModal" @disabled(!$attendancePenalty)>
-                                    Log Instance
+                                    {{ __('hrms.employees.btn_log_instance') }}
                                 </button>
                             </div>
                             <div class="card-body p-0">
                                 @if($penalties->isEmpty())
                                     <div class="p-5 text-center text-muted">
                                         <i class="feather-check-circle fs-32 d-block mb-3 text-success"></i>
-                                        <div class="fw-bold mb-1">No Penalty Instances Logged</div>
-                                        <div>This employee has no active penalty records.</div>
+                                        <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_penalties') }}</div>
+                                        <div>{{ __('hrms.employees.lbl_no_penalties_desc') }}</div>
                                     </div>
                                 @else
                                     <div class="table-responsive">
                                         <table class="table table-hover align-middle mb-0">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th>Date Occurred</th>
-                                                    <th>Rule Violation</th>
-                                                    <th>Status</th>
-                                                    <th>Month</th>
-                                                    <th class="text-end">Deduction / Penalty</th>
-                                                    <th class="text-end">Action</th>
+                                                    <th>{{ __('hrms.employees.tbl_date_occurred') }}</th>
+                                                    <th>{{ __('hrms.employees.tbl_rule_violation') }}</th>
+                                                    <th>{{ __('hrms.employees.tbl_status') }}</th>
+                                                    <th>{{ __('hrms.employees.tbl_month') }}</th>
+                                                    <th class="text-end">{{ __('hrms.employees.tbl_deduction_penalty') }}</th>
+                                                    <th class="text-end">{{ __('hrms.employees.tbl_actions') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1533,7 +1533,7 @@
                     <div class="col-lg-4 col-12">
                         <div class="card-custom">
                             <div class="card-custom-header">
-                                <h5 class="card-custom-title"><i class="feather-shield text-primary"></i> Company Penalization Policy</h5>
+                                <h5 class="card-custom-title"><i class="feather-shield text-primary"></i> {{ __('hrms.employees.lbl_penalization_policy') }}</h5>
                             </div>
                             <div class="card-body p-4">
                                 @if($attendancePenalties && $attendancePenalties->isNotEmpty())
@@ -1541,7 +1541,7 @@
                                         <div class="policy-info-pane {{ $index === 0 ? '' : 'd-none' }}" data-index="{{ $index }}" data-policy-type="{{ $policy->rule_type }}">
                                             <div class="mb-4 d-flex justify-content-between align-items-center">
                                                 <div>
-                                                    <div class="info-label">Active Rule Type</div>
+                                                    <div class="info-label">{{ __('hrms.employees.lbl_active_rule_type') }}</div>
                                                     <div class="info-value text-dark text-capitalize fw-bold" style="font-size: 15px;">
                                                         {{ str_replace('_', ' ', $policy->rule_type) }}
                                                     </div>
@@ -1565,30 +1565,30 @@
                                             <div class="row g-3">
                                                 @if($policy->rule_type === 'late_arrival')
                                                     <div class="col-6">
-                                                        <div class="info-label">Grace Period</div>
+                                                        <div class="info-label">{{ __('hrms.employees.lbl_grace_period') }}</div>
                                                         <div class="info-value">{{ $policy->grace_period_minutes }} Mins</div>
                                                     </div>
                                                 @elseif($policy->rule_type === 'under_hours')
                                                     <div class="col-6">
-                                                        <div class="info-label">Daily Target</div>
+                                                        <div class="info-label">{{ __('hrms.employees.lbl_daily_target') }}</div>
                                                         <div class="info-value">{{ floatval($policy->grace_period_minutes / 60) }} Hours</div>
                                                     </div>
                                                 @else
                                                     <div class="col-6">
-                                                        <div class="info-label">Grace Period</div>
+                                                        <div class="info-label">{{ __('hrms.employees.lbl_grace_period') }}</div>
                                                         <div class="info-value">N/A</div>
                                                     </div>
                                                 @endif
                                                 <div class="col-6">
-                                                    <div class="info-label">Threshold Count</div>
+                                                    <div class="info-label">{{ __('hrms.employees.lbl_threshold_count') }}</div>
                                                     <div class="info-value">{{ $policy->threshold_count }} Marks</div>
                                                 </div>
                                                 <div class="col-6">
-                                                    <div class="info-label">Deduction Type</div>
+                                                    <div class="info-label">{{ __('hrms.employees.lbl_deduction_type') }}</div>
                                                     <div class="info-value text-capitalize">{{ str_replace('_', ' ', $policy->penalty_action) }}</div>
                                                 </div>
                                                 <div class="col-6">
-                                                    <div class="info-label">Penalty Value</div>
+                                                    <div class="info-label">{{ __('hrms.employees.lbl_penalty_value') }}</div>
                                                     <div class="info-value text-danger fw-bold">{{ floatval($policy->penalty_value) }} Deduct</div>
                                                 </div>
                                             </div>
@@ -1613,8 +1613,8 @@
                         <div class="card-custom">
                             <div class="card-custom-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
                                 <div>
-                                    <h5 class="card-custom-title"><i class="feather-file-text text-primary"></i> Employee Documents Registry</h5>
-                                    <small class="text-muted d-block mt-1">Manage, upload, or request official documents for this employee.</small>
+                                    <h5 class="card-custom-title"><i class="feather-file-text text-primary"></i> {{ __('hrms.employees.lbl_doc_registry') }}</h5>
+                                    <small class="text-muted d-block mt-1">{{ __('hrms.employees.lbl_doc_registry_desc') }}</small>
                                 </div>
                                 <div class="documents-toolbar d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
                                     <div class="documents-search d-flex align-items-center px-3 py-1">
@@ -1623,53 +1623,53 @@
                                             type="text" 
                                             id="documentSearchInput" 
                                             class="form-control border-0 bg-transparent p-0 fs-13" 
-                                            placeholder="Search documents..." 
+                                            placeholder="{{ __('hrms.employees.lbl_search_docs') }}" 
                                             autocomplete="off"
                                             style="box-shadow: none; height: 32px;"
                                         >
                                     </div>
 
-                                    <x-ui.sort-dropdown label="SORT">
+                                    <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                                         <a class="dropdown-item document-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="title_asc">
-                                            <span>Document Title (A-Z)</span>
+                                            <span>{{ __('hrms.employees.lbl_doc_title_asc') }}</span>
                                             <i class="feather-check ms-3"></i>
                                         </a>
                                         <a class="dropdown-item document-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="title_desc">
-                                            <span>Document Title (Z-A)</span>
+                                            <span>{{ __('hrms.employees.lbl_doc_title_desc') }}</span>
                                         </a>
                                         <div class="dropdown-divider"></div>
                                         <a class="dropdown-item document-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="expiry_asc">
-                                            <span>Expiry Date (Soonest)</span>
+                                            <span>{{ __('hrms.employees.lbl_expiry_soonest') }}</span>
                                         </a>
                                         <a class="dropdown-item document-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="expiry_desc">
-                                            <span>Expiry Date (Latest)</span>
+                                            <span>{{ __('hrms.employees.lbl_expiry_latest') }}</span>
                                         </a>
                                     </x-ui.sort-dropdown>
 
-                                    <x-ui.filter label="FILTER">
+                                    <x-ui.filter label="{{ __('hrms.common.filter') }}">
                                         <div class="document-filter-panel">
-                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                                         <form id="documentFilterForm" onsubmit="return false;">
                                             <div class="mb-3">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Document Status</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_status') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="status">
-                                                    <option value="">All Statuses</option>
-                                                    <option value="uploaded">Uploaded</option>
-                                                    <option value="requested">Pending Upload</option>
+                                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                                    <option value="uploaded">{{ __('hrms.employees.lbl_uploaded') }}</option>
+                                                    <option value="requested">{{ __('hrms.employees.lbl_pending_upload') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Expiry Requirement</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.lbl_expiry_req') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="has_expiry">
-                                                    <option value="">All Documents</option>
-                                                    <option value="1">Has Expiry</option>
-                                                    <option value="0">No Expiry</option>
+                                                    <option value="">{{ __('hrms.employees.tbl_actions') }} - {{ __('hrms.common.filter') }}</option>
+                                                    <option value="1">{{ __('hrms.employees.lbl_has_expiry') }}</option>
+                                                    <option value="0">{{ __('hrms.employees.lbl_no_expiry') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="dropdown-divider my-3"></div>
                                             <div class="document-filter-footer d-flex">
-                                                <x-ui.button type="button" id="btnDocumentFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">Apply Filters</x-ui.button>
-                                                <x-ui.button type="button" id="btnDocumentFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">Reset</x-ui.button>
+                                                <x-ui.button type="button" id="btnDocumentFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">{{ __('hrms.common.apply') }}</x-ui.button>
+                                                <x-ui.button type="button" id="btnDocumentFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">{{ __('hrms.common.reset') }}</x-ui.button>
                                             </div>
                                         </form>
                                         </div>
@@ -1678,11 +1678,11 @@
                                     <div class="documents-action-group d-flex align-items-center gap-2">
                                         @if(auth()->user()->hasHrPermission('hr.settings.manage'))
                                             <x-ui.button variant="light" size="sm" class="document-action-btn" data-bs-toggle="modal" data-bs-target="#requestDocumentModal" icon="feather-git-pull-request">
-                                                Request Document
+                                                {{ __('hrms.employees.btn_request_doc') }}
                                             </x-ui.button>
                                         @endif
                                         <x-ui.button variant="primary" size="sm" class="document-action-btn document-action-btn-primary" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" icon="feather-upload-cloud">
-                                            Upload Document
+                                            {{ __('hrms.employees.btn_upload_doc') }}
                                         </x-ui.button>
                                     </div>
                                 </div>
@@ -1695,12 +1695,12 @@
                                     <table class="table table-bordered table-hover mb-0 align-middle text-center documents-table">
                                         <thead class="table-light">
                                             <tr>
-                                                <th class="text-start" style="width: 250px;">Document Title</th>
-                                                <th>Source / Requested By</th>
-                                                <th>Expiry Date</th>
-                                                <th>File</th>
-                                                <th>Status</th>
-                                                <th style="width: 280px;">Actions</th>
+                                                <th class="text-start" style="width: 250px;">{{ __('hrms.employees.tbl_doc_title') }}</th>
+                                                <th>{{ __('hrms.employees.tbl_doc_source') }}</th>
+                                                <th>{{ __('hrms.employees.tbl_expiry_date') }}</th>
+                                                <th>{{ __('hrms.employees.tbl_file') }}</th>
+                                                <th>{{ __('hrms.employees.tbl_status') }}</th>
+                                                <th style="width: 280px;">{{ __('hrms.employees.tbl_actions') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1752,7 +1752,7 @@
                                                                 <span class="text-muted fs-11">Required on Upload</span>
                                                             @endif
                                                         @else
-                                                            <span class="text-muted fs-11">No Expiry</span>
+                                                            <span class="text-muted fs-11">{{ __('hrms.employees.lbl_no_expiry') }}</span>
                                                         @endif
                                                     </td>
                                                     <td class="text-start">
@@ -1784,9 +1784,9 @@
                                                     </td>
                                                     <td>
                                                         @if($doc->status === 'requested')
-                                                            <span class="badge bg-soft-warning text-warning">Pending Upload</span>
+                                                            <span class="badge bg-soft-warning text-warning">{{ __('hrms.employees.lbl_pending_upload') }}</span>
                                                         @elseif($doc->status === 'uploaded')
-                                                            <span class="badge bg-soft-success text-success">Uploaded</span>
+                                                            <span class="badge bg-soft-success text-success">{{ __('hrms.employees.lbl_uploaded') }}</span>
                                                         @else
                                                             <span class="badge bg-soft-secondary text-secondary">{{ ucfirst($doc->status) }}</span>
                                                         @endif
@@ -1796,12 +1796,12 @@
                                                             <!-- File Upload Form for Pending Request -->
                                                             <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
                                                                 @csrf
-                                                                <input type="hidden" name="document_id" value="{{ $doc->id }}">
+                                                                 <input type="hidden" name="document_id" value="{{ $doc->id }}">
                                                                 <div class="flex-grow-1 text-start">
                                                                     <div class="erp-custom-file-upload">
                                                                         <label class="file-upload-label py-1.5 px-3" style="font-size: 11px; cursor: pointer; border-style: dashed; border-width: 1px;" for="table_file_{{ $doc->id }}">
                                                                             <i class="feather-upload-cloud me-1 text-primary fs-12"></i>
-                                                                            <span class="file-text text-muted" id="file_text_{{ $doc->id }}">Choose File</span>
+                                                                            <span class="file-text text-muted" id="file_text_{{ $doc->id }}">{{ __('hrms.employees.lbl_choose_file') }}</span>
                                                                             <input type="file" name="file" id="table_file_{{ $doc->id }}" class="d-none" required onchange="document.getElementById('file_text_{{ $doc->id }}').innerText = this.files[0]?.name || 'Choose File'">
                                                                         </label>
                                                                     </div>
@@ -1813,7 +1813,7 @@
                                                                     @endif
                                                                 </div>
                                                                 <button type="submit" class="btn btn-sm btn-primary py-1 px-2 d-flex align-items-center justify-content-center" style="border-radius: 6px; font-size: 11px; height: 28px;">
-                                                                    <i class="feather-upload-cloud me-1"></i> Upload
+                                                                    <i class="feather-upload-cloud me-1"></i> {{ __('hrms.employees.btn_upload') }}
                                                                 </button>
                                                             </form>
                                                         @else
@@ -1823,7 +1823,7 @@
                                                                         @csrf
                                                                         @method('DELETE')
                                                                         <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-1 px-3" style="border-radius: 6px; font-size: 11px;">
-                                                                            <i class="feather-trash-2"></i> Remove Record
+                                                                            <i class="feather-trash-2"></i> {{ __('hrms.employees.btn_remove_record') }}
                                                                         </button>
                                                                     </form>
                                                                 @endif
@@ -1836,14 +1836,14 @@
                                                 <tr>
                                                     <td colspan="6" class="text-center py-5 text-muted fs-12">
                                                         <i class="feather-file fs-24 d-block mb-2 text-secondary"></i>
-                                                        No documents uploaded or requested for this employee profile yet.
+                                                        {{ __('hrms.employees.lbl_no_docs_uploaded') }}
                                                     </td>
                                                 </tr>
                                             @else
                                                 <tr id="documentNoResultsRow" class="d-none">
                                                     <td colspan="6" class="text-center py-5 text-muted fs-12">
                                                         <i class="feather-search fs-24 d-block mb-2 text-secondary"></i>
-                                                        No documents match your search or filters.
+                                                        {{ __('hrms.employees.lbl_no_docs_match') }}
                                                     </td>
                                                 </tr>
                                             @endif
@@ -1861,19 +1861,19 @@
                 <div class="card-custom">
                     <div class="card-custom-header">
                         <div>
-                            <h5 class="card-custom-title"><i class="feather-clock text-primary"></i> Previous Employment History</h5>
-                            <small class="text-muted d-block mt-1">Timeline of previous roles and experiences outside this company.</small>
+                            <h5 class="card-custom-title"><i class="feather-clock text-primary"></i> {{ __('hrms.employees.lbl_prev_history') }}</h5>
+                            <small class="text-muted d-block mt-1">{{ __('hrms.employees.lbl_prev_history_desc') }}</small>
                         </div>
                         <button type="button" class="btn btn-sm btn-primary py-2 px-3 d-flex align-items-center gap-1" style="border-radius: 6px; font-size: 12px;" data-bs-toggle="modal" data-bs-target="#addHistoryModal">
-                            <i class="feather-plus"></i> Add Experience
+                            <i class="feather-plus"></i> {{ __('hrms.employees.btn_add_exp') }}
                         </button>
                     </div>
                     <div class="card-body p-4">
                         @if($employee->employmentHistories->isEmpty())
                             <div class="p-5 text-center text-muted">
                                 <i class="feather-activity fs-32 d-block mb-3 text-secondary"></i>
-                                <div class="fw-bold mb-1">No Previous Employment Records</div>
-                                <div>Click "Add Experience" to document work history.</div>
+                                <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_prev_records') }}</div>
+                                <div>{{ __('hrms.employees.lbl_no_prev_records_desc') }}</div>
                             </div>
                         @else
                             <div class="timeline-container px-3">
@@ -1885,7 +1885,7 @@
                                                 <h6 class="fw-bold text-dark mb-1">{{ $history->designation }}</h6>
                                                 <div class="fw-semibold text-secondary mb-2" style="font-size: 13px;">{{ $history->company_name }}</div>
                                                 <span class="badge bg-soft-primary text-primary fs-11 px-2 py-1 rounded">
-                                                    {{ $history->start_date->format('M Y') }} – {{ $history->end_date ? $history->end_date->format('M Y') : 'Present' }}
+                                                    {{ $history->start_date->format('M Y') }} – {{ $history->end_date ? $history->end_date->format('M Y') : __('hrms.employees.lbl_present') }}
                                                 </span>
                                                 @if($history->job_description)
                                                     <p class="text-muted fs-13 mt-3 mb-0 text-wrap" style="max-width: 100%; white-space: pre-line;">{{ $history->job_description }}</p>
@@ -1896,7 +1896,7 @@
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-1 px-3" style="border-radius: 6px; font-size: 11px;">
-                                                        <i class="feather-trash-2"></i> Delete
+                                                        <i class="feather-trash-2"></i> {{ __('hrms.assets.delete') }}
                                                     </button>
                                                 </form>
                                             @endif
@@ -1920,55 +1920,55 @@
                 <div class="card-custom">
                     <div class="card-custom-header d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
                         <div>
-                            <h5 class="card-custom-title"><i class="feather-package text-primary"></i> Company Assets</h5>
-                            <small class="text-muted d-block mt-1">Laptops, devices, and other assets currently assigned to this employee.</small>
+                            <h5 class="card-custom-title"><i class="feather-package text-primary"></i> {{ __('hrms.employees.lbl_co_assets') }}</h5>
+                            <small class="text-muted d-block mt-1">{{ __('hrms.employees.lbl_co_assets_desc') }}</small>
                         </div>
                         <div class="asset-toolbar d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
                             <div class="documents-search d-flex align-items-center px-3 py-1">
                                 <i class="feather-search text-muted me-2 fs-14"></i>
-                                <input type="text" id="assignedAssetSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search assigned assets..." autocomplete="off" style="box-shadow: none; height: 32px;">
+                                <input type="text" id="assignedAssetSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.employees.lbl_search_assets') }}" autocomplete="off" style="box-shadow: none; height: 32px;">
                             </div>
-                            <x-ui.sort-dropdown label="SORT">
+                            <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                                 <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="name_asc">
-                                    <span>Asset Name (A-Z)</span>
+                                    <span>{{ __('hrms.employees.lbl_asset_name_asc') }}</span>
                                     <i class="feather-check ms-3"></i>
                                 </a>
                                 <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="name_desc">
-                                    <span>Asset Name (Z-A)</span>
+                                    <span>{{ __('hrms.employees.lbl_asset_name_desc') }}</span>
                                 </a>
                                 <div class="dropdown-divider"></div>
                                 <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="assigned_desc">
-                                    <span>Assigned Date (Latest)</span>
+                                    <span>{{ __('hrms.employees.lbl_assigned_latest') }}</span>
                                 </a>
                                 <a class="dropdown-item assigned-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="assigned_asc">
-                                    <span>Assigned Date (Oldest)</span>
+                                    <span>{{ __('hrms.employees.lbl_assigned_oldest') }}</span>
                                 </a>
                             </x-ui.sort-dropdown>
-                            <x-ui.filter label="FILTER">
+                            <x-ui.filter label="{{ __('hrms.common.filter') }}">
                                 <div class="document-filter-panel">
-                                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                                     <form id="assignedAssetFilterForm" onsubmit="return false;">
                                         <div class="mb-3">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Asset Category</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.lbl_asset_category') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="category">
-                                                <option value="">All Categories</option>
+                                                <option value="">{{ __('hrms.common.all_companies') }} - {{ __('hrms.employees.tbl_category') }}</option>
                                                 @foreach($assignedAssetCategories as $categoryName)
                                                     <option value="{{ \Illuminate\Support\Str::lower($categoryName) }}">{{ $categoryName }}</option>
                                                 @endforeach
                                             </x-ui.odoo-form-ui>
                                         </div>
                                         <div class="mb-3">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Serial Number</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.lbl_serial_number') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="serial">
-                                                <option value="">All Assets</option>
-                                                <option value="1">Has Serial Number</option>
-                                                <option value="0">No Serial Number</option>
+                                                <option value="">{{ __('hrms.employees.tbl_actions') }} - {{ __('hrms.common.filter') }}</option>
+                                                <option value="1">{{ __('hrms.employees.lbl_has_serial') }}</option>
+                                                <option value="0">{{ __('hrms.employees.lbl_no_serial') }}</option>
                                             </x-ui.odoo-form-ui>
                                         </div>
                                         <div class="dropdown-divider my-3"></div>
                                         <div class="document-filter-footer d-flex">
-                                            <x-ui.button type="button" id="btnAssignedAssetFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">Apply Filters</x-ui.button>
-                                            <x-ui.button type="button" id="btnAssignedAssetFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">Reset</x-ui.button>
+                                            <x-ui.button type="button" id="btnAssignedAssetFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">{{ __('hrms.common.apply') }}</x-ui.button>
+                                            <x-ui.button type="button" id="btnAssignedAssetFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">{{ __('hrms.common.reset') }}</x-ui.button>
                                         </div>
                                     </form>
                                 </div>
@@ -1980,12 +1980,12 @@
                             <table class="table table-hover align-middle mb-0 text-center assigned-assets-table">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="text-start" style="width: 150px; padding-left: 20px;">Asset Tag / Code</th>
-                                        <th class="text-start">Asset Name</th>
-                                        <th>Category</th>
-                                        <th>Serial Number</th>
+                                        <th class="text-start" style="width: 150px; padding-left: 20px;">{{ __('hrms.employees.tbl_asset_tag') }}</th>
+                                        <th class="text-start">{{ __('hrms.employees.tbl_asset_name') }}</th>
+                                        <th>{{ __('hrms.employees.tbl_category') }}</th>
+                                        <th>{{ __('hrms.employees.lbl_serial_number') }}</th>
                                         <th>Assigned At</th>
-                                        <th class="text-end" style="width: 180px; padding-right: 20px;">Actions</th>
+                                        <th class="text-end" style="width: 180px; padding-right: 20px;">{{ __('hrms.employees.tbl_actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2019,7 +2019,7 @@
                                             <td class="text-end" style="padding-right: 20px;">
                                                 @if(auth()->user()->hasHrPermission('hr.settings.manage'))
                                                     <button type="button" class="btn btn-sm btn-light border text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center" style="border-color: #cbd5e1; background-color: #ffffff; color: #475569; font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-asset-id="{{ $asset->id }}" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})">
-                                                         Return Asset
+                                                         {{ __('hrms.employees.btn_return_asset') }}
                                                     </button>
                                                 @else
                                                     <span class="text-muted fs-12">-</span>
@@ -2030,7 +2030,7 @@
                                         <tr>
                                             <td colspan="6" class="text-center py-5 text-muted fs-12">
                                                 <i class="feather-package fs-24 d-block mb-2 text-secondary"></i>
-                                                No company assets are currently assigned to this employee.
+                                                {{ __('hrms.employees.lbl_no_assets_assigned') }}
                                             </td>
                                         </tr>
                                     @endforelse
@@ -2038,7 +2038,7 @@
                                         <tr id="assignedAssetNoResultsRow" class="d-none">
                                             <td colspan="6" class="text-center py-5 text-muted fs-12">
                                                 <i class="feather-search fs-24 d-block mb-2 text-secondary"></i>
-                                                No assigned assets match your search or filters.
+                                                {{ __('hrms.employees.lbl_no_assets_match') }}
                                             </td>
                                         </tr>
                                     @endif
@@ -2051,47 +2051,47 @@
                     <div class="card border rounded bg-white shadow-sm mt-4">
                         <div class="card-header border-bottom d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 py-3 px-4 bg-white">
                             <div>
-                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 14px;">Asset Requests Log</h5>
-                                <small class="text-muted fs-11">Trace requests submitted by this employee for hardware or credentials.</small>
+                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 14px;">{{ __('hrms.employees.lbl_asset_requests_log') }}</h5>
+                                <small class="text-muted fs-11">{{ __('hrms.employees.lbl_asset_requests_desc') }}</small>
                             </div>
                             <div class="asset-toolbar d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
                                 <div class="documents-search d-flex align-items-center px-3 py-1">
                                     <i class="feather-search text-muted me-2 fs-14"></i>
-                                    <input type="text" id="assetRequestSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search requests..." autocomplete="off" style="box-shadow: none; height: 32px;">
+                                    <input type="text" id="assetRequestSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.employees.lbl_search_requests') }}" autocomplete="off" style="box-shadow: none; height: 32px;">
                                 </div>
-                                <x-ui.sort-dropdown label="SORT">
+                                <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                                     <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="date_desc">
-                                        <span>Request Date (Latest)</span>
+                                        <span>{{ __('hrms.employees.lbl_assigned_latest') }}</span>
                                         <i class="feather-check ms-3"></i>
                                     </a>
                                     <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="date_asc">
-                                        <span>Request Date (Oldest)</span>
+                                        <span>{{ __('hrms.employees.lbl_assigned_oldest') }}</span>
                                     </a>
                                     <div class="dropdown-divider"></div>
                                     <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="category_asc">
-                                        <span>Category (A-Z)</span>
+                                        <span>{{ __('hrms.employees.lbl_asset_category') }} (A-Z)</span>
                                     </a>
                                     <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="status_asc">
-                                        <span>Status (A-Z)</span>
+                                        <span>{{ __('hrms.employees.tbl_status') }} (A-Z)</span>
                                     </a>
                                 </x-ui.sort-dropdown>
-                                <x-ui.filter label="FILTER">
+                                <x-ui.filter label="{{ __('hrms.common.filter') }}">
                                     <div class="document-filter-panel">
-                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                                         <form id="assetRequestFilterForm" onsubmit="return false;">
                                             <div class="mb-3">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Requested Category</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_requested_category') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="category">
-                                                    <option value="">All Categories</option>
+                                                    <option value="">{{ __('hrms.common.all_companies') }} - {{ __('hrms.employees.tbl_category') }}</option>
                                                     @foreach($requestAssetCategories as $categoryName)
                                                         <option value="{{ \Illuminate\Support\Str::lower($categoryName) }}">{{ $categoryName }}</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Request Status</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_status') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="status">
-                                                    <option value="">All Statuses</option>
+                                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
                                                     @foreach($requestAssetStatuses as $statusName)
                                                         <option value="{{ $statusName }}">{{ ucfirst($statusName) }}</option>
                                                     @endforeach
@@ -2099,14 +2099,14 @@
                                             </div>
                                             <div class="dropdown-divider my-3"></div>
                                             <div class="document-filter-footer d-flex">
-                                                <x-ui.button type="button" id="btnAssetRequestFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">Apply Filters</x-ui.button>
-                                                <x-ui.button type="button" id="btnAssetRequestFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">Reset</x-ui.button>
+                                                <x-ui.button type="button" id="btnAssetRequestFilterApply" variant="primary" size="sm" class="flex-grow-1 document-filter-btn">{{ __('hrms.common.apply') }}</x-ui.button>
+                                                <x-ui.button type="button" id="btnAssetRequestFilterReset" variant="light" size="sm" class="border flex-grow-1 document-filter-btn">{{ __('hrms.common.reset') }}</x-ui.button>
                                             </div>
                                         </form>
                                     </div>
                                 </x-ui.filter>
                                 <button type="button" class="btn btn-sm asset-action-btn asset-action-btn-primary d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#requestAssetModal">
-                                    <i class="feather-plus"></i> Request Asset
+                                    <i class="feather-plus"></i> {{ __('hrms.employees.btn_request_asset') }}
                                 </button>
                             </div>
                         </div>
@@ -2115,11 +2115,11 @@
                                 <table class="table align-middle mb-0 text-center asset-requests-table">
                                     <thead class="table-light text-uppercase fs-10" style="letter-spacing: 0.5px;">
                                         <tr>
-                                            <th class="text-start" style="padding-left: 20px;">Requested Category</th>
-                                            <th>Request Date</th>
-                                            <th class="text-start">Reason</th>
-                                            <th>Status</th>
-                                            <th class="text-start" style="padding-right: 20px;">Admin Notes</th>
+                                            <th class="text-start" style="padding-left: 20px;">{{ __('hrms.employees.tbl_requested_category') }}</th>
+                                            <th>{{ __('hrms.employees.tbl_expiry_date') }}</th>
+                                            <th class="text-start">{{ __('hrms.employees.tbl_reason') }}</th>
+                                            <th>{{ __('hrms.employees.tbl_status') }}</th>
+                                            <th class="text-start" style="padding-right: 20px;">{{ __('hrms.employees.tbl_admin_notes') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -2158,7 +2158,7 @@
                                         @empty
                                             <tr>
                                                 <td colspan="5" class="text-center py-4 text-muted fs-11">
-                                                    No asset requests have been submitted by this employee.
+                                                    {{ __('hrms.employees.lbl_no_asset_requests') }}
                                                 </td>
                                             </tr>
                                         @endforelse
@@ -2166,7 +2166,7 @@
                                             <tr id="assetRequestNoResultsRow" class="d-none">
                                                 <td colspan="5" class="text-center py-4 text-muted fs-11">
                                                     <i class="feather-search fs-20 d-block mb-2 text-secondary"></i>
-                                                    No asset requests match your search or filters.
+                                                    {{ __('hrms.employees.lbl_no_asset_requests_match') }}
                                                 </td>
                                             </tr>
                                         @endif
@@ -2185,7 +2185,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title fw-bold text-dark" id="requestDocumentModalLabel">
-                            <i class="feather-git-pull-request me-2 text-primary" style="font-size: 16px;"></i>Request Document from Employee
+                            <i class="feather-git-pull-request me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.employees.mdl_req_doc_title') }}
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
@@ -2194,28 +2194,28 @@
                         <div class="modal-body">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="input" label="Document Name" name="name" :required="true" placeholder="e.g. Previous Experience Certificate, 10th Marksheet" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_doc_name') }}" name="name" :required="true" placeholder="{{ __('hrms.employees.mdl_doc_name_placeholder') }}" />
                                 </div>
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="textarea" label="Instructions" name="description" placeholder="Explain what details or formatting are required..." />
+                                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_instructions') }}" name="description" placeholder="{{ __('hrms.employees.mdl_instructions_placeholder') }}" />
                                 </div>
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="radio" label="Requires Expiry" name="has_expiry" :required="true">
+                                    <x-ui.odoo-form-ui type="radio" label="{{ __('hrms.employees.mdl_requires_expiry') }}" name="has_expiry" :required="true">
                                         <div class="form-check">
                                             <input type="radio" id="has_expiry_yes" name="has_expiry" value="1" class="form-check-input">
-                                            <label class="form-check-label fs-13" for="has_expiry_yes">Yes</label>
+                                            <label class="form-check-label fs-13" for="has_expiry_yes">{{ __('hrms.employees.mdl_yes') }}</label>
                                         </div>
                                         <div class="form-check">
                                             <input type="radio" id="has_expiry_no" name="has_expiry" value="0" class="form-check-input" checked>
-                                            <label class="form-check-label fs-13" for="has_expiry_no">No</label>
+                                            <label class="form-check-label fs-13" for="has_expiry_no">{{ __('hrms.employees.mdl_no') }}</label>
                                         </div>
                                     </x-ui.odoo-form-ui>
                                 </div>
                             </div>
                         </div>
                         <div class="modal-footer bg-light py-2 gap-2">
-                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Send Request</button>
-                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_send_request') }}</button>
+                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_discard') }}</button>
                         </div>
                     </form>
                 </div>
@@ -2228,7 +2228,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title fw-bold text-dark" id="uploadDocumentModalLabel">
-                            <i class="feather-upload-cloud me-2 text-primary" style="font-size: 16px;"></i>Upload New Document
+                            <i class="feather-upload-cloud me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.employees.mdl_upload_doc_title') }}
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
@@ -2237,19 +2237,19 @@
                         <div class="modal-body">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="input" label="Document Title" name="name" :required="true" placeholder="e.g. Aadhar Card, Offer Letter" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_doc_title') }}" name="name" :required="true" placeholder="{{ __('hrms.employees.mdl_doc_title_placeholder') }}" />
                                 </div>
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="file" label="Select File" name="file" :required="true" placeholder="Click to upload PDF, JPG, PNG (Max 10MB)..." />
+                                    <x-ui.odoo-form-ui type="file" label="{{ __('hrms.employees.mdl_select_file') }}" name="file" :required="true" placeholder="{{ __('hrms.employees.mdl_select_file_placeholder') }}" />
                                 </div>
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" inputType="date" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_expiry_date') }}" name="expiry_date" inputType="date" />
                                 </div>
                             </div>
                         </div>
                         <div class="modal-footer bg-light py-2 gap-2">
-                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Upload File</button>
-                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_upload_file') }}</button>
+                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_discard') }}</button>
                         </div>
                     </form>
                 </div>
@@ -2262,7 +2262,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title fw-bold text-dark" id="addHistoryModalLabel">
-                            <i class="feather-clock me-2 text-primary" style="font-size: 16px;"></i>Add Previous Work Experience
+                            <i class="feather-clock me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.employees.mdl_add_history_title') }}
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
@@ -2271,25 +2271,25 @@
                         <div class="modal-body">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="input" label="Company Name" name="company_name" placeholder="e.g. Acme Corp" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_company_name') }}" name="company_name" placeholder="{{ __('hrms.employees.mdl_company_name_placeholder') }}" :required="true" />
                                 </div>
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="input" label="Designation" name="designation" placeholder="e.g. Senior Software Engineer" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_designation') }}" name="designation" placeholder="{{ __('hrms.employees.mdl_designation_placeholder') }}" :required="true" />
                                 </div>
                                 <div class="col-6">
-                                    <x-ui.odoo-form-ui type="input" label="Start Date" name="start_date" inputType="date" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_start_date') }}" name="start_date" inputType="date" :required="true" />
                                 </div>
                                 <div class="col-6">
-                                    <x-ui.odoo-form-ui type="input" label="End Date" name="end_date" inputType="date" placeholder="Leave empty if present" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_end_date') }}" name="end_date" inputType="date" placeholder="{{ __('hrms.employees.mdl_end_date_placeholder') }}" />
                                 </div>
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="textarea" label="Job Description" name="job_description" rows="3" placeholder="Explain your key responsibilities, achievements, and tech stack..." />
+                                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_job_desc') }}" name="job_description" rows="3" placeholder="{{ __('hrms.employees.mdl_job_desc_placeholder') }}" />
                                 </div>
                             </div>
                         </div>
                         <div class="modal-footer bg-light py-2 gap-2">
-                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Experience</button>
-                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                            <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_save_exp') }}</button>
+                            <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_discard') }}</button>
                         </div>
                     </form>
                 </div>
@@ -2301,7 +2301,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="addAdhocModalLabel">Add Adhoc Salary Component</h5>
+                    <h5 class="modal-title fw-bold" id="addAdhocModalLabel">{{ __('hrms.employees.mdl_add_adhoc_title') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.employees.adhoc-components.store', $employee->id) }}" method="POST">
@@ -2309,19 +2309,19 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Adhoc Component" name="salary_component_id" select2-selector="default" :required="true">
-                                    <option value="">Select Component</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_adhoc_component') }}" name="salary_component_id" select2-selector="default" :required="true">
+                                    <option value="">{{ __('hrms.employees.mdl_select_component') }}</option>
                                     @foreach($availableAdhocComponents as $ac)
                                         <option value="{{ $ac->id }}">{{ $ac->name }} [{{ $ac->code }}]</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Amount (₹)" name="amount" inputType="number" step="0.01" placeholder="0.00" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_amount_inr') }}" name="amount" inputType="number" step="0.01" placeholder="0.00" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Payroll Month" name="payroll_month" select2-selector="default" :required="true">
-                                    <option value="">Select Payroll Month</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_payroll_month') }}" name="payroll_month" select2-selector="default" :required="true">
+                                    <option value="">{{ __('hrms.employees.mdl_select_payroll_month') }}</option>
                                     @for ($i = -6; $i <= 6; $i++)
                                         @php
                                             $month = now()->addMonths($i);
@@ -2334,13 +2334,13 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" rows="3" placeholder="Bonus details, adjustment notes..." />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_remarks') }}" name="remarks" rows="3" placeholder="{{ __('hrms.employees.mdl_remarks_placeholder') }}" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2 justify-content-end">
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Close</button>
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Add Component</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_close') }}</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_add_component') }}</button>
                     </div>
                 </form>
             </div>
@@ -2352,7 +2352,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="addPenaltyModalLabel">Log Attendance Penalty Instance</h5>
+                    <h5 class="modal-title fw-bold" id="addPenaltyModalLabel">{{ __('hrms.employees.mdl_add_penalty_title') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.employees.penalties.store', $employee->id) }}" method="POST">
@@ -2360,23 +2360,23 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Rule Violated" name="rule_type" select2-selector="default" :required="true">
-                                    <option value="">Select Rule Violation</option>
-                                    <option value="no_attendance">No Attendance</option>
-                                    <option value="late_arrival">Late Arrival</option>
-                                    <option value="under_hours">Under Hours</option>
-                                    <option value="missing_logs">Missing Logs</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_rule_violated') }}" name="rule_type" select2-selector="default" :required="true">
+                                    <option value="">{{ __('hrms.employees.mdl_select_violation') }}</option>
+                                    <option value="no_attendance">{{ __('hrms.employees.mdl_violation_no_attendance') }}</option>
+                                    <option value="late_arrival">{{ __('hrms.employees.mdl_violation_late_arrival') }}</option>
+                                    <option value="under_hours">{{ __('hrms.employees.mdl_violation_under_hours') }}</option>
+                                    <option value="missing_logs">{{ __('hrms.employees.mdl_violation_missing_logs') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Violation Date" name="date" inputType="date" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_violation_date') }}" name="date" inputType="date" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Deduction Value / Amount" name="penalty_amount" inputType="number" step="0.01" placeholder="e.g. 0.50 (for half-day)" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_deduction_value') }}" name="penalty_amount" inputType="number" step="0.01" placeholder="{{ __('hrms.employees.mdl_deduction_placeholder') }}" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Payroll Month" name="payroll_month" select2-selector="default" :required="true">
-                                    <option value="">Select Payroll Month</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_payroll_month') }}" name="payroll_month" select2-selector="default" :required="true">
+                                    <option value="">{{ __('hrms.employees.mdl_select_payroll_month') }}</option>
                                     @for ($i = -6; $i <= 6; $i++)
                                         @php
                                             $month = now()->addMonths($i);
@@ -2389,13 +2389,13 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" rows="3" placeholder="Late arrival note, log timestamps..." />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_remarks') }}" name="remarks" rows="3" placeholder="{{ __('hrms.employees.mdl_remarks_penalty_placeholder') }}" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2 justify-content-end">
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Close</button>
-                        <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">Log Penalty</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_close') }}</button>
+                        <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_log_penalty') }}</button>
                     </div>
                 </form>
             </div>
@@ -2411,10 +2411,10 @@
                         <div class="modal-header">
                             <div>
                                 <h5 class="modal-title fw-bold" id="leaveRulesModalLabel{{ $ltype->id }}">
-                                    <i class="feather-sliders text-primary me-2"></i>{{ $ltype->name }} Rules
+                                    <i class="feather-sliders text-primary me-2"></i>{{ $ltype->name }} {{ __('hrms.employees.mdl_leave_rules_title') }}
                                 </h5>
                                 <div class="text-muted fs-12 mt-1">
-                                    {{ $ltype->code }} · {{ ucfirst($ltype->type) }} · {{ floatval($ltype->quota) }} days yearly quota
+                                    {{ $ltype->code }} · {{ ucfirst($ltype->type) }} · {{ floatval($ltype->quota) }} {{ __('hrms.employees.mdl_yearly_quota') }}
                                 </div>
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -2423,8 +2423,8 @@
                             @if(empty($rulePoints))
                                 <div class="text-center py-5 text-muted">
                                     <i class="feather-check-circle d-block fs-32 mb-3 text-success"></i>
-                                    <div class="fw-bold text-dark mb-1">Standard rules apply</div>
-                                    <div>No custom leave rules are configured for this leave type.</div>
+                                    <div class="fw-bold text-dark mb-1">{{ __('hrms.employees.mdl_std_rules') }}</div>
+                                    <div>{{ __('hrms.employees.mdl_no_custom_rules') }}</div>
                                 </div>
                             @else
                                 <div class="row g-3">
@@ -2447,7 +2447,7 @@
                             @endif
                         </div>
                         <div class="modal-footer bg-white">
-                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.employees.mdl_btn_close') }}</button>
                         </div>
                     </div>
                 </div>
@@ -2461,7 +2461,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="returnAssetModalLabel">
-                        <i class="feather-corner-up-left me-2 text-primary"></i>Return Asset to Inventory
+                        <i class="feather-corner-up-left me-2 text-primary"></i>{{ __('hrms.employees.mdl_return_asset_title') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -2470,39 +2470,42 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="info-label mb-1">Asset To Return</label>
+                                <label class="info-label mb-1">{{ __('hrms.employees.mdl_asset_to_return') }}</label>
                                 <input type="text" id="return_asset_name_display" class="form-control bg-light" readonly>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Return Date" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_return_date') }}" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Return Condition" name="return_condition" :required="true" select2-selector="default">
-                                    <option value="good">Good</option>
-                                    <option value="new">New</option>
-                                    <option value="fair">Fair</option>
-                                    <option value="damaged">Damaged (Needs Maintenance)</option>
-                                    <option value="scrapped">Scrapped</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_return_condition') }}" name="return_condition" :required="true" select2-selector="default">
+                                    <option value="good">{{ __('hrms.employees.mdl_condition_good') }}</option>
+                                    <option value="new">{{ __('hrms.employees.mdl_condition_new') }}</option>
+                                    <option value="fair">{{ __('hrms.employees.mdl_condition_fair') }}</option>
+                                    <option value="damaged">{{ __('hrms.employees.mdl_condition_damaged') }}</option>
+                                    <option value="scrapped">{{ __('hrms.employees.mdl_condition_scrapped') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Return Notes" name="return_notes" placeholder="Condition details, damage details, return notes..." />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_return_notes') }}" name="return_notes" placeholder="{{ __('hrms.employees.mdl_return_notes_placeholder') }}" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Process Return</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_process_return') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_cancel') }}</button>
                     </div>
                 </form>
             </div>
+        </div>
+    </div>
+
     <!-- REQUEST ASSET MODAL FOR PROFILE TAB -->
     <div class="modal fade" id="requestAssetModal" tabindex="-1" aria-labelledby="requestAssetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="requestAssetModalLabel">
-                        <i class="feather-plus me-2 text-primary"></i>Request Company Asset
+                        <i class="feather-plus me-2 text-primary"></i>{{ __('hrms.employees.mdl_request_asset_title') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -2512,25 +2515,25 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="info-label mb-1">Employee Requesting</label>
+                                <label class="info-label mb-1">{{ __('hrms.employees.mdl_emp_requesting') }}</label>
                                 <input type="text" class="form-control bg-light" value="{{ $employee->display_name }} ({{ $employee->employee_id }})" readonly>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Asset Category" name="asset_category_id" :required="true" select2-selector="default">
-                                    <option value="">Select Category</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.lbl_asset_category') }}" name="asset_category_id" :required="true" select2-selector="default">
+                                    <option value="">{{ __('hrms.common.all_companies') }} - {{ __('hrms.employees.tbl_category') }}</option>
                                     @foreach($categories->where('company_id', $employee->company_id) as $category)
                                         <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Reason for Request" name="reason" placeholder="Please specify why you need this asset..." :required="true" />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_reason_req') }}" name="reason" placeholder="{{ __('hrms.employees.mdl_reason_placeholder') }}" :required="true" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Submit Request</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_submit_request') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_discard') }}</button>
                     </div>
                 </form>
             </div>

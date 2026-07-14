@@ -80,7 +80,7 @@ class RosterController extends Controller
                 break;
         }
 
-        $shifts = $shiftsQuery->get();
+        $shifts = $shiftsQuery->paginate(10, ['*'], 'shift_page')->withQueryString();
         $activeShifts = ProductionShift::where('active', true)->get();
 
         // 2. Roster Scheduling Matrix Data
@@ -109,7 +109,29 @@ class RosterController extends Controller
         if ($selectedDepartmentId) {
             $employeesQuery->where('department_id', $selectedDepartmentId);
         }
-        $employees = $employeesQuery->with(['department', 'designation', 'shift'])->get();
+        if ($search !== '') {
+            $employeesQuery->where(function ($query) use ($search): void {
+                $query->where('full_name', 'like', "%{$search}%")
+                    ->orWhereHas('designation', function ($q) use ($search): void {
+                        $q->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+        switch ($sortBy) {
+            case 'name-desc':
+                $employeesQuery->orderBy('full_name', 'desc');
+                break;
+            case 'designation':
+                $employeesQuery->leftJoin('designations', 'employees.designation_id', '=', 'designations.id')
+                    ->select('employees.*')
+                    ->orderBy('designations.name', 'asc');
+                break;
+            case 'name-asc':
+            default:
+                $employeesQuery->orderBy('full_name', 'asc');
+                break;
+        }
+        $employees = $employeesQuery->with(['department', 'designation', 'shift'])->paginate(10, ['*'], 'roster_page')->withQueryString();
 
         // Fetch shift rosters in scope
         $rosters = ShiftRoster::query()
