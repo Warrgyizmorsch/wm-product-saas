@@ -163,6 +163,10 @@ class ProjectController extends Controller
                 'rules'   => ['required', 'string', 'max:255'],
                 'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'name', $value),
             ],
+            'description' => [
+                'rules'   => ['nullable', 'string'],
+                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'description', $value),
+            ],
             'budget_amount' => [
                 'rules'   => ['nullable', 'numeric', 'min:0'],
                 'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'budget_amount', $value),

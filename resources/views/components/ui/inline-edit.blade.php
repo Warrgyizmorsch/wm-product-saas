@@ -31,6 +31,8 @@
                     <option value="{{ $optionValue }}" @selected($optionValue == $value)>{{ $optionLabel }}</option>
                 @endforeach
             </select>
+        @elseif ($type === 'textarea')
+            <textarea class="form-control form-control-sm inline-edit__control" rows="3">{{ $value }}</textarea>
         @else
             <input type="text" class="form-control form-control-sm inline-edit__control" value="{{ $value }}">
         @endif
@@ -62,6 +64,20 @@
         .inline-edit__edit {
             display: inline-block;
             min-width: 220px;
+        }
+
+        .inline-edit[data-type="textarea"] {
+            display: block;
+        }
+
+        .inline-edit[data-type="textarea"] .inline-edit__view {
+            display: block;
+            white-space: pre-wrap;
+        }
+
+        .inline-edit[data-type="textarea"] .inline-edit__edit {
+            display: block;
+            width: 100%;
         }
 
         .inline-edit.is-saving .inline-edit__control {

@@ -10,12 +10,6 @@
             class="btn btn-light">
             <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
         </a>
-        @can('update', $project)
-            <button type="button" class="btn btn-light" data-bs-toggle="modal"
-                data-bs-target="#editProjectModal-{{ $project->id }}">
-                <i class="feather-edit-2 me-2"></i>{{ __('projects.edit_description') }}
-            </button>
-        @endcan
         <form action="{{ route('projects.destroy', $project) }}" method="POST"
             onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
             @csrf
@@ -32,11 +26,7 @@
 
 @section('content')
     <div class="erp-single-panel bg-white">
-        {{-- The edit-description modal shows its own scoped inline errors (see
-        _edit-description-modal.blade.php), so this page-level banner is suppressed for that
-        form to avoid showing the same errors twice. It still covers tasklist/task forms,
-        which don't have inline errorText. --}}
-        @if ($errors->any() && !old('_modal'))
+        @if ($errors->any())
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                 <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
                 <ul class="mb-0 fs-12 ps-3">
@@ -249,12 +239,16 @@
             </div>
         </div>
 
-        @if ($project->description)
-            <div class="mb-4 bg-light p-3 rounded border border-dashed">
-                <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
-                <p class="mb-0 text-dark fs-13">{{ $project->description }}</p>
-            </div>
-        @endif
+        <div class="mb-4 bg-light p-3 rounded border border-dashed">
+            <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
+            @if ($canUpdateProject)
+                <div class="text-dark fs-13">
+                    <x-ui.inline-edit field="description" :value="$project->description" :url="route('projects.field', $project)" type="textarea" />
+                </div>
+            @else
+                <p class="mb-0 text-dark fs-13">{{ $project->description ?: '—' }}</p>
+            @endif
+        </div>
 
         {{-- Tab Navigation --}}
         @php
@@ -336,9 +330,6 @@
         </script>
     @endpush
 
-    @can('update', $project)
-        @include('modules.projects._edit-description-modal', ['project' => $project])
-    @endcan
 
     @include('modules.projects._modal-reopen-script')
 @endsection
