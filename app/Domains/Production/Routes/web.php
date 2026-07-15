@@ -9,6 +9,7 @@ use App\Domains\Production\Controllers\CapaController;
 use App\Domains\Production\Controllers\DeviationController;
 use App\Domains\Production\Controllers\DowntimeController;
 use App\Domains\Production\Controllers\KpiTargetController;
+use App\Domains\Production\Controllers\LabelController;
 use App\Domains\Production\Controllers\LotTraceabilityController;
 use App\Domains\Production\Controllers\MachineController;
 use App\Domains\Production\Controllers\MachineDashboardController;
@@ -164,6 +165,7 @@ Route::prefix('production')
         // Lot Traceability
         Route::get('mes/traceability', [LotTraceabilityController::class, 'index'])->name('mes.traceability.index');
         Route::get('mes/traceability/search', [LotTraceabilityController::class, 'search'])->name('mes.traceability.search');
+        Route::get('mes/traceability/export-csv', [LotTraceabilityController::class, 'exportCsv'])->name('mes.traceability.export-csv');
 
         // Barcode / QR Scanning
         Route::get('mes/scanner', [ScannerController::class, 'index'])->name('mes.scanner.index');
@@ -220,4 +222,10 @@ Route::prefix('production')
 
         Route::post('quality/deviations/{id}/approve', [DeviationController::class, 'approve'])->name('quality.deviations.approve');
         Route::resource('quality/deviations', DeviationController::class)->only(['index', 'store']);
+
+        // ── Label Printing (Printable HTML — no PDF package required) ───────────────
+        Route::get('labels/orders/{id}', [LabelController::class, 'printOrder'])->name('labels.orders.print');
+        Route::get('labels/batches/{id}', [LabelController::class, 'printBatch'])->name('labels.batches.print');
+        Route::get('labels/serials/{id}', [LabelController::class, 'printSerial'])->name('labels.serials.print');
+        Route::get('labels/products/{id}/sku', [LabelController::class, 'printProductSku'])->name('labels.products.sku');
     });
