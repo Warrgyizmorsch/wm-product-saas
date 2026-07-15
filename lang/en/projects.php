@@ -4,6 +4,7 @@ return [
     'title' => 'Projects',
     'create' => 'Create',
     'edit' => 'Edit',
+    'edit_description' => 'Edit Description',
     'new_project' => 'Create Project',
     'back_to_projects' => 'Back to Projects',
     'back_to_project' => 'Back to Project',

@@ -13,7 +13,7 @@
         @can('update', $project)
             <button type="button" class="btn btn-light" data-bs-toggle="modal"
                 data-bs-target="#editProjectModal-{{ $project->id }}">
-                <i class="feather-edit-2 me-2"></i>{{ __('projects.edit') }}
+                <i class="feather-edit-2 me-2"></i>{{ __('projects.edit_description') }}
             </button>
         @endcan
         <form action="{{ route('projects.destroy', $project) }}" method="POST"
@@ -32,9 +32,10 @@
 
 @section('content')
     <div class="erp-single-panel bg-white">
-        {{-- The edit-project modal shows its own scoped inline errors (see _form-fields.blade.php),
-        so this page-level banner is suppressed for that form to avoid showing the same
-        errors twice. It still covers tasklist/task forms, which don't have inline errorText. --}}
+        {{-- The edit-description modal shows its own scoped inline errors (see
+        _edit-description-modal.blade.php), so this page-level banner is suppressed for that
+        form to avoid showing the same errors twice. It still covers tasklist/task forms,
+        which don't have inline errorText. --}}
         @if ($errors->any() && !old('_modal'))
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                 <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
@@ -336,7 +337,7 @@
     @endpush
 
     @can('update', $project)
-        @include('modules.projects._edit-modal', ['project' => $project, 'customers' => $customers, 'users' => $users])
+        @include('modules.projects._edit-description-modal', ['project' => $project])
     @endcan
 
     @include('modules.projects._modal-reopen-script')

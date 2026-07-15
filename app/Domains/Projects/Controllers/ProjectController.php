@@ -53,12 +53,6 @@ class ProjectController extends Controller
         ];
 
         $canCreate = auth()->user()->can('create', Project::class);
-        $canUpdateAny = $data['projects']->contains(fn (Project $project) => auth()->user()->can('update', $project));
-
-        if ($canCreate || $canUpdateAny) {
-            $data['customers'] = Customer::query()->orderBy('name')->get();
-            $data['users'] = User::query()->orderBy('name')->get();
-        }
 
         if ($canCreate) {
             $data['nextCode'] = $this->projects->getNextProjectCode();

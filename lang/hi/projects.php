@@ -4,6 +4,7 @@ return [
     'title' => 'प्रोजेक्ट्स',
     'create' => 'बनाएं',
     'edit' => 'संपादित करें',
+    'edit_description' => 'विवरण संपादित करें',
     'new_project' => 'नया प्रोजेक्ट',
     'back_to_projects' => 'प्रोजेक्ट्स पर वापस जाएं',
     'back_to_project' => 'प्रोजेक्ट पर वापस जाएं',

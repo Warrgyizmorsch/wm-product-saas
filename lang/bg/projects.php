@@ -4,6 +4,7 @@ return [
     'title' => 'Проекти',
     'create' => 'Създаване',
     'edit' => 'Редакция',
+    'edit_description' => 'Редакция на описанието',
     'new_project' => 'Нов проект',
     'back_to_projects' => 'Назад към проектите',
     'back_to_project' => 'Назад към проекта',
