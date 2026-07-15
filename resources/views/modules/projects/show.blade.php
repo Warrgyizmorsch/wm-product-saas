@@ -6,18 +6,6 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <a href="javascript:void(0);" onclick="openActivityDrawer('{{ route('projects.activity', $project) }}')"
-            class="btn btn-light">
-            <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
-        </a>
-        <form action="{{ route('projects.destroy', $project) }}" method="POST"
-            onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
-            @csrf
-            @method('DELETE')
-            <button type="submit" class="btn btn-danger">
-                <i class="feather-trash-2 me-2"></i>{{ __('projects.delete') }}
-            </button>
-        </form>
         <a href="{{ route('projects.index') }}" class="btn btn-light">
             <i class="feather-arrow-left me-2"></i>{{ __('projects.back') }}
         </a>
@@ -39,31 +27,59 @@
         @endif
 
         {{-- Header Identity Row --}}
+        @php
+            $projectStatusVariant = match ($project->status) {
+                'Active' => 'success',
+                'On Hold' => 'warning',
+                'Completed' => 'primary',
+                'Closed' => 'dark',
+                default => 'secondary',
+            };
+        @endphp
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 pb-3 border-bottom">
-            <h4 class="fw-bold text-dark mb-0">
-                <i class="feather-briefcase me-2 text-primary"></i>{{ $project->project_code }} —
-                @if ($canUpdateProject)
-                    <x-ui.inline-edit field="name" :value="$project->name" :url="route('projects.field', $project)" />
-                @else
-                    {{ $project->name }}
-                @endif
+            <h4 class="fw-bold text-dark mb-0 d-flex flex-wrap align-items-center gap-2">
+                <span>
+                    <i class="feather-briefcase me-2 text-primary"></i>{{ $project->project_code }} —
+                    @if ($canUpdateProject)
+                        <x-ui.inline-edit field="name" :value="$project->name" :url="route('projects.field', $project)" />
+                    @else
+                        {{ $project->name }}
+                    @endif
+                </span>
+                <x-ui.badge variant="{{ $projectStatusVariant }}" soft>
+                    {{ __('projects.statuses.' . $project->status) }}
+                </x-ui.badge>
             </h4>
-            @php
-                $projectStatusVariant = match ($project->status) {
-                    'Active' => 'success',
-                    'On Hold' => 'warning',
-                    'Completed' => 'primary',
-                    'Closed' => 'dark',
-                    default => 'secondary',
-                };
-            @endphp
-            <x-ui.badge variant="{{ $projectStatusVariant }}" soft>
-                {{ __('projects.statuses.' . $project->status) }}
-            </x-ui.badge>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="javascript:void(0);" onclick="openActivityDrawer('{{ route('projects.activity', $project) }}')"
+                    class="btn btn-light">
+                    <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
+                </a>
+                <form action="{{ route('projects.destroy', $project) }}" method="POST"
+                    onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">
+                        <i class="feather-trash-2 me-2"></i>{{ __('projects.delete') }}
+                    </button>
+                </form>
+            </div>
         </div>
 
         {{-- Identity / Meta Grid --}}
-        <div class="row g-4 mb-4">
+        <div class="accordion mb-4" id="projectDetailsAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#projectDetailsCollapse" aria-expanded="true"
+                        aria-controls="projectDetailsCollapse">
+                        <i class="feather-info me-2 text-primary"></i>{{ __('projects.details') }}
+                    </button>
+                </h2>
+                <div id="projectDetailsCollapse" class="accordion-collapse collapse show"
+                    data-bs-parent="#projectDetailsAccordion">
+                    <div class="accordion-body">
+                        <div class="row g-4">
             <div class="col-lg-4 col-md-6">
                 <div class="row erp-form-row mb-2">
                     <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.client') }}:</span>
@@ -245,6 +261,10 @@
             </div>
             <div class="col-lg-4">
                 @include('modules.projects._collaborators')
+            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
