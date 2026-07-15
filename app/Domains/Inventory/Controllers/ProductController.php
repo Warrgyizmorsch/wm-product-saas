@@ -39,7 +39,18 @@ class ProductController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        $products = $query->latest()->paginate(15);
+        // Sorting
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+        
+        $allowedSorts = ['name', 'sku', 'selling_price', 'cost_price', 'status'];
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        $products = $query->paginate(10)->withQueryString();
 
         return view('modules.inventory.products.index', compact('products'));
     }

@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Quotations | SaaS ERP')
-@section('page-title', 'Quotations')
-@section('breadcrumb', 'CRM / Quotations')
+@section('title', 'Quotation Approvals | SaaS ERP')
+@section('page-title', 'Quotation Approvals')
+@section('breadcrumb', 'CRM / Approvals / Quotations')
 
 @section('content')
 
@@ -28,7 +28,7 @@
         
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">Quotations Listing</h5>
+            <h5 class="fw-bold text-dark mb-0">Quotation Approvals Listing</h5>
             <div class="d-flex gap-2 ms-auto">
                 <!-- Custom Sort Component -->
                 <x-ui.sort-dropdown label="Sort">
@@ -62,7 +62,7 @@
                 </x-ui.sort-dropdown>
 
                 <!-- Custom Filter Component -->
-                <form method="GET" action="{{ route('crm.quotations.index') }}" class="d-inline">
+                <form method="GET" action="{{ route('crm.approvals.quotations.index') }}" class="d-inline">
                     <x-ui.filter label="Filter" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                         
@@ -76,13 +76,13 @@
                             <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">All Statuses</option>
                                 @foreach(['Draft', 'Pending Approval', 'Approved', 'Sent', 'Quotation Sent', 'Accepted', 'Rejected', 'Quotation Rework'] as $statusOption)
-                                    <option value="{{ $statusOption }}" {{ request('status') === $statusOption ? 'selected' : '' }}>{{ $statusOption }}</option>
+                                    <option value="{{ $statusOption }}" {{ request('status') === $statusOption || (!request()->has('status') && !request()->has('search') && $statusOption === 'Pending Approval') ? 'selected' : '' }}>{{ $statusOption }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('crm.quotations.index') }}" class="btn btn-sm btn-light border">Reset</a>
+                            <a href="{{ route('crm.approvals.quotations.index') }}" class="btn btn-sm btn-light border">Reset</a>
                             <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
                         </div>
                     </x-ui.filter>
@@ -135,29 +135,16 @@
                             </td>
                             <td class="text-end pe-4">
                                 <div class="d-inline-flex gap-2 align-items-center justify-content-end">
-                                    @if ($quotation->status === 'Approved')
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline">
+                                    @if ($quotation->status === 'Pending Approval')
+                                        <form action="{{ route('crm.quotations.approve', $quotation->id) }}" method="POST" class="d-inline">
                                             @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="Quotation Sent">
-                                            <button type="submit" class="btn btn-xs btn-soft-info py-1 px-2 fs-10 fw-bold border-0" title="Send Quotation">
-                                                <i class="feather-send me-1"></i>Send
+                                            <button type="submit" class="btn btn-xs btn-soft-success py-1 px-2 fs-10 fw-bold border-0" title="Approve">
+                                                <i class="feather-check me-1"></i>Approve
                                             </button>
                                         </form>
-                                    @elseif (in_array($quotation->status, ['Quotation Sent', 'Sent']))
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('crm.quotations.reject', $quotation->id) }}" method="POST" class="d-inline">
                                             @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="Accepted">
-                                            <button type="submit" class="btn btn-xs btn-soft-success py-1 px-2 fs-10 fw-bold border-0" title="Accept Quotation">
-                                                <i class="feather-check me-1"></i>Accept
-                                            </button>
-                                        </form>
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="Rejected">
-                                            <button type="submit" class="btn btn-xs btn-soft-danger py-1 px-2 fs-10 fw-bold border-0" title="Reject Quotation">
+                                            <button type="submit" class="btn btn-xs btn-soft-danger py-1 px-2 fs-10 fw-bold border-0" title="Reject">
                                                 <i class="feather-x me-1"></i>Reject
                                             </button>
                                         </form>
@@ -169,25 +156,6 @@
                                                 <a href="{{ route('crm.leads.show', ['lead' => $quotation->lead_id, 'edit_quotation' => 1, 'active_quotation_id' => $quotation->id]) }}" class="dropdown-item">
                                                     <i class="feather-edit me-2 text-muted fs-12"></i>Edit Quotation
                                                 </a>
-                                            </li>
-                                        @endif
-
-                                        @if ($quotation->status === 'Pending Approval')
-                                            <li>
-                                                <form action="{{ route('crm.quotations.approve', $quotation->id) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="dropdown-item text-success">
-                                                        <i class="feather-check me-2 text-success fs-12"></i>Approve
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            <li>
-                                                <form action="{{ route('crm.quotations.reject', $quotation->id) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="feather-x me-2 text-danger fs-12"></i>Reject
-                                                    </button>
-                                                </form>
                                             </li>
                                         @endif
 
