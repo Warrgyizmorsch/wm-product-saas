@@ -23,13 +23,110 @@ class QuotationController extends Controller
     ) {
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', Quotation::class);
 
-        return view('modules.crm.quotations.index', [
-            'quotations' => $this->quotations->latest(),
-        ]);
+        $query = Quotation::query()
+            ->with(['lead', 'salesPerson'])
+            ->where('is_current', true);
+
+        // Exclude Draft and Pending Approval statuses by default
+        if (!$request->has('status') && !$request->has('search')) {
+            $query->whereNotIn('status', ['Draft', 'Pending Approval']);
+        }
+
+        // Search Keywords
+        if ($search = $request->input('search')) {
+            $query->where(function($q) use ($search) {
+                $cleanSearch = str_replace('QT-', '', $search);
+                $q->where('quotation_number', 'like', "%{$cleanSearch}%")
+                  ->orWhere('status', 'like', "%{$search}%")
+                  ->orWhereHas('lead', function($leadQ) use ($search) {
+                      $leadQ->where('company_name', 'like', "%{$search}%")
+                            ->orWhere('contact_person', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Status Filter
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'quotation_date');
+        $sortOrder = $request->input('sort_order', 'desc');
+        
+        $allowedSorts = ['quotation_number', 'quotation_date', 'expiry_date', 'total_amount', 'status'];
+        if ($sortBy === 'customer_name') {
+            $query->join('leads', 'quotations.lead_id', '=', 'leads.id')
+                  ->select('quotations.*')
+                  ->orderBy(\Illuminate\Support\Facades\DB::raw('COALESCE(leads.company_name, leads.contact_person)'), $sortOrder);
+        } elseif (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('quotation_date', 'desc');
+        }
+
+        $quotations = $query->paginate(10)->withQueryString();
+
+        return view('modules.crm.quotations.index', compact('quotations'));
+    }
+
+    public function approvalsIndex(Request $request): View
+    {
+        $this->authorize('viewAny', Quotation::class);
+
+        $query = Quotation::query()
+            ->with(['lead', 'salesPerson'])
+            ->where('is_current', true);
+
+        // For Approvals, by default filter by Pending Approval if no status/search is specified
+        if (!$request->has('status') && !$request->has('search')) {
+            $query->where('status', 'Pending Approval');
+        }
+
+        // Search Keywords
+        if ($search = $request->input('search')) {
+            $query->where(function($q) use ($search) {
+                $cleanSearch = str_replace('QT-', '', $search);
+                $q->where('quotation_number', 'like', "%{$cleanSearch}%")
+                  ->orWhere('status', 'like', "%{$search}%")
+                  ->orWhereHas('lead', function($leadQ) use ($search) {
+                      $leadQ->where('company_name', 'like', "%{$search}%")
+                            ->orWhere('contact_person', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Status Filter
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'quotation_date');
+        $sortOrder = $request->input('sort_order', 'desc');
+        
+        $allowedSorts = ['quotation_number', 'quotation_date', 'expiry_date', 'total_amount', 'status'];
+        if ($sortBy === 'customer_name') {
+            $query->join('leads', 'quotations.lead_id', '=', 'leads.id')
+                  ->select('quotations.*')
+                  ->orderBy(\Illuminate\Support\Facades\DB::raw('COALESCE(leads.company_name, leads.contact_person)'), $sortOrder);
+        } elseif (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('quotation_date', 'desc');
+        }
+
+        $quotations = $query->paginate(10)->withQueryString();
+
+        return view('modules.crm.quotations.approvals', compact('quotations'));
     }
 
     public function create()
@@ -42,7 +139,6 @@ class QuotationController extends Controller
         $this->authorize('create', Quotation::class);
 
         $validated = $request->validate([
-            'customer_id'         => ['required', 'exists:customers,id'],
             'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
             'sales_person_id'     => ['nullable', 'exists:users,id'],
             'quotation_number'    => ['required', 'string', 'max:255'],
@@ -146,7 +242,6 @@ class QuotationController extends Controller
         $this->authorize('update', $quotation);
 
         $validated = $request->validate([
-            'customer_id'         => ['required', 'exists:customers,id'],
             'lead_id'             => ['nullable', 'integer', 'exists:leads,id'],
             'sales_person_id'     => ['nullable', 'exists:users,id'],
             'quotation_number'    => ['required', 'string', 'max:255'],
@@ -203,36 +298,38 @@ class QuotationController extends Controller
     {
         if ($status === 'Accepted') {
             $customer = $quotation->customer;
-            if ($customer) {
+            
+            if (!$customer) {
+                $lead = null;
+                if ($leadId) {
+                    $lead = Lead::find($leadId);
+                }
+                if (!$lead && $quotation->lead_id) {
+                    $lead = Lead::find($quotation->lead_id);
+                }
+
+                if ($lead) {
+                    if ($lead->email) {
+                        $customer = Customer::where('email', $lead->email)->first();
+                    }
+                    if (!$customer && $lead->phone) {
+                        $customer = Customer::where('phone', $lead->phone)->first();
+                    }
+
+                    if (!$customer) {
+                        Customer::create([
+                            'tenant_id' => $lead->tenant_id,
+                            'name' => $lead->company_name ?: ($lead->contact_person ?: 'Converted Lead'),
+                            'email' => $lead->email,
+                            'phone' => $lead->phone,
+                            'status' => 'active',
+                        ]);
+                    } else {
+                        $customer->update(['status' => 'active']);
+                    }
+                }
+            } else {
                 $customer->update(['status' => 'active']);
-            }
-
-            // Find lead by direct lead_id first (most accurate)
-            $lead = null;
-            if ($leadId) {
-                $lead = Lead::find($leadId);
-            }
-
-            // Fallback: if quotation has lead_id stored on model
-            if (!$lead && $quotation->lead_id) {
-                $lead = Lead::find($quotation->lead_id);
-            }
-
-            // Last resort: find by customer email/phone
-            if (!$lead && $customer) {
-                if ($customer->email) {
-                    $lead = Lead::where('email', $customer->email)->first();
-                }
-                if (!$lead && $customer->phone) {
-                    $lead = Lead::where('phone', $customer->phone)->first();
-                }
-            }
-
-            if ($lead) {
-                $lead->update([
-                    'status'      => 'Converted',
-                    'is_customer' => true,
-                ]);
             }
         }
     }

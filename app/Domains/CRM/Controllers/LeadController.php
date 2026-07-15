@@ -162,16 +162,7 @@ class LeadController extends Controller
             $customer = Customer::where('phone', $lead->phone)->first();
         }
 
-        // Step 1b: If creating quotation and no customer exists, auto-create one
-        if (request()->has('create_quotation') && !$customer) {
-            $customer = Customer::create([
-                'tenant_id' => $lead->tenant_id,
-                'name'      => $lead->contact_person ?: ($lead->company_name ?: 'Converted Lead'),
-                'email'     => $lead->email,
-                'phone'     => $lead->phone,
-                'status'    => 'inactive',
-            ]);
-        }
+
 
         // Step 2: Get quotations ONLY for this specific lead (by lead_id)
         $quotations = Quotation::where('lead_id', $lead->id)->latest()->get();
@@ -615,28 +606,6 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
 
-        // 1. Ensure the customer record is created for this lead as inactive
-        $existingCustomer = null;
-        if ($lead->email) {
-            $existingCustomer = Customer::where('email', $lead->email)->first();
-        }
-
-        if (!$existingCustomer) {
-            $customer = Customer::create([
-                'tenant_id' => $lead->tenant_id,
-                'name' => $lead->company_name ?: ($lead->contact_person ?: 'Converted Lead'),
-                'email' => $lead->email,
-                'phone' => $lead->phone,
-                'status' => 'inactive',
-            ]);
-        } else {
-            $customer = $existingCustomer;
-        }
-
-        // 2. DO NOT update lead status to Converted or is_customer to true here.
-        // It will only be updated to Converted when the quotation is accepted.
-
-        // 3. Redirect to Lead show page with create_quotation parameter
         return redirect()->route('crm.leads.show', [
             'lead' => $lead->id,
             'create_quotation' => 1

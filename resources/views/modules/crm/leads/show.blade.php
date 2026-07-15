@@ -532,9 +532,7 @@
                                                 <h5 class="fw-bold text-dark fs-14 mb-0">Timeline History</h5>
                                                 <button class="btn btn-xs btn-outline-secondary border-0 p-1" title="Filter History"><i class="feather-filter fs-12"></i></button>
                                             </div>
-                                            <div class="text-muted fs-11" style="font-family: 'Inter', sans-serif;">
-                                                No upcoming automated actions &bull; <a href="javascript:void(0)" class="text-primary hover-underline">Hide Upcoming Automated Actions</a>
-                                            </div>
+                                           
                                         </div>
 
                                         <div class="zoho-timeline-container">
@@ -732,12 +730,10 @@
 
                                         <div class="row g-4 mb-4 fs-13 text-dark">
                                             <div class="col-md-6">
-                                                <input type="hidden" name="customer_id" value="{{ $customer ? $customer->id : '' }}">
                                                 <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display"
                                                     :value="$lead->contact_person ?: ($lead->company_name ?: 'N/A')"
                                                     readonly="true"
-                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;"
-                                                    :errorText="$errors->first('customer_id')" />
+                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
 
                                                 <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $lead->email)" :errorText="$errors->first('email')" />
                                                 <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $lead->phone)" :errorText="$errors->first('phone')" />
@@ -855,12 +851,10 @@
 
                                         <div class="row g-4 mb-4 fs-13 text-dark">
                                             <div class="col-md-6">
-                                                <input type="hidden" name="customer_id" value="{{ $customer ? $customer->id : '' }}">
                                                 <x-ui.odoo-form-ui type="input" label="Customer" name="_customer_display"
                                                     :value="$lead->contact_person ?: ($lead->company_name ?: 'N/A')"
                                                     readonly="true"
-                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;"
-                                                    :errorText="$errors->first('customer_id')" />
+                                                    style="font-weight: bold; color: var(--bs-primary); background-color: #f8f9fa;" />
 
                                                 <x-ui.odoo-form-ui type="input" label="Email" name="email" :value="old('email', $activeQuotation->email ?: $lead->email)" :errorText="$errors->first('email')" />
                                                 <x-ui.odoo-form-ui type="input" label="Phone" name="phone" :value="old('phone', $activeQuotation->phone ?: $lead->phone)" :errorText="$errors->first('phone')" />

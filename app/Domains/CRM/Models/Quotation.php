@@ -24,7 +24,6 @@ class Quotation extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'customer_id',
         'lead_id',        // Links this quotation to a specific lead (not just email)
         'parent_id',      // Root parent quotation ID
         'revision_number',// Revision count (0 = original, 1 = R1, etc)
@@ -53,9 +52,25 @@ class Quotation extends BaseModel
         'revision_number' => 'integer',
     ];
 
-    public function customer(): BelongsTo
+    public function getCustomerAttribute(): ?Customer
     {
-        return $this->belongsTo(Customer::class);
+        $lead = $this->lead;
+        if ($lead) {
+            $customer = null;
+            if ($lead->email) {
+                $customer = Customer::where('email', $lead->email)->first();
+            }
+            if (!$customer && $lead->phone) {
+                $customer = Customer::where('phone', $lead->phone)->first();
+            }
+            return $customer;
+        }
+        return null;
+    }
+
+    public function getCustomerIdAttribute(): ?int
+    {
+        return $this->customer?->id;
     }
 
     public function salesPerson(): BelongsTo

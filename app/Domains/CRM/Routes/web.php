@@ -62,6 +62,7 @@ Route::prefix('crm')
         Route::post('customers', [CustomerController::class, 'store'])
             ->name('customers.store');
 
+        Route::get('approvals/quotations', [QuotationController::class, 'approvalsIndex'])->name('approvals.quotations.index');
         Route::get('quotations', [QuotationController::class, 'index'])->name('quotations.index');
         Route::get('quotations/create', [QuotationController::class, 'create'])->name('quotations.create');
         Route::post('quotations', [QuotationController::class, 'store'])->name('quotations.store');
