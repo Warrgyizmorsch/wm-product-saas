@@ -3,6 +3,7 @@
 namespace App\Domains\Accounting\Repositories;
 
 use App\Domains\Accounting\Models\Journal;
+use App\Domains\Accounting\Models\JournalEntry;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -28,7 +29,11 @@ class JournalRepository implements JournalRepositoryInterface
             });
         }
 
-        return $query->orderByDesc('journal_date')->orderByDesc('id')->paginate($perPage);
+        $sortable = ['journal_number', 'journal_date', 'status', 'total_debit', 'total_credit'];
+        $sort = in_array($filters['sort'] ?? null, $sortable, true) ? $filters['sort'] : 'journal_date';
+        $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+        return $query->orderBy($sort, $direction)->orderByDesc('id')->paginate($perPage);
     }
 
     public function find(int $id): ?Journal
@@ -89,5 +94,41 @@ class JournalRepository implements JournalRepositoryInterface
         }
 
         return $journal->load(['entries.account']);
+    }
+
+    public function trialBalance(int $periodId): Collection
+    {
+        return JournalEntry::query()
+            ->select('chart_of_account_id')
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('accounting_period_id', $periodId))
+            ->groupBy('chart_of_account_id')
+            ->with('account')
+            ->get();
+    }
+
+    public function ledgerEntries(int $chartOfAccountId, int $periodId): Collection
+    {
+        return JournalEntry::query()
+            ->where('chart_of_account_id', $chartOfAccountId)
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('accounting_period_id', $periodId))
+            ->with('journal')
+            ->get()
+            ->sortBy(fn ($entry) => $entry->journal->journal_date)
+            ->values();
+    }
+
+    public function openingBalance(int $chartOfAccountId, \DateTimeInterface $before): array
+    {
+        $totals = JournalEntry::query()
+            ->where('chart_of_account_id', $chartOfAccountId)
+            ->whereHas('journal', fn ($q) => $q->whereIn('status', [Journal::STATUS_POSTED, Journal::STATUS_REVERSED])->where('journal_date', '<', $before))
+            ->selectRaw('SUM(debit) as debit, SUM(credit) as credit')
+            ->first();
+
+        return [
+            'debit' => (float) ($totals->debit ?? 0),
+            'credit' => (float) ($totals->credit ?? 0),
+        ];
     }
 }

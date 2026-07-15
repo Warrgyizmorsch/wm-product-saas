@@ -93,7 +93,14 @@
             ['label' => 'Track Status', 'icon' => 'feather-trending-up', 'route' => 'production.track-status'],
         ],
         'Finance & People' => [
-            ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => ['Chart of Accounts', 'Journals', 'Ledgers', 'Tax Reports']],
+            ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
+                ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
+                ['label' => 'Journals', 'route' => 'accounting.journals.index'],
+                ['label' => 'Fiscal Years & Periods', 'route' => 'accounting.fiscal-years.index'],
+                ['label' => 'Tax Rates', 'route' => 'accounting.tax-rates.index'],
+                ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
+                ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
+            ]],
             ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'url' => '#', 'children' => [['label' => 'Employees', 'route' => 'hrms.employees.index'], 'Attendance', 'Leave', 'Payroll', ['label' => 'Setting', 'route' => 'hrms.org.index']]],
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],

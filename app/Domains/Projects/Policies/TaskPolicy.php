@@ -40,11 +40,10 @@ class TaskPolicy
 
     private function authorizeOnProject(User $user, Project $project, string $permission): bool
     {
-        return $project->tenant_id === $user->tenant_id
-            && $this->access->allows($user, $permission, [
-                'tenant_id' => $project->tenant_id,
-                'owner_id' => $project->owner_id,
-            ]);
+        return $this->access->allows($user, $permission, [
+            'tenant_id' => $project->tenant_id,
+            'owner_id' => $project->owner_id,
+        ]);
     }
 
     /**
@@ -55,10 +54,6 @@ class TaskPolicy
      */
     private function authorizeOnTask(User $user, Task $task, string $permission): bool
     {
-        if ($task->tenant_id !== $user->tenant_id) {
-            return false;
-        }
-
         if ($this->access->allows($user, $permission, [
             'tenant_id' => $task->tenant_id,
             'owner_id' => $task->assignee_id,

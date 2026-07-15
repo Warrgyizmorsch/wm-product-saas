@@ -15,20 +15,18 @@ class ProjectMemberPolicy
 
     public function manage(User $user, Project $project): bool
     {
-        return $project->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'projects.members.manage', [
-                'tenant_id' => $project->tenant_id,
-                'owner_id' => $project->owner_id,
-            ]);
+        return $this->access->allows($user, 'projects.members.manage', [
+            'tenant_id' => $project->tenant_id,
+            'owner_id' => $project->owner_id,
+        ]);
     }
 
     public function update(User $user, ProjectMember $member): bool
     {
-        return $member->tenant_id === $user->tenant_id
-            && $this->access->allows($user, 'projects.members.manage', [
-                'tenant_id' => $member->tenant_id,
-                'owner_id' => $member->project?->owner_id,
-            ]);
+        return $this->access->allows($user, 'projects.members.manage', [
+            'tenant_id' => $member->tenant_id,
+            'owner_id' => $member->project?->owner_id,
+        ]);
     }
 
     public function delete(User $user, ProjectMember $member): bool

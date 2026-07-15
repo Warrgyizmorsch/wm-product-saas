@@ -309,6 +309,32 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Projects\Policies\TaskPolicy::class
         );
 
+        // ── Accounting Policies ────────────────────────────────────────────────
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\ChartOfAccount::class,
+            \App\Domains\Accounting\Policies\ChartOfAccountPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\FiscalYear::class,
+            \App\Domains\Accounting\Policies\FiscalYearPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\AccountingPeriod::class,
+            \App\Domains\Accounting\Policies\AccountingPeriodPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\Journal::class,
+            \App\Domains\Accounting\Policies\JournalPolicy::class
+        );
+
+        \Illuminate\Support\Facades\Gate::policy(
+            \App\Domains\Accounting\Models\TaxRate::class,
+            \App\Domains\Accounting\Policies\TaxRatePolicy::class
+        );
+
         // ── Access (RBAC admin) Policies ──────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Models\User::class,

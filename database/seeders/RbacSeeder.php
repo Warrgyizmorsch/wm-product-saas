@@ -156,6 +156,29 @@ class RbacSeeder extends Seeder
             'hr.settings.manage' => $permissions['hr.settings.manage'],
         ], RolePermission::SCOPE_TENANT);
 
+        // Day-to-day bookkeeping only — deleting accounts/tax rates, closing fiscal
+        // years/periods, and reversing posted journals stay reserved for
+        // tenant_owner/company_admin (segregation of duties over the ledger).
+        $this->grant($roles['accountant'], [
+            'accounting.chart_of_accounts.view' => $permissions['accounting.chart_of_accounts.view'],
+            'accounting.chart_of_accounts.create' => $permissions['accounting.chart_of_accounts.create'],
+            'accounting.chart_of_accounts.update' => $permissions['accounting.chart_of_accounts.update'],
+            'accounting.fiscal_years.view' => $permissions['accounting.fiscal_years.view'],
+            'accounting.periods.view' => $permissions['accounting.periods.view'],
+            'accounting.journals.view' => $permissions['accounting.journals.view'],
+            'accounting.journals.post' => $permissions['accounting.journals.post'],
+            'accounting.tax_rates.view' => $permissions['accounting.tax_rates.view'],
+            'accounting.tax_rates.create' => $permissions['accounting.tax_rates.create'],
+            'accounting.tax_rates.update' => $permissions['accounting.tax_rates.update'],
+            'accounting.reports.view' => $permissions['accounting.reports.view'],
+        ], RolePermission::SCOPE_TENANT);
+
+        // Auditor is a read-only oversight role (existing but previously had zero
+        // grants anywhere in this seeder) — financial reports are exactly what it's for.
+        $this->grant($roles['auditor'], [
+            'accounting.reports.view' => $permissions['accounting.reports.view'],
+        ], RolePermission::SCOPE_TENANT);
+
         $this->assignDemoAdmin($roles['tenant_owner']);
     }
 
@@ -232,6 +255,23 @@ class RbacSeeder extends Seeder
             ['name' => 'projects.tasks.create', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'create'],
             ['name' => 'projects.tasks.update', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'update'],
             ['name' => 'projects.tasks.delete', 'module' => 'projects', 'entity' => 'tasks', 'action' => 'delete'],
+            ['name' => 'accounting.chart_of_accounts.view', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'view'],
+            ['name' => 'accounting.chart_of_accounts.create', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'create'],
+            ['name' => 'accounting.chart_of_accounts.update', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'update'],
+            ['name' => 'accounting.chart_of_accounts.delete', 'module' => 'accounting', 'entity' => 'chart_of_accounts', 'action' => 'delete'],
+            ['name' => 'accounting.fiscal_years.view', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'view'],
+            ['name' => 'accounting.fiscal_years.create', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'create'],
+            ['name' => 'accounting.fiscal_years.close', 'module' => 'accounting', 'entity' => 'fiscal_years', 'action' => 'close'],
+            ['name' => 'accounting.periods.view', 'module' => 'accounting', 'entity' => 'periods', 'action' => 'view'],
+            ['name' => 'accounting.periods.manage', 'module' => 'accounting', 'entity' => 'periods', 'action' => 'manage'],
+            ['name' => 'accounting.journals.view', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'view'],
+            ['name' => 'accounting.journals.post', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'post'],
+            ['name' => 'accounting.journals.reverse', 'module' => 'accounting', 'entity' => 'journals', 'action' => 'reverse'],
+            ['name' => 'accounting.tax_rates.view', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'view'],
+            ['name' => 'accounting.tax_rates.create', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'create'],
+            ['name' => 'accounting.tax_rates.update', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'update'],
+            ['name' => 'accounting.tax_rates.delete', 'module' => 'accounting', 'entity' => 'tax_rates', 'action' => 'delete'],
+            ['name' => 'accounting.reports.view', 'module' => 'accounting', 'entity' => 'reports', 'action' => 'view'],
         ];
 
         $permissions = [];
@@ -261,6 +301,7 @@ class RbacSeeder extends Seeder
             ['slug' => 'sales_executive', 'name' => 'Sales Executive', 'tenant_id' => null, 'level' => 50],
             ['slug' => 'inventory_manager', 'name' => 'Inventory Manager', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'hr_manager', 'name' => 'HR Manager', 'tenant_id' => null, 'level' => 40],
+            ['slug' => 'accountant', 'name' => 'Accountant', 'tenant_id' => null, 'level' => 40],
             ['slug' => 'auditor', 'name' => 'Auditor', 'tenant_id' => null, 'level' => 80],
             ['slug' => 'read_only', 'name' => 'Read Only User', 'tenant_id' => null, 'level' => 90],
         ];

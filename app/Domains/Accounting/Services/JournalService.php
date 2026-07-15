@@ -2,6 +2,7 @@
 
 namespace App\Domains\Accounting\Services;
 
+use App\Domains\Accounting\Models\AccountingPeriod;
 use App\Domains\Accounting\Models\Journal;
 use App\Domains\Accounting\Repositories\JournalRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
@@ -120,6 +121,22 @@ class JournalService
     public function paginate(array $filters = [], int $perPage = 15)
     {
         return $this->journals->paginateAll($filters, $perPage);
+    }
+
+    public function trialBalance(AccountingPeriod $period): Collection
+    {
+        return $this->journals->trialBalance($period->id);
+    }
+
+    /**
+     * @return array{opening: array{debit: float, credit: float}, entries: Collection}
+     */
+    public function generalLedger(int $chartOfAccountId, AccountingPeriod $period): array
+    {
+        return [
+            'opening' => $this->journals->openingBalance($chartOfAccountId, $period->start_date),
+            'entries' => $this->journals->ledgerEntries($chartOfAccountId, $period->id),
+        ];
     }
 
     /**
