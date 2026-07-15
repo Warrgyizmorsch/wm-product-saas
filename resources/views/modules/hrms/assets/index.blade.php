@@ -115,6 +115,9 @@
             color: #ef4444 !important;
             font-weight: 600;
         }
+        #registry-pane .table-responsive {
+            min-height: 350px;
+        }
     </style>
 @endpush
 
@@ -147,17 +150,17 @@
             <ul class="nav nav-tabs border-bottom mb-4" id="assetModuleTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="registry-tab" data-bs-toggle="tab" data-bs-target="#registry-pane" type="button" role="tab" aria-controls="registry-pane" aria-selected="true">
-                        <i class="feather-package me-2"></i>Asset Registry
+                        <i class="feather-package me-2"></i>{{ __('hrms.assets.tab_registry') }}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories-pane" type="button" role="tab" aria-controls="categories-pane" aria-selected="false">
-                        <i class="feather-sliders me-2"></i>Asset Categories
+                        <i class="feather-sliders me-2"></i>{{ __('hrms.assets.tab_categories') }}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests-pane" type="button" role="tab" aria-controls="requests-pane" aria-selected="false">
-                        <i class="feather-user-check me-2"></i>Asset Requests
+                        <i class="feather-user-check me-2"></i>{{ __('hrms.assets.tab_requests') }}
                         @if($pendingRequestsCount > 0)
                             <span class="badge bg-danger rounded-circle p-1 ms-1" style="font-size: 9px; min-width: 16px; min-height: 16px; line-height: 8px;">
                                 {{ $pendingRequestsCount }}
@@ -173,7 +176,7 @@
                     <div class="card border rounded bg-white shadow-sm">
                         <div class="card-header border-bottom d-flex flex-wrap justify-content-between align-items-center py-3 px-4 bg-white gap-3">
                             <div>
-                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">Assets Master Directory</h5>
+                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.assets.directory_title') }}</h5>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                 <!-- Registry Search & Filter Form -->
@@ -186,11 +189,11 @@
                                     
                                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" name="registry_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search assets..." value="{{ request('registry_search') }}" style="box-shadow: none; height: 32px;">
+                                        <input type="text" name="registry_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.assets.search_placeholder') }}" value="{{ request('registry_search') }}" style="box-shadow: none; height: 32px;">
                                     </div>
 
                                     <div class="d-flex gap-2">
-                                        <x-ui.filter label="Filters" offset="0, 5">
+                                        <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
                                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                                             
                                             <div class="mb-3" style="min-width: 250px;">
@@ -242,7 +245,7 @@
                                     </div>
                                 </form>
                                 <button type="button" class="btn btn-sm btn-primary py-2 px-3 d-flex align-items-center gap-1" style="border-radius: 6px; font-size: 12px;" data-bs-toggle="modal" data-bs-target="#addAssetModal">
-                                    <i class="feather-plus"></i> Log Asset
+                                    <i class="feather-plus"></i> {{ __('hrms.assets.log_asset') }}
                                 </button>
                             </div>
                         </div>
@@ -251,14 +254,14 @@
                                 <table class="table table-hover align-middle mb-0 text-center">
                                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                                         <tr>
-                                            <th class="text-start" style="padding-left: 20px; width: 140px;">Asset Tag</th>
-                                            <th class="text-start">Asset / Brand</th>
-                                            <th>Category</th>
-                                            <th>Serial Number</th>
-                                            <th>Status</th>
-                                            <th>Condition</th>
-                                            <th>Holder</th>
-                                            <th class="text-end" style="padding-right: 20px; width: 220px;">Actions</th>
+                                            <th class="text-start" style="padding-left: 20px; width: 140px;">{{ __('hrms.assets.asset_tag') }}</th>
+                                            <th class="text-start">{{ __('hrms.assets.asset_brand') }}</th>
+                                            <th>{{ __('hrms.assets.category') }}</th>
+                                            <th>{{ __('hrms.assets.serial_number') }}</th>
+                                            <th>{{ __('hrms.assets.status') }}</th>
+                                            <th>{{ __('hrms.assets.condition') }}</th>
+                                            <th>{{ __('hrms.assets.holder') }}</th>
+                                            <th class="text-end" style="padding-right: 20px; width: 220px;">{{ __('hrms.assets.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -299,11 +302,11 @@
                                                     <div class="d-flex justify-content-end align-items-center gap-2">
                                                         @if($asset->status === 'available')
                                                             <button type="button" class="action-dropdown-btn text-uppercase fw-bold px-3" style="width: auto !important; font-size: 11px; letter-spacing: 0.5px; height: 32px;" data-bs-toggle="modal" data-bs-target="#allocateAssetModal" data-asset-id="{{ $asset->id }}" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})" data-company-id="{{ $asset->company_id }}">
-                                                                Allocate
+                                                                {{ __('hrms.assets.allocate') }}
                                                             </button>
                                                         @elseif($asset->status === 'allocated')
                                                             <button type="button" class="action-dropdown-btn text-uppercase fw-bold px-3" style="width: auto !important; font-size: 11px; letter-spacing: 0.5px; height: 32px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-asset-id="{{ $asset->id }}" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})">
-                                                                Release
+                                                                {{ __('hrms.assets.release') }}
                                                             </button>
                                                         @endif
 
@@ -311,7 +314,7 @@
                                                             <li>
                                                                 <a class="dropdown-item show-history-btn" href="javascript:void(0)" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})" data-allocations="{{ base64_encode($asset->allocations()->with('employee')->get()->toJson()) }}">
                                                                     <i class="feather feather-clock me-3"></i>
-                                                                    <span>History Log</span>
+                                                                    <span>{{ __('hrms.assets.history_log') }}</span>
                                                                 </a>
                                                             </li>
                                                             <li>
@@ -328,7 +331,7 @@
                                                                     data-condition="{{ $asset->condition }}" 
                                                                     data-notes="{{ $asset->notes }}">
                                                                     <i class="feather feather-edit-3 me-3"></i>
-                                                                    <span>Edit</span>
+                                                                    <span>{{ __('hrms.assets.edit') }}</span>
                                                                 </a>
                                                             </li>
                                                             <li>
@@ -340,7 +343,7 @@
                                                                     @method('DELETE')
                                                                     <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                                         <i class="feather feather-trash-2 me-3"></i>
-                                                                        <span>Delete</span>
+                                                                        <span>{{ __('hrms.assets.delete') }}</span>
                                                                     </button>
                                                                 </form>
                                                             </li>
@@ -360,9 +363,21 @@
                                     </tbody>
                                 </table>
                             </div>
+                            @php
+                                $currentPage = $assets->currentPage();
+                                $totalPages = $assets->lastPage();
+                                $totalResults = $assets->total();
+                                $perPage = $assets->perPage();
+                            @endphp
                             @if($assets->hasPages())
-                                <div class="card-footer bg-white border-top py-3 px-4 d-flex justify-content-end">
-                                    {{ $assets->links() }}
+                                <div class="card-footer bg-white border-top px-4 py-3">
+                                    <x-ui.pagination
+                                        class="px-0 py-0"
+                                        :current-page="$currentPage"
+                                        :total-pages="$totalPages"
+                                        :total-results="$totalResults"
+                                        :per-page="$perPage"
+                                    />
                                 </div>
                             @endif
                         </div>
@@ -420,7 +435,7 @@
                                     </div>
                                 </form>
                                 <button type="button" class="btn btn-sm btn-primary py-2 px-3 d-flex align-items-center gap-1" style="border-radius: 6px; font-size: 12px;" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
-                                    <i class="feather-plus"></i> Add Category
+                                    <i class="feather-plus"></i> {{ __('hrms.assets.add_category') }}
                                 </button>
                             </div>
                         </div>
@@ -429,11 +444,12 @@
                                 <table class="table table-hover align-middle mb-0 text-center">
                                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                                         <tr>
-                                            <th class="text-start" style="padding-left: 20px;">Category Name</th>
-                                            <th class="text-start">Description</th>
-                                            <th>Total Assets Linked</th>
-                                            <th>Organization Entity</th>
-                                            <th>Created At</th>
+                                            <th class="text-start" style="padding-left: 20px;">{{ __('hrms.assets.category_name') }}</th>
+                                            <th class="text-start">{{ __('hrms.assets.description') }}</th>
+                                            <th>{{ __('hrms.assets.total_assets') }}</th>
+                                            <th>{{ __('hrms.assets.org_entity') }}</th>
+                                            <th>{{ __('hrms.assets.created_at') }}</th>
+                                            <th class="text-end" style="padding-right: 20px;">{{ __('hrms.assets.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -450,10 +466,37 @@
                                                 </td>
                                                 <td>{{ $category->company->company_name }}</td>
                                                 <td class="text-muted fs-12">{{ $category->created_at->format('d M, Y') }}</td>
+                                                <td class="text-end" style="padding-right: 20px;">
+                                                    <x-ui.action-dropdown>
+                                                        <li>
+                                                            <a class="dropdown-item edit-category-btn" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editCategoryModal"
+                                                                data-category-id="{{ $category->id }}"
+                                                                data-company-id="{{ $category->company_id }}"
+                                                                data-name="{{ $category->name }}"
+                                                                data-description="{{ $category->description }}">
+                                                                <i class="feather feather-edit-3 me-3"></i>
+                                                                <span>Edit</span>
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <hr class="dropdown-divider">
+                                                        </li>
+                                                        <li>
+                                                            <form action="{{ route('hrms.assets.category.destroy', $category->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this asset category? This action cannot be undone.');">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
+                                                                    <i class="feather feather-trash-2 me-3"></i>
+                                                                    <span>Delete</span>
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                    </x-ui.action-dropdown>
+                                                </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="5" class="text-center py-5 text-muted fs-12">
+                                                <td colspan="6" class="text-center py-5 text-muted fs-12">
                                                     <i class="feather-sliders fs-32 d-block mb-3 text-secondary"></i>
                                                     <div class="fw-bold mb-1">No Categories Set</div>
                                                     <div>Configure asset types like Laptops, Keys, Vehicles etc.</div>
@@ -464,6 +507,23 @@
                                 </table>
                             </div>
                         </div>
+                        @php
+                            $categoryCurrentPage = $filteredCategories->currentPage();
+                            $categoryTotalPages = $filteredCategories->lastPage();
+                            $categoryTotalResults = $filteredCategories->total();
+                            $categoryPerPage = $filteredCategories->perPage();
+                        @endphp
+                        @if($filteredCategories->hasPages())
+                            <div class="card-footer bg-white border-top px-4 py-3">
+                                <x-ui.pagination
+                                    class="px-0 py-0"
+                                    :current-page="$categoryCurrentPage"
+                                    :total-pages="$categoryTotalPages"
+                                    :total-results="$categoryTotalResults"
+                                    :per-page="$categoryPerPage"
+                                />
+                            </div>
+                        @endif
                     </div>
                 </div>
 
@@ -546,13 +606,13 @@
                                 <table class="table table-hover align-middle mb-0 text-center">
                                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                                         <tr>
-                                            <th class="text-start" style="padding-left: 20px;">Employee</th>
-                                            <th>Organization Entity</th>
-                                            <th>Requested Category</th>
-                                            <th>Reason</th>
-                                            <th>Request Date</th>
-                                            <th>Status</th>
-                                            <th class="text-end" style="padding-right: 20px; width: 220px;">Actions</th>
+                                            <th class="text-start" style="padding-left: 20px;">{{ __('hrms.employees.title') }}</th>
+                                            <th>{{ __('hrms.assets.org_entity') }}</th>
+                                            <th>{{ __('hrms.assets.req_asset') }}</th>
+                                            <th>{{ __('hrms.assets.req_reason') }}</th>
+                                            <th>{{ __('hrms.assets.req_at') }}</th>
+                                            <th>{{ __('hrms.assets.status') }}</th>
+                                            <th class="text-end" style="padding-right: 20px; width: 220px;">{{ __('hrms.assets.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -624,6 +684,23 @@
                                 </table>
                             </div>
                         </div>
+                        @php
+                            $requestCurrentPage = $requests->currentPage();
+                            $requestTotalPages = $requests->lastPage();
+                            $requestTotalResults = $requests->total();
+                            $requestPerPage = $requests->perPage();
+                        @endphp
+                        @if($requests->hasPages())
+                            <div class="card-footer bg-white border-top px-4 py-3">
+                                <x-ui.pagination
+                                    class="px-0 py-0"
+                                    :current-page="$requestCurrentPage"
+                                    :total-pages="$requestTotalPages"
+                                    :total-results="$requestTotalResults"
+                                    :per-page="$requestPerPage"
+                                />
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -862,7 +939,44 @@
         </div>
     </div>
 
-    <!-- MODAL 5: RETURN ASSET -->
+    <!-- MODAL 4B: EDIT CATEGORY -->
+    <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="editCategoryModalLabel">
+                        <i class="feather-sliders me-2 text-primary"></i>Edit Asset Category
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editCategoryForm" method="POST">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="Belongs to Company" name="company_id" id="edit_category_company_id" :required="true" select2-selector="default">
+                                    <option value="">Select Company</option>
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="Category Name" name="name" id="edit_category_name" placeholder="e.g. IT Laptops, Office Car Keys" :required="true" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_category_description" placeholder="Brief details about what items go into this category..." />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 gap-2">
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Changes</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <div class="modal fade" id="returnAssetModal" tabindex="-1" aria-labelledby="returnAssetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -993,9 +1107,28 @@
             $('#editAssetModal').appendTo('body');
             $('#allocateAssetModal').appendTo('body');
             $('#addCategoryModal').appendTo('body');
+            $('#editCategoryModal').appendTo('body');
             $('#returnAssetModal').appendTo('body');
             $('#assetHistoryModal').appendTo('body');
             $('#rejectRequestModal').appendTo('body');
+
+            // Handle edit category details binding
+            $('#editCategoryModal').on('show.bs.modal', function(event) {
+                var button = $(event.relatedTarget);
+                var categoryId = button.data('category-id');
+                var companyId = button.data('company-id');
+                var name = button.data('name');
+                var description = button.data('description');
+
+                var modal = $(this);
+                // Set form action URL dynamically
+                modal.find('form').attr('action', '/hrms/assets/category/update/' + categoryId);
+
+                // Bind values
+                modal.find('#edit_category_company_id').val(companyId).trigger('change');
+                modal.find('#edit_category_name').val(name);
+                modal.find('#edit_category_description').val(description);
+            });
 
             // Handle edit asset details binding
             $('#editAssetModal').on('show.bs.modal', function(event) {
@@ -1223,7 +1356,7 @@
             });
 
             // Handle search form submission via AJAX (covers Enter key and clicking Apply in filter)
-            $(document).on('submit', 'form[action*="assets"]', function(e) {
+            $(document).on('submit', 'form[action*="assets"][method="GET"], form[action*="assets"][method="get"]', function(e) {
                 e.preventDefault();
                 var form = $(this);
                 var formData = form.serialize();
@@ -1382,6 +1515,23 @@
                         }
                     }
                 });
+            });
+
+            // Dynamically adjust dropdown direction (dropup vs dropdown) to prevent clipping
+            $(document).on('click', '.dropdown-toggle-custom', function() {
+                var dropdown = $(this).closest('.dropdown');
+                var menu = dropdown.find('.dropdown-menu');
+                if (!menu.length) return;
+
+                var windowHeight = $(window).height();
+                var toggleOffset = $(this).offset().top - $(window).scrollTop();
+                var dropdownHeight = menu.outerHeight() || 150;
+
+                if (toggleOffset + dropdownHeight > windowHeight - 50) {
+                    dropdown.addClass('dropup');
+                } else {
+                    dropdown.removeClass('dropup');
+                }
             });
 
             // Autofocus active search inputs on load and restore cursor to the end

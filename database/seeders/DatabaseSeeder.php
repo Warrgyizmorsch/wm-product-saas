@@ -49,6 +49,7 @@ class DatabaseSeeder extends Seeder
             InventoryMasterDemoSeeder::class,
             FurnitureManufacturingDemoSeeder::class,
             HrmsDemoSeeder::class,
+            AccountingChartOfAccountsSeeder::class,
         ]);
     }
 }

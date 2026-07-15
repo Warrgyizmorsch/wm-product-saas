@@ -22,6 +22,9 @@
                 ['label' => 'Contacts'],
                 ['label' => 'Activities'],
             ]],
+            ['label' => 'CRM Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
+                ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
+            ]],
              ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
                 ['label' => 'Quotations', 'route' => 'crm.quotations.index'],
                 ['label' => 'Sales Orders', 'route' => 'sales.orders.index'],

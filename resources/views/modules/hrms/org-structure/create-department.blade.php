@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'ORG STRUCTURE | SaaS ERP')
-@section('page-title', 'Create Department')
-@section('breadcrumb', 'HRMS / Org Structure / Departments / Create')
+@section('title', __('hrms.org_create.create_dept_title') . ' | SaaS ERP')
+@section('page-title', __('hrms.org_create.create_dept_title'))
+@section('breadcrumb', 'HRMS / Org Structure / Departments / ' . __('hrms.org_create.create_dept_title'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('hrms.org.index', ['tab' => 'departments']) }}" variant="light" icon="feather-arrow-left">
-        Back to Org Structure
+        {{ __('hrms.org_create.back_to_org') }}
     </x-ui.button>
 @endsection
 
@@ -62,23 +62,23 @@
                             @csrf
                             <div class="mb-4 d-flex align-items-center justify-content-between">
                                 <h5 class="fw-bold mb-0 me-4">
-                                    <span class="d-block mb-2">Department Information:</span>
+                                    <span class="d-block mb-2">{{ __('hrms.org_create.dept_info') }}:</span>
                                 </h5>
-                                <x-ui.button type="submit" variant="light-brand" size="lg">Add New</x-ui.button>
+                                <x-ui.button type="submit" variant="light-brand" size="lg">{{ __('hrms.org_create.add_new') }}</x-ui.button>
                             </div>
 
                             <div class="row g-4">
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Department Name" name="name" id="name" placeholder="Enter Department Name" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.department_name') }}" name="name" id="name" placeholder="{{ __('hrms.org.department_name') }}" :required="true" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Department Code" name="code" id="code" placeholder="Enter Department Code" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.department_code') }}" name="code" id="code" placeholder="{{ __('hrms.org.department_code') }}" :required="true" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Parent Branch" name="branch_id" id="branch_id" :required="true">
-                                        <option value="">Select Branch</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_branch') }}" name="branch_id" id="branch_id" :required="true">
+                                        <option value="">{{ __('hrms.org.select_branch') }}</option>
                                         @foreach($branches as $branch)
                                             <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                         @endforeach
@@ -86,8 +86,8 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Department Head" name="head_employee_id" id="head_employee_id">
-                                        <option value="">Select Department Head</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.department_head') }}" name="head_employee_id" id="head_employee_id">
+                                        <option value="">{{ __('hrms.org.department_head') }}</option>
                                         @foreach($employees as $employee)
                                             <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                         @endforeach
@@ -95,14 +95,14 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Status" name="status" id="status" :required="true">
-                                        <option value="1">Active</option>
-                                        <option value="0">Inactive</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="status" :required="true">
+                                        <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                        <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="description" placeholder="Enter description..." rows="4" />
+                                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.description') }}" name="description" id="description" placeholder="{{ __('hrms.org.description') }}" rows="4" />
                                 </div>
                             </div>
                         </form>

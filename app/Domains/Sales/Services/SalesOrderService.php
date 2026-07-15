@@ -95,6 +95,19 @@ class SalesOrderService
             $salesOrder = $this->salesOrders->create($data);
             $salesOrder->items()->createMany($itemsData);
 
+            if (!empty($data['quotation_id'])) {
+                $quotation = \App\Domains\CRM\Models\Quotation::find($data['quotation_id']);
+                if ($quotation && $quotation->lead_id) {
+                    $lead = \App\Domains\CRM\Models\Lead::find($quotation->lead_id);
+                    if ($lead) {
+                        $lead->update([
+                            'status' => 'Converted',
+                            'is_customer' => true,
+                        ]);
+                    }
+                }
+            }
+
             return $salesOrder;
         });
     }

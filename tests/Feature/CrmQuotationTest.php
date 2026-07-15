@@ -62,10 +62,20 @@ class CrmQuotationTest extends TestCase
             'segment' => 'Enterprise',
             'call_date' => now(),
         ]);
+
+        // Create product
+        $this->product = \App\Domains\Inventory\Models\Product::create([
+            'tenant_id' => $this->tenant->id,
+            'name' => 'Standard Widget',
+            'sku' => 'WIDG-001',
+            'type' => 'finished_good',
+            'status' => 'active',
+            'unit_cost' => 100.00,
+        ]);
     }
 
     /** @test */
-    public function convert_to_quotation_initiates_inactive_customer_and_does_not_convert_lead()
+    public function convert_to_quotation_does_not_create_customer_and_does_not_convert_lead()
     {
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
@@ -81,33 +91,24 @@ class CrmQuotationTest extends TestCase
         $this->assertEquals('Qualified', $this->lead->status);
         $this->assertFalse($this->lead->is_customer);
 
-        // A customer record should be created with status 'inactive'
+        // No customer record should be created yet
         $customer = Customer::where('email', $this->lead->email)->first();
-        $this->assertNotNull($customer);
-        $this->assertEquals('inactive', $customer->status);
+        $this->assertNull($customer);
     }
 
     /** @test */
-    public function quotation_status_accepted_converts_lead_and_activates_customer()
+    public function quotation_status_accepted_creates_active_customer_and_converts_lead_on_sales_order()
     {
-        // 1. Create inactive customer first (simulating the convertToQuotation step)
-        $customer = Customer::create([
-            'tenant_id' => $this->tenant->id,
-            'name' => 'Acme Corp',
-            'email' => 'john@acme.com',
-            'phone' => '1234567890',
-            'status' => 'inactive',
-        ]);
-
-        // 2. Create a Quotation in Draft
+        // 1. Create a Quotation in Draft without a customer_id (nullable)
         $quotationData = [
-            'customer_id' => $customer->id,
+            'customer_id' => null,
             'sales_person_id' => $this->user->id,
             'quotation_number' => 'QT-9999',
             'quotation_date' => now()->format('Y-m-d'),
             'status' => 'Draft',
             'items' => [
                 [
+                    'product_id' => $this->product->id,
                     'item_name' => 'Consulting Service',
                     'quantity' => 10,
                     'unit_price' => 100,
@@ -121,22 +122,20 @@ class CrmQuotationTest extends TestCase
             ->withHeader('X-Tenant', 'test-tenant')
             ->post(route('crm.quotations.store'), $quotationData);
 
-        // Response should be a redirect (3xx), not 422 or 500
-        $response->assertStatus(302); // must redirect
-
+        // Response should be a redirect (3xx)
+        $response->assertStatus(302);
         $response->assertSessionHasNoErrors();
 
-        // Fetch created quotation — bypass BelongsToTenant global scope in tests
+        // Fetch created quotation
         $quotation = Quotation::withoutGlobalScopes()->latest()->first();
-        $this->assertNotNull($quotation, 'Quotation was not created — check validation errors');
+        $this->assertNotNull($quotation);
         $this->assertEquals('Draft', $quotation->status);
         $this->assertEquals($this->lead->id, $quotation->lead_id);
+        $this->assertNull($quotation->customer_id);
 
-        // Verify customer and lead are still inactive / not converted
-        $customer->refresh();
-        $this->assertEquals('inactive', $customer->status);
-        $this->lead->refresh();
-        $this->assertEquals('Qualified', $this->lead->status);
+        // Verify customer does not exist yet
+        $customer = Customer::where('email', $this->lead->email)->first();
+        $this->assertNull($customer);
 
         // Approve the quotation first
         $response = $this->actingAs($this->user)
@@ -147,7 +146,7 @@ class CrmQuotationTest extends TestCase
         $quotation->refresh();
         $this->assertEquals('Approved', $quotation->status);
 
-        // 3. Update quotation status to Accepted
+        // 2. Update quotation status to Accepted
         $updateData = array_merge($quotationData, [
             'status' => 'Accepted',
         ]);
@@ -161,11 +160,43 @@ class CrmQuotationTest extends TestCase
         $this->assertNotNull($activeQuotation);
         $this->assertEquals('Accepted', $activeQuotation->status);
 
-        // Verify customer is activated
-        $customer->refresh();
+        // Verify customer is created and active
+        $customer = Customer::where('email', $this->lead->email)->first();
+        $this->assertNotNull($customer);
         $this->assertEquals('active', $customer->status);
 
-        // Verify lead is converted
+        // Verify quotation is linked to the newly created customer
+        $activeQuotation->refresh();
+        $this->assertEquals($customer->id, $activeQuotation->customer_id);
+
+        // Verify lead is NOT converted yet (remains Qualified)
+        $this->lead->refresh();
+        $this->assertEquals('Qualified', $this->lead->status);
+        $this->assertFalse($this->lead->is_customer);
+
+        // 3. Create a Sales Order referencing the quotation
+        $salesOrderData = [
+            'customer_id' => $customer->id,
+            'quotation_id' => $activeQuotation->id,
+            'sales_person_id' => $this->user->id,
+            'sales_order_number' => 'SO-1234',
+            'order_date' => now()->format('Y-m-d'),
+            'items' => [
+                [
+                    'product_id' => $this->product->id,
+                    'quantity' => 5,
+                    'unit_price' => 120.00,
+                ]
+            ]
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('sales.orders.store'), $salesOrderData);
+
+        $response->assertStatus(302);
+
+        // Verify lead is now converted after creating the Sales Order
         $this->lead->refresh();
         $this->assertEquals('Converted', $this->lead->status);
         $this->assertTrue($this->lead->is_customer);
@@ -272,7 +303,34 @@ class CrmQuotationTest extends TestCase
         $customer->refresh();
         $this->assertEquals('active', $customer->status);
 
-        // Verify lead is converted
+        // Verify lead is NOT converted yet (remains Qualified)
+        $this->lead->refresh();
+        $this->assertEquals('Qualified', $this->lead->status);
+        $this->assertFalse($this->lead->is_customer);
+
+        // 4. Create a Sales Order referencing the quotation
+        $salesOrderData = [
+            'customer_id' => $customer->id,
+            'quotation_id' => $quotation->id,
+            'sales_person_id' => $this->user->id,
+            'sales_order_number' => 'SO-5678',
+            'order_date' => now()->format('Y-m-d'),
+            'items' => [
+                [
+                    'product_id' => $this->product->id,
+                    'quantity' => 5,
+                    'unit_price' => 120.00,
+                ]
+            ]
+        ];
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('sales.orders.store'), $salesOrderData);
+
+        $response->assertStatus(302);
+
+        // Verify lead is now converted after creating the Sales Order
         $this->lead->refresh();
         $this->assertEquals('Converted', $this->lead->status);
         $this->assertTrue($this->lead->is_customer);
@@ -350,5 +408,16 @@ class CrmQuotationTest extends TestCase
         $response->assertStatus(302);
         $quotation->refresh();
         $this->assertEquals('Rejected', $quotation->status);
+    }
+
+    /** @test */
+    public function quotation_approvals_index_is_accessible()
+    {
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('crm.approvals.quotations.index'));
+
+        $response->assertStatus(200);
+        $response->assertViewIs('modules.crm.quotations.approvals');
     }
 }

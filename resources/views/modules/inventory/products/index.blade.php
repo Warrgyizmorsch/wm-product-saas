@@ -15,77 +15,123 @@
 @endpush
 
 @section('page-actions')
-    <a href="{{ route('inventory.products.create') }}" class="btn btn-primary">
-        <i class="feather-plus me-2"></i>New Item
-    </a>
+    <x-ui.button href="{{ route('inventory.products.create') }}" variant="primary" icon="feather-plus">
+        New Item
+    </x-ui.button>
 @endsection
 
 @section('content')
     <div class="erp-single-panel">
         @if (session('success'))
-            <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-success text-white me-3">
-                        <i class="feather-check-circle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                        <p class="fs-12 mb-0">{{ session('success') }}</p>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
+        @endif
+        @if ($errors->any())
+            <div class="alert alert-danger mb-3 alert-dismissible fade show fs-12 py-2" role="alert">
+                <ul class="mb-0 ps-3 text-start">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
             </div>
         @endif
 
-        <!-- Filters Section - Inlined on Single panel -->
-        <form method="GET" action="{{ route('inventory.products.index') }}" class="mb-4">
-            <div class="row g-3">
-                <div class="col-md-4 erp-form-input-col">
-                    <input type="text" name="search" class="form-control" placeholder="Search by name, SKU..." value="{{ request('search') }}" />
-                </div>
-                <div class="col-md-3 erp-form-input-col">
-                    <select name="item_type" class="form-select" data-select2-selector="default">
-                        <option value="">All Item Types</option>
-                        <option value="Goods" {{ request('item_type') === 'Goods' ? 'selected' : '' }}>Goods (Physical)</option>
-                        <option value="Service" {{ request('item_type') === 'Service' ? 'selected' : '' }}>Service</option>
-                    </select>
-                </div>
-                <div class="col-md-3 erp-form-input-col">
-                    <select name="status" class="form-select" data-select2-selector="default">
-                        <option value="">All Statuses</option>
-                        <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
-                        <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
-                    </select>
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <div class="d-grid w-100">
-                        <button type="submit" class="btn btn-secondary h-40">
-                            <i class="feather-filter me-2"></i>Filter
-                        </button>
-                    </div>
-                </div>
+        @php
+            $sortBy = request('sort_by', 'created_at');
+            $sortOrder = request('sort_order', 'desc');
+        @endphp
+
+        <!-- Toolbar: Sort, Filters -->
+        <div class="d-flex align-items-center mb-3">
+            <h5 class="fw-bold text-dark mb-0">Items Listing</h5>
+            <div class="d-flex gap-2 ms-auto">
+                <!-- Custom Sort Component -->
+                <x-ui.sort-dropdown label="Sort">
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>Item Name (A-Z)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Item Name (Z-A)</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'sku', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'sku' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>SKU (A-Z)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'sku', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'sku' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>SKU (Z-A)</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'selling_price', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'selling_price' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Selling Price (High to Low)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'selling_price', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'selling_price' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>Selling Price (Low to High)</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'cost_price', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'cost_price' && $sortOrder === 'desc' ? 'active' : '' }}">
+                        <span>Cost Price (High to Low)</span>
+                    </a>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'cost_price', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'cost_price' && $sortOrder === 'asc' ? 'active' : '' }}">
+                        <span>Cost Price (Low to High)</span>
+                    </a>
+                </x-ui.sort-dropdown>
+
+                <!-- Custom Filter Component -->
+                <form method="GET" action="{{ route('inventory.products.index') }}" class="d-inline">
+                    <x-ui.filter label="Filter" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
+                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search by name, SKU..." value="{{ request('search') }}" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Item Type</label>
+                            <x-ui.odoo-form-ui type="select" name="item_type">
+                                <option value="">All Item Types</option>
+                                <option value="Goods" {{ request('item_type') === 'Goods' ? 'selected' : '' }}>Goods (Physical)</option>
+                                <option value="Service" {{ request('item_type') === 'Service' ? 'selected' : '' }}>Service</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <x-ui.odoo-form-ui type="select" name="status">
+                                <option value="">All Statuses</option>
+                                <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
+                                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-4">
+                            <a href="{{ route('inventory.products.index') }}" class="btn btn-sm btn-light border">Reset</a>
+                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        </div>
+                    </x-ui.filter>
+                </form>
             </div>
-        </form>
+        </div>
 
         <!-- Items Table -->
         <div class="table-responsive">
-            <table class="erp-thin-table">
+            <x-ui.odoo-form-ui type="table" id="productsTable">
                 <thead>
                     <tr>
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
-                        <th style="width: 25%">Item Name / SKU</th>
-                        <th style="width: 12%">Type</th>
-                        <th style="width: 12%">Variation</th>
-                        <th style="width: 12%" class="text-end">Selling Price</th>
-                        <th style="width: 12%" class="text-end">Cost Price</th>
-                        <th style="width: 12%" class="text-end">Stock on Hand</th>
-                        <th style="width: 10%">Status</th>
-                        <th class="text-end" style="width: 15%">Actions</th>
+                        <th>Item Name / SKU</th>
+                        <th>Type</th>
+                        <th>Variation</th>
+                        <th class="text-end">Selling Price</th>
+                        <th class="text-end">Cost Price</th>
+                        <th class="text-end">Stock on Hand</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Action</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="fs-13 text-dark">
                     @forelse ($products as $product)
                         <tr>
                             <td class="text-center">
@@ -136,38 +182,49 @@
                             </td>
                             <td>
                                 @if ($product->status === 'active')
-                                    <span class="erp-badge-active">Active</span>
+                                    <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold">Active</span>
                                 @else
-                                    <span class="erp-badge-draft">Inactive</span>
+                                    <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11 fw-semibold">Inactive</span>
                                 @endif
                             </td>
-                            <td class="text-end">
-                                <div class="d-inline-flex gap-1 justify-content-end align-items-center">
-                                    <x-ui.icon-btn href="{{ route('inventory.products.show', $product) }}" variant="soft-info" title="View details" icon="feather-eye" />
-                                    <x-ui.icon-btn href="{{ route('inventory.products.edit', $product) }}" variant="soft-primary" title="Edit" icon="feather-edit" />
-                                    <form action="{{ route('inventory.products.destroy', $product) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this product?');" class="d-inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <x-ui.icon-btn type="submit" variant="soft-danger" title="Delete" icon="feather-trash-2" />
-                                    </form>
-                                </div>
+                            <td class="text-end pe-4">
+                                <x-ui.action-dropdown :viewUrl="route('inventory.products.show', $product)">
+                                    <li>
+                                        <a href="{{ route('inventory.products.edit', $product) }}" class="dropdown-item">
+                                            <i class="feather-edit me-2 text-muted fs-12"></i>Edit Item
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form action="{{ route('inventory.products.destroy', $product) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this product?');" class="d-inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="dropdown-item text-danger">
+                                                <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Item
+                                            </button>
+                                        </form>
+                                    </li>
+                                </x-ui.action-dropdown>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center py-4 text-muted">
-                                <i class="feather-box me-2 fs-16"></i>No items or products found in this workspace.
+                            <td colspan="9" class="text-center py-5 text-muted">
+                                <i class="feather-box fs-1 d-block mb-3 text-light"></i>
+                                No items or products found in this workspace.
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
-            </table>
+            </x-ui.odoo-form-ui>
         </div>
 
-        @if($products->hasPages())
-            <div class="mt-3">
-                {{ $products->links() }}
-            </div>
-        @endif
+        <div class="pt-3">
+            <x-ui.pagination 
+                :currentPage="$products->currentPage()" 
+                :totalPages="$products->lastPage()" 
+                :totalResults="$products->total()" 
+                :perPage="$products->perPage()" />
+        </div>
     </div>
 @endsection

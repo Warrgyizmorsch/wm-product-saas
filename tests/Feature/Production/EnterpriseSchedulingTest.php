@@ -689,4 +689,162 @@ class EnterpriseSchedulingTest extends TestCase
         $this->assertStringContainsString('2 day(s) skipped', $holiday['message']);
         $this->assertEquals('Overloaded WC.', $overload['message']);
     }
+
+    /**
+     * Test that inactive holidays do not block scheduling.
+     */
+    public function test_inactive_holiday_behavior(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'Assembly Line',
+            'code'                  => 'ASM-01',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+
+        $machine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'Drill Press',
+            'code'           => 'CNC-MIL',
+            'status'         => 'active',
+        ]);
+
+        $cal = ProductionCalendar::create([
+            'tenant_id'    => $this->tenant->id,
+            'name'         => 'Calendar with Inactive Holiday',
+            'working_days' => [1, 2, 3, 4, 5],
+            'is_default'   => false,
+        ]);
+        $wc->update(['production_calendar_id' => $cal->id]);
+
+        // Add an INACTIVE holiday on Tuesday 2026-07-07
+        ProductionCalendarHoliday::create([
+            'tenant_id'              => $this->tenant->id,
+            'production_calendar_id' => $cal->id,
+            'name'                   => 'Inactive Holiday',
+            'holiday_date'           => '2026-07-07',
+            'holiday_type'           => 'public_holiday',
+            'active'                 => false,
+        ]);
+
+        // Operation starts Monday 2026-07-06 at 15:30:00 for 120 mins.
+        // Shift finishes at 16:00:00 (so 30 mins are scheduled on Mon, leaving 90 mins).
+        // Since Tuesday holiday is inactive, it should finish on Tuesday morning.
+        $order = $this->createMockOrder('ORD-202', $wc, $machine, 120);
+        $start = Carbon::parse('2026-07-06 15:30:00');
+
+        $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
+        $op    = $sched->operations->first();
+
+        // Standard shift Tuesday starts at 08:00:00. Remaining 120 mins -> finishes Tuesday 10:00:00.
+        $this->assertEquals('2026-07-07 10:00:00', $op->planned_finish->toDateTimeString());
+    }
+
+    /**
+     * Test that holidays from another tenant do not affect scheduling.
+     */
+    public function test_holiday_from_another_tenant_does_not_affect_scheduling(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'Assembly Line',
+            'code'                  => 'ASM-01',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+
+        $machine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'Drill Press',
+            'code'           => 'CNC-MIL',
+            'status'         => 'active',
+        ]);
+
+        $cal = ProductionCalendar::create([
+            'tenant_id'    => $this->tenant->id,
+            'name'         => 'Tenant Calendar',
+            'working_days' => [1, 2, 3, 4, 5],
+            'is_default'   => false,
+        ]);
+        $wc->update(['production_calendar_id' => $cal->id]);
+
+        // Add a holiday on Tuesday 2026-07-07 for ANOTHER tenant
+        $otherTenant = Tenant::factory()->create(['id' => 999, 'slug' => 'other-tenant']);
+        ProductionCalendarHoliday::create([
+            'tenant_id'              => 999,
+            'production_calendar_id' => $cal->id,
+            'name'                   => 'Other Tenant Holiday',
+            'holiday_date'           => '2026-07-07',
+            'holiday_type'           => 'public_holiday',
+            'active'                 => true,
+        ]);
+
+        $order = $this->createMockOrder('ORD-203', $wc, $machine, 120);
+        $start = Carbon::parse('2026-07-06 15:30:00');
+
+        $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
+        $op    = $sched->operations->first();
+
+        // Tuesday is not blocked because the holiday belongs to tenant 999.
+        $this->assertEquals('2026-07-07 10:00:00', $op->planned_finish->toDateTimeString());
+    }
+
+    /**
+     * Test that holidays from another calendar do not affect scheduling on the current calendar.
+     */
+    public function test_holiday_from_another_calendar_does_not_affect_scheduling(): void
+    {
+        $wc = WorkCenter::create([
+            'tenant_id'             => $this->tenant->id,
+            'name'                  => 'Assembly Line',
+            'code'                  => 'ASM-01',
+            'efficiency_percentage' => 100.0,
+            'status'                => 'active',
+        ]);
+
+        $machine = Machine::create([
+            'tenant_id'      => $this->tenant->id,
+            'work_center_id' => $wc->id,
+            'name'           => 'Drill Press',
+            'code'           => 'CNC-MIL',
+            'status'         => 'active',
+        ]);
+
+        $cal = ProductionCalendar::create([
+            'tenant_id'    => $this->tenant->id,
+            'name'         => 'Target Calendar',
+            'working_days' => [1, 2, 3, 4, 5],
+            'is_default'   => false,
+        ]);
+        $wc->update(['production_calendar_id' => $cal->id]);
+
+        // Create ANOTHER calendar and put the holiday on it
+        $otherCal = ProductionCalendar::create([
+            'tenant_id'    => $this->tenant->id,
+            'name'         => 'Other Calendar',
+            'working_days' => [1, 2, 3, 4, 5],
+            'is_default'   => false,
+        ]);
+
+        ProductionCalendarHoliday::create([
+            'tenant_id'              => $this->tenant->id,
+            'production_calendar_id' => $otherCal->id,
+            'name'                   => 'Other Calendar Holiday',
+            'holiday_date'           => '2026-07-07',
+            'holiday_type'           => 'public_holiday',
+            'active'                 => true,
+        ]);
+
+        $order = $this->createMockOrder('ORD-204', $wc, $machine, 120);
+        $start = Carbon::parse('2026-07-06 15:30:00');
+
+        $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
+        $op    = $sched->operations->first();
+
+        // Tuesday is not blocked because the holiday belongs to $otherCal, not $cal.
+        $this->assertEquals('2026-07-07 10:00:00', $op->planned_finish->toDateTimeString());
+    }
 }

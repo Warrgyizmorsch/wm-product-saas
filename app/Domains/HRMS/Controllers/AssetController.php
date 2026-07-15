@@ -49,7 +49,7 @@ class AssetController extends Controller
         }
 
         $assets = $assetsQuery->orderBy('asset_code')
-            ->paginate(12)
+            ->paginate(10)
             ->withQueryString();
 
         // 2. Categories Dropdown (Unfiltered for modals)
@@ -70,7 +70,9 @@ class AssetController extends Controller
             $categoriesQuery->where('company_id', $request->input('category_company_id'));
         }
 
-        $filteredCategories = $categoriesQuery->orderBy('name')->get();
+        $filteredCategories = $categoriesQuery->orderBy('name')
+            ->paginate(10)
+            ->withQueryString();
 
         // 4. Other collections
         $companies = Company::query()->where('status', true)->orderBy('company_name')->get();
@@ -103,7 +105,9 @@ class AssetController extends Controller
             $requestsQuery->where('status', $request->input('request_status'));
         }
 
-        $requests = $requestsQuery->orderBy('created_at', 'desc')->get();
+        $requests = $requestsQuery->orderBy('created_at', 'desc')
+            ->paginate(10)
+            ->withQueryString();
 
         // Total Pending Requests Count (unaffected by filters, for the tab badge)
         $pendingRequestsCount = AssetRequest::query()->where('status', 'pending')->count();
@@ -229,6 +233,49 @@ class AssetController extends Controller
         AssetCategory::create($validated);
 
         return redirect()->route('hrms.assets.index')->with('success', 'Asset category created.');
+    }
+
+    /**
+     * Update an existing asset category.
+     */
+    public function updateCategory(Request $request, AssetCategory $assetCategory): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'company_id' => 'required|exists:companies,id',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        $assetCategory->update($validated);
+
+        return redirect()->route('hrms.assets.index')->with('success', 'Asset category updated.');
+    }
+
+    /**
+     * Delete an asset category and its associated assets and allocations.
+     */
+    public function destroyCategory(AssetCategory $assetCategory): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        // Option 2: Check if there are assets linked to the category
+        $assetCount = $assetCategory->assets()->count();
+        if ($assetCount > 0) {
+            return redirect()->back()->with('error', "Cannot delete category '{$assetCategory->name}' because it has {$assetCount} assets linked to it. Please re-assign or delete those assets first.");
+        }
+
+        // Also check if there are asset requests linked to this category
+        $requestCount = AssetRequest::where('asset_category_id', $assetCategory->id)->count();
+        if ($requestCount > 0) {
+            return redirect()->back()->with('error', "Cannot delete category '{$assetCategory->name}' because it has {$requestCount} asset requests linked to it. Please resolve or remove those requests first.");
+        }
+
+        // Delete the category itself since it is empty
+        $assetCategory->delete();
+
+        return redirect()->route('hrms.assets.index')->with('success', 'Asset category deleted successfully.');
     }
 
     /**

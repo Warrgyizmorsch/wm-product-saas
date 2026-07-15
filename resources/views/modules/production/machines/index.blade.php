@@ -25,11 +25,14 @@
 @endpush
 
 @section('page-actions')
-    @can('create', App\Domains\Production\Models\Machine::class)
-        <a href="{{ route('production.machines.create') }}" class="btn btn-primary">
-            <i class="feather-plus me-2"></i>Create Machine
-        </a>
-    @endcan
+    <div class="d-flex align-items-center gap-2">
+        <x-ui.import-export-dropdown type="machines" importModalTarget="#importMachinesModal" />
+        @can('create', App\Domains\Production\Models\Machine::class)
+            <a href="{{ route('production.machines.create') }}" class="btn btn-primary">
+                <i class="feather-plus me-2"></i>Create Machine
+            </a>
+        @endcan
+    </div>
 @endsection
 
 @section('content')
@@ -226,4 +229,17 @@
             {{ $machines->links() }}
         </div>
     </div>
+
+    {{-- Import Machines Modal --}}
+    <x-ui.modal id="importMachinesModal" title="Import Machines via Excel/CSV" submitText="Import File" :centered="true">
+        <form method="POST" action="{{ route('production.import-export.import-preview', 'machines') }}" enctype="multipart/form-data" id="importMachinesForm">
+            @csrf
+            <p class="fs-13 text-muted mb-3">Upload an Excel (.xlsx, .xls) or CSV (.csv) file containing Machine records. Make sure the headers match the column names in the template file.</p>
+            <x-ui.odoo-form-ui type="file" name="file" label="Excel/CSV File" required placeholder="Choose file..." />
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="importMachinesForm" class="btn btn-primary">Import File</button>
+        </x-slot>
+    </x-ui.modal>
 @endsection

@@ -1,15 +1,15 @@
 @extends('layouts.duralux')
 
-@section('title', 'CRM Leads Track Status | SaaS ERP')
-@section('page-title', 'CRM Leads Track Status')
-@section('breadcrumb', 'Track Status')
+@section('title', __('hrms.track_status.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.track_status.title'))
+@section('breadcrumb', __('hrms.track_status.title'))
 
 @section('page-actions')
     <x-ui.badge variant="success" soft class="p-2 me-2">
         <i class="feather-info me-1"></i> Static Array Mode
     </x-ui.badge>
     <x-ui.button href="{{ route('crm.leads.index') }}" variant="light" icon="feather-arrow-left">
-        Back to Leads
+        {{ __('hrms.track_status.back') }}
     </x-ui.button>
 @endsection
 

@@ -1,7 +1,7 @@
 <div class="row">
     <!-- List Table Card -->
     <div class="col-12">
-        <x-ui.card title="Designations" stretch bodyClass="p-0">
+        <x-ui.card title="{{ __('hrms.org.designations') }}" stretch bodyClass="p-0">
             <x-slot name="headerAction">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <!-- Search Form -->
@@ -11,41 +11,41 @@
                         <input type="hidden" name="ds_status" value="{{ $filters['ds_status'] }}">
                         <input type="hidden" name="ds_sort" value="{{ $filters['ds_sort'] }}">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                        <input type="text" name="ds_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search designations..." value="{{ $filters['ds_search'] }}" style="box-shadow: none; height: 32px;">
+                        <input type="text" name="ds_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.org.search_desig') }}" value="{{ $filters['ds_search'] }}" style="box-shadow: none; height: 32px;">
                     </form>
 
                     <!-- Sort Dropdown -->
-                    <x-ui.sort-dropdown label="SORT">
+                    <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['ds_sort'] === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'designations', 'ds_sort' => 'name_asc']) }}">
-                            <span>Name (A-Z)</span>
+                            <span>{{ __('hrms.common.sort_name_asc') }}</span>
                             @if($filters['ds_sort'] === 'name_asc') <i class="feather-check ms-3"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['ds_sort'] === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'designations', 'ds_sort' => 'name_desc']) }}">
-                            <span>Name (Z-A)</span>
+                            <span>{{ __('hrms.common.sort_name_desc') }}</span>
                             @if($filters['ds_sort'] === 'name_desc') <i class="feather-check ms-3"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['ds_sort'] === 'level_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'designations', 'ds_sort' => 'level_asc']) }}">
-                            <span>Level (A-Z)</span>
+                            <span>{{ __('hrms.employees.lbl_grade') ?? 'Grade' }} (A-Z)</span>
                             @if($filters['ds_sort'] === 'level_asc') <i class="feather-check ms-3"></i> @endif
                         </a>
                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $filters['ds_sort'] === 'level_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'designations', 'ds_sort' => 'level_desc']) }}">
-                            <span>Level (Z-A)</span>
+                            <span>{{ __('hrms.employees.lbl_grade') ?? 'Grade' }} (Z-A)</span>
                             @if($filters['ds_sort'] === 'level_desc') <i class="feather-check ms-3"></i> @endif
                         </a>
                     </x-ui.sort-dropdown>
 
                     <!-- Filter Dropdown -->
-                    <x-ui.filter label="FILTER">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                    <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                         <form method="GET" action="{{ route('hrms.org.index') }}">
                             <input type="hidden" name="tab" value="designations">
                             <input type="hidden" name="ds_search" value="{{ $filters['ds_search'] }}">
                             <input type="hidden" name="ds_sort" value="{{ $filters['ds_sort'] }}">
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">DEPARTMENT</label>
+                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.org.tbl_dept') }}</label>
                                 <select name="ds_department_id" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
-                                    <option value="">All Departments</option>
+                                    <option value="">{{ __('hrms.common.all_departments') }}</option>
                                     @foreach($departmentsList as $dept)
                                         <option value="{{ $dept->id }}" @selected((string) $filters['ds_department_id'] === (string) $dept->id)>
                                             {{ $dept->name }}
@@ -55,17 +55,17 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
+                                <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.org.tbl_status') }}</label>
                                 <select name="ds_status" class="form-select" style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
-                                    <option value="">All Statuses</option>
-                                    <option value="1" @selected($filters['ds_status'] === '1')>Active</option>
-                                    <option value="0" @selected($filters['ds_status'] === '0')>Inactive</option>
+                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                    <option value="1" @selected($filters['ds_status'] === '1')>{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0" @selected($filters['ds_status'] === '0')>{{ __('hrms.employees.frm_status_inactive') }}</option>
                                 </select>
                             </div>
                             
                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                <a href="{{ route('hrms.org.index', ['tab' => 'designations']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">RESET</a>
-                                <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3 text-white bg-primary border-primary">APPLY FILTERS</button>
+                                <a href="{{ route('hrms.org.index', ['tab' => 'designations']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">{{ __('hrms.common.reset') }}</a>
+                                <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3 text-white bg-primary border-primary">{{ __('hrms.common.apply') }}</button>
                             </div>
                         </form>
                     </x-ui.filter>
@@ -76,12 +76,12 @@
                 <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th width="60">#</th>
-                            <th>Designation Name</th>
-                            <th>Grade Level</th>
-                            <th>Department</th>
-                            <th>Status</th>
-                            <th width="150" class="text-end">Actions</th>
+                            <th width="60">{{ __('hrms.org.tbl_hash') }}</th>
+                            <th>{{ __('hrms.org.tbl_desig_name') }}</th>
+                            <th>{{ __('hrms.employees.lbl_grade') ?? 'Grade Level' }}</th>
+                            <th>{{ __('hrms.org.tbl_dept') }}</th>
+                            <th>{{ __('hrms.org.tbl_status') }}</th>
+                            <th width="150" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="designationsTableBody">
@@ -98,31 +98,31 @@
                             <td>{{ $ds->department->name ?? 'N/A' }}</td>
                             <td>
                                 @if($ds->status)
-                                    <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                                    <x-ui.badge variant="success" soft>{{ __('hrms.employees.frm_status_active') }}</x-ui.badge>
                                 @else
-                                    <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                                    <x-ui.badge variant="danger" soft>{{ __('hrms.employees.frm_status_inactive') }}</x-ui.badge>
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.designation.destroy', $ds->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this designation?');">
+                                <form action="{{ route('hrms.designation.destroy', $ds->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.org.confirm_delete_desig') }}');">
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end">
-                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-desig" data-bs-toggle="modal" data-bs-target="#viewDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}" title="View Details" data-bs-toggle="tooltip">
+                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-desig" data-bs-toggle="modal" data-bs-target="#viewDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}" title="{{ __('hrms.employees.view_profile') }}" data-bs-toggle="tooltip">
                                             <i class="feather feather-eye"></i>
                                         </a>
                                         <x-ui.action-dropdown>
                                             <li>
                                                 <a class="dropdown-item btn-edit-desig" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editDesigModal" data-desig="{{ base64_encode($ds->toJson()) }}">
                                                     <i class="feather feather-edit-3 me-3"></i>
-                                                    <span>Edit</span>
+                                                    <span>{{ __('hrms.assets.edit') }}</span>
                                                 </a>
                                             </li>
                                             <li class="dropdown-divider"></li>
                                             <li>
                                                 <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                     <i class="feather feather-trash-2 me-3"></i>
-                                                    <span>Delete</span>
+                                                    <span>{{ __('hrms.assets.delete') }}</span>
                                                 </button>
                                             </li>
                                         </x-ui.action-dropdown>
@@ -134,7 +134,7 @@
                         @if($designations->isEmpty())
                         <tr>
                             <td colspan="7" class="text-center py-5 text-muted">
-                                No Designations found. Click "Add Designation" to create one.
+                                {{ __('hrms.org.empty_desig') }}
                             </td>
                         </tr>
                         @endif
@@ -190,7 +190,7 @@
                     if (levelEl) levelEl.innerText = desig.level || 'N/A';
                     
                     let descEl = document.getElementById('modal_view_desig_desc');
-                    if (descEl) descEl.innerText = desig.description || 'No description provided.';
+                    if (descEl) descEl.innerText = desig.description || '{{ __("hrms.employees.lbl_no_description") }}';
                     
                     let avatarEl = document.getElementById('modal_view_desig_avatar');
                     if (avatarEl) {
@@ -200,9 +200,9 @@
                     let statusEl = document.getElementById('modal_view_desig_status');
                     if (statusEl) {
                         if (desig.status === true || desig.status === 1 || desig.status === '1') {
-                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">Active</span>';
+                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.frm_status_active") }}</span>';
                         } else {
-                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">Inactive</span>';
+                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.frm_status_inactive") }}</span>';
                         }
                     }
                 });

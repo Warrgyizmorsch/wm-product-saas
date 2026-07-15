@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'PENALIZATION POLICY SETTINGS | SaaS ERP')
-@section('page-title', 'Penalization Policies')
-@section('breadcrumb', 'HRMS / Penalization Policy Settings')
+@section('title', __('hrms.penalization.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.penalization.title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.penalization.title'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">

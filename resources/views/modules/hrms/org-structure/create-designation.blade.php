@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'ORG STRUCTURE | SaaS ERP')
-@section('page-title', 'Create Designation')
-@section('breadcrumb', 'HRMS / Org Structure / Designations / Create')
+@section('title', __('hrms.org_create.create_desig_title') . ' | SaaS ERP')
+@section('page-title', __('hrms.org_create.create_desig_title'))
+@section('breadcrumb', 'HRMS / Org Structure / Designations / ' . __('hrms.org_create.create_desig_title'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('hrms.org.index', ['tab' => 'designations']) }}" variant="light" icon="feather-arrow-left">
-        Back to Org Structure
+        {{ __('hrms.org_create.back_to_org') }}
     </x-ui.button>
 @endsection
 
@@ -62,23 +62,23 @@
                             @csrf
                             <div class="mb-4 d-flex align-items-center justify-content-between">
                                 <h5 class="fw-bold mb-0 me-4">
-                                    <span class="d-block mb-2">Designation Information:</span>
+                                    <span class="d-block mb-2">{{ __('hrms.org_create.desig_info') }}:</span>
                                 </h5>
-                                <x-ui.button type="submit" variant="light-brand" size="lg">Add New</x-ui.button>
+                                <x-ui.button type="submit" variant="light-brand" size="lg">{{ __('hrms.org_create.add_new') }}</x-ui.button>
                             </div>
 
                             <div class="row g-4">
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Designation Name" name="name" id="name" placeholder="Enter Designation Name" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.designation_name') }}" name="name" id="name" placeholder="{{ __('hrms.org.designation_name') }}" :required="true" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Level / Grade" name="level" id="level" placeholder="Enter Grade (e.g. L1, Senior)" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.grade_level') }}" name="level" id="level" placeholder="{{ __('hrms.org.grade_level') }}" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Parent Department" name="department_id" id="department_id" :required="true">
-                                        <option value="">Select Department</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_department') }}" name="department_id" id="department_id" :required="true">
+                                        <option value="">{{ __('hrms.org.select_department') }}</option>
                                         @foreach($departments as $department)
                                             <option value="{{ $department->id }}">{{ $department->name }}</option>
                                         @endforeach
@@ -86,14 +86,14 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Status" name="status" id="status" :required="true">
-                                        <option value="1">Active</option>
-                                        <option value="0">Inactive</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="status" :required="true">
+                                        <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                        <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="description" placeholder="Enter description..." rows="4" />
+                                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.description') }}" name="description" id="description" placeholder="{{ __('hrms.org.description') }}" rows="4" />
                                 </div>
                             </div>
                         </form>

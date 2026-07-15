@@ -8,17 +8,17 @@
 <div class="row g-4">
     <!-- List Table Card -->
     <div class="col-12">
-        <x-ui.card title="Salary Structures (Slabs)" stretch bodyClass="p-0">
+        <x-ui.card title="{{ __('hrms.salary.structures_slabs') }}" stretch bodyClass="p-0">
             <x-slot name="headerAction">
                 <x-ui.button variant="light" size="sm" icon="feather-activity" data-bs-toggle="offcanvas" data-bs-target="#ctcCalculatorDrawer" class="me-2">
-                    CTC Calculator
+                    {{ __('hrms.salary.ctc_calculator') }}
                 </x-ui.button>
                 <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-structure-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-bs-toggle="modal" data-bs-target="#addSalaryStructureModal">
-                    Add Structure
+                    {{ __('hrms.salary.add_structure') }}
                 </x-ui.button>
             </x-slot>
 
-            <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap">
+            <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
                 <!-- Search Input (Placed before sort and filter in same line) -->
                 <div class="theme-search-container" style="max-width: 300px;">
                     <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
@@ -63,10 +63,7 @@
 
                 <!-- Filter Dropdown -->
                 <x-ui.filter label="FILTER">
-                    <div class="theme-filter-header">
-                        <i class="feather-sliders text-primary"></i>
-                        <span>Filter Options</span>
-                    </div>
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                     <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
                         <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
                         <input type="hidden" name="tab" value="structures">
@@ -77,18 +74,20 @@
                             <input type="hidden" name="struct_sort" value="{{ request('struct_sort') }}">
                         @endif
                         
-                        <div class="theme-filter-group">
-                            <label class="theme-filter-label">Status</label>
-                            <select name="struct_status" class="theme-filter-field">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <x-ui.odoo-form-ui type="select" name="struct_status">
                                 <option value="">All Statuses</option>
                                 <option value="1" @selected(request('struct_status') === '1')>Active</option>
                                 <option value="0" @selected(request('struct_status') === '0')>Inactive</option>
-                            </select>
+                            </x-ui.odoo-form-ui>
                         </div>
                         
-                        <div class="theme-filter-footer">
-                            <button type="submit" class="theme-filter-apply-btn">Apply Filters</button>
-                            <a href="{{ route('hrms.salary-structure.index', ['pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : '', 'tab' => 'structures']) }}" class="theme-filter-reset-btn">Reset</a>
+                        <div class="dropdown-divider my-3"></div>
+
+                        <div class="d-flex gap-2">
+                            <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
+                            <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="window.location.href='{{ route('hrms.salary-structure.index', ['pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : '', 'tab' => 'structures']) }}'">Reset</x-ui.button>
                         </div>
                     </form>
                 </x-ui.filter>
@@ -109,10 +108,10 @@
                     </thead>
                     <tbody>
                         @forelse($salaryStructures as $structure)
-                            <tr>
+                            <tr class="structure-row">
                                 <td>{{ $loop->iteration }}</td>
                                 <td>
-                                    <span class="fw-bold text-dark">{{ $structure->name }}</span>
+                                    <span class="fw-bold text-dark structure-name">{{ $structure->name }}</span>
                                 </td>
                                 <td>
                                     <span class="fw-semibold">₹{{ number_format($structure->min_ctc, 2) }}</span>
@@ -221,6 +220,23 @@
                     </tbody>
                 </table>
             </div>
+            @php
+                $currentPage = $salaryStructures->currentPage();
+                $totalPages = $salaryStructures->lastPage();
+                $totalResults = $salaryStructures->total();
+                $perPage = $salaryStructures->perPage();
+            @endphp
+            @if($salaryStructures->hasPages())
+                <div class="card-footer bg-white border-top px-4 py-3">
+                    <x-ui.pagination
+                        class="px-0 py-0"
+                        :current-page="$currentPage"
+                        :total-pages="$totalPages"
+                        :total-results="$totalResults"
+                        :per-page="$perPage"
+                    />
+                </div>
+            @endif
         </x-ui.card>
     </div>
 </div>

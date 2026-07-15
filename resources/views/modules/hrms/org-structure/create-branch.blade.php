@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'ORG STRUCTURE | SaaS ERP')
-@section('page-title', 'Create Branch')
-@section('breadcrumb', 'HRMS / Org Structure / Branches / Create')
+@section('title', __('hrms.org_create.create_branch_title') . ' | SaaS ERP')
+@section('page-title', __('hrms.org_create.create_branch_title'))
+@section('breadcrumb', 'HRMS / Org Structure / Branches / ' . __('hrms.org_create.create_branch_title'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('hrms.org.index', ['tab' => 'branches']) }}" variant="light" icon="feather-arrow-left">
-        Back to Org Structure
+        {{ __('hrms.org_create.back_to_org') }}
     </x-ui.button>
 @endsection
 
@@ -62,23 +62,23 @@
                             @csrf
                             <div class="mb-4 d-flex align-items-center justify-content-between">
                                 <h5 class="fw-bold mb-0 me-4">
-                                    <span class="d-block mb-2">Branch Information:</span>
+                                    <span class="d-block mb-2">{{ __('hrms.org_create.branch_info') }}:</span>
                                 </h5>
-                                <x-ui.button type="submit" variant="light-brand" size="lg">Add New</x-ui.button>
+                                <x-ui.button type="submit" variant="light-brand" size="lg">{{ __('hrms.org_create.add_new') }}</x-ui.button>
                             </div>
 
                             <div class="row g-4">
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Branch Name" name="name" id="name" placeholder="Enter Branch Name" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.branch_name') }}" name="name" id="name" placeholder="{{ __('hrms.org.branch_name') }}" :required="true" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Branch Code" name="code" id="code" placeholder="Enter Branch Code" :required="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.branch_code') }}" name="code" id="code" placeholder="{{ __('hrms.org.branch_code') }}" :required="true" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Parent Business Unit" name="business_unit_id" id="business_unit_id" :required="true">
-                                        <option value="">Select Business Unit</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_business_unit') }}" name="business_unit_id" id="business_unit_id" :required="true">
+                                        <option value="">{{ __('hrms.org.select_business_unit') }}</option>
                                         @foreach($businessUnits as $buUnit)
                                             <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
                                         @endforeach
@@ -86,8 +86,8 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Branch Manager" name="manager_employee_id" id="manager_employee_id">
-                                        <option value="">Select Manager</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.branch_manager') }}" name="manager_employee_id" id="manager_employee_id">
+                                        <option value="">{{ __('hrms.org.select_manager') }}</option>
                                         @foreach($employees as $employee)
                                             <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                         @endforeach
@@ -95,44 +95,44 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Phone" name="phone" id="phone" placeholder="Enter Phone Number" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.phone') }}" name="phone" id="phone" placeholder="{{ __('hrms.org.phone') }}" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Email" name="email" id="email" inputType="email" placeholder="Enter Email Address" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.email') }}" name="email" id="email" inputType="email" placeholder="{{ __('hrms.org.email') }}" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Country" name="country" id="country" select2-selector="country" class="geo-country" data-initial-value="{{ old('country', 'United States') }}">
-                                        <option value="">Select Country</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.country') }}" name="country" id="country" select2-selector="country" class="geo-country" data-initial-value="{{ old('country', 'United States') }}">
+                                        <option value="">{{ __('hrms.org.select_country') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="State" name="state" id="state" select2-selector="default" class="geo-state">
-                                        <option value="">Select State</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.state') }}" name="state" id="state" select2-selector="default" class="geo-state">
+                                        <option value="">{{ __('hrms.org.select_state') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="City" name="city" id="city" select2-selector="default" class="geo-city">
-                                        <option value="">Select City</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.city') }}" name="city" id="city" select2-selector="default" class="geo-city">
+                                        <option value="">{{ __('hrms.org.select_city') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Postal Code" name="postal_code" id="postal_code" placeholder="Enter Postal Code" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.postal_code') }}" name="postal_code" id="postal_code" placeholder="{{ __('hrms.org.postal_code') }}" />
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Status" name="status" id="status" :required="true">
-                                        <option value="1">Active</option>
-                                        <option value="0">Inactive</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="status" :required="true">
+                                        <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                        <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="textarea" label="Address" name="address" id="address" placeholder="Enter Address details..." rows="3" />
+                                    <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.address') }}" name="address" id="address" placeholder="{{ __('hrms.org.address') }}" rows="3" />
                                 </div>
                             </div>
                         </form>

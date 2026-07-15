@@ -163,7 +163,6 @@ class QuotationService
             // Prepare active revision data
             $revData = [
                 'tenant_id' => $quotation->tenant_id,
-                'customer_id' => $data['customer_id'],
                 'lead_id' => $data['lead_id'] ?? $quotation->lead_id,
                 'sales_person_id' => $data['sales_person_id'] ?? $quotation->sales_person_id,
                 'quotation_number' => $newQuotationNumber,

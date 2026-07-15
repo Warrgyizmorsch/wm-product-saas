@@ -13,7 +13,7 @@ class QuotationRepository
 
     public function find(int $id): ?Quotation
     {
-        return Quotation::query()->with(['customer', 'salesPerson', 'items'])->find($id);
+        return Quotation::query()->with(['lead', 'salesPerson', 'items'])->find($id);
     }
 
     public function count(): int
@@ -24,7 +24,7 @@ class QuotationRepository
     public function latest(): \Illuminate\Database\Eloquent\Collection
     {
         return Quotation::query()
-            ->with(['customer', 'salesPerson'])
+            ->with(['lead', 'salesPerson'])
             ->where('is_current', true)
             ->where('status', '!=', 'Draft')
             ->latest()

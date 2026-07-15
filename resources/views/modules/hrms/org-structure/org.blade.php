@@ -1,33 +1,33 @@
 @extends('layouts.duralux')
 
-@section('title', 'HR SETTINGS | SaaS ERP')
-@section('page-title', 'HR Settings')
-@section('breadcrumb', 'HRMS / Settings')
+@section('title', __('hrms.org.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.org.title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.org.title'))
 
 @section('page-actions')
     <div id="add-btn-legal-entities" class="org-add-btn-wrapper">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCompanyModal">
-            Add Legal Entity
+            {{ __('hrms.org.add_legal_entity') }}
         </x-ui.button>
     </div>
     <div id="add-btn-business-units" class="org-add-btn-wrapper d-none">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addBuModal">
-            Add Business Unit
+            {{ __('hrms.org.add_business_unit') }}
         </x-ui.button>
     </div>
     <div id="add-btn-branches" class="org-add-btn-wrapper d-none">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addBranchModal">
-            Add Branch
+            {{ __('hrms.org.add_branch') }}
         </x-ui.button>
     </div>
     <div id="add-btn-departments" class="org-add-btn-wrapper d-none">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDeptModal">
-            Add Department
+            {{ __('hrms.org.add_department') }}
         </x-ui.button>
     </div>
     <div id="add-btn-designations" class="org-add-btn-wrapper d-none">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addDesigModal">
-            Add Designation
+            {{ __('hrms.org.add_designation') }}
         </x-ui.button>
     </div>
 @endsection
@@ -179,27 +179,27 @@
                             <ul class="nav gap-2 border-bottom pb-2" id="orgTabs" role="tablist">
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link active" id="legal-entities-tab" data-bs-toggle="tab" data-bs-target="#legal-entities" type="button" role="tab" aria-controls="legal-entities" aria-selected="true">
-                                        <i class="feather-home me-2"></i>Legal Entities
+                                        <i class="feather-home me-2"></i>{{ __('hrms.org.legal_entities') }}
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="business-units-tab" data-bs-toggle="tab" data-bs-target="#business-units" type="button" role="tab" aria-controls="business-units" aria-selected="false">
-                                        <i class="feather-briefcase me-2"></i>Business Units
+                                        <i class="feather-briefcase me-2"></i>{{ __('hrms.org.business_units') }}
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="branches-tab" data-bs-toggle="tab" data-bs-target="#branches" type="button" role="tab" aria-controls="branches" aria-selected="false">
-                                        <i class="feather-map-pin me-2"></i>Branches
+                                        <i class="feather-map-pin me-2"></i>{{ __('hrms.org.branches') }}
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="departments-tab" data-bs-toggle="tab" data-bs-target="#departments" type="button" role="tab" aria-controls="departments" aria-selected="false">
-                                        <i class="feather-users me-2"></i>Departments
+                                        <i class="feather-users me-2"></i>{{ __('hrms.org.departments') }}
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="designations-tab" data-bs-toggle="tab" data-bs-target="#designations" type="button" role="tab" aria-controls="designations" aria-selected="false">
-                                        <i class="feather-award me-2"></i>Designations
+                                        <i class="feather-award me-2"></i>{{ __('hrms.org.designations') }}
                                     </button>
                                 </li>
                             </ul>
@@ -240,8 +240,8 @@
                             <div class="avatar-text avatar-xl bg-soft-warning text-warning mx-auto mb-4" style="width: 60px; height: 60px; min-width: 60px; min-height: 60px;">
                                 <i class="feather-calendar fs-24"></i>
                             </div>
-                            <h4 class="fw-bold mb-2">Leave Structure Settings</h4>
-                            <p class="text-muted mb-0">The leave structure configuration tools and layout will be implemented here in a future update.</p>
+                            <h4 class="fw-bold mb-2">{{ __('hrms.org.leave_structure_settings') }}</h4>
+                            <p class="text-muted mb-0">{{ __('hrms.org.leave_structure_desc') }}</p>
                         </div>
                     </div>
                 </div>
