@@ -28,13 +28,44 @@ class LeaveStructureController extends Controller
 
         $leaveTypes = collect();
 
+        $ltSearch = $request->string('lt_search')->trim()->value();
+        $ltSort = $request->string('lt_sort')->value() ?: 'name_asc';
+        $ltType = $request->filled('lt_type') ? $request->string('lt_type')->value() : null;
+
         if ($selectedPlan) {
-            $leaveTypes = $selectedPlan->types()
-                ->paginate(10)
-                ->withQueryString();
+            $typesQuery = $selectedPlan->types();
+
+            if ($ltSearch !== '') {
+                $typesQuery->where(function ($query) use ($ltSearch): void {
+                    $query->where('name', 'like', "%{$ltSearch}%")
+                        ->orWhere('code', 'like', "%{$ltSearch}%");
+                });
+            }
+
+            if ($ltType !== null && $ltType !== '') {
+                $typesQuery->where('type', $ltType);
+            }
+
+            switch ($ltSort) {
+                case 'name_desc':
+                    $typesQuery->orderBy('name', 'desc');
+                    break;
+                case 'quota_asc':
+                    $typesQuery->orderBy('quota', 'asc');
+                    break;
+                case 'quota_desc':
+                    $typesQuery->orderBy('quota', 'desc');
+                    break;
+                case 'name_asc':
+                default:
+                    $typesQuery->orderBy('name', 'asc');
+                    break;
+            }
+
+            $leaveTypes = $typesQuery->paginate(10, ['*'], 'lt_page')->withQueryString();
         }
 
-        return view('modules.hrms.leave-structure.index', compact('companies', 'leavePlans', 'leaveTypes', 'selectedPlan'));
+        return view('modules.hrms.leave-structure.index', compact('companies', 'leavePlans', 'leaveTypes', 'selectedPlan', 'ltSearch', 'ltSort', 'ltType'));
     }
 
     public function storePlan(Request $request)

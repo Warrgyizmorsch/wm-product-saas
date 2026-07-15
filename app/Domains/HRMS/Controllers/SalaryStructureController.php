@@ -78,67 +78,90 @@ class SalaryStructureController extends Controller
 
         $salaryComponents = $salaryComponentsQuery->get();
         
-        $recurringComponents = $salaryComponents->filter(fn($c) => !$c->is_adhoc);
+        // Recurring Components Pagination
+        $recurringQuery = SalaryComponent::with(['company'])->where('is_adhoc', false);
+        if ($selectedPayGroup) {
+            $recurringQuery->where('pay_group_id', $selectedPayGroup->id);
+        } else {
+            $recurringQuery->whereNull('pay_group_id');
+        }
+
         if ($request->filled('rec_status')) {
             $recStatus = $request->get('rec_status');
-            $recurringComponents = $recurringComponents->filter(fn($c) => (string) $c->status === (string) $recStatus);
+            $recurringQuery->where('status', $recStatus);
         }
         if ($request->filled('rec_type')) {
             $recType = $request->get('rec_type');
-            $recurringComponents = $recurringComponents->filter(fn($c) => $c->type === $recType);
+            $recurringQuery->where('type', $recType);
         }
         if ($request->filled('rec_search')) {
-            $recSearch = strtolower($request->get('rec_search'));
-            $recurringComponents = $recurringComponents->filter(fn($c) => 
-                str_contains(strtolower($c->name), $recSearch) || 
-                str_contains(strtolower($c->code), $recSearch)
-            );
+            $recSearch = $request->get('rec_search');
+            $recurringQuery->where(function ($q) use ($recSearch) {
+                $q->where('name', 'like', "%{$recSearch}%")
+                  ->orWhere('code', 'like', "%{$recSearch}%");
+            });
         }
         if ($request->filled('rec_sort')) {
             $recSort = $request->get('rec_sort');
             if ($recSort === 'name_asc') {
-                $recurringComponents = $recurringComponents->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE);
+                $recurringQuery->orderBy('name', 'asc');
             } elseif ($recSort === 'name_desc') {
-                $recurringComponents = $recurringComponents->sortByDesc('name', SORT_NATURAL | SORT_FLAG_CASE);
+                $recurringQuery->orderBy('name', 'desc');
             } elseif ($recSort === 'code_asc') {
-                $recurringComponents = $recurringComponents->sortBy('code', SORT_NATURAL | SORT_FLAG_CASE);
+                $recurringQuery->orderBy('code', 'asc');
             } elseif ($recSort === 'code_desc') {
-                $recurringComponents = $recurringComponents->sortByDesc('code', SORT_NATURAL | SORT_FLAG_CASE);
+                $recurringQuery->orderBy('code', 'desc');
             }
+        } else {
+            $recurringQuery->orderBy('id', 'asc');
         }
 
-        $adhocComponents = $salaryComponents->filter(fn($c) => $c->is_adhoc);
+        $recurringComponents = $recurringQuery->paginate(10, ['*'], 'rec_page')->withQueryString();
+
+        // Ad-hoc Components Pagination
+        $adhocQuery = SalaryComponent::with(['company'])->where('is_adhoc', true);
+        if ($selectedPayGroup) {
+            $adhocQuery->where('pay_group_id', $selectedPayGroup->id);
+        } else {
+            $adhocQuery->whereNull('pay_group_id');
+        }
+
         if ($request->filled('adhoc_status')) {
             $adhocStatus = $request->get('adhoc_status');
-            $adhocComponents = $adhocComponents->filter(fn($c) => (string) $c->status === (string) $adhocStatus);
+            $adhocQuery->where('status', $adhocStatus);
         }
         if ($request->filled('adhoc_type')) {
             $adhocType = $request->get('adhoc_type');
-            $adhocComponents = $adhocComponents->filter(fn($c) => $c->type === $adhocType);
+            $adhocQuery->where('type', $adhocType);
         }
         if ($request->filled('adhoc_search')) {
-            $adhocSearch = strtolower($request->get('adhoc_search'));
-            $adhocComponents = $adhocComponents->filter(fn($c) => 
-                str_contains(strtolower($c->name), $adhocSearch) || 
-                str_contains(strtolower($c->code), $adhocSearch)
-            );
+            $adhocSearch = $request->get('adhoc_search');
+            $adhocQuery->where(function ($q) use ($adhocSearch) {
+                $q->where('name', 'like', "%{$adhocSearch}%")
+                  ->orWhere('code', 'like', "%{$adhocSearch}%");
+            });
         }
         if ($request->filled('adhoc_sort')) {
             $adhocSort = $request->get('adhoc_sort');
             if ($adhocSort === 'name_asc') {
-                $adhocComponents = $adhocComponents->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE);
+                $adhocQuery->orderBy('name', 'asc');
             } elseif ($adhocSort === 'name_desc') {
-                $adhocComponents = $adhocComponents->sortByDesc('name', SORT_NATURAL | SORT_FLAG_CASE);
+                $adhocQuery->orderBy('name', 'desc');
             } elseif ($adhocSort === 'code_asc') {
-                $adhocComponents = $adhocComponents->sortBy('code', SORT_NATURAL | SORT_FLAG_CASE);
+                $adhocQuery->orderBy('code', 'asc');
             } elseif ($adhocSort === 'code_desc') {
-                $adhocComponents = $adhocComponents->sortByDesc('code', SORT_NATURAL | SORT_FLAG_CASE);
+                $adhocQuery->orderBy('code', 'desc');
             }
+        } else {
+            $adhocQuery->orderBy('id', 'asc');
         }
 
-        $salaryStructures = $salaryStructuresQuery->paginate(10)->withQueryString();
+        $adhocComponents = $adhocQuery->paginate(10, ['*'], 'adhoc_page')->withQueryString();
 
-        return view('modules.hrms.salary-structure.index', compact('companies', 'payGroups', 'selectedPayGroup', 'salaryComponents', 'recurringComponents', 'adhocComponents', 'salaryStructures'));
+        $allStructuresForSimulator = (clone $salaryStructuresQuery)->get();
+        $salaryStructures = $salaryStructuresQuery->paginate(10, ['*'], 'struct_page')->withQueryString();
+
+        return view('modules.hrms.salary-structure.index', compact('companies', 'payGroups', 'selectedPayGroup', 'salaryComponents', 'recurringComponents', 'adhocComponents', 'salaryStructures', 'allStructuresForSimulator'));
     }
 
     public function storeComponent(Request $request)

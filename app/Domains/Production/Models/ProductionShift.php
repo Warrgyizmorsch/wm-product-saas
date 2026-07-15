@@ -14,6 +14,7 @@ class ProductionShift extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'company_id',
         'name',
         'code',
         'start_time',
@@ -28,6 +29,11 @@ class ProductionShift extends BaseModel
         'overtime_allowed' => 'boolean',
         'active'           => 'boolean',
     ];
+
+    public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\HRMS\Models\Company::class, 'company_id');
+    }
 
     public function workCenters(): BelongsToMany
     {

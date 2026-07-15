@@ -4,6 +4,12 @@
 @section('page-title', __('hrms.salary.title'))
 @section('breadcrumb', 'HRMS / ' . __('hrms.salary.title'))
 
+@section('page-actions')
+    <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addPayGroupModal">
+        Add Pay Group
+    </x-ui.button>
+@endsection
+
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
@@ -183,70 +189,55 @@
             <div class="col-12">
                 <x-ui.card title="Pay Groups" bodyClass="p-0" stretch>
                     <x-slot name="headerAction">
-                        <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addPayGroupModal">
-                            Add Pay Group
-                        </x-ui.button>
+                        <div class="d-flex align-items-center gap-2">
+                            <!-- Search Input -->
+                            <div class="theme-search-container" style="width: 240px !important; position: relative;">
+                                <i class="feather-search"></i>
+                                <input type="text" id="payGroupSearch" class="theme-search-input" placeholder="Search pay groups...">
+                            </div>
+
+                            <!-- Sort Dropdown -->
+                            <x-ui.sort-dropdown label="SORT">
+                                <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortPayGroups('name_asc', this); event.preventDefault();">Name (A-Z)</a>
+                                <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortPayGroups('name_desc', this); event.preventDefault();">Name (Z-A)</a>
+                                <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortPayGroups('newest', this); event.preventDefault();">Newest First</a>
+                            </x-ui.sort-dropdown>
+
+                            <!-- Filter Dropdown -->
+                            <x-ui.filter label="FILTER">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <x-ui.odoo-form-ui type="select" name="pg_status" id="pg_filter_status">
+                                        <option value="">All Statuses</option>
+                                        <option value="1">Active</option>
+                                        <option value="0">Inactive</option>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Company</label>
+                                    <x-ui.odoo-form-ui type="select" name="pg_company" id="pg_filter_company">
+                                        <option value="">All Companies</option>
+                                        @foreach($companies as $company)
+                                            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="dropdown-divider my-3"></div>
+
+                                <div class="d-flex gap-2">
+                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterPayGroups()">Apply Filters</x-ui.button>
+                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetPayGroupFilters()">Reset</x-ui.button>
+                                </div>
+                            </x-ui.filter>
+                        </div>
                     </x-slot>
                     <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PAY GROUPS LIST -->
                         <div class="col-md-4 col-12 border-end">
-                            <!-- Search, Sort & Filter Panel -->
-                            <div class="p-3 border-bottom bg-light-soft">
-                                <!-- Sort & Filter Buttons (Side-by-Side at the top) -->
-                                <div class="d-flex gap-2 mb-3">
-                                    <!-- Sort Dropdown -->
-                                    <x-ui.sort-dropdown label="SORT" class="flex-fill">
-                                        <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortPayGroups('name_asc', this); event.preventDefault();">Name (A-Z)</a>
-                                        <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortPayGroups('name_desc', this); event.preventDefault();">Name (Z-A)</a>
-                                        <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortPayGroups('newest', this); event.preventDefault();">Newest First</a>
-                                    </x-ui.sort-dropdown>
-
-                                    <!-- Filter Dropdown -->
-                                    <x-ui.filter label="FILTER" class="flex-fill">
-                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
-                                        <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
-                                            @if(request()->filled('pay_group_id'))
-                                                <input type="hidden" name="pay_group_id" value="{{ request('pay_group_id') }}">
-                                            @endif
-                                            @if(request()->filled('tab'))
-                                                <input type="hidden" name="tab" value="{{ request('tab') }}">
-                                            @endif
-                                            
-                                            <div class="mb-3">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
-                                                <x-ui.odoo-form-ui type="select" name="pg_status" id="pg_filter_status">
-                                                    <option value="">All Statuses</option>
-                                                    <option value="1" @selected(request('pg_status') === '1')>Active</option>
-                                                    <option value="0" @selected(request('pg_status') === '0')>Inactive</option>
-                                                </x-ui.odoo-form-ui>
-                                            </div>
-
-                                            <div class="mb-3">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Company</label>
-                                                <x-ui.odoo-form-ui type="select" name="pg_company" id="pg_filter_company">
-                                                    <option value="">All Companies</option>
-                                                    @foreach($companies as $company)
-                                                        <option value="{{ $company->id }}" @selected(request('pg_company') == $company->id)>{{ $company->company_name }}</option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-                                            </div>
-
-                                            <div class="dropdown-divider my-3"></div>
-
-                                            <div class="d-flex gap-2">
-                                                <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
-                                                <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="window.location.href='{{ route('hrms.salary-structure.index', ['pay_group_id' => request('pay_group_id'), 'tab' => request('tab')]) }}'">Reset</x-ui.button>
-                                            </div>
-                                        </form>
-                                    </x-ui.filter>
-                                </div>
-
-                                <!-- Search Input (Below the buttons) -->
-                                <div class="theme-search-container">
-                                    <i class="feather-search"></i>
-                                    <input type="text" id="payGroupSearch" class="theme-search-input" placeholder="Search pay groups...">
-                                </div>
-                            </div>
 
                             <div class="list-group list-group-flush rounded-0" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
                                 @forelse($payGroups as $pg)
@@ -394,24 +385,9 @@
                 payGroupSearchInput.addEventListener('input', filterPayGroups);
             }
 
-            // Prevent structures search form submit and filter client-side instantly
+            // Prevent structures search form submit
             $(document).on('submit', 'form:has(input[name="struct_search"])', function(e) {
                 e.preventDefault();
-            });
-            $(document).on('input', 'input[name="struct_search"]', function() {
-                const search = $(this).val().toLowerCase().trim();
-                $('.structure-row').each(function() {
-                    const name = $(this).find('.structure-name').text().toLowerCase();
-                    const detailId = $(this).find('.toggle-structure-details').attr('data-target');
-                    if (name.includes(search)) {
-                        $(this).css('display', '');
-                    } else {
-                        $(this).css('display', 'none');
-                        if (detailId) {
-                            $(detailId).addClass('d-none');
-                        }
-                    }
-                });
             });
 
             // Auto submit theme filter form on radio/select changes
@@ -518,6 +494,17 @@
                     item.style.setProperty('display', 'none', 'important');
                 }
             });
+
+            // Auto close dropdowns
+            $('.dropdown-menu').removeClass('show');
+            $('.dropdown, .erp-sort-dropdown, .erp-filter-dropdown').removeClass('show');
+        }
+
+        function resetPayGroupFilters() {
+            $('#pg_filter_status').val('').trigger('change');
+            $('#pg_filter_company').val('').trigger('change');
+            document.getElementById('payGroupSearch').value = '';
+            filterPayGroups();
         }
         
         function sortPayGroups(criteria, element) {
@@ -542,7 +529,15 @@
             
             // Re-append in sorted order
             items.forEach(item => list.appendChild(item));
+
+            // Auto close dropdowns
+            $('.dropdown-menu').removeClass('show');
+            $('.dropdown, .erp-sort-dropdown, .erp-filter-dropdown').removeClass('show');
         }
+
+        window.filterPayGroups = filterPayGroups;
+        window.resetPayGroupFilters = resetPayGroupFilters;
+        window.sortPayGroups = sortPayGroups;
     </script>
 @endsection
 

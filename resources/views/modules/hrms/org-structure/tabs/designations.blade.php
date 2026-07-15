@@ -65,7 +65,7 @@
                             
                             <div class="d-flex gap-2 justify-content-end mt-4">
                                 <a href="{{ route('hrms.org.index', ['tab' => 'designations']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">{{ __('hrms.common.reset') }}</a>
-                                <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3 text-white bg-primary border-primary">{{ __('hrms.common.apply') }}</button>
+                                <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">{{ __('hrms.common.apply') }}</button>
                             </div>
                         </form>
                     </x-ui.filter>

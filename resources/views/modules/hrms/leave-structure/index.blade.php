@@ -4,6 +4,12 @@
 @section('page-title', __('hrms.leave.title'))
 @section('breadcrumb', 'HRMS / ' . __('hrms.leave.title'))
 
+@section('page-actions')
+    <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
+        Add Leave Plan
+    </x-ui.button>
+@endsection
+
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
@@ -170,66 +176,58 @@
                 </x-ui.alert>
             @endif
 
-            <!-- Single Outer Card spanning full width -->
             <div class="col-12">
                 <x-ui.card title="Leave Plans" bodyClass="p-0" stretch>
                     <x-slot name="headerAction">
-                        <x-ui.button variant="primary" size="sm" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
-                            Add Leave Plan
-                        </x-ui.button>
+                        <div class="d-flex align-items-center gap-2">
+                            <!-- Search Input -->
+                            <div class="theme-search-container" style="width: 240px !important; position: relative;">
+                                <i class="feather-search"></i>
+                                <input type="text" id="leavePlanSearch" class="theme-search-input" placeholder="Search leave plans...">
+                            </div>
+
+                            <!-- Sort Dropdown -->
+                            <x-ui.sort-dropdown label="SORT">
+                                <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortLeavePlans('name_asc', this); event.preventDefault();">Name (A-Z)</a>
+                                <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortLeavePlans('name_desc', this); event.preventDefault();">Name (Z-A)</a>
+                                <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortLeavePlans('newest', this); event.preventDefault();">Newest First</a>
+                            </x-ui.sort-dropdown>
+
+                            <!-- Filter Dropdown -->
+                            <x-ui.filter label="FILTER">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <x-ui.odoo-form-ui type="select" name="lp_status" id="lp_filter_status">
+                                        <option value="">All Statuses</option>
+                                        <option value="1">Active</option>
+                                        <option value="0">Inactive</option>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Company</label>
+                                    <x-ui.odoo-form-ui type="select" name="lp_company" id="lp_filter_company">
+                                        <option value="">All Companies</option>
+                                        @foreach($companies as $company)
+                                            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="dropdown-divider my-3"></div>
+
+                                <div class="d-flex gap-2">
+                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterLeavePlans()">Apply Filters</x-ui.button>
+                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeavePlanFilters()">Reset</x-ui.button>
+                                </div>
+                            </x-ui.filter>
+                        </div>
                     </x-slot>
 
                     <div class="row g-0">
                         <!-- LEFT COLUMN: ALL PLANS NAMES ONLY -->
                         <div class="col-md-4 col-12 border-end">
-                            <!-- Search, Sort & Filter Panel -->
-                            <div class="p-3 border-bottom bg-light-soft">
-                                <!-- Sort & Filter Buttons (Side-by-Side at the top) -->
-                                <div class="d-flex gap-2 mb-2">
-                                    <!-- Sort Dropdown -->
-                                    <x-ui.sort-dropdown label="SORT" class="flex-fill">
-                                        <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortLeavePlans('name_asc', this); event.preventDefault();">Name (A-Z)</a>
-                                        <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortLeavePlans('name_desc', this); event.preventDefault();">Name (Z-A)</a>
-                                        <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortLeavePlans('newest', this); event.preventDefault();">Newest First</a>
-                                    </x-ui.sort-dropdown>
-
-                                    <!-- Filter Dropdown -->
-                                    <x-ui.filter label="FILTER" class="flex-fill">
-                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
-                                            <x-ui.odoo-form-ui type="select" name="lp_status" id="lp_filter_status">
-                                                <option value="">All Statuses</option>
-                                                <option value="1">Active</option>
-                                                <option value="0">Inactive</option>
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Company</label>
-                                            <x-ui.odoo-form-ui type="select" name="lp_company" id="lp_filter_company">
-                                                <option value="">All Companies</option>
-                                                @foreach($companies as $company)
-                                                    <option value="{{ $company->id }}">{{ $company->company_name }}</option>
-                                                @endforeach
-                                            </x-ui.odoo-form-ui>
-                                        </div>
-
-                                        <div class="dropdown-divider my-3"></div>
-
-                                        <div class="d-flex gap-2">
-                                            <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterLeavePlans()">Apply Filters</x-ui.button>
-                                            <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeavePlanFilters()">Reset</x-ui.button>
-                                        </div>
-                                    </x-ui.filter>
-                                </div>
-
-                                <!-- Search Input (Below the buttons) -->
-                                <div class="theme-search-container">
-                                    <i class="feather-search"></i>
-                                    <input type="text" id="leavePlanSearch" class="theme-search-input" placeholder="Search leave plans...">
-                                </div>
-                            </div>
 
                             <div class="list-group list-group-flush rounded-0" style="min-height: 400px; max-height: 600px; overflow-y: auto;">
                                 @forelse($leavePlans as $plan)
@@ -258,24 +256,23 @@
                         </div>
 
                         <!-- RIGHT COLUMN: SELECTED PLAN DETAILS & LEAVE TYPES TABLE -->
-                        <div class="col-md-8 col-12">
-                            @forelse($leavePlans as $plan)
-                                @php
-                                    $isPaneActive = ($selectedPlan && $selectedPlan->id === $plan->id) || (!$selectedPlan && $loop->first);
-                                @endphp
-                                <div class="plan-details-pane {{ $isPaneActive ? '' : 'd-none' }}" id="plan-details-{{ $plan->id }}">
+                        <div class="col-md-8 col-12" id="activePlanDetailsContainer">
+                            @if($selectedPlan)
+                                <input type="hidden" id="lt_sort_value" value="{{ $ltSort }}">
+                                <input type="hidden" id="lt_type_value" value="{{ $ltType }}">
+                                <div class="plan-details-pane" id="plan-details-{{ $selectedPlan->id }}">
                                     <div class="p-4">
                                         <!-- Selected Plan Details and Actions -->
                                         <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
                                             <div>
-                                                <h5 class="fw-bold text-dark mb-1" style="font-size: 16px;">{{ $plan->name }}</h5>
+                                                <h5 class="fw-bold text-dark mb-1" style="font-size: 16px;">{{ $selectedPlan->name }}</h5>
                                                 <div class="text-muted d-flex align-items-center gap-2" style="font-size: 12px;">
-                                                    <span><i class="feather-briefcase me-1"></i>{{ $plan->company ? $plan->company->company_name : 'All Companies' }}</span>
+                                                    <span><i class="feather-briefcase me-1"></i>{{ $selectedPlan->company ? $selectedPlan->company->company_name : 'All Companies' }}</span>
                                                     <span>&bull;</span>
-                                                    <span><i class="feather-calendar me-1"></i>Effective From: <strong>{{ $plan->effective_from ? $plan->effective_from->format('d M, Y') : '-' }}</strong></span>
+                                                    <span><i class="feather-calendar me-1"></i>Effective From: <strong>{{ $selectedPlan->effective_from ? $selectedPlan->effective_from->format('d M, Y') : '-' }}</strong></span>
                                                     <span>&bull;</span>
                                                     <span>
-                                                        @if($plan->status)
+                                                        @if($selectedPlan->status)
                                                             <span class="text-success"><i class="feather-check-circle me-1"></i>Active</span>
                                                         @else
                                                             <span class="text-danger"><i class="feather-slash me-1"></i>Inactive</span>
@@ -285,12 +282,12 @@
                                             </div>
                                             
                                             <!-- Actions Dropdown for Leave Plan -->
-                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $plan->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this plan and all its configured leave types?');">
+                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $selectedPlan->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this plan and all its configured leave types?');">
                                                 @csrf
                                                 @method('DELETE')
                                                 <x-ui.action-dropdown>
                                                     <li>
-                                                        <a class="dropdown-item edit-plan-btn" href="javascript:void(0)" data-plan="{{ base64_encode($plan->toJson()) }}">
+                                                        <a class="dropdown-item edit-plan-btn" href="javascript:void(0)" data-plan="{{ base64_encode($selectedPlan->toJson()) }}">
                                                             <i class="feather feather-edit-3 me-3"></i>
                                                             <span>Edit Plan</span>
                                                         </a>
@@ -306,16 +303,16 @@
                                             </form>
                                         </div>
 
-                                        @if($plan->description)
+                                        @if($selectedPlan->description)
                                             <div class="p-3 bg-light rounded mb-4" style="font-size: 13px; color: #475569;">
-                                                <i class="feather-info me-2 text-primary"></i>{{ $plan->description }}
+                                                <i class="feather-info me-2 text-primary"></i>{{ $selectedPlan->description }}
                                             </div>
                                         @endif
 
                                         <!-- Sub-header for Leave Types list -->
                                         <div class="d-flex justify-content-between align-items-center mb-3">
                                             <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">Leave Types</h6>
-                                            <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-type-trigger-btn" data-plan-id="{{ $plan->id }}" data-bs-toggle="modal" data-bs-target="#addLeaveTypeModal">
+                                            <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-type-trigger-btn" data-plan-id="{{ $selectedPlan->id }}" data-bs-toggle="modal" data-bs-target="#addLeaveTypeModal">
                                                 Add Leave Type
                                             </x-ui.button>
                                         </div>
@@ -325,22 +322,22 @@
                                             <!-- Search Input -->
                                             <div class="theme-search-container flex-grow-1">
                                                 <i class="feather-search"></i>
-                                                <input type="text" class="theme-search-input leave-type-search-input" data-plan-id="{{ $plan->id }}" placeholder="Search leave types...">
+                                                <input type="text" class="theme-search-input leave-type-search-input" data-plan-id="{{ $selectedPlan->id }}" placeholder="Search leave types..." value="{{ $ltSearch }}">
                                             </div>
 
                                             <!-- Sort Dropdown -->
                                             <x-ui.sort-dropdown label="SORT" style="flex-shrink: 0;">
-                                                <a class="dropdown-item d-flex justify-content-between align-items-center py-2 active" href="#" data-sort="name_asc" onclick="sortLeaveTypes('{{ $plan->id }}', 'name_asc', this); event.preventDefault();">
+                                                <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $ltSort === 'name_asc' ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeLeaveTypeSort('{{ $selectedPlan->id }}', 'name_asc', this); event.preventDefault();">
                                                     <span>Name (A-Z)</span>
                                                 </a>
-                                                <a class="dropdown-item d-flex justify-content-between align-items-center py-2" href="#" data-sort="name_desc" onclick="sortLeaveTypes('{{ $plan->id }}', 'name_desc', this); event.preventDefault();">
+                                                <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $ltSort === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeLeaveTypeSort('{{ $selectedPlan->id }}', 'name_desc', this); event.preventDefault();">
                                                     <span>Name (Z-A)</span>
                                                 </a>
                                                 <div class="dropdown-divider"></div>
-                                                <a class="dropdown-item d-flex justify-content-between align-items-center py-2" href="#" data-sort="quota_asc" onclick="sortLeaveTypes('{{ $plan->id }}', 'quota_asc', this); event.preventDefault();">
+                                                <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $ltSort === 'quota_asc' ? 'active' : '' }}" href="#" data-sort="quota_asc" onclick="changeLeaveTypeSort('{{ $selectedPlan->id }}', 'quota_asc', this); event.preventDefault();">
                                                     <span>Quota (Low to High)</span>
                                                 </a>
-                                                <a class="dropdown-item d-flex justify-content-between align-items-center py-2" href="#" data-sort="quota_desc" onclick="sortLeaveTypes('{{ $plan->id }}', 'quota_desc', this); event.preventDefault();">
+                                                <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $ltSort === 'quota_desc' ? 'active' : '' }}" href="#" data-sort="quota_desc" onclick="changeLeaveTypeSort('{{ $selectedPlan->id }}', 'quota_desc', this); event.preventDefault();">
                                                     <span>Quota (High to Low)</span>
                                                 </a>
                                             </x-ui.sort-dropdown>
@@ -348,26 +345,26 @@
                                             <!-- Filter Dropdown -->
                                             <x-ui.filter label="FILTER" style="flex-shrink: 0;">
                                                 <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
-                                                <div class="mb-3 leave-type-filter-select-wrapper" data-plan-id="{{ $plan->id }}">
+                                                <div class="mb-3 leave-type-filter-select-wrapper" data-plan-id="{{ $selectedPlan->id }}">
                                                     <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
-                                                    <x-ui.odoo-form-ui type="select" class="leave-type-filter-select">
+                                                    <x-ui.odoo-form-ui type="select" name="lt_filter_type" id="lt_filter_type">
                                                         <option value="">All Types</option>
-                                                        <option value="paid">Paid</option>
-                                                        <option value="unpaid">Unpaid</option>
+                                                        <option value="paid" @selected($ltType === 'paid')>Paid</option>
+                                                        <option value="unpaid" @selected($ltType === 'unpaid')>Unpaid</option>
                                                     </x-ui.odoo-form-ui>
                                                 </div>
 
                                                 <div class="dropdown-divider my-3"></div>
 
                                                 <div class="d-flex gap-2">
-                                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterLeaveTypes('{{ $plan->id }}')">Apply Filters</x-ui.button>
-                                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeaveTypeFilters('{{ $plan->id }}')">Reset</x-ui.button>
+                                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyLeaveTypeFilter('{{ $selectedPlan->id }}')">Apply Filters</x-ui.button>
+                                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeaveTypeFilters('{{ $selectedPlan->id }}')">Reset</x-ui.button>
                                                 </div>
                                             </x-ui.filter>
                                         </div>
 
                                         <div class="border rounded bg-white">
-                                            <table class="table table-hover mb-0 align-middle" style="font-size: 13px;">
+                                            <table class="table table-hover mb-0 align-middle" style="font-size: 13px;" id="leaveTypesTable">
                                                 <thead class="table-light">
                                                     <tr>
                                                         <th>Leave Type</th>
@@ -376,8 +373,8 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    @forelse($plan->types as $type)
-                                                        <tr class="leave-type-row-{{ $plan->id }}"
+                                                    @forelse($leaveTypes as $type)
+                                                        <tr class="leave-type-row-{{ $selectedPlan->id }}"
                                                             data-name="{{ strtolower($type->name) }}"
                                                             data-type="{{ strtolower($type->type) }}"
                                                             data-quota="{{ floatval($type->quota) }}">
@@ -439,26 +436,28 @@
                                             $perPage = $leaveTypes->perPage();
                                         @endphp
                                         @if($leaveTypes->hasPages())
-                                            <div class="card-footer bg-white border-top px-4 py-3">
+                                            <div class="card-footer bg-white border-top px-4 py-3 leave-type-pagination-container">
                                                 <x-ui.pagination
                                                     class="px-0 py-0"
                                                     :current-page="$currentPage"
                                                     :total-pages="$totalPages"
                                                     :total-results="$totalResults"
                                                     :per-page="$perPage"
+                                                    page-param="lt_page"
                                                 />
                                             </div>
                                         @endif
                                     </div>
                                 </div>
-                            @empty
+                            @else
                                 <!-- Empty state when no plan selected/exists -->
                                 <div class="text-center py-5 text-muted my-5">
                                     <i class="feather-calendar text-secondary mb-3 d-block" style="font-size: 48px;"></i>
                                     <h5 class="fw-bold text-dark">No Leave Plan Selected</h5>
                                     <p class="text-muted">Please select a leave plan from the left list or create a new plan.</p>
                                 </div>
-                            @endforelse
+                            @endif
+                        </div>
                         </div>
                     </div>
                 </x-ui.card>
@@ -1137,11 +1136,10 @@
                 leavePlanSearchInput.addEventListener('input', filterLeavePlans);
             }
 
-            // Client-side plan switching (no page reloads)
+            // AJAX-based plan switching (no full page reloads)
             $(document).on('click', '.plan-switch-btn', function(e) {
                 e.preventDefault();
                 let clicked = $(this);
-                let targetPaneId = clicked.attr('data-target');
                 let planId = clicked.attr('data-plan-id');
 
                 // Switch active class in list items
@@ -1151,15 +1149,14 @@
                 clicked.addClass('active');
                 clicked.find('span').removeClass('text-dark').addClass('text-primary');
 
-                // Toggle visibility of plan details panes
-                $('.plan-details-pane').addClass('d-none');
-                $(targetPaneId).removeClass('d-none');
-
                 // Update URL parameter without reload
                 if (history.pushState) {
                     let newurl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?plan_id=' + planId;
                     window.history.pushState({path:newurl}, '', newurl);
                 }
+
+                // Load plan details via AJAX (full reload of details container)
+                loadPlanDetails(planId, 1, true);
             });
 
             // Set up preselected plan when opening add leave type
@@ -1536,79 +1533,134 @@
                 $('.dropdown-menu').removeClass('show');
             }
 
-            // Client-side filtering and sorting functions for Leave Types
+            // AJAX-based search, sort, filter and pagination for Leave Types
+            function loadPlanDetails(planId, page = 1, isPlanSwitch = false) {
+                var search = $('.leave-type-search-input').val() || '';
+                var sort = $('#lt_sort_value').val() || 'name_asc';
+                var type = $('#lt_type_value').val() || '';
+                
+                var url = '{{ route("hrms.leave-structure.index") }}?plan_id=' + planId + 
+                          '&lt_search=' + encodeURIComponent(search) + 
+                          '&lt_sort=' + encodeURIComponent(sort) + 
+                          '&lt_type=' + encodeURIComponent(type) + 
+                          '&lt_page=' + page;
+                          
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    success: function(response) {
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(response, 'text/html');
+                        
+                        if (isPlanSwitch) {
+                            // Update active details container completely
+                            var oldContainer = $('#activePlanDetailsContainer');
+                            var newContainer = $(doc).find('#activePlanDetailsContainer');
+                            if (newContainer.length && oldContainer.length) {
+                                oldContainer.html(newContainer.html());
+                            }
+                        } else {
+                            // Update only the table and pagination to preserve input focus & open states
+                            var oldTable = $('#leaveTypesTable');
+                            var newTable = $(doc).find('#leaveTypesTable');
+                            if (newTable.length && oldTable.length) {
+                                oldTable.html(newTable.html());
+                            }
+                            
+                            var oldPagination = $('.leave-type-pagination-container');
+                            var newPagination = $(doc).find('.leave-type-pagination-container');
+                            if (newPagination.length && oldPagination.length) {
+                                oldPagination.replaceWith(newPagination);
+                            } else if (newPagination.length) {
+                                $('#leaveTypesTable').parent().after(newPagination);
+                            } else {
+                                oldPagination.empty();
+                            }
+                        }
+
+                        // Re-initialize Select2 inside active details container (especially the filter select)
+                        if (window.jQuery && $.fn.select2) {
+                            $('#activePlanDetailsContainer').find('.odoo-select2').each(function() {
+                                var select = $(this);
+                                if (!select.hasClass('select2-hidden-accessible')) {
+                                    select.select2({
+                                        theme: "bootstrap-5",
+                                        width: "100%"
+                                    });
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+
+            let leaveTypeSearchTimeout = null;
             $(document).on('input', '.leave-type-search-input', function() {
-                const planId = $(this).attr('data-plan-id');
-                filterLeaveTypes(planId);
+                clearTimeout(leaveTypeSearchTimeout);
+                var planId = $(this).attr('data-plan-id');
+                leaveTypeSearchTimeout = setTimeout(function() {
+                    loadPlanDetails(planId, 1, false);
+                }, 300);
             });
 
-            function filterLeaveTypes(planId) {
-                const searchInput = $(`.leave-type-search-input[data-plan-id="${planId}"]`);
-                const search = searchInput.val().toLowerCase().trim();
-                
-                const filterSelect = $(`.leave-type-filter-select-wrapper[data-plan-id="${planId}"] select`);
-                const typeFilter = filterSelect.val() || '';
-                
-                $(`.leave-type-row-${planId}`).each(function() {
-                    const name = $(this).attr('data-name') || '';
-                    const type = $(this).attr('data-type') || '';
-                    
-                    const matchesSearch = name.includes(search);
-                    const matchesType = (typeFilter === '') || (type === typeFilter);
-                    
-                    if (matchesSearch && matchesType) {
-                        $(this).removeClass('d-none');
-                    } else {
-                        $(this).addClass('d-none');
+            window.changeLeaveTypeSort = function(planId, criteria, element) {
+                var input = document.getElementById('lt_sort_value');
+                if (input) {
+                    input.value = criteria;
+                }
+
+                if (element) {
+                    var menu = element.closest('.dropdown-menu');
+                    if (menu) {
+                        menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                            el.classList.remove('active');
+                        });
                     }
-                });
+                    element.classList.add('active');
+                }
 
-                // Auto close dropdowns
-                $('.dropdown-menu').removeClass('show');
-            }
+                loadPlanDetails(planId, 1, false);
+            };
 
-            function resetLeaveTypeFilters(planId) {
-                $(`.leave-type-filter-select-wrapper[data-plan-id="${planId}"] select`).val('').trigger('change');
-                $(`.leave-type-search-input[data-plan-id="${planId}"]`).val('');
-                filterLeaveTypes(planId);
-            }
+            window.applyLeaveTypeFilter = function(planId) {
+                var typeVal = $('#lt_filter_type').val() || '';
+                var input = document.getElementById('lt_type_value');
+                if (input) {
+                    input.value = typeVal;
+                }
 
-            function sortLeaveTypes(planId, criteria, element) {
-                $(element).closest('.dropdown-menu').find('.dropdown-item').removeClass('active');
-                $(element).addClass('active');
-                
-                const tbody = $(`.leave-type-row-${planId}`).first().parent();
-                if (!tbody.length) return;
-                const items = tbody.find(`.leave-type-row-${planId}`).get();
-                
-                items.sort((a, b) => {
-                    if (criteria === 'name_asc') {
-                        return $(a).attr('data-name').localeCompare($(b).attr('data-name'));
-                    } else if (criteria === 'name_desc') {
-                        return $(b).attr('data-name').localeCompare($(a).attr('data-name'));
-                    } else if (criteria === 'quota_asc') {
-                        return parseFloat($(a).attr('data-quota') || 0) - parseFloat($(b).attr('data-quota') || 0);
-                    } else if (criteria === 'quota_desc') {
-                        return parseFloat($(b).attr('data-quota') || 0) - parseFloat($(a).attr('data-quota') || 0);
-                    }
-                    return 0;
-                });
-                
-                $.each(items, function(i, item) {
-                    tbody.append(item);
-                });
+                loadPlanDetails(planId, 1, false);
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
+            };
 
-                // Auto close dropdowns
-                $('.dropdown-menu').removeClass('show');
-            }
+            window.resetLeaveTypeFilters = function(planId) {
+                $('#lt_filter_type').val('').trigger('change');
+                var input = document.getElementById('lt_type_value');
+                if (input) {
+                    input.value = '';
+                }
+                $('.leave-type-search-input').val('');
+
+                loadPlanDetails(planId, 1, false);
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
+            };
+
+            $(document).on('click', '#activePlanDetailsContainer .leave-type-pagination-container a', function(e) {
+                e.preventDefault();
+                var url = $(this).attr('href');
+                if (!url) return;
+                var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+                var page = urlParams.get('lt_page') || 1;
+                var planId = $('.leave-type-search-input').attr('data-plan-id');
+                loadPlanDetails(planId, page, false);
+            });
 
             // Expose function references to window to bypass scope restrictions
             window.filterLeavePlans = filterLeavePlans;
             window.resetLeavePlanFilters = resetLeavePlanFilters;
             window.sortLeavePlans = sortLeavePlans;
-            window.filterLeaveTypes = filterLeaveTypes;
-            window.resetLeaveTypeFilters = resetLeaveTypeFilters;
-            window.sortLeaveTypes = sortLeaveTypes;
         });
     </script>
     <script>
