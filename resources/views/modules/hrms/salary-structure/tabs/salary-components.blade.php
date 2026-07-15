@@ -53,36 +53,32 @@
                     </x-slot>
 
                     <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
+                        <input type="hidden" id="rec_sort_value" value="{{ request('rec_sort') }}">
+                        <input type="hidden" id="rec_status_value" value="{{ request('rec_status') }}">
+                        <input type="hidden" id="rec_type_value" value="{{ request('rec_type') }}">
+
                         <!-- Search Input (Placed before sort and filter in same line) -->
                         <div class="theme-search-container" style="max-width: 300px;">
-                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
-                                <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
-                                <input type="hidden" name="tab" value="components">
-                                <input type="hidden" name="subtab" value="recurring">
-                                <input type="hidden" name="rec_status" value="{{ request('rec_status') }}">
-                                <input type="hidden" name="rec_type" value="{{ request('rec_type') }}">
-                                <input type="hidden" name="rec_sort" value="{{ request('rec_sort') }}">
-                                <i class="feather-search"></i>
-                                <input type="text" name="rec_search" class="theme-search-input" placeholder="Search components..." value="{{ request('rec_search') }}">
-                            </form>
+                            <i class="feather-search"></i>
+                            <input type="text" id="rec_search_input" name="rec_search" class="theme-search-input" placeholder="Search components..." value="{{ request('rec_search') }}">
                         </div>
 
                         <!-- Sort Dropdown -->
                         <x-ui.sort-dropdown label="SORT">
-                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['rec_sort' => 'name_asc']) }}">
+                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'name_asc' || !request('rec_sort') ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeRecSort('name_asc', this); event.preventDefault();">
                                 <span>Name (A-Z)</span>
-                                @if(request('rec_sort') === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                                @if(request('rec_sort') === 'name_asc' || !request('rec_sort')) <i class="feather-check ms-3"></i> @endif
                             </a>
-                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['rec_sort' => 'name_desc']) }}">
+                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeRecSort('name_desc', this); event.preventDefault();">
                                 <span>Name (Z-A)</span>
                                 @if(request('rec_sort') === 'name_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'code_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['rec_sort' => 'code_asc']) }}">
+                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'code_asc' ? 'active' : '' }}" href="#" data-sort="code_asc" onclick="changeRecSort('code_asc', this); event.preventDefault();">
                                 <span>Code (A-Z)</span>
                                 @if(request('rec_sort') === 'code_asc') <i class="feather-check ms-3"></i> @endif
                             </a>
-                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'code_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['rec_sort' => 'code_desc']) }}">
+                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'code_desc' ? 'active' : '' }}" href="#" data-sort="code_desc" onclick="changeRecSort('code_desc', this); event.preventDefault();">
                                 <span>Code (Z-A)</span>
                                 @if(request('rec_sort') === 'code_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
@@ -91,43 +87,36 @@
                         <!-- Filter Dropdown -->
                         <x-ui.filter label="FILTER">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
-                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
-                                <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
-                                <input type="hidden" name="tab" value="components">
-                                <input type="hidden" name="subtab" value="recurring">
-                                <input type="hidden" name="rec_search" value="{{ request('rec_search') }}">
-                                <input type="hidden" name="rec_sort" value="{{ request('rec_sort') }}">
-                                
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
-                                    <x-ui.odoo-form-ui type="select" name="rec_status">
-                                        <option value="">All Statuses</option>
-                                        <option value="1" @selected(request('rec_status') === '1')>Active</option>
-                                        <option value="0" @selected(request('rec_status') === '0')>Inactive</option>
-                                    </x-ui.odoo-form-ui>
-                                </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <x-ui.odoo-form-ui type="select" name="rec_filter_status" id="rec_filter_status">
+                                    <option value="">All Statuses</option>
+                                    <option value="1" @selected(request('rec_status') === '1')>Active</option>
+                                    <option value="0" @selected(request('rec_status') === '0')>Inactive</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
-                                    <x-ui.odoo-form-ui type="select" name="rec_type">
-                                        <option value="">All Types</option>
-                                        <option value="earning" @selected(request('rec_type') === 'earning')>Earning</option>
-                                        <option value="deduction" @selected(request('rec_type') === 'deduction')>Deduction</option>
-                                    </x-ui.odoo-form-ui>
-                                </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
+                                <x-ui.odoo-form-ui type="select" name="rec_filter_type" id="rec_filter_type">
+                                    <option value="">All Types</option>
+                                    <option value="earning" @selected(request('rec_type') === 'earning')>Earning</option>
+                                    <option value="deduction" @selected(request('rec_type') === 'deduction')>Deduction</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
 
-                                <div class="dropdown-divider my-3"></div>
+                            <div class="dropdown-divider my-3"></div>
 
-                                <div class="d-flex gap-2">
-                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
-                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="window.location.href='{{ route('hrms.salary-structure.index', ['pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : '', 'tab' => 'components', 'subtab' => 'recurring']) }}'">Reset</x-ui.button>
-                                </div>
-                            </form>
+                            <div class="d-flex gap-2">
+                                <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyRecFilter()">Apply Filters</x-ui.button>
+                                <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetRecFilters()">Reset</x-ui.button>
+                            </div>
                         </x-ui.filter>
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
+                        <table class="table table-hover mb-0 align-middle" id="recurringComponentsTable">
                             <thead class="table-light">
                                 <tr>
                                     <th width="60">#</th>
@@ -141,7 +130,7 @@
                             <tbody>
                                 @forelse($recurringComponents as $sc)
                                 <tr class="recurring-component-row">
-                                    <td>{{ $loop->iteration }}</td>
+                                    <td>{{ ($recurringComponents instanceof \Illuminate\Pagination\LengthAwarePaginator) ? ($recurringComponents->currentPage() - 1) * $recurringComponents->perPage() + $loop->iteration : $loop->iteration }}</td>
                                     <td><span class="fw-bold text-dark component-name">{{ $sc->name }}</span></td>
                                     <td><code class="component-code">{{ $sc->code }}</code></td>
                                     <td>
@@ -190,20 +179,22 @@
                             </tbody>
                         </table>
                     </div>
-                    @if($salaryComponents instanceof \Illuminate\Pagination\LengthAwarePaginator && $salaryComponents->hasPages())
+                    @if($recurringComponents instanceof \Illuminate\Pagination\LengthAwarePaginator && $recurringComponents->hasPages())
                         @php
-                            $currentPage = $salaryComponents->currentPage();
-                            $totalPages = $salaryComponents->lastPage();
-                            $totalResults = $salaryComponents->total();
-                            $perPage = $salaryComponents->perPage();
+                            $currentPage = $recurringComponents->currentPage();
+                            $totalPages = $recurringComponents->lastPage();
+                            $totalResults = $recurringComponents->total();
+                            $perPage = $recurringComponents->perPage();
                         @endphp
-                        <div class="card-footer bg-white border-top px-4 py-3">
+                        <div class="card-footer bg-white border-top px-4 py-3 rec-pagination-container">
                             <x-ui.pagination
                                 class="px-0 py-0"
                                 :current-page="$currentPage"
                                 :total-pages="$totalPages"
                                 :total-results="$totalResults"
                                 :per-page="$perPage"
+                                page-param="rec_page"
+                                tab="components"
                             />
                         </div>
                     @endif
@@ -224,36 +215,32 @@
                     </x-slot>
 
                     <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
+                        <input type="hidden" id="adhoc_sort_value" value="{{ request('adhoc_sort') }}">
+                        <input type="hidden" id="adhoc_status_value" value="{{ request('adhoc_status') }}">
+                        <input type="hidden" id="adhoc_type_value" value="{{ request('adhoc_type') }}">
+
                         <!-- Search Input (Placed before sort and filter in same line) -->
                         <div class="theme-search-container" style="max-width: 300px;">
-                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
-                                <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
-                                <input type="hidden" name="tab" value="components">
-                                <input type="hidden" name="subtab" value="adhoc">
-                                <input type="hidden" name="adhoc_status" value="{{ request('adhoc_status') }}">
-                                <input type="hidden" name="adhoc_type" value="{{ request('adhoc_type') }}">
-                                <input type="hidden" name="adhoc_sort" value="{{ request('adhoc_sort') }}">
-                                <i class="feather-search"></i>
-                                <input type="text" name="adhoc_search" class="theme-search-input" placeholder="Search components..." value="{{ request('adhoc_search') }}">
-                            </form>
+                            <i class="feather-search"></i>
+                            <input type="text" id="adhoc_search_input" name="adhoc_search" class="theme-search-input" placeholder="Search components..." value="{{ request('adhoc_search') }}">
                         </div>
 
                         <!-- Sort Dropdown -->
                         <x-ui.sort-dropdown label="SORT">
-                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['adhoc_sort' => 'name_asc']) }}">
+                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'name_asc' || !request('adhoc_sort') ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeAdhocSort('name_asc', this); event.preventDefault();">
                                 <span>Name (A-Z)</span>
-                                @if(request('adhoc_sort') === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                                @if(request('adhoc_sort') === 'name_asc' || !request('adhoc_sort')) <i class="feather-check ms-3"></i> @endif
                             </a>
-                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['adhoc_sort' => 'name_desc']) }}">
+                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeAdhocSort('name_desc', this); event.preventDefault();">
                                 <span>Name (Z-A)</span>
                                 @if(request('adhoc_sort') === 'name_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <div class="dropdown-divider"></div>
-                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'code_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['adhoc_sort' => 'code_asc']) }}">
+                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'code_asc' ? 'active' : '' }}" href="#" data-sort="code_asc" onclick="changeAdhocSort('code_asc', this); event.preventDefault();">
                                 <span>Code (A-Z)</span>
                                 @if(request('adhoc_sort') === 'code_asc') <i class="feather-check ms-3"></i> @endif
                             </a>
-                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'code_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['adhoc_sort' => 'code_desc']) }}">
+                            <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'code_desc' ? 'active' : '' }}" href="#" data-sort="code_desc" onclick="changeAdhocSort('code_desc', this); event.preventDefault();">
                                 <span>Code (Z-A)</span>
                                 @if(request('adhoc_sort') === 'code_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
@@ -262,43 +249,36 @@
                         <!-- Filter Dropdown -->
                         <x-ui.filter label="FILTER">
                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
-                            <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
-                                <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
-                                <input type="hidden" name="tab" value="components">
-                                <input type="hidden" name="subtab" value="adhoc">
-                                <input type="hidden" name="adhoc_search" value="{{ request('adhoc_search') }}">
-                                <input type="hidden" name="adhoc_sort" value="{{ request('adhoc_sort') }}">
-                                
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
-                                    <x-ui.odoo-form-ui type="select" name="adhoc_status">
-                                        <option value="">All Statuses</option>
-                                        <option value="1" @selected(request('adhoc_status') === '1')>Active</option>
-                                        <option value="0" @selected(request('adhoc_status') === '0')>Inactive</option>
-                                    </x-ui.odoo-form-ui>
-                                </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <x-ui.odoo-form-ui type="select" name="adhoc_filter_status" id="adhoc_filter_status">
+                                    <option value="">All Statuses</option>
+                                    <option value="1" @selected(request('adhoc_status') === '1')>Active</option>
+                                    <option value="0" @selected(request('adhoc_status') === '0')>Inactive</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
-                                    <x-ui.odoo-form-ui type="select" name="adhoc_type">
-                                        <option value="">All Types</option>
-                                        <option value="earning" @selected(request('adhoc_type') === 'earning')>Earning</option>
-                                        <option value="deduction" @selected(request('adhoc_type') === 'deduction')>Deduction</option>
-                                    </x-ui.odoo-form-ui>
-                                </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
+                                <x-ui.odoo-form-ui type="select" name="adhoc_filter_type" id="adhoc_filter_type">
+                                    <option value="">All Types</option>
+                                    <option value="earning" @selected(request('adhoc_type') === 'earning')>Earning</option>
+                                    <option value="deduction" @selected(request('adhoc_type') === 'deduction')>Deduction</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
 
-                                <div class="dropdown-divider my-3"></div>
+                            <div class="dropdown-divider my-3"></div>
 
-                                <div class="d-flex gap-2">
-                                    <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
-                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="window.location.href='{{ route('hrms.salary-structure.index', ['pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : '', 'tab' => 'components', 'subtab' => 'adhoc']) }}'">Reset</x-ui.button>
-                                </div>
-                            </form>
+                            <div class="d-flex gap-2">
+                                <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyAdhocFilter()">Apply Filters</x-ui.button>
+                                <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetAdhocFilters()">Reset</x-ui.button>
+                            </div>
                         </x-ui.filter>
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
+                        <table class="table table-hover mb-0 align-middle" id="adhocComponentsTable">
                             <thead class="table-light">
                                 <tr>
                                     <th width="60">#</th>
@@ -312,7 +292,7 @@
                             <tbody>
                                 @forelse($adhocComponents as $sc)
                                 <tr class="adhoc-component-row">
-                                    <td>{{ $loop->iteration }}</td>
+                                    <td>{{ ($adhocComponents instanceof \Illuminate\Pagination\LengthAwarePaginator) ? ($adhocComponents->currentPage() - 1) * $adhocComponents->perPage() + $loop->iteration : $loop->iteration }}</td>
                                     <td><span class="fw-bold text-dark component-name">{{ $sc->name }}</span></td>
                                     <td><code class="component-code">{{ $sc->code }}</code></td>
                                     <td>
@@ -361,20 +341,22 @@
                             </tbody>
                         </table>
                     </div>
-                    @if($salaryComponents instanceof \Illuminate\Pagination\LengthAwarePaginator && $salaryComponents->hasPages())
+                    @if($adhocComponents instanceof \Illuminate\Pagination\LengthAwarePaginator && $adhocComponents->hasPages())
                         @php
-                            $currentPage = $salaryComponents->currentPage();
-                            $totalPages = $salaryComponents->lastPage();
-                            $totalResults = $salaryComponents->total();
-                            $perPage = $salaryComponents->perPage();
+                            $currentPage = $adhocComponents->currentPage();
+                            $totalPages = $adhocComponents->lastPage();
+                            $totalResults = $adhocComponents->total();
+                            $perPage = $adhocComponents->perPage();
                         @endphp
-                        <div class="card-footer bg-white border-top px-4 py-3">
+                        <div class="card-footer bg-white border-top px-4 py-3 adhoc-pagination-container">
                             <x-ui.pagination
                                 class="px-0 py-0"
                                 :current-page="$currentPage"
                                 :total-pages="$totalPages"
                                 :total-results="$totalResults"
                                 :per-page="$perPage"
+                                page-param="adhoc_page"
+                                tab="components"
                             />
                         </div>
                     @endif
@@ -395,33 +377,203 @@
             window.history.pushState({path:newurl}, '', newurl);
         });
 
-        // Prevent components search forms submit and filter client-side instantly
-        $(document).on('submit', 'form:has(input[name="rec_search"]), form:has(input[name="adhoc_search"])', function(e) {
+        // AJAX loaders for Recurring & Adhoc components
+        function loadRecurring(page = 1) {
+            var payGroupId = '{{ $selectedPayGroup ? $selectedPayGroup->id : "" }}';
+            var search = $('#rec_search_input').val() || '';
+            var sort = $('#rec_sort_value').val() || 'name_asc';
+            var status = $('#rec_filter_status').val() || '';
+            var type = $('#rec_filter_type').val() || '';
+            
+            var url = '{{ route("hrms.salary-structure.index") }}?pay_group_id=' + payGroupId + 
+                      '&tab=components&subtab=recurring&rec_search=' + encodeURIComponent(search) + 
+                      '&rec_sort=' + encodeURIComponent(sort) + 
+                      '&rec_status=' + encodeURIComponent(status) + 
+                      '&rec_type=' + encodeURIComponent(type) + 
+                      '&rec_page=' + page;
+                      
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(response) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(response, 'text/html');
+                    
+                    // Update table
+                    var oldTable = $('#recurringComponentsTable');
+                    var newTable = $(doc).find('#recurringComponentsTable');
+                    if (newTable.length && oldTable.length) {
+                        oldTable.html(newTable.html());
+                    }
+                    
+                    // Update pagination
+                    var oldPagination = $('.rec-pagination-container');
+                    var newPagination = $(doc).find('.rec-pagination-container');
+                    if (newPagination.length && oldPagination.length) {
+                        oldPagination.replaceWith(newPagination);
+                    } else if (newPagination.length) {
+                        $('#recurringComponentsTable').parent().after(newPagination);
+                    } else if (oldPagination.length) {
+                        oldPagination.remove();
+                    }
+                }
+            });
+        }
+
+        function loadAdhoc(page = 1) {
+            var payGroupId = '{{ $selectedPayGroup ? $selectedPayGroup->id : "" }}';
+            var search = $('#adhoc_search_input').val() || '';
+            var sort = $('#adhoc_sort_value').val() || 'name_asc';
+            var status = $('#adhoc_filter_status').val() || '';
+            var type = $('#adhoc_filter_type').val() || '';
+            
+            var url = '{{ route("hrms.salary-structure.index") }}?pay_group_id=' + payGroupId + 
+                      '&tab=components&subtab=adhoc&adhoc_search=' + encodeURIComponent(search) + 
+                      '&adhoc_sort=' + encodeURIComponent(sort) + 
+                      '&adhoc_status=' + encodeURIComponent(status) + 
+                      '&adhoc_type=' + encodeURIComponent(type) + 
+                      '&adhoc_page=' + page;
+                      
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(response) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(response, 'text/html');
+                    
+                    // Update table
+                    var oldTable = $('#adhocComponentsTable');
+                    var newTable = $(doc).find('#adhocComponentsTable');
+                    if (newTable.length && oldTable.length) {
+                        oldTable.html(newTable.html());
+                    }
+                    
+                    // Update pagination
+                    var oldPagination = $('.adhoc-pagination-container');
+                    var newPagination = $(doc).find('.adhoc-pagination-container');
+                    if (newPagination.length && oldPagination.length) {
+                        oldPagination.replaceWith(newPagination);
+                    } else if (newPagination.length) {
+                        $('#adhocComponentsTable').parent().after(newPagination);
+                    } else if (oldPagination.length) {
+                        oldPagination.remove();
+                    }
+                }
+            });
+        }
+
+        let recSearchTimeout = null;
+        $(document).on('input', '#rec_search_input', function() {
+            clearTimeout(recSearchTimeout);
+            recSearchTimeout = setTimeout(function() {
+                loadRecurring(1);
+            }, 300);
+        });
+
+        let adhocSearchTimeout = null;
+        $(document).on('input', '#adhoc_search_input', function() {
+            clearTimeout(adhocSearchTimeout);
+            adhocSearchTimeout = setTimeout(function() {
+                loadAdhoc(1);
+            }, 300);
+        });
+
+        window.changeRecSort = function(criteria, element) {
+            var input = document.getElementById('rec_sort_value');
+            if (input) {
+                input.value = criteria;
+            }
+
+            if (element) {
+                var menu = element.closest('.dropdown-menu');
+                if (menu) {
+                    menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                        el.classList.remove('active');
+                        var check = el.querySelector('.feather-check');
+                        if (check) check.remove();
+                    });
+                }
+                element.classList.add('active');
+                $(element).append('<i class="feather-check ms-3"></i>');
+            }
+
+            loadRecurring(1);
+        };
+
+        window.changeAdhocSort = function(criteria, element) {
+            var input = document.getElementById('adhoc_sort_value');
+            if (input) {
+                input.value = criteria;
+            }
+
+            if (element) {
+                var menu = element.closest('.dropdown-menu');
+                if (menu) {
+                    menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                        el.classList.remove('active');
+                        var check = el.querySelector('.feather-check');
+                        if (check) check.remove();
+                    });
+                }
+                element.classList.add('active');
+                $(element).append('<i class="feather-check ms-3"></i>');
+            }
+
+            loadAdhoc(1);
+        };
+
+        window.applyRecFilter = function() {
+            loadRecurring(1);
+            $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+            $('.erp-filter-dropdown.show').removeClass('show');
+        };
+
+        window.resetRecFilters = function() {
+            $('#rec_filter_status').val('').trigger('change');
+            $('#rec_filter_type').val('').trigger('change');
+            $('#rec_search_input').val('');
+            var sortInput = document.getElementById('rec_sort_value');
+            if (sortInput) sortInput.value = '';
+
+            loadRecurring(1);
+            $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+            $('.erp-filter-dropdown.show').removeClass('show');
+        };
+
+        window.applyAdhocFilter = function() {
+            loadAdhoc(1);
+            $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+            $('.erp-filter-dropdown.show').removeClass('show');
+        };
+
+        window.resetAdhocFilters = function() {
+            $('#adhoc_filter_status').val('').trigger('change');
+            $('#adhoc_filter_type').val('').trigger('change');
+            $('#adhoc_search_input').val('');
+            var sortInput = document.getElementById('adhoc_sort_value');
+            if (sortInput) sortInput.value = '';
+
+            loadAdhoc(1);
+            $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+            $('.erp-filter-dropdown.show').removeClass('show');
+        };
+
+        $(document).on('click', '.rec-pagination-container a', function(e) {
             e.preventDefault();
+            var url = $(this).attr('href');
+            if (!url) return;
+            var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+            var page = urlParams.get('rec_page') || 1;
+            loadRecurring(page);
         });
-        $(document).on('input', 'input[name="rec_search"]', function() {
-            const search = $(this).val().toLowerCase().trim();
-            $('.recurring-component-row').each(function() {
-                const name = $(this).find('.component-name').text().toLowerCase();
-                const code = $(this).find('.component-code').text().toLowerCase();
-                if (name.includes(search) || code.includes(search)) {
-                    $(this).css('display', '');
-                } else {
-                    $(this).css('display', 'none');
-                }
-            });
-        });
-        $(document).on('input', 'input[name="adhoc_search"]', function() {
-            const search = $(this).val().toLowerCase().trim();
-            $('.adhoc-component-row').each(function() {
-                const name = $(this).find('.component-name').text().toLowerCase();
-                const code = $(this).find('.component-code').text().toLowerCase();
-                if (name.includes(search) || code.includes(search)) {
-                    $(this).css('display', '');
-                } else {
-                    $(this).css('display', 'none');
-                }
-            });
+
+        $(document).on('click', '.adhoc-pagination-container a', function(e) {
+            e.preventDefault();
+            var url = $(this).attr('href');
+            if (!url) return;
+            var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+            var page = urlParams.get('adhoc_page') || 1;
+            loadAdhoc(page);
         });
 
         // Add Action Trigger to pre-populate pay_group_id and is_adhoc

@@ -239,76 +239,82 @@
                                 <div class="row">
                                     <div class="col-12">
                                         <x-ui.card title="Shifts" stretch bodyClass="p-0">
+                                            <input type="hidden" id="shift_sort_value" value="{{ $shiftSort }}">
                                             <x-slot name="headerAction">
                                                  <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                     <!-- Search Input (Server-Side Form submission) -->
+                                                     <!-- Search Input -->
                                                      <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftSearchForm" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px; height: 38px;">
                                                          <input type="hidden" name="tab" value="shifts">
-                                                         <input type="hidden" name="shift_sort" value="{{ $shiftSort }}">
-                                                         <input type="hidden" name="shift_status" value="{{ $shiftStatus }}">
-                                                         <input type="hidden" name="shift_overtime" value="{{ $shiftOvertime }}">
                                                          <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
                                                          <input type="text" name="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search shifts..." value="{{ $shiftSearch }}" style="box-shadow: none; height: 32px; outline: none;">
                                                      </form>
 
                                                      <!-- Sort Dropdown -->
                                                      <x-ui.sort-dropdown label="SORT">
-                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'name_asc', 'shift_page' => 1]) }}">
-                                                             <span>Name (A-Z)</span>
-                                                             @if($shiftSort === 'name_asc') <i class="feather-check ms-3"></i> @endif
-                                                         </a>
-                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'name_desc', 'shift_page' => 1]) }}">
-                                                             <span>Name (Z-A)</span>
-                                                             @if($shiftSort === 'name_desc') <i class="feather-check ms-3"></i> @endif
-                                                         </a>
-                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'code_asc', 'shift_page' => 1]) }}">
-                                                             <span>Code (A-Z)</span>
-                                                             @if($shiftSort === 'code_asc') <i class="feather-check ms-3"></i> @endif
-                                                         </a>
-                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'code_desc', 'shift_page' => 1]) }}">
-                                                             <span>Code (Z-A)</span>
-                                                             @if($shiftSort === 'code_desc') <i class="feather-check ms-3"></i> @endif
-                                                         </a>
-                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'start_asc', 'shift_page' => 1]) }}">
-                                                             <span>Start Time (Asc)</span>
-                                                             @if($shiftSort === 'start_asc') <i class="feather-check ms-3"></i> @endif
-                                                         </a>
-                                                         <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['tab' => 'shifts', 'shift_sort' => 'start_desc', 'shift_page' => 1]) }}">
-                                                             <span>Start Time (Desc)</span>
-                                                             @if($shiftSort === 'start_desc') <i class="feather-check ms-3"></i> @endif
-                                                         </a>
+                                                         <div id="shift_sort_dropdown_menu">
+                                                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_asc' ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeShiftSort('name_asc', this); event.preventDefault();">
+                                                                 <span>Name (A-Z)</span>
+                                                                 @if($shiftSort === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                                                             </a>
+                                                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeShiftSort('name_desc', this); event.preventDefault();">
+                                                                 <span>Name (Z-A)</span>
+                                                                 @if($shiftSort === 'name_desc') <i class="feather-check ms-3"></i> @endif
+                                                             </a>
+                                                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_asc' ? 'active' : '' }}" href="#" data-sort="code_asc" onclick="changeShiftSort('code_asc', this); event.preventDefault();">
+                                                                 <span>Code (A-Z)</span>
+                                                                 @if($shiftSort === 'code_asc') <i class="feather-check ms-3"></i> @endif
+                                                             </a>
+                                                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_desc' ? 'active' : '' }}" href="#" data-sort="code_desc" onclick="changeShiftSort('code_desc', this); event.preventDefault();">
+                                                                 <span>Code (Z-A)</span>
+                                                                 @if($shiftSort === 'code_desc') <i class="feather-check ms-3"></i> @endif
+                                                             </a>
+                                                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_asc' ? 'active' : '' }}" href="#" data-sort="start_asc" onclick="changeShiftSort('start_asc', this); event.preventDefault();">
+                                                                 <span>Start Time (Asc)</span>
+                                                                 @if($shiftSort === 'start_asc') <i class="feather-check ms-3"></i> @endif
+                                                             </a>
+                                                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_desc' ? 'active' : '' }}" href="#" data-sort="start_desc" onclick="changeShiftSort('start_desc', this); event.preventDefault();">
+                                                                 <span>Start Time (Desc)</span>
+                                                                 @if($shiftSort === 'start_desc') <i class="feather-check ms-3"></i> @endif
+                                                             </a>
+                                                         </div>
                                                      </x-ui.sort-dropdown>
 
                                                      <!-- Filter Dropdown -->
                                                      <x-ui.filter label="FILTER">
                                                          <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
                                                          <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftFilterForm">
-                                                             <input type="hidden" name="tab" value="shifts">
-                                                             <input type="hidden" name="shift_search" value="{{ $shiftSearch }}">
-                                                             <input type="hidden" name="shift_sort" value="{{ $shiftSort }}">
+                                                              <div class="mb-3">
+                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">COMPANY</label>
+                                                                  <x-ui.odoo-form-ui type="select" name="shift_company_id" id="shift_filter_company_id">
+                                                                      <option value="">All Companies</option>
+                                                                      @foreach($companies as $company)
+                                                                          <option value="{{ $company->id }}" @selected((string) request('shift_company_id') === (string) $company->id)>{{ $company->company_name }}</option>
+                                                                      @endforeach
+                                                                  </x-ui.odoo-form-ui>
+                                                              </div>
 
-                                                             <div class="mb-3">
-                                                                 <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
-                                                                 <x-ui.odoo-form-ui type="select" name="shift_status" id="shift_filter_status">
-                                                                     <option value="">All Statuses</option>
-                                                                     <option value="1" @selected($shiftStatus === '1')>Active</option>
-                                                                     <option value="0" @selected($shiftStatus === '0')>Inactive</option>
-                                                                 </x-ui.odoo-form-ui>
-                                                             </div>
+                                                              <div class="mb-3">
+                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
+                                                                  <x-ui.odoo-form-ui type="select" name="shift_status" id="shift_filter_status">
+                                                                      <option value="">All Statuses</option>
+                                                                      <option value="1" @selected($shiftStatus === '1')>Active</option>
+                                                                      <option value="0" @selected($shiftStatus === '0')>Inactive</option>
+                                                                  </x-ui.odoo-form-ui>
+                                                              </div>
 
-                                                             <div class="mb-3">
-                                                                 <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">OVERTIME</label>
-                                                                 <x-ui.odoo-form-ui type="select" name="shift_overtime" id="shift_filter_overtime">
-                                                                     <option value="">All</option>
-                                                                     <option value="1" @selected($shiftOvertime === '1')>Allowed</option>
-                                                                     <option value="0" @selected($shiftOvertime === '0')>Not Allowed</option>
-                                                                 </x-ui.odoo-form-ui>
-                                                             </div>
+                                                              <div class="mb-3">
+                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">OVERTIME</label>
+                                                                  <x-ui.odoo-form-ui type="select" name="shift_overtime" id="shift_filter_overtime">
+                                                                      <option value="">All</option>
+                                                                      <option value="1" @selected($shiftOvertime === '1')>Allowed</option>
+                                                                      <option value="0" @selected($shiftOvertime === '0')>Not Allowed</option>
+                                                                  </x-ui.odoo-form-ui>
+                                                              </div>
 
-                                                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                                                 <a href="{{ route('hrms.roster.index', ['tab' => 'shifts']) }}" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3 border" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border-color: #cbd5e1; color: #475569;">RESET</a>
-                                                                 <button type="submit" class="btn btn-sm text-uppercase fw-bold py-2 px-3 roster-filter-apply-btn">APPLY FILTERS</button>
-                                                             </div>
+                                                              <div class="d-flex gap-2 justify-content-end mt-4">
+                                                                  <a href="#" id="btn-reset-shift-filters" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3 border" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border-color: #cbd5e1; color: #475569;">RESET</a>
+                                                                  <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">APPLY FILTERS</button>
+                                                              </div>
                                                          </form>
                                                      </x-ui.filter>
                                                  </div>
@@ -321,6 +327,7 @@
                                                              <th width="60">#</th>
                                                              <th>Shift Code</th>
                                                              <th>Shift Name</th>
+                                                             <th>Company</th>
                                                              <th>Start Time</th>
                                                              <th>End Time</th>
                                                              <th>Break Duration</th>
@@ -339,6 +346,13 @@
                                                              <td class="shift-index-cell">{{ $loop->iteration }}</td>
                                                              <td><code class="shift-code-label">{{ $sf->code }}</code></td>
                                                              <td><span class="fw-bold text-dark shift-name-label">{{ $sf->name }}</span></td>
+                                                             <td>
+                                                                 @if($sf->company)
+                                                                     <span class="text-muted fs-12">{{ $sf->company->company_name }}</span>
+                                                                 @else
+                                                                     <span class="badge bg-soft-secondary text-secondary">Shared (All)</span>
+                                                                 @endif
+                                                             </td>
                                                              <td><span class="font-monospace text-muted">{{ substr($sf->start_time, 0, 5) }}</span></td>
                                                              <td><span class="font-monospace text-muted">{{ substr($sf->end_time, 0, 5) }}</span></td>
                                                              <td><span>{{ $sf->break_minutes ?? 0 }} mins</span></td>
@@ -400,15 +414,15 @@
                                                  $totalResults = $shifts->total();
                                                  $perPage = $shifts->perPage();
                                              @endphp
-                                             <div class="px-4 py-3 border-top bg-light-soft">
-                                                 <x-ui.pagination 
-                                                     :current-page="$currentPage"
-                                                     :total-pages="$totalPages"
-                                                     :total-results="$totalResults"
-                                                     :per-page="$perPage"
-                                                     page-param="shift_page"
-                                                 />
-                                             </div>
+                                              <div class="px-4 py-3 border-top bg-light-soft shift-pagination-container">
+                                                  <x-ui.pagination 
+                                                      :current-page="$currentPage"
+                                                      :total-pages="$totalPages"
+                                                      :total-results="$totalResults"
+                                                      :per-page="$perPage"
+                                                      page-param="shift_page"
+                                                  />
+                                              </div>
                                         </x-ui.card>
                                     </div>
                                 </div>
@@ -434,8 +448,11 @@
                                                 <button type="button" class="dropdown-item sort-option {{ $sortBy === 'name-desc' ? 'active' : '' }}" data-sort="name-desc">
                                                     Name (Z - A)
                                                 </button>
-                                                <button type="button" class="dropdown-item sort-option {{ $sortBy === 'designation' ? 'active' : '' }}" data-sort="designation">
-                                                    Designation
+                                                <button type="button" class="dropdown-item sort-option {{ $sortBy === 'designation-asc' || $sortBy === 'designation' ? 'active' : '' }}" data-sort="designation-asc">
+                                                    Designation (A - Z)
+                                                </button>
+                                                <button type="button" class="dropdown-item sort-option {{ $sortBy === 'designation-desc' ? 'active' : '' }}" data-sort="designation-desc">
+                                                    Designation (Z - A)
                                                 </button>
                                             </x-ui.sort-dropdown>
 
@@ -471,6 +488,18 @@
                                                 </div>
 
                                                 <div class="mb-3">
+                                                    <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">Designation</label>
+                                                    <x-ui.odoo-form-ui type="select" name="designation_id" id="roster_filter_designation">
+                                                        <option value="">All Designations</option>
+                                                        @foreach($designations as $desg)
+                                                            <option value="{{ $desg->id }}" {{ $selectedDesignationId == $desg->id ? 'selected' : '' }}>
+                                                                {{ $desg->name }}
+                                                            </option>
+                                                        @endforeach
+                                                    </x-ui.odoo-form-ui>
+                                                </div>
+
+                                                <div class="mb-3">
                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">Start Date</label>
                                                     <input type="date" name="start_date" class="form-control form-control-sm" value="{{ $startDate->format('Y-m-d') }}" style="border-color: #cbd5e1; border-radius: 6px;">
                                                 </div>
@@ -479,14 +508,14 @@
 
                                                 <div class="d-flex gap-2">
                                                     <button type="submit" class="btn btn-sm roster-filter-apply-btn w-100 fw-bold py-2 text-uppercase">APPLY FILTERS</button>
-                                                    <a href="{{ route('hrms.roster.index', ['tab' => 'roster']) }}" class="btn btn-sm roster-filter-reset-btn w-100 fw-bold py-2 text-center text-uppercase">RESET</a>
+                                                    <a href="#" id="btn-reset-roster-filters" class="btn btn-sm roster-filter-reset-btn w-100 fw-bold py-2 text-center text-uppercase">RESET</a>
                                                 </div>
                                             </x-ui.filter>
                                         </form>
                                     </x-slot>
 
                                     <!-- Grid Board Matrix (Fixed Column Width Layout to prevent viewport overflow) -->
-                                    <div class="table-responsive border rounded bg-white">
+                                    <div class="table-responsive border rounded bg-white" id="rosterBoardGrid">
                                         <table class="table table-bordered table-hover mb-0 align-middle text-center roster-grid-table">
                                             <thead class="table-light">
                                                 <tr>
@@ -569,7 +598,7 @@
                                          $totalResults = $employees->total();
                                          $perPage = $employees->perPage();
                                      @endphp
-                                     <div class="px-4 py-3 border-top bg-light-soft">
+                                      <div class="px-4 py-3 border-top bg-light-soft roster-pagination-container">
                                          <x-ui.pagination 
                                              :current-page="$currentPage"
                                              :total-pages="$totalPages"
@@ -859,45 +888,117 @@
                 }
             });
 
-            // 1. ROSTER SEARCH AND SORT RELOAD ACTIONS
+            // 1. ROSTER SEARCH AND SORT AJAX ACTIONS
+            function loadRoster(page = 1) {
+                var search = $('#rosterSearch').val() || '';
+                var sort = $('#filterSortInput').val() || 'name-asc';
+                var company = $('#roster_filter_company').val() || '';
+                var department = $('#roster_filter_department').val() || '';
+                var designation = $('#roster_filter_designation').val() || '';
+                var startDate = $('#rosterFilterForm input[name="start_date"]').val() || '';
+                
+                var url = '{{ route("hrms.roster.index") }}?tab=roster&search=' + encodeURIComponent(search) + 
+                          '&sort=' + encodeURIComponent(sort) + 
+                          '&company_id=' + encodeURIComponent(company) + 
+                          '&department_id=' + encodeURIComponent(department) + 
+                          '&designation_id=' + encodeURIComponent(designation) + 
+                          '&start_date=' + encodeURIComponent(startDate) + 
+                          '&roster_page=' + page;
+                          
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    success: function(response) {
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(response, 'text/html');
+                        
+                        // Update grid container
+                        var oldGrid = $('#rosterBoardGrid');
+                        var newGrid = $(doc).find('#rosterBoardGrid');
+                        if (newGrid.length && oldGrid.length) {
+                            oldGrid.html(newGrid.html());
+                        }
+                        
+                        // Update pagination
+                        var oldPagination = $('.roster-pagination-container');
+                        var newPagination = $(doc).find('.roster-pagination-container');
+                        if (newPagination.length && oldPagination.length) {
+                            oldPagination.replaceWith(newPagination);
+                        } else if (newPagination.length) {
+                            $('#rosterBoardGrid').parent().append(newPagination);
+                        } else {
+                            oldPagination.empty();
+                        }
+                    }
+                });
+            }
+
             let rosterSearchTimeout = null;
             $(document).on('input', '#rosterSearch', function() {
                 clearTimeout(rosterSearchTimeout);
-                const form = this.closest('form');
                 rosterSearchTimeout = setTimeout(() => {
-                    const url = new URL(form.action || window.location.href);
-                    const formData = new FormData(form);
-                    for (const [key, value] of formData.entries()) {
-                        url.searchParams.set(key, value);
-                    }
-                    url.searchParams.set('roster_page', '1'); // Reset page to 1
-                    window.location.href = url.toString();
-                }, 400);
+                    loadRoster(1);
+                }, 300);
             });
 
             $(document).on('click', '.sort-option', function(e) {
                 e.preventDefault();
                 const sortBy = $(this).attr('data-sort');
-                const form = document.getElementById('rosterFilterForm');
-                const url = new URL(form.action || window.location.href);
-                const formData = new FormData(form);
-                for (const [key, value] of formData.entries()) {
-                    url.searchParams.set(key, value);
+                $('#filterSortInput').val(sortBy);
+                
+                var parent = this.closest('.dropdown-menu');
+                if (parent) {
+                    parent.querySelectorAll('.sort-option').forEach(function(btn) {
+                        btn.classList.remove('active');
+                    });
                 }
-                url.searchParams.set('sort', sortBy);
-                url.searchParams.set('roster_page', '1'); // Reset page to 1
-                window.location.href = url.toString();
+                this.classList.add('active');
+
+                loadRoster(1);
             });
 
             $(document).on('submit', '#rosterFilterForm', function(e) {
                 e.preventDefault();
-                const url = new URL(this.action || window.location.href);
-                const formData = new FormData(this);
-                for (const [key, value] of formData.entries()) {
-                    url.searchParams.set(key, value);
+                loadRoster(1);
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
+            });
+
+            $(document).on('click', '#btn-reset-roster-filters', function(e) {
+                e.preventDefault();
+                $('#rosterSearch').val('');
+                $('#roster_filter_company').val('').trigger('change');
+                $('#roster_filter_department').val('').trigger('change');
+                $('#roster_filter_designation').val('').trigger('change');
+                
+                var today = new Date().toISOString().split('T')[0];
+                $('#rosterFilterForm input[name="start_date"]').val(today);
+                
+                $('#filterSortInput').val('name-asc');
+                
+                var sortMenu = document.querySelector('#rosterFilterForm');
+                if (sortMenu) {
+                    sortMenu.querySelectorAll('.sort-option').forEach(function(btn) {
+                        btn.classList.remove('active');
+                    });
+                    var defaultBtn = sortMenu.querySelector('.sort-option[data-sort="name-asc"]');
+                    if (defaultBtn) {
+                        defaultBtn.classList.add('active');
+                    }
                 }
-                url.searchParams.set('roster_page', '1'); // Reset page to 1
-                window.location.href = url.toString();
+
+                loadRoster(1);
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
+            });
+
+            $(document).on('click', '#rosterSettingsContent .roster-pagination-container a', function(e) {
+                e.preventDefault();
+                var url = $(this).attr('href');
+                if (!url) return;
+                var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+                var page = urlParams.get('roster_page') || 1;
+                loadRoster(page);
             });
 
             // 2. JQUERY MODAL CASCADE AND SELECT2 INITIALIZATION (Wrapped safely)
@@ -1082,44 +1183,42 @@
                 })(window.jQuery);
             }
 
-            // 3. AJAX CELL SCHEDULE MATRIX UPDATE (Vanilla JS)
-            document.querySelectorAll('.roster-cell-select').forEach(select => {
-                select.addEventListener('change', function() {
-                    const employeeId = this.dataset.employeeId;
-                    const date = this.dataset.date;
-                    const rawVal = this.value;
-                    const shiftId = rawVal === 'off' ? null : (rawVal || null);
-                    const cellTd = this.closest('td');
+            // 3. AJAX CELL SCHEDULE MATRIX UPDATE (Delegated jQuery listener)
+            $(document).on('change', '.roster-cell-select', function() {
+                const employeeId = this.dataset.employeeId;
+                const date = this.dataset.date;
+                const rawVal = this.value;
+                const shiftId = rawVal === 'off' ? null : (rawVal || null);
+                const cellTd = this.closest('td');
 
-                    this.style.opacity = '0.5';
-                    fetch("{{ route('hrms.roster.update-cell') }}", {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        body: JSON.stringify({ employee_id: employeeId, date: date, shift_id: shiftId })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        this.style.opacity = '1';
-                        if (data.success) {
-                            cellTd.className = 'date-cell';
-                            if (rawVal === 'off') cellTd.classList.add('bg-soft-secondary');
-                            else if (rawVal === '') cellTd.classList.add('bg-soft-light');
-                            else cellTd.classList.add('bg-soft-primary');
+                this.style.opacity = '0.5';
+                fetch("{{ route('hrms.roster.update-cell') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ employee_id: employeeId, date: date, shift_id: shiftId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    this.style.opacity = '1';
+                    if (data.success) {
+                        cellTd.className = 'date-cell';
+                        if (rawVal === 'off') cellTd.classList.add('bg-soft-secondary');
+                        else if (rawVal === '') cellTd.classList.add('bg-soft-light');
+                        else cellTd.classList.add('bg-soft-primary');
 
-                            if (typeof Swal !== 'undefined') {
-                                Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true })
-                                    .fire({ icon: 'success', title: data.message || 'Roster updated successfully.' });
-                            }
-                        } else alert('An error occurred while saving the shift.');
-                    })
-                    .catch(error => {
-                        this.style.opacity = '1';
-                        console.error('Error updating roster:', error);
-                        alert('Network error. Failed to save shift.');
-                    });
+                        if (typeof Swal !== 'undefined') {
+                            Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true })
+                                .fire({ icon: 'success', title: data.message || 'Roster updated successfully.' });
+                        }
+                    } else alert('An error occurred while saving the shift.');
+                })
+                .catch(error => {
+                    this.style.opacity = '1';
+                    console.error('Error updating roster:', error);
+                    alert('Network error. Failed to save shift.');
                 });
             });
 
@@ -1131,6 +1230,7 @@
                         let shift = JSON.parse(atob(this.dataset.shift));
                         document.getElementById('modal_view_shift_name').innerText = shift.name;
                         document.getElementById('modal_view_shift_code').innerText = shift.code;
+                        document.getElementById('modal_view_shift_company').innerText = (shift.company ? shift.company.company_name : 'Shared (All Companies)');
                         document.getElementById('modal_view_shift_start').innerText = shift.start_time ? shift.start_time.substring(0, 5) : 'N/A';
                         document.getElementById('modal_view_shift_end').innerText = shift.end_time ? shift.end_time.substring(0, 5) : 'N/A';
                         document.getElementById('modal_view_shift_break').innerText = (shift.break_minutes || 0) + ' mins';
@@ -1151,6 +1251,11 @@
                         document.getElementById('edit_shift_end').value = shift.end_time ? shift.end_time.substring(0, 5) : '';
                         document.getElementById('edit_shift_break').value = shift.break_minutes || 0;
                         
+                        let companySelect = document.getElementById('edit_shift_company_id');
+                        if (companySelect && window.jQuery) {
+                            companySelect.value = shift.company_id || '';
+                            if (window.jQuery(companySelect).hasClass('select2-hidden-accessible')) window.jQuery(companySelect).trigger('change');
+                        }
                         let overtimeSelect = document.getElementById('edit_shift_overtime');
                         if (overtimeSelect && window.jQuery) {
                             overtimeSelect.value = (shift.overtime_allowed ? '1' : '0');
@@ -1167,35 +1272,123 @@
                 });
             }
 
-            // Server-side search and filter submission logic for Shifts
+            // AJAX-based search, sort and filter for Shifts
+            function loadShifts(page = 1) {
+                var search = $('#shiftSearchForm input[name="shift_search"]').val() || '';
+                var sort = $('#shift_sort_value').val() || 'name_asc';
+                var status = $('#shift_filter_status').val() || '';
+                var overtime = $('#shift_filter_overtime').val() || '';
+                var companyId = $('#shift_filter_company_id').val() || '';
+                
+                var url = '{{ route("hrms.roster.index") }}?tab=shifts&shift_search=' + encodeURIComponent(search) + 
+                          '&shift_sort=' + encodeURIComponent(sort) + 
+                          '&shift_status=' + encodeURIComponent(status) + 
+                          '&shift_overtime=' + encodeURIComponent(overtime) + 
+                          '&shift_company_id=' + encodeURIComponent(companyId) + 
+                          '&shift_page=' + page;
+                          
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    success: function(response) {
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(response, 'text/html');
+                        
+                        // Update table
+                        var oldTable = $('#shiftsTable');
+                        var newTable = $(doc).find('#shiftsTable');
+                        if (newTable.length && oldTable.length) {
+                            oldTable.html(newTable.html());
+                        }
+                        
+                        // Update pagination
+                        var oldPagination = $('.shift-pagination-container');
+                        var newPagination = $(doc).find('.shift-pagination-container');
+                        if (newPagination.length && oldPagination.length) {
+                            oldPagination.replaceWith(newPagination);
+                        } else if (newPagination.length) {
+                            $('#shiftsTable').parent().append(newPagination);
+                        } else {
+                            oldPagination.empty();
+                        }
+                    }
+                });
+            }
+
             let shiftSearchTimeout = null;
             $(document).on('input', '#shiftSearchForm input[name="shift_search"]', function () {
                 clearTimeout(shiftSearchTimeout);
-                const form = this.closest('form');
-                if (!form) return;
-
                 shiftSearchTimeout = setTimeout(function () {
-                    const url = new URL(form.action || window.location.href);
-                    const formData = new FormData(form);
-                    for (const [key, value] of formData.entries()) {
-                        url.searchParams.set(key, value);
-                    }
-                    url.searchParams.set('shift_page', '1'); // Reset to page 1
-                    window.location.href = url.toString();
-                }, 400);
+                    loadShifts(1);
+                }, 300);
             });
 
-            $(document).on('submit', '#shiftFilterForm', function (event) {
+            $(document).on('submit', '#shiftSearchForm, #shiftFilterForm', function (event) {
                 event.preventDefault();
-                const form = this;
-                const url = new URL(form.action || window.location.href);
-                const formData = new FormData(form);
-                for (const [key, value] of formData.entries()) {
-                    url.searchParams.set(key, value);
-                }
-                url.searchParams.set('shift_page', '1'); // Reset to page 1
-                window.location.href = url.toString();
+                loadShifts(1);
+                // Close the filter dropdown if open
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
             });
+
+            $(document).on('click', '#btn-reset-shift-filters', function(e) {
+                e.preventDefault();
+                $('#shiftSearchForm input[name="shift_search"]').val('');
+                $('#shift_filter_status').val('').trigger('change');
+                $('#shift_filter_overtime').val('').trigger('change');
+                $('#shift_filter_company_id').val('').trigger('change');
+                $('#shift_sort_value').val('name_asc');
+                
+                var sortMenu = document.querySelector('#shift_sort_dropdown_menu');
+                if (sortMenu) {
+                    sortMenu.querySelectorAll('.dropdown-item').forEach(function(item) {
+                        item.classList.remove('active');
+                        var check = item.querySelector('.feather-check');
+                        if (check) check.remove();
+                    });
+                    var defaultItem = sortMenu.querySelector('[data-sort="name_asc"]');
+                    if (defaultItem) {
+                        defaultItem.classList.add('active');
+                        $(defaultItem).append('<i class="feather-check ms-3"></i>');
+                    }
+                }
+                
+                loadShifts(1);
+                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+                $('.erp-filter-dropdown.show').removeClass('show');
+            });
+
+            $(document).on('click', '#rosterSettingsContent .shift-pagination-container a', function(e) {
+                e.preventDefault();
+                var url = $(this).attr('href');
+                if (!url) return;
+                var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+                var page = urlParams.get('shift_page') || 1;
+                loadShifts(page);
+            });
+
+            // Global function for sorting shifts
+            window.changeShiftSort = function(criteria, element) {
+                var input = document.getElementById('shift_sort_value');
+                if (input) {
+                    input.value = criteria;
+                }
+
+                if (element) {
+                    var menu = element.closest('.dropdown-menu');
+                    if (menu) {
+                        menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                            el.classList.remove('active');
+                            var check = el.querySelector('.feather-check');
+                            if (check) check.remove();
+                        });
+                    }
+                    element.classList.add('active');
+                    $(element).append('<i class="feather-check ms-3"></i>');
+                }
+
+                loadShifts(1);
+            };
         });
     </script>
 @endsection

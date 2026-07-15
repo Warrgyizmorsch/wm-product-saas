@@ -4,6 +4,31 @@
 @section('page-title', 'Asset Management')
 @section('breadcrumb', 'HRMS / Asset Management')
 
+@section('page-actions')
+    <div id="hdr-btn-log-asset" class="d-none d-flex align-items-center gap-2">
+        <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importAssetModal" class="fw-bold text-uppercase">
+            Import
+        </x-ui.button>
+        <x-ui.button variant="outline-primary" icon="feather-download" href="{{ route('hrms.assets.export') }}" id="btn-export-assets-link" class="fw-bold text-uppercase">
+            Export
+        </x-ui.button>
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAssetModal" class="fw-bold text-uppercase">
+            {{ __('hrms.assets.log_asset') }}
+        </x-ui.button>
+    </div>
+    <div id="hdr-btn-add-category" class="d-none d-flex align-items-center gap-2">
+        <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importCategoryModal" class="fw-bold text-uppercase">
+            Import
+        </x-ui.button>
+        <x-ui.button variant="outline-primary" icon="feather-download" href="{{ route('hrms.assets.categories.export') }}" id="btn-export-categories-link" class="fw-bold text-uppercase">
+            Export
+        </x-ui.button>
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCategoryModal" class="fw-bold text-uppercase">
+            {{ __('hrms.assets.add_category') }}
+        </x-ui.button>
+    </div>
+@endsection
+
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
@@ -186,6 +211,7 @@
                                             <input type="hidden" name="{{ $param }}" value="{{ request($param) }}">
                                         @endif
                                     @endforeach
+                                    <input type="hidden" name="registry_sort" id="registry_sort" value="{{ request('registry_sort', 'code_asc') }}">
                                     
                                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
@@ -193,6 +219,14 @@
                                     </div>
 
                                     <div class="d-flex gap-2">
+                                        <x-ui.sort-dropdown label="SORT">
+                                            <a class="dropdown-item py-2 {{ request('registry_sort', 'code_asc') == 'code_asc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'code_asc', this); event.preventDefault();">Code (A-Z)</a>
+                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'code_desc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'code_desc', this); event.preventDefault();">Code (Z-A)</a>
+                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'name_asc', this); event.preventDefault();">Name (A-Z)</a>
+                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'name_desc', this); event.preventDefault();">Name (Z-A)</a>
+                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'newest', this); event.preventDefault();">Newest First</a>
+                                        </x-ui.sort-dropdown>
+
                                         <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
                                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                                             
@@ -244,9 +278,6 @@
                                     @endif
                                     </div>
                                 </form>
-                                <button type="button" class="btn btn-sm btn-primary py-2 px-3 d-flex align-items-center gap-1" style="border-radius: 6px; font-size: 12px;" data-bs-toggle="modal" data-bs-target="#addAssetModal">
-                                    <i class="feather-plus"></i> {{ __('hrms.assets.log_asset') }}
-                                </button>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -399,6 +430,7 @@
                                             <input type="hidden" name="{{ $param }}" value="{{ request($param) }}">
                                         @endif
                                     @endforeach
+                                    <input type="hidden" name="category_sort" id="category_sort" value="{{ request('category_sort', 'name_asc') }}">
                                     
                                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
@@ -406,6 +438,12 @@
                                     </div>
 
                                     <div class="d-flex gap-2">
+                                        <x-ui.sort-dropdown label="SORT">
+                                            <a class="dropdown-item py-2 {{ request('category_sort', 'name_asc') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'name_asc', this); event.preventDefault();">Name (A-Z)</a>
+                                            <a class="dropdown-item py-2 {{ request('category_sort') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'name_desc', this); event.preventDefault();">Name (Z-A)</a>
+                                            <a class="dropdown-item py-2 {{ request('category_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'newest', this); event.preventDefault();">Newest First</a>
+                                        </x-ui.sort-dropdown>
+
                                         <x-ui.filter label="Filters" offset="0, 5">
                                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                                             
@@ -434,9 +472,6 @@
                                     @endif
                                     </div>
                                 </form>
-                                <button type="button" class="btn btn-sm btn-primary py-2 px-3 d-flex align-items-center gap-1" style="border-radius: 6px; font-size: 12px;" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
-                                    <i class="feather-plus"></i> {{ __('hrms.assets.add_category') }}
-                                </button>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -542,6 +577,7 @@
                                             <input type="hidden" name="{{ $param }}" value="{{ request($param) }}">
                                         @endif
                                     @endforeach
+                                    <input type="hidden" name="request_sort" id="request_sort" value="{{ request('request_sort', 'newest') }}">
                                     
                                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
@@ -549,6 +585,13 @@
                                     </div>
 
                                     <div class="d-flex gap-2">
+                                        <x-ui.sort-dropdown label="SORT">
+                                            <a class="dropdown-item py-2 {{ request('request_sort', 'newest') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'newest', this); event.preventDefault();">Newest First</a>
+                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'oldest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'oldest', this); event.preventDefault();">Oldest First</a>
+                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'status_asc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_asc', this); event.preventDefault();">Status (A-Z)</a>
+                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'status_desc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_desc', this); event.preventDefault();">Status (Z-A)</a>
+                                        </x-ui.sort-dropdown>
+
                                         <x-ui.filter label="Filters" offset="0, 5">
                                             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                                             
@@ -839,6 +882,98 @@
         </div>
     </div>
 
+    <!-- IMPORT ASSET REGISTRY MODAL -->
+    <div class="modal fade" id="importAssetModal" tabindex="-1" aria-labelledby="importAssetModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="importAssetModalLabel">
+                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>Import Assets
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('hrms.assets.import') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body text-start">
+                        <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="feather-info text-primary fs-15"></i>
+                                <span class="fw-bold">Excel Template Instructions</span>
+                            </div>
+                            <span class="text-muted leading-relaxed">
+                                Please download the Excel template, populate your asset details, and upload the completed file. Ensure mandatory columns (`asset_code`, `name`, `category_name`, and `company_name`) are filled correctly. New categories will be auto-created during the import.
+                            </span>
+                            <div class="mt-1">
+                                <a href="{{ route('hrms.assets.import.template') }}" class="btn btn-xs btn-soft-primary d-inline-flex align-items-center fw-bold py-1.5 px-3" style="border-radius: 6px; font-size: 11px;">
+                                    <i class="feather-download me-1.5 fs-12"></i> Download Template
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="erp-custom-file-upload">
+                                <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="asset_import_file">
+                                    <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
+                                    <span class="file-text text-muted" id="asset_import_file_text">Select Excel (.xlsx) File</span>
+                                    <input type="file" name="file" id="asset_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('asset_import_file_text').innerText = this.files[0]?.name || 'Select Excel (.xlsx) File'">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 gap-2">
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Import</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- IMPORT CATEGORY MODAL -->
+    <div class="modal fade" id="importCategoryModal" tabindex="-1" aria-labelledby="importCategoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="importCategoryModalLabel">
+                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>Import Asset Categories
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('hrms.assets.categories.import') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-body text-start">
+                        <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="feather-info text-primary fs-15"></i>
+                                <span class="fw-bold">Excel Template Instructions</span>
+                            </div>
+                            <span class="text-muted leading-relaxed">
+                                Please download the Excel template, populate your category details, and upload the completed file. Ensure mandatory columns (`name` and `company_name`) are filled correctly.
+                            </span>
+                            <div class="mt-1">
+                                <a href="{{ route('hrms.assets.categories.import.template') }}" class="btn btn-xs btn-soft-primary d-inline-flex align-items-center fw-bold py-1.5 px-3" style="border-radius: 6px; font-size: 11px;">
+                                    <i class="feather-download me-1.5 fs-12"></i> Download Template
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="erp-custom-file-upload">
+                                <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="category_import_file">
+                                    <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
+                                    <span class="file-text text-muted" id="category_import_file_text">Select Excel (.xlsx) File</span>
+                                    <input type="file" name="file" id="category_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('category_import_file_text').innerText = this.files[0]?.name || 'Select Excel (.xlsx) File'">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 gap-2">
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Import</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="allocateAssetModal" tabindex="-1" aria-labelledby="allocateAssetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -1052,6 +1187,10 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL 7: REJECT REQUEST -->
     <div class="modal fade" id="rejectRequestModal" tabindex="-1" aria-labelledby="rejectRequestModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -1111,6 +1250,35 @@
             $('#returnAssetModal').appendTo('body');
             $('#assetHistoryModal').appendTo('body');
             $('#rejectRequestModal').appendTo('body');
+            $('#importAssetModal').appendTo('body');
+            $('#importCategoryModal').appendTo('body');
+
+            // Dynamically append search/filter parameters to export links on click
+            $(document).on('click', '#btn-export-assets-link', function(e) {
+                var search = $('#registry-pane input[name="registry_search"]').val() || '';
+                var category = $('#registry-pane select[name="registry_category_id"]').val() || '';
+                var status = $('#registry-pane select[name="registry_status"]').val() || '';
+                var condition = $('#registry-pane select[name="registry_condition"]').val() || '';
+                var sort = $('#registry_sort').val() || '';
+                
+                var url = '{{ route("hrms.assets.export") }}?registry_search=' + encodeURIComponent(search) +
+                          '&registry_category_id=' + encodeURIComponent(category) +
+                          '&registry_status=' + encodeURIComponent(status) +
+                          '&registry_condition=' + encodeURIComponent(condition) +
+                          '&registry_sort=' + encodeURIComponent(sort);
+                $(this).attr('href', url);
+            });
+
+            $(document).on('click', '#btn-export-categories-link', function(e) {
+                var search = $('#categories-pane input[name="category_search"]').val() || '';
+                var company = $('#categories-pane select[name="category_company_id"]').val() || '';
+                var sort = $('#category_sort').val() || '';
+                
+                var url = '{{ route("hrms.assets.categories.export") }}?category_search=' + encodeURIComponent(search) +
+                          '&category_company_id=' + encodeURIComponent(company) +
+                          '&category_sort=' + encodeURIComponent(sort);
+                $(this).attr('href', url);
+            });
 
             // Handle edit category details binding
             $('#editCategoryModal').on('show.bs.modal', function(event) {
@@ -1351,9 +1519,6 @@
                 var tab = new bootstrap.Tab(tabEl);
                 tab.show();
             }
-            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-                localStorage.setItem('activeAssetTab', e.target.id);
-            });
 
             // Handle search form submission via AJAX (covers Enter key and clicking Apply in filter)
             $(document).on('submit', 'form[action*="assets"][method="GET"], form[action*="assets"][method="get"]', function(e) {
@@ -1544,6 +1709,55 @@
                     input.value = val;
                 }
             });
+
+            // Toggle Add buttons in header based on active tab
+            function updateHeaderActions() {
+                var activeTabId = localStorage.getItem('activeAssetTab') || 'registry-tab';
+                if (activeTabId === 'registry-tab') {
+                    $('#hdr-btn-log-asset').removeClass('d-none');
+                    $('#hdr-btn-add-category').addClass('d-none');
+                } else if (activeTabId === 'categories-tab') {
+                    $('#hdr-btn-log-asset').addClass('d-none');
+                    $('#hdr-btn-add-category').removeClass('d-none');
+                } else {
+                    $('#hdr-btn-log-asset').addClass('d-none');
+                    $('#hdr-btn-add-category').addClass('d-none');
+                }
+            }
+
+            // On page load
+            setTimeout(updateHeaderActions, 50);
+
+            // On tab change
+            $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+                localStorage.setItem('activeAssetTab', e.target.id);
+                updateHeaderActions();
+            });
         });
+
+        // Global function for sorting
+        function changeSort(tab, criteria, element) {
+            var input = document.getElementById(tab + '_sort');
+            if (input) {
+                input.value = criteria;
+            }
+
+            if (element) {
+                var menu = element.closest('.dropdown-menu');
+                if (menu) {
+                    menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                        el.classList.remove('active');
+                    });
+                }
+                element.classList.add('active');
+            }
+
+            if (input) {
+                var form = input.closest('form');
+                if (form) {
+                    $(form).submit();
+                }
+            }
+        }
     </script>
 @endpush

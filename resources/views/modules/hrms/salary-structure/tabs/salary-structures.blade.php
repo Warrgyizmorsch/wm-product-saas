@@ -2,7 +2,7 @@
     $selectedPayGroup = $selectedPayGroup ?? null;
     $salaryStructures = $salaryStructures ?? collect();
     $salaryComponents = $salaryComponents ?? collect();
-    $recurringComponents = $recurringComponents ?? $salaryComponents->filter(fn ($component) => !($component->is_adhoc ?? false));
+    $recurringComponentsForStructure = $salaryComponents->filter(fn ($component) => !($component->is_adhoc ?? false));
 @endphp
 
 <div class="row g-4">
@@ -19,43 +19,40 @@
             </x-slot>
 
             <div class="px-4 py-3 border-bottom bg-white d-flex align-items-center justify-content-end gap-2 flex-wrap" style="position: relative; z-index: 10;">
+                <input type="hidden" id="struct_sort_value" value="{{ request('struct_sort', 'name_asc') }}">
+                <input type="hidden" id="struct_status_value" value="{{ request('struct_status') }}">
+
                 <!-- Search Input (Placed before sort and filter in same line) -->
                 <div class="theme-search-container" style="max-width: 300px;">
-                    <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
-                        <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
-                        <input type="hidden" name="tab" value="structures">
-                        <input type="hidden" name="struct_status" value="{{ request('struct_status') }}">
-                        <input type="hidden" name="struct_sort" value="{{ request('struct_sort') }}">
-                        <i class="feather-search"></i>
-                        <input type="text" name="struct_search" class="theme-search-input" placeholder="Search structures..." value="{{ request('struct_search') }}">
-                    </form>
+                    <i class="feather-search"></i>
+                    <input type="text" id="struct_search_input" name="struct_search" class="theme-search-input" placeholder="Search structures..." value="{{ request('struct_search') }}">
                 </div>
 
                 <!-- Sort Dropdown -->
                 <x-ui.sort-dropdown label="SORT">
-                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'name_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'name_asc']) }}">
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'name_asc' || !request('struct_sort') ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeStructSort('name_asc', this); event.preventDefault();">
                         <span>Name (A-Z)</span>
-                        @if(request('struct_sort') === 'name_asc') <i class="feather-check ms-3"></i> @endif
+                        @if(request('struct_sort') === 'name_asc' || !request('struct_sort')) <i class="feather-check ms-3"></i> @endif
                     </a>
-                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'name_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'name_desc']) }}">
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeStructSort('name_desc', this); event.preventDefault();">
                         <span>Name (Z-A)</span>
                         @if(request('struct_sort') === 'name_desc') <i class="feather-check ms-3"></i> @endif
                     </a>
                     <div class="dropdown-divider"></div>
-                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'min_ctc_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'min_ctc_asc']) }}">
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'min_ctc_asc' ? 'active' : '' }}" href="#" data-sort="min_ctc_asc" onclick="changeStructSort('min_ctc_asc', this); event.preventDefault();">
                         <span>Min CTC (Low to High)</span>
                         @if(request('struct_sort') === 'min_ctc_asc') <i class="feather-check ms-3"></i> @endif
                     </a>
-                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'min_ctc_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'min_ctc_desc']) }}">
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'min_ctc_desc' ? 'active' : '' }}" href="#" data-sort="min_ctc_desc" onclick="changeStructSort('min_ctc_desc', this); event.preventDefault();">
                         <span>Min CTC (High to Low)</span>
                         @if(request('struct_sort') === 'min_ctc_desc') <i class="feather-check ms-3"></i> @endif
                     </a>
                     <div class="dropdown-divider"></div>
-                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'max_ctc_asc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'max_ctc_asc']) }}">
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'max_ctc_asc' ? 'active' : '' }}" href="#" data-sort="max_ctc_asc" onclick="changeStructSort('max_ctc_asc', this); event.preventDefault();">
                         <span>Max CTC (Low to High)</span>
                         @if(request('struct_sort') === 'max_ctc_asc') <i class="feather-check ms-3"></i> @endif
                     </a>
-                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'max_ctc_desc' ? 'active' : '' }}" href="{{ request()->fullUrlWithQuery(['struct_sort' => 'max_ctc_desc']) }}">
+                    <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'max_ctc_desc' ? 'active' : '' }}" href="#" data-sort="max_ctc_desc" onclick="changeStructSort('max_ctc_desc', this); event.preventDefault();">
                         <span>Max CTC (High to Low)</span>
                         @if(request('struct_sort') === 'max_ctc_desc') <i class="feather-check ms-3"></i> @endif
                     </a>
@@ -64,37 +61,26 @@
                 <!-- Filter Dropdown -->
                 <x-ui.filter label="FILTER">
                     <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
-                    <form method="GET" action="{{ route('hrms.salary-structure.index') }}">
-                        <input type="hidden" name="pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
-                        <input type="hidden" name="tab" value="structures">
-                        @if(request()->filled('struct_search'))
-                            <input type="hidden" name="struct_search" value="{{ request('struct_search') }}">
-                        @endif
-                        @if(request()->filled('struct_sort'))
-                            <input type="hidden" name="struct_sort" value="{{ request('struct_sort') }}">
-                        @endif
-                        
-                        <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
-                            <x-ui.odoo-form-ui type="select" name="struct_status">
-                                <option value="">All Statuses</option>
-                                <option value="1" @selected(request('struct_status') === '1')>Active</option>
-                                <option value="0" @selected(request('struct_status') === '0')>Inactive</option>
-                            </x-ui.odoo-form-ui>
-                        </div>
-                        
-                        <div class="dropdown-divider my-3"></div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                        <x-ui.odoo-form-ui type="select" name="struct_filter_status" id="struct_filter_status">
+                            <option value="">All Statuses</option>
+                            <option value="1" @selected(request('struct_status') === '1')>Active</option>
+                            <option value="0" @selected(request('struct_status') === '0')>Inactive</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+                    
+                    <div class="dropdown-divider my-3"></div>
 
-                        <div class="d-flex gap-2">
-                            <x-ui.button type="submit" variant="primary" size="sm" class="flex-grow-1">Apply Filters</x-ui.button>
-                            <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="window.location.href='{{ route('hrms.salary-structure.index', ['pay_group_id' => $selectedPayGroup ? $selectedPayGroup->id : '', 'tab' => 'structures']) }}'">Reset</x-ui.button>
-                        </div>
-                    </form>
+                    <div class="d-flex gap-2">
+                        <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyStructFilter()">Apply Filters</x-ui.button>
+                        <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetStructFilters()">Reset</x-ui.button>
+                    </div>
                 </x-ui.filter>
             </div>
 
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle" id="salaryStructuresTable">
                     <thead class="table-light">
                         <tr>
                             <th width="60">#</th>
@@ -227,13 +213,14 @@
                 $perPage = $salaryStructures->perPage();
             @endphp
             @if($salaryStructures->hasPages())
-                <div class="card-footer bg-white border-top px-4 py-3">
+                <div class="card-footer bg-white border-top px-4 py-3 struct-pagination-container">
                     <x-ui.pagination
                         class="px-0 py-0"
                         :current-page="$currentPage"
                         :total-pages="$totalPages"
                         :total-results="$totalResults"
                         :per-page="$perPage"
+                        page-param="struct_page"
                     />
                 </div>
             @endif
@@ -288,7 +275,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse($recurringComponents as $comp)
+                                    @forelse($recurringComponentsForStructure as $comp)
                                         <tr>
                                             <td>
                                                 <span class="fw-bold">{{ $comp->name }}</span>
@@ -391,7 +378,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($recurringComponents as $comp)
+                                    @foreach($recurringComponentsForStructure as $comp)
                                         <tr>
                                             <td>
                                                 <span class="fw-bold">{{ $comp->name }}</span>
@@ -567,6 +554,111 @@
             // Open the modal programmatically to avoid tooltip/modal toggle attribute collision
             $('#editSalaryStructureModal').modal('show');
         });
+
+        // AJAX-based search, sort, filter and pagination for Salary Structures
+        function loadStructures(page = 1) {
+            var payGroupId = '{{ $selectedPayGroup ? $selectedPayGroup->id : "" }}';
+            var search = $('#struct_search_input').val() || '';
+            var sort = $('#struct_sort_value').val() || 'name_asc';
+            var status = $('#struct_status_value').val() || '';
+            
+            var url = '{{ route("hrms.salary-structure.index") }}?pay_group_id=' + payGroupId + 
+                      '&tab=structures&struct_search=' + encodeURIComponent(search) + 
+                      '&struct_sort=' + encodeURIComponent(sort) + 
+                      '&struct_status=' + encodeURIComponent(status) + 
+                      '&struct_page=' + page;
+                      
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(response) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(response, 'text/html');
+                    
+                    // Update table
+                    var oldTable = $('#salaryStructuresTable');
+                    var newTable = $(doc).find('#salaryStructuresTable');
+                    if (newTable.length && oldTable.length) {
+                        oldTable.html(newTable.html());
+                    }
+                    
+                    // Update pagination
+                    var oldPagination = $('.struct-pagination-container');
+                    var newPagination = $(doc).find('.struct-pagination-container');
+                    if (newPagination.length && oldPagination.length) {
+                        oldPagination.replaceWith(newPagination);
+                    } else if (newPagination.length) {
+                        $('#salaryStructuresTable').parent().after(newPagination);
+                    } else {
+                        oldPagination.empty();
+                    }
+                }
+            });
+        }
+
+        let structSearchTimeout = null;
+        $(document).on('input', '#struct_search_input', function() {
+            clearTimeout(structSearchTimeout);
+            structSearchTimeout = setTimeout(function() {
+                loadStructures(1);
+            }, 300);
+        });
+
+        window.changeStructSort = function(criteria, element) {
+            var input = document.getElementById('struct_sort_value');
+            if (input) {
+                input.value = criteria;
+            }
+
+            if (element) {
+                var menu = element.closest('.dropdown-menu');
+                if (menu) {
+                    menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                        el.classList.remove('active');
+                        var check = el.querySelector('.feather-check');
+                        if (check) check.remove();
+                    });
+                }
+                element.classList.add('active');
+                $(element).append('<i class="feather-check ms-3"></i>');
+            }
+
+            loadStructures(1);
+        };
+
+        window.applyStructFilter = function() {
+            var statusVal = $('#struct_filter_status').val() || '';
+            var input = document.getElementById('struct_status_value');
+            if (input) {
+                input.value = statusVal;
+            }
+
+            loadStructures(1);
+            $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+            $('.erp-filter-dropdown.show').removeClass('show');
+        };
+
+        window.resetStructFilters = function() {
+            $('#struct_filter_status').val('').trigger('change');
+            var input = document.getElementById('struct_status_value');
+            if (input) {
+                input.value = '';
+            }
+            $('#struct_search_input').val('');
+
+            loadStructures(1);
+            $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
+            $('.erp-filter-dropdown.show').removeClass('show');
+        };
+
+        $(document).on('click', '.struct-pagination-container a', function(e) {
+            e.preventDefault();
+            var url = $(this).attr('href');
+            if (!url) return;
+            var urlParams = new URLSearchParams(url.substring(url.indexOf('?')));
+            var page = urlParams.get('struct_page') || 1;
+            loadStructures(page);
+        });
     });
 
     // Real-time client-side calculator
@@ -578,7 +670,7 @@
             return;
         }
 
-        let structures = @json($salaryStructures);
+        let structures = @json($allStructuresForSimulator ?? collect());
         let matched = null;
 
         // Loop through structures and check matching min_ctc <= CTC <= max_ctc
@@ -722,4 +814,5 @@
         $('#sim-slab-name').text(matched.name);
         $('#sim-results-card').fadeIn();
     }
+
 </script>

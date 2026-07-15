@@ -48,8 +48,20 @@ class AssetController extends Controller
             $assetsQuery->where('condition', $request->input('registry_condition'));
         }
 
-        $assets = $assetsQuery->orderBy('asset_code')
-            ->paginate(10)
+        $registrySort = $request->input('registry_sort', 'code_asc');
+        if ($registrySort === 'code_desc') {
+            $assetsQuery->orderBy('asset_code', 'desc');
+        } elseif ($registrySort === 'name_asc') {
+            $assetsQuery->orderBy('name', 'asc');
+        } elseif ($registrySort === 'name_desc') {
+            $assetsQuery->orderBy('name', 'desc');
+        } elseif ($registrySort === 'newest') {
+            $assetsQuery->orderBy('created_at', 'desc');
+        } else {
+            $assetsQuery->orderBy('asset_code', 'asc');
+        }
+
+        $assets = $assetsQuery->paginate(10)
             ->withQueryString();
 
         // 2. Categories Dropdown (Unfiltered for modals)
@@ -70,8 +82,16 @@ class AssetController extends Controller
             $categoriesQuery->where('company_id', $request->input('category_company_id'));
         }
 
-        $filteredCategories = $categoriesQuery->orderBy('name')
-            ->paginate(10)
+        $categorySort = $request->input('category_sort', 'name_asc');
+        if ($categorySort === 'name_desc') {
+            $categoriesQuery->orderBy('name', 'desc');
+        } elseif ($categorySort === 'newest') {
+            $categoriesQuery->orderBy('created_at', 'desc');
+        } else {
+            $categoriesQuery->orderBy('name', 'asc');
+        }
+
+        $filteredCategories = $categoriesQuery->paginate(10)
             ->withQueryString();
 
         // 4. Other collections
@@ -105,8 +125,18 @@ class AssetController extends Controller
             $requestsQuery->where('status', $request->input('request_status'));
         }
 
-        $requests = $requestsQuery->orderBy('created_at', 'desc')
-            ->paginate(10)
+        $requestSort = $request->input('request_sort', 'newest');
+        if ($requestSort === 'oldest') {
+            $requestsQuery->orderBy('created_at', 'asc');
+        } elseif ($requestSort === 'status_asc') {
+            $requestsQuery->orderBy('status', 'asc');
+        } elseif ($requestSort === 'status_desc') {
+            $requestsQuery->orderBy('status', 'desc');
+        } else {
+            $requestsQuery->orderBy('created_at', 'desc');
+        }
+
+        $requests = $requestsQuery->paginate(10)
             ->withQueryString();
 
         // Total Pending Requests Count (unaffected by filters, for the tab badge)
@@ -430,5 +460,447 @@ class AssetController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Asset request rejected.');
+    }
+
+    /**
+     * Export all assets.
+     */
+    public function export(Request $request)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $assetsQuery = Asset::query()
+            ->with(['company', 'category', 'assignedEmployee']);
+
+        if ($request->filled('registry_search')) {
+            $search = $request->input('registry_search');
+            $assetsQuery->where(function($q) use ($search) {
+                $q->where('asset_code', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%")
+                  ->orWhere('brand', 'like', "%{$search}%")
+                  ->orWhere('serial_number', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('registry_category_id')) {
+            $assetsQuery->where('asset_category_id', $request->input('registry_category_id'));
+        }
+
+        if ($request->filled('registry_status')) {
+            $assetsQuery->where('status', $request->input('registry_status'));
+        }
+
+        if ($request->filled('registry_condition')) {
+            $assetsQuery->where('condition', $request->input('registry_condition'));
+        }
+
+        $registrySort = $request->input('registry_sort', 'code_asc');
+        if ($registrySort === 'code_desc') {
+            $assetsQuery->orderBy('asset_code', 'desc');
+        } elseif ($registrySort === 'name_asc') {
+            $assetsQuery->orderBy('name', 'asc');
+        } elseif ($registrySort === 'name_desc') {
+            $assetsQuery->orderBy('name', 'desc');
+        } elseif ($registrySort === 'newest') {
+            $assetsQuery->orderBy('created_at', 'desc');
+        } else {
+            $assetsQuery->orderBy('asset_code', 'asc');
+        }
+
+        $assets = $assetsQuery->get();
+
+        $headers = [
+            'Asset Code',
+            'Asset Name',
+            'Category',
+            'Company',
+            'Brand',
+            'Model Number',
+            'Serial Number',
+            'Purchase Date',
+            'Purchase Cost',
+            'Condition',
+            'Status',
+            'Current Holder',
+            'Notes'
+        ];
+
+        $data = [];
+        foreach ($assets as $asset) {
+            $purchaseDate = '';
+            if ($asset->purchase_date) {
+                if ($asset->purchase_date instanceof \Carbon\Carbon) {
+                    $purchaseDate = $asset->purchase_date->format('Y-m-d');
+                } else {
+                    $purchaseDate = date('Y-m-d', strtotime($asset->purchase_date));
+                }
+            }
+
+            $data[] = [
+                $asset->asset_code,
+                $asset->name,
+                $asset->category ? $asset->category->name : 'N/A',
+                $asset->company ? $asset->company->company_name : 'N/A',
+                $asset->brand ?? '',
+                $asset->model_number ?? '',
+                $asset->serial_number ?? '',
+                $purchaseDate,
+                $asset->purchase_cost ?? '',
+                ucfirst($asset->condition ?? 'good'),
+                ucfirst($asset->status ?? 'available'),
+                $asset->assignedEmployee ? $asset->assignedEmployee->full_name : 'In Inventory',
+                $asset->notes ?? ''
+            ];
+        }
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, 'assets_registry_export_' . now()->format('Y-m-d') . '.xlsx');
+    }
+
+    /**
+     * Download Excel template for Asset import.
+     */
+    public function downloadTemplate()
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $headers = [
+            'asset_code',
+            'name',
+            'category_name',
+            'brand',
+            'model_number',
+            'serial_number',
+            'purchase_date',
+            'purchase_cost',
+            'condition',
+            'notes'
+        ];
+
+        $sampleCategory = AssetCategory::first();
+
+        $data = [
+            [
+                'AST-0001',
+                'Dell Latitude 5420',
+                $sampleCategory ? $sampleCategory->name : 'Laptops',
+                'Dell',
+                'Latitude 5420',
+                'SN123456789',
+                '2026-07-15',
+                '1200.00',
+                'new',
+                'Developer work laptop.'
+            ]
+        ];
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, 'assets_import_template.xlsx');
+    }
+
+    /**
+     * Import Assets from Excel file.
+     */
+    public function import(Request $request)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'file' => 'required|file',
+        ]);
+
+        try {
+            $filePath = $request->file('file')->getRealPath();
+            $rows = \App\Domains\HRMS\Helpers\XlsxHelper::import($filePath);
+
+            if (empty($rows)) {
+                return redirect()->back()->with('error', 'The Excel file is empty.');
+            }
+
+            $headers = array_shift($rows);
+            $headers = array_map(function($h) {
+                $h = strtolower(trim(preg_replace('/[\x{FEFF}\x{FFFE}]/u', '', $h)));
+                $h = str_replace([' ', '-'], '_', $h);
+                return preg_replace('/[^a-z0-9_]/', '', $h);
+            }, $headers);
+
+            $required = ['asset_code', 'name', 'category_name'];
+            foreach ($required as $req) {
+                if (!in_array($req, $headers)) {
+                    return redirect()->back()->with('error', "Missing required column: " . str_replace('_', ' ', $req));
+                }
+            }
+
+            $importedCount = 0;
+            $errors = [];
+
+            foreach ($rows as $index => $row) {
+                $rowData = [];
+                foreach ($headers as $colIdx => $headerName) {
+                    $rowData[$headerName] = isset($row[$colIdx]) ? trim((string)$row[$colIdx]) : '';
+                }
+
+                if (empty($rowData['asset_code']) && empty($rowData['name'])) {
+                    continue;
+                }
+
+                $rowNum = $index + 2;
+
+                if (empty($rowData['asset_code'])) {
+                    $errors[] = "Row {$rowNum}: Asset Code is required.";
+                    continue;
+                }
+                if (empty($rowData['name'])) {
+                    $errors[] = "Row {$rowNum}: Asset Name is required.";
+                    continue;
+                }
+                if (empty($rowData['category_name'])) {
+                    $errors[] = "Row {$rowNum}: Category Name is required.";
+                    continue;
+                }
+
+                if (Asset::where('asset_code', $rowData['asset_code'])->exists()) {
+                    $errors[] = "Row {$rowNum}: Asset Code '{$rowData['asset_code']}' already exists.";
+                    continue;
+                }
+
+                $categoryInput = $rowData['category_name'];
+                $category = AssetCategory::whereRaw('LOWER(name) = ?', [strtolower($categoryInput)])
+                    ->first();
+
+                if (!$category) {
+                    $singularName = \Illuminate\Support\Str::singular($categoryInput);
+                    $category = AssetCategory::whereRaw('LOWER(name) = ?', [strtolower($singularName)])
+                        ->first();
+                }
+
+                if (!$category) {
+                    $pluralName = \Illuminate\Support\Str::plural($categoryInput);
+                    $category = AssetCategory::whereRaw('LOWER(name) = ?', [strtolower($pluralName)])
+                        ->first();
+                }
+
+                if (!$category) {
+                    $fallbackCompany = Company::where('status', true)->first();
+                    if (!$fallbackCompany) {
+                        $errors[] = "Row {$rowNum}: No active company found to assign the category '{$categoryInput}'.";
+                        continue;
+                    }
+                    $category = AssetCategory::create([
+                        'company_id' => $fallbackCompany->id,
+                        'name' => $categoryInput,
+                        'description' => 'Automatically created via Excel Asset Import',
+                    ]);
+                }
+
+                $companyId = $category->company_id;
+
+                $purchaseDate = null;
+                if (!empty($rowData['purchase_date'])) {
+                    $parsed = strtotime($rowData['purchase_date']);
+                    if ($parsed) {
+                        $purchaseDate = date('Y-m-d', $parsed);
+                    }
+                }
+
+                $condition = strtolower($rowData['condition'] ?? 'good');
+                if (!in_array($condition, ['new', 'good', 'fair', 'damaged', 'scrapped'])) {
+                    $condition = 'good';
+                }
+
+                $status = 'available';
+                if ($condition === 'damaged') {
+                    $status = 'maintenance';
+                } elseif ($condition === 'scrapped') {
+                    $status = 'scrapped';
+                }
+
+                Asset::create([
+                    'company_id' => $companyId,
+                    'asset_category_id' => $category->id,
+                    'asset_code' => $rowData['asset_code'],
+                    'name' => $rowData['name'],
+                    'brand' => $rowData['brand'] ?: null,
+                    'model_number' => $rowData['model_number'] ?: null,
+                    'serial_number' => $rowData['serial_number'] ?: null,
+                    'purchase_date' => $purchaseDate,
+                    'purchase_cost' => is_numeric($rowData['purchase_cost']) ? $rowData['purchase_cost'] : null,
+                    'condition' => $condition,
+                    'status' => $status,
+                    'notes' => $rowData['notes'] ?: null,
+                ]);
+
+                $importedCount++;
+            }
+
+            if (!empty($errors)) {
+                return redirect()->back()->with('success', "Imported {$importedCount} assets successfully. Warnings/Errors: " . implode(', ', $errors));
+            }
+
+            return redirect()->back()->with('success', "{$importedCount} assets imported successfully.");
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Import failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Export Asset Categories.
+     */
+    public function exportCategories(Request $request)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $categoriesQuery = AssetCategory::query();
+
+        if ($request->filled('category_search')) {
+            $search = $request->input('category_search');
+            $categoriesQuery->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('category_company_id')) {
+            $categoriesQuery->where('company_id', $request->input('category_company_id'));
+        }
+
+        $categorySort = $request->input('category_sort', 'name_asc');
+        if ($categorySort === 'name_desc') {
+            $categoriesQuery->orderBy('name', 'desc');
+        } elseif ($categorySort === 'newest') {
+            $categoriesQuery->orderBy('created_at', 'desc');
+        } else {
+            $categoriesQuery->orderBy('name', 'asc');
+        }
+
+        $categories = $categoriesQuery->get();
+
+        $headers = [
+            'Category Name',
+            'Description',
+            'Company Name',
+            'Total Assets Linked'
+        ];
+
+        $data = [];
+        foreach ($categories as $category) {
+            $data[] = [
+                $category->name,
+                $category->description ?? '',
+                $category->company ? $category->company->company_name : 'N/A',
+                $category->assets()->count()
+            ];
+        }
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, 'asset_categories_export_' . now()->format('Y-m-d') . '.xlsx');
+    }
+
+    /**
+     * Download template for Category Import.
+     */
+    public function downloadCategoriesTemplate()
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $headers = [
+            'name',
+            'description',
+            'company_name'
+        ];
+
+        $sampleCompany = Company::first();
+
+        $data = [
+            [
+                'Laptops',
+                'Company laptops and notebooks.',
+                $sampleCompany ? $sampleCompany->company_name : 'Acme Corporation'
+            ]
+        ];
+
+        return \App\Domains\HRMS\Helpers\XlsxHelper::export($headers, $data, 'asset_categories_import_template.xlsx');
+    }
+
+    /**
+     * Import Categories from Excel.
+     */
+    public function importCategories(Request $request)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'file' => 'required|file',
+        ]);
+
+        try {
+            $filePath = $request->file('file')->getRealPath();
+            $rows = \App\Domains\HRMS\Helpers\XlsxHelper::import($filePath);
+
+            if (empty($rows)) {
+                return redirect()->back()->with('error', 'The Excel file is empty.');
+            }
+
+            $headers = array_shift($rows);
+            $headers = array_map(function($h) {
+                $h = strtolower(trim(preg_replace('/[\x{FEFF}\x{FFFE}]/u', '', $h)));
+                $h = str_replace([' ', '-'], '_', $h);
+                return preg_replace('/[^a-z0-9_]/', '', $h);
+            }, $headers);
+
+            $required = ['name', 'company_name'];
+            foreach ($required as $req) {
+                if (!in_array($req, $headers)) {
+                    return redirect()->back()->with('error', "Missing required column: " . str_replace('_', ' ', $req));
+                }
+            }
+
+            $importedCount = 0;
+            $errors = [];
+
+            foreach ($rows as $index => $row) {
+                $rowData = [];
+                foreach ($headers as $colIdx => $headerName) {
+                    $rowData[$headerName] = isset($row[$colIdx]) ? trim((string)$row[$colIdx]) : '';
+                }
+
+                if (empty($rowData['name'])) {
+                    continue;
+                }
+
+                $rowNum = $index + 2;
+
+                if (empty($rowData['company_name'])) {
+                    $errors[] = "Row {$rowNum}: Company Name is required.";
+                    continue;
+                }
+
+                $company = Company::where('company_name', 'like', $rowData['company_name'])->first();
+                if (!$company) {
+                    $errors[] = "Row {$rowNum}: Company '{$rowData['company_name']}' not found.";
+                    continue;
+                }
+
+                if (AssetCategory::where('company_id', $company->id)->where('name', $rowData['name'])->exists()) {
+                    $errors[] = "Row {$rowNum}: Category '{$rowData['name']}' already exists for company '{$rowData['company_name']}'.";
+                    continue;
+                }
+
+                AssetCategory::create([
+                    'company_id' => $company->id,
+                    'name' => $rowData['name'],
+                    'description' => $rowData['description'] ?: null,
+                ]);
+
+                $importedCount++;
+            }
+
+            if (!empty($errors)) {
+                return redirect()->back()->with('success', "Imported {$importedCount} categories successfully. Warnings/Errors: " . implode(', ', $errors));
+            }
+
+            return redirect()->back()->with('success', "{$importedCount} categories imported successfully.");
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Import failed: ' . $e->getMessage());
+        }
     }
 }

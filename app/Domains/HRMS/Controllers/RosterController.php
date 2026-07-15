@@ -39,8 +39,9 @@ class RosterController extends Controller
         $shiftSort = $request->string('shift_sort')->value() ?: 'name_asc';
         $shiftStatus = $request->filled('shift_status') ? $request->string('shift_status')->value() : null;
         $shiftOvertime = $request->filled('shift_overtime') ? $request->string('shift_overtime')->value() : null;
+        $shiftCompanyId = $request->integer('shift_company_id') ?: null;
 
-        $shiftsQuery = ProductionShift::query();
+        $shiftsQuery = ProductionShift::with('company');
         if ($shiftSearch !== '') {
             $shiftsQuery->where(function ($query) use ($shiftSearch): void {
                 $query->where('name', 'like', "%{$shiftSearch}%")
@@ -56,6 +57,10 @@ class RosterController extends Controller
 
         if ($shiftOvertime !== null && $shiftOvertime !== '') {
             $shiftsQuery->where('overtime_allowed', $shiftOvertime === '1');
+        }
+
+        if ($shiftCompanyId) {
+            $shiftsQuery->where('company_id', $shiftCompanyId);
         }
 
         switch ($shiftSort) {
@@ -86,6 +91,7 @@ class RosterController extends Controller
         // 2. Roster Scheduling Matrix Data
         $selectedCompanyId = $request->integer('company_id') ?: null;
         $selectedDepartmentId = $request->integer('department_id') ?: null;
+        $selectedDesignationId = $request->integer('designation_id') ?: null;
         $search = $request->string('search')->trim()->value();
         $sortBy = $request->string('sort', 'name-asc')->value();
 
@@ -102,16 +108,19 @@ class RosterController extends Controller
         }
 
         // Fetch filtered employees
-        $employeesQuery = Employee::query()->where('status', true);
+        $employeesQuery = Employee::query()->where('employees.status', true);
         if ($selectedCompanyId) {
-            $employeesQuery->where('company_id', $selectedCompanyId);
+            $employeesQuery->where('employees.company_id', $selectedCompanyId);
         }
         if ($selectedDepartmentId) {
-            $employeesQuery->where('department_id', $selectedDepartmentId);
+            $employeesQuery->where('employees.department_id', $selectedDepartmentId);
+        }
+        if ($selectedDesignationId) {
+            $employeesQuery->where('employees.designation_id', $selectedDesignationId);
         }
         if ($search !== '') {
             $employeesQuery->where(function ($query) use ($search): void {
-                $query->where('full_name', 'like', "%{$search}%")
+                $query->where('employees.full_name', 'like', "%{$search}%")
                     ->orWhereHas('designation', function ($q) use ($search): void {
                         $q->where('name', 'like', "%{$search}%");
                     });
@@ -119,19 +128,23 @@ class RosterController extends Controller
         }
         switch ($sortBy) {
             case 'name-desc':
-                $employeesQuery->orderBy('full_name', 'desc');
+                $employeesQuery->orderBy('employees.full_name', 'desc');
                 break;
             case 'designation':
+            case 'designation-asc':
                 $employeesQuery->leftJoin('designations', 'employees.designation_id', '=', 'designations.id')
-                    ->select('employees.*')
                     ->orderBy('designations.name', 'asc');
+                break;
+            case 'designation-desc':
+                $employeesQuery->leftJoin('designations', 'employees.designation_id', '=', 'designations.id')
+                    ->orderBy('designations.name', 'desc');
                 break;
             case 'name-asc':
             default:
-                $employeesQuery->orderBy('full_name', 'asc');
+                $employeesQuery->orderBy('employees.full_name', 'asc');
                 break;
         }
-        $employees = $employeesQuery->with(['department', 'designation', 'shift'])->paginate(10, ['*'], 'roster_page')->withQueryString();
+        $employees = $employeesQuery->with(['department', 'designation', 'shift'])->paginate(10, ['employees.*'], 'roster_page')->withQueryString();
 
         // Fetch shift rosters in scope
         $rosters = ShiftRoster::query()
@@ -148,7 +161,7 @@ class RosterController extends Controller
 
         return view('modules.hrms.roster.index', compact(
             'tab', 'companies', 'businessUnits', 'branches', 'departments', 'designations', 'shifts', 'activeShifts',
-            'selectedCompanyId', 'selectedDepartmentId', 'search', 'sortBy', 'startDate', 'dates',
+            'selectedCompanyId', 'selectedDepartmentId', 'selectedDesignationId', 'search', 'sortBy', 'startDate', 'dates',
             'employees', 'rosterMap', 'shiftSearch', 'shiftSort', 'shiftStatus', 'shiftOvertime'
         ));
     }
@@ -346,8 +359,12 @@ class RosterController extends Controller
                 'required',
                 'max:50',
                 Rule::unique('production_shifts', 'code')
-                    ->where('tenant_id', tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id())
+                    ->where(function ($query) use ($request) {
+                        return $query->where('tenant_id', tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id())
+                            ->where('company_id', $request->company_id);
+                    })
             ],
+            'company_id' => 'nullable|exists:companies,id',
             'start_time' => 'required',
             'end_time' => 'required',
             'break_minutes' => 'required|integer|min:0',
@@ -357,6 +374,7 @@ class RosterController extends Controller
 
         ProductionShift::create([
             'tenant_id' => tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id(),
+            'company_id' => $request->company_id ?: null,
             'name' => $request->name,
             'code' => $request->code,
             'start_time' => $request->start_time,
@@ -381,9 +399,13 @@ class RosterController extends Controller
                 'required',
                 'max:50',
                 Rule::unique('production_shifts', 'code')
-                    ->where('tenant_id', tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id())
+                    ->where(function ($query) use ($request) {
+                        return $query->where('tenant_id', tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id())
+                            ->where('company_id', $request->company_id);
+                    })
                     ->ignore($shift->id)
             ],
+            'company_id' => 'nullable|exists:companies,id',
             'start_time' => 'required',
             'end_time' => 'required',
             'break_minutes' => 'required|integer|min:0',
@@ -392,6 +414,7 @@ class RosterController extends Controller
         ]);
 
         $shift->update([
+            'company_id' => $request->company_id ?: null,
             'name' => $request->name,
             'code' => $request->code,
             'start_time' => $request->start_time,

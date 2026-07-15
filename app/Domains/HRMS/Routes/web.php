@@ -99,6 +99,12 @@ Route::prefix('hrms')
 
         // Asset Management
         Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
+        Route::get('/assets/export', [AssetController::class, 'export'])->name('assets.export');
+        Route::post('/assets/import', [AssetController::class, 'import'])->name('assets.import');
+        Route::get('/assets/import/template', [AssetController::class, 'downloadTemplate'])->name('assets.import.template');
+        Route::get('/assets/categories/export', [AssetController::class, 'exportCategories'])->name('assets.categories.export');
+        Route::post('/assets/categories/import', [AssetController::class, 'importCategories'])->name('assets.categories.import');
+        Route::get('/assets/categories/import/template', [AssetController::class, 'downloadCategoriesTemplate'])->name('assets.categories.import.template');
         Route::post('/assets/store', [AssetController::class, 'store'])->name('assets.store');
         Route::post('/assets/update/{asset}', [AssetController::class, 'update'])->name('assets.update');
         Route::delete('/assets/delete/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');

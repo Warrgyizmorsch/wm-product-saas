@@ -134,6 +134,11 @@ class Employee extends Model
         return $this->belongsTo(BusinessUnit::class);
     }
 
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionShift::class, 'shift_id');
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
@@ -172,11 +177,6 @@ class Employee extends Model
     public function reportingManager(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'reporting_manager_id');
-    }
-
-    public function shift(): BelongsTo
-    {
-        return $this->belongsTo(\App\Domains\Production\Models\ProductionShift::class, 'shift_id');
     }
 
     public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
