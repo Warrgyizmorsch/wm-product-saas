@@ -76,7 +76,7 @@
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
                                 <x-ui.inline-edit field="customer_id" :value="$project->customer_id"
-                                    :url="route('projects.field', $project)" type="select2" :options="$clientOptions" />
+                                    :url="route('projects.field', $project)" type="select2" :options="$clientOptions" :label="__('projects.client')" />
                             @else
                                 {{ $project->customer?->name ?: '—' }}
                             @endif
@@ -92,7 +92,7 @@
                                 @php
                                     $ownerOptions = $users->pluck('name', 'id');
                                 @endphp
-                                <x-ui.inline-edit field="owner_id" :value="$project->owner_id" :url="route('projects.field', $project)" type="select2" :options="$ownerOptions" />
+                                <x-ui.inline-edit field="owner_id" :value="$project->owner_id" :url="route('projects.field', $project)" type="select2" :options="$ownerOptions" :label="__('projects.project_owner')" />
                             @else
                                 {{ $project->owner?->name ?: '—' }}
                             @endif
@@ -109,7 +109,7 @@
                                     $managerOptions = $users->pluck('name', 'id')
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
-                                <x-ui.inline-edit field="manager_id" :value="$project->manager_id" :url="route('projects.field', $project)" type="select2" :options="$managerOptions" />
+                                <x-ui.inline-edit field="manager_id" :value="$project->manager_id" :url="route('projects.field', $project)" type="select2" :options="$managerOptions" :label="__('projects.project_manager')" />
                             @else
                                 {{ $project->manager?->name ?: '—' }}
                             @endif
@@ -126,7 +126,7 @@
                                     $priorityOptions = collect(\App\Domains\Projects\Models\Project::PRIORITIES)
                                         ->mapWithKeys(fn($priority) => [$priority => __('projects.priorities.' . $priority)]);
                                 @endphp
-                                <x-ui.inline-edit field="priority" :value="$project->priority" :url="route('projects.field', $project)" type="select" :options="$priorityOptions" />
+                                <x-ui.inline-edit field="priority" :value="$project->priority" :url="route('projects.field', $project)" type="select" :options="$priorityOptions" :label="__('projects.priority')" />
                             @else
                                 {{ __('projects.priorities.' . $project->priority) }}
                             @endif
@@ -143,7 +143,7 @@
                                     $statusOptions = collect(\App\Domains\Projects\Models\Project::EDITABLE_STATUSES)
                                         ->mapWithKeys(fn($status) => [$status => __('projects.statuses.' . $status)]);
                                 @endphp
-                                <x-ui.inline-edit field="status" :value="$project->status" :url="route('projects.field', $project)" type="select" :options="$statusOptions" />
+                                <x-ui.inline-edit field="status" :value="$project->status" :url="route('projects.field', $project)" type="select" :options="$statusOptions" :label="__('projects.status')" />
                             @else
                                 {{ __('projects.statuses.' . $project->status) }}
                             @endif
@@ -153,15 +153,24 @@
             </div>
             <div class="col-lg-4 col-md-6">
                 <div class="row erp-form-row mb-2">
-                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.start_date') }} /
-                            {{ __('projects.end_date') }}:</span></div>
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.start_date') }}:</span></div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
-                                <x-ui.inline-edit field="start_date" :value="$project->start_date" :url="route('projects.field', $project)" type="date" /> – <x-ui.inline-edit field="end_date" :value="$project->end_date"
-                                    :url="route('projects.field', $project)" type="date" />
+                                <x-ui.inline-edit field="start_date" :value="$project->start_date" :url="route('projects.field', $project)" type="date" :label="__('projects.start_date')" />
                             @else
-                                {{ $project->start_date?->format('d/m/Y') ?: '—' }} –
+                                {{ $project->start_date?->format('d/m/Y') ?: '—' }}
+                            @endif
+                        </span>
+                    </div>
+                </div>
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.end_date') }}:</span></div>
+                    <div class="col-md-8">
+                        <span class="text-dark fw-bold fs-13">
+                            @if ($canUpdateProject)
+                                <x-ui.inline-edit field="end_date" :value="$project->end_date" :url="route('projects.field', $project)" type="date" :label="__('projects.end_date')" />
+                            @else
                                 {{ $project->end_date?->format('d/m/Y') ?: '—' }}
                             @endif
                         </span>
@@ -179,7 +188,7 @@
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
                                 <x-ui.inline-edit field="billing_method" :value="$project->billing_method"
-                                    :url="route('projects.field', $project)" type="select2" :options="$billingMethodOptions" />
+                                    :url="route('projects.field', $project)" type="select2" :options="$billingMethodOptions" :label="__('projects.billing_method')" />
                             @else
                                 {{ $project->billing_method ? __('projects.billing_methods.' . $project->billing_method) : '—' }}
                             @endif
@@ -198,7 +207,7 @@
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
                                 <x-ui.inline-edit field="budget_type" :value="$project->budget_type"
-                                    :url="route('projects.field', $project)" type="select2" :options="$budgetTypeOptions" />
+                                    :url="route('projects.field', $project)" type="select2" :options="$budgetTypeOptions" :label="__('projects.budget_type')" />
                             @else
                                 {{ $project->budget_type ? __('projects.budget_types.' . $project->budget_type) : '—' }}
                             @endif
@@ -212,7 +221,7 @@
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
                                 <x-ui.inline-edit field="budget_amount" :value="$project->budget_amount"
-                                    :url="route('projects.field', $project)" type="number" />
+                                    :url="route('projects.field', $project)" type="number" :label="__('projects.budget_amount')" />
                             @else
                                 {{ $project->budget_amount !== null ? number_format((float) $project->budget_amount, 2) : '—' }}
                             @endif
@@ -226,7 +235,7 @@
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
                                 <x-ui.inline-edit field="budget_hours" :value="$project->budget_hours"
-                                    :url="route('projects.field', $project)" type="number" />
+                                    :url="route('projects.field', $project)" type="number" :label="__('projects.budget_hours')" />
                             @else
                                 {{ $project->budget_hours !== null ? number_format((float) $project->budget_hours, 2) : '—' }}
                             @endif
@@ -243,7 +252,7 @@
             <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
             @if ($canUpdateProject)
                 <div class="text-dark fs-13">
-                    <x-ui.inline-edit field="description" :value="$project->description" :url="route('projects.field', $project)" type="textarea" />
+                    <x-ui.inline-edit field="description" :value="$project->description" :url="route('projects.field', $project)" type="textarea" :label="__('projects.description')" />
                 </div>
             @else
                 <p class="mb-0 text-dark fs-13">{{ $project->description ?: '—' }}</p>
