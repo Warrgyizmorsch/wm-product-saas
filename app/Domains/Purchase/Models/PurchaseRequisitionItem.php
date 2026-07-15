@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Sales\Models\SalesOrderItem;
+use App\Models\Concerns\BelongsToTenant;
 
 class PurchaseRequisitionItem extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     protected $table = 'purchase_requisition_items';
 
@@ -51,5 +52,14 @@ class PurchaseRequisitionItem extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class, 'warehouse_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $item) {
+            if (empty($item->tenant_id) && $item->requisition) {
+                $item->tenant_id = $item->requisition->tenant_id;
+            }
+        });
     }
 }

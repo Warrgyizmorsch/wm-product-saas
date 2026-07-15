@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\BelongsToTenant;
 
 class DeliveryOrderItem extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     protected $table = 'delivery_order_items';
 
@@ -83,5 +84,14 @@ class DeliveryOrderItem extends Model
     public function dispatchItems(): HasMany
     {
         return $this->hasMany(DispatchOrderItem::class, 'delivery_order_item_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $item) {
+            if (empty($item->tenant_id) && $item->deliveryOrder) {
+                $item->tenant_id = $item->deliveryOrder->tenant_id;
+            }
+        });
     }
 }

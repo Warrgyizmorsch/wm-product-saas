@@ -5,10 +5,11 @@ namespace App\Domains\Sales\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToTenant;
 
 class DispatchOrderItem extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     protected $table = 'dispatch_order_items';
 
@@ -44,5 +45,14 @@ class DispatchOrderItem extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Inventory\Models\Warehouse::class, 'warehouse_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $item) {
+            if (empty($item->tenant_id) && $item->dispatchOrder) {
+                $item->tenant_id = $item->dispatchOrder->tenant_id;
+            }
+        });
     }
 }

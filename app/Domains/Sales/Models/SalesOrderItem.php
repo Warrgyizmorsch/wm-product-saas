@@ -5,10 +5,11 @@ namespace App\Domains\Sales\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToTenant;
 
 class SalesOrderItem extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     protected $table = 'sales_order_items';
 
@@ -50,4 +51,12 @@ class SalesOrderItem extends Model
         return $this->belongsTo(\App\Domains\Inventory\Models\Warehouse::class, 'warehouse_id');
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $item) {
+            if (empty($item->tenant_id) && $item->salesOrder) {
+                $item->tenant_id = $item->salesOrder->tenant_id;
+            }
+        });
+    }
 }

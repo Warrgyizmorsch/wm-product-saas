@@ -5,10 +5,11 @@ namespace App\Domains\CRM\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToTenant;
 
 class QuotationItem extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     protected $fillable = [
         'quotation_id',
@@ -37,5 +38,14 @@ class QuotationItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'product_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $item) {
+            if (empty($item->tenant_id) && $item->quotation) {
+                $item->tenant_id = $item->quotation->tenant_id;
+            }
+        });
     }
 }

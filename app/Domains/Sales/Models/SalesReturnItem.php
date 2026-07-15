@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Models\Concerns\BelongsToTenant;
 
 class SalesReturnItem extends Model
 {
+    use BelongsToTenant;
+
     protected $fillable = [
         'sales_return_id',
         'delivery_order_item_id',
@@ -32,5 +35,14 @@ class SalesReturnItem extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $item) {
+            if (empty($item->tenant_id) && $item->salesReturn) {
+                $item->tenant_id = $item->salesReturn->tenant_id;
+            }
+        });
     }
 }
