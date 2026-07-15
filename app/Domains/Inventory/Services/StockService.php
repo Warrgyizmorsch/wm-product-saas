@@ -273,6 +273,7 @@ class StockService
 
             // 1. Manage batch details if batch tracking is active
             $batchId = null;
+            $batch = null;
             if ($product->track_batch && !empty($batchNumber)) {
                 $batch = Batch::query()->where('tenant_id', $tenantId)
                     ->where('product_id', $productId)
@@ -314,10 +315,11 @@ class StockService
             ]);
 
             // 3. Register Serial Numbers
+            $createdSerials = [];
             if ($product->track_serial_number && !empty($serialNumbers)) {
                 foreach ($serialNumbers as $snString) {
                     if (empty($snString)) continue;
-                    SerialNumber::query()->updateOrCreate(
+                    $createdSerials[] = SerialNumber::query()->updateOrCreate(
                         [
                             'tenant_id' => $tenantId,
                             'product_id' => $productId,
@@ -369,6 +371,10 @@ class StockService
                 ]);
             }
 
+            // Attach created objects to returned transaction
+            $transaction->created_batch = $batch;
+            $transaction->created_serials = $createdSerials;
+
             return $transaction;
         });
     }
@@ -414,6 +420,8 @@ class StockService
             $totalCostValue = 0.0;
             $remainingToDeduct = $quantity;
 
+            $allocations = [];
+
             // 2. Valuation calculation (FIFO lot depletion vs Weighted Average cost pricing)
             if ($product->inventory_valuation_method === 'FIFO') {
                 $inLots = StockTransaction::query()
@@ -430,6 +438,7 @@ class StockService
 
                     $lotBalance = (float)$lot->balance_qty;
                     if ($lotBalance >= $remainingToDeduct) {
+                        $qtyConsumed = $remainingToDeduct;
                         $totalCostValue += $remainingToDeduct * (float)$lot->unit_cost;
                         $lot->update(['balance_qty' => $lotBalance - $remainingToDeduct]);
 
@@ -444,8 +453,17 @@ class StockService
                             }
                         }
 
+                        if ($lot->batch_id) {
+                            $allocations[] = [
+                                'batch_id' => $lot->batch_id,
+                                'quantity_consumed' => $qtyConsumed,
+                                'stock_transaction_id' => $lot->id,
+                            ];
+                        }
+
                         $remainingToDeduct = 0;
                     } else {
+                        $qtyConsumed = $lotBalance;
                         $totalCostValue += $lotBalance * (float)$lot->unit_cost;
                         $lot->update(['balance_qty' => 0]);
 
@@ -458,6 +476,14 @@ class StockService
                                     'available_qty' => max(0.0, (float)$batch->available_qty - $lotBalance)
                                 ]);
                             }
+                        }
+
+                        if ($lot->batch_id) {
+                            $allocations[] = [
+                                'batch_id' => $lot->batch_id,
+                                'quantity_consumed' => $qtyConsumed,
+                                'stock_transaction_id' => $lot->id,
+                            ];
                         }
 
                         $remainingToDeduct -= $lotBalance;
@@ -488,6 +514,7 @@ class StockService
                     if ($remainingToDeduct <= 0) break;
                     $lotBalance = (float)$lot->balance_qty;
                     if ($lotBalance >= $remainingToDeduct) {
+                        $qtyConsumed = $remainingToDeduct;
                         $lot->update(['balance_qty' => $lotBalance - $remainingToDeduct]);
                         if ($lot->batch_id) {
                             $batch = Batch::find($lot->batch_id);
@@ -498,8 +525,16 @@ class StockService
                                 ]);
                             }
                         }
+                        if ($lot->batch_id) {
+                            $allocations[] = [
+                                'batch_id' => $lot->batch_id,
+                                'quantity_consumed' => $qtyConsumed,
+                                'stock_transaction_id' => $lot->id,
+                            ];
+                        }
                         $remainingToDeduct = 0;
                     } else {
+                        $qtyConsumed = $lotBalance;
                         $lot->update(['balance_qty' => 0]);
                         if ($lot->batch_id) {
                             $batch = Batch::find($lot->batch_id);
@@ -509,6 +544,13 @@ class StockService
                                     'available_qty' => max(0.0, (float)$batch->available_qty - $lotBalance)
                                 ]);
                             }
+                        }
+                        if ($lot->batch_id) {
+                            $allocations[] = [
+                                'batch_id' => $lot->batch_id,
+                                'quantity_consumed' => $qtyConsumed,
+                                'stock_transaction_id' => $lot->id,
+                            ];
                         }
                         $remainingToDeduct -= $lotBalance;
                     }
@@ -531,6 +573,7 @@ class StockService
             ]);
 
             // 4. Update Serial Number Status to Sold
+            $serialIds = [];
             if ($product->track_serial_number && !empty($serialNumbers)) {
                 foreach ($serialNumbers as $snString) {
                     if (empty($snString)) continue;
@@ -546,6 +589,7 @@ class StockService
                             'status' => 'Sold',
                             'stock_transaction_id_out' => $transaction->id,
                         ]);
+                        $serialIds[] = $snRecord->id;
                     }
                 }
             }
@@ -562,6 +606,10 @@ class StockService
                     $stock->delete();
                 }
             }
+
+            // Attach details of allocations and serials consumed to transaction
+            $transaction->consumed_allocations = $allocations;
+            $transaction->consumed_serial_ids = $serialIds;
 
             return $transaction;
         });

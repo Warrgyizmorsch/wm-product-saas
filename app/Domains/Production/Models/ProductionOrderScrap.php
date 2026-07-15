@@ -4,6 +4,7 @@ namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\StockTransaction;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -20,6 +21,7 @@ class ProductionOrderScrap extends BaseModel
         'reason',
         'recorded_by',
         'recorded_at',
+        'stock_transaction_id', // idempotency guard: set once when stock outflow is posted
     ];
 
     protected $casts = [
@@ -45,5 +47,22 @@ class ProductionOrderScrap extends BaseModel
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    /**
+     * The stock outflow transaction that recorded this scrap.
+     * If null, the stock has not yet been posted (or was posted before this column existed).
+     */
+    public function stockTransaction(): BelongsTo
+    {
+        return $this->belongsTo(StockTransaction::class, 'stock_transaction_id');
+    }
+
+    /**
+     * Returns true if the inventory stock outflow has already been posted.
+     */
+    public function isStockPosted(): bool
+    {
+        return ! is_null($this->stock_transaction_id);
     }
 }
