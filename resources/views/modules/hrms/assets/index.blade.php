@@ -1,16 +1,16 @@
 @extends('layouts.duralux')
 
-@section('title', 'ASSET MANAGEMENT | SaaS ERP')
-@section('page-title', 'Asset Management')
-@section('breadcrumb', 'HRMS / Asset Management')
+@section('title', __('hrms.sidebar.asset_management') . ' | SaaS ERP')
+@section('page-title', __('hrms.sidebar.asset_management'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.sidebar.asset_management'))
 
 @section('page-actions')
     <div id="hdr-btn-log-asset" class="d-none d-flex align-items-center gap-2">
         <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importAssetModal" class="fw-bold text-uppercase">
-            Import
+            {{ __('hrms.employees.import') }}
         </x-ui.button>
         <x-ui.button variant="outline-primary" icon="feather-download" href="{{ route('hrms.assets.export') }}" id="btn-export-assets-link" class="fw-bold text-uppercase">
-            Export
+            {{ __('hrms.employees.export') }}
         </x-ui.button>
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAssetModal" class="fw-bold text-uppercase">
             {{ __('hrms.assets.log_asset') }}
@@ -18,10 +18,10 @@
     </div>
     <div id="hdr-btn-add-category" class="d-none d-flex align-items-center gap-2">
         <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importCategoryModal" class="fw-bold text-uppercase">
-            Import
+            {{ __('hrms.employees.import') }}
         </x-ui.button>
         <x-ui.button variant="outline-primary" icon="feather-download" href="{{ route('hrms.assets.categories.export') }}" id="btn-export-categories-link" class="fw-bold text-uppercase">
-            Export
+            {{ __('hrms.employees.export') }}
         </x-ui.button>
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCategoryModal" class="fw-bold text-uppercase">
             {{ __('hrms.assets.add_category') }}
@@ -33,6 +33,21 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
+        .btn-outline-primary {
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+            background-color: transparent !important;
+        }
+        .btn-outline-primary:hover,
+        .btn-outline-primary:focus,
+        .btn-outline-primary:active,
+        .btn-outline-primary.active,
+        .btn-outline-primary.show {
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            color: #fff !important;
+        }
+
         /* Modern layouts for connected settings sidebar */
         @media (min-width: 992px) {
             .nxl-content {
@@ -219,21 +234,21 @@
                                     </div>
 
                                     <div class="d-flex gap-2">
-                                        <x-ui.sort-dropdown label="SORT">
-                                            <a class="dropdown-item py-2 {{ request('registry_sort', 'code_asc') == 'code_asc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'code_asc', this); event.preventDefault();">Code (A-Z)</a>
-                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'code_desc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'code_desc', this); event.preventDefault();">Code (Z-A)</a>
-                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'name_asc', this); event.preventDefault();">Name (A-Z)</a>
-                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'name_desc', this); event.preventDefault();">Name (Z-A)</a>
-                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'newest', this); event.preventDefault();">Newest First</a>
+                                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                                            <a class="dropdown-item py-2 {{ request('registry_sort', 'code_asc') == 'code_asc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'code_asc', this); event.preventDefault();">{{ __('hrms.common.sort_code_asc') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'code_desc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'code_desc', this); event.preventDefault();">{{ __('hrms.common.sort_code_desc') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'newest', this); event.preventDefault();">{{ __('hrms.assets.sort_newest') }}</a>
                                         </x-ui.sort-dropdown>
 
                                         <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
-                                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                             
                                             <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Asset Category</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.category') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="registry_category_id">
-                                                    <option value="">All Categories</option>
+                                                    <option value="">{{ __('hrms.assets.all_categories') }}</option>
                                                     @foreach($categories as $category)
                                                         <option value="{{ $category->id }}" {{ request('registry_category_id') == $category->id ? 'selected' : '' }}>
                                                             {{ $category->name }}
@@ -243,31 +258,31 @@
                                             </div>
 
                                             <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.status') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="registry_status">
-                                                    <option value="">All Statuses</option>
-                                                    <option value="available" {{ request('registry_status') === 'available' ? 'selected' : '' }}>Available</option>
-                                                    <option value="allocated" {{ request('registry_status') === 'allocated' ? 'selected' : '' }}>Allocated</option>
-                                                    <option value="maintenance" {{ request('registry_status') === 'maintenance' ? 'selected' : '' }}>Maintenance</option>
-                                                    <option value="scrapped" {{ request('registry_status') === 'scrapped' ? 'selected' : '' }}>Scrapped</option>
+                                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                                    <option value="available" {{ request('registry_status') === 'available' ? 'selected' : '' }}>{{ __('hrms.assets.status_available') }}</option>
+                                                    <option value="allocated" {{ request('registry_status') === 'allocated' ? 'selected' : '' }}>{{ __('hrms.assets.status_allocated') }}</option>
+                                                    <option value="maintenance" {{ request('registry_status') === 'maintenance' ? 'selected' : '' }}>{{ __('hrms.assets.status_maintenance') }}</option>
+                                                    <option value="scrapped" {{ request('registry_status') === 'scrapped' ? 'selected' : '' }}>{{ __('hrms.assets.status_scrapped') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
 
                                             <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Condition</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.condition') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="registry_condition">
-                                                    <option value="">All Conditions</option>
-                                                    <option value="new" {{ request('registry_condition') === 'new' ? 'selected' : '' }}>New</option>
-                                                    <option value="good" {{ request('registry_condition') === 'good' ? 'selected' : '' }}>Good</option>
-                                                    <option value="fair" {{ request('registry_condition') === 'fair' ? 'selected' : '' }}>Fair</option>
-                                                    <option value="damaged" {{ request('registry_condition') === 'damaged' ? 'selected' : '' }}>Damaged</option>
-                                                    <option value="scrapped" {{ request('registry_condition') === 'scrapped' ? 'selected' : '' }}>Scrapped</option>
+                                                    <option value="">{{ __('hrms.assets.all_conditions') }}</option>
+                                                    <option value="new" {{ request('registry_condition') === 'new' ? 'selected' : '' }}>{{ __('hrms.assets.cond_new') }}</option>
+                                                    <option value="good" {{ request('registry_condition') === 'good' ? 'selected' : '' }}>{{ __('hrms.assets.cond_good') }}</option>
+                                                    <option value="fair" {{ request('registry_condition') === 'fair' ? 'selected' : '' }}>{{ __('hrms.assets.cond_fair') }}</option>
+                                                    <option value="damaged" {{ request('registry_condition') === 'damaged' ? 'selected' : '' }}>{{ __('hrms.assets.cond_damaged') }}</option>
+                                                    <option value="scrapped" {{ request('registry_condition') === 'scrapped' ? 'selected' : '' }}>{{ __('hrms.assets.cond_scrapped') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
 
                                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                                <a href="{{ route('hrms.assets.index', request()->except(['registry_search', 'registry_category_id', 'registry_status', 'registry_condition'])) }}" class="btn btn-sm btn-light border">Reset</a>
-                                                <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                                                <a href="{{ route('hrms.assets.index', request()->except(['registry_search', 'registry_category_id', 'registry_status', 'registry_condition'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
+                                                <button type="submit" class="btn btn-sm btn-primary">{{ __('hrms.common.apply') }}</button>
                                             </div>
                                         </x-ui.filter>
 
@@ -313,12 +328,12 @@
                                                 </td>
                                                 <td>
                                                     <span class="badge badge-{{ $asset->status }} px-2 py-1 text-capitalize">
-                                                        {{ $asset->status }}
+                                                        {{ __('hrms.assets.status_' . $asset->status) }}
                                                     </span>
                                                 </td>
                                                 <td>
                                                     <span class="badge badge-{{ $asset->condition }} px-2 py-1 text-capitalize">
-                                                        {{ $asset->condition }}
+                                                        {{ __('hrms.assets.cond_' . $asset->condition) }}
                                                     </span>
                                                 </td>
                                                 <td>
@@ -369,7 +384,7 @@
                                                                 <hr class="dropdown-divider">
                                                             </li>
                                                             <li>
-                                                                <form action="{{ route('hrms.assets.destroy', $asset->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this asset record?');">
+                                                                <form action="{{ route('hrms.assets.destroy', $asset->id) }}" method="POST" onsubmit="return confirm('{{ __('hrms.assets.confirm_delete_asset') ?? 'Are you sure you want to delete this asset record?' }}');">
                                                                     @csrf
                                                                     @method('DELETE')
                                                                     <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
@@ -386,8 +401,8 @@
                                             <tr>
                                                 <td colspan="8" class="text-center py-5 text-muted fs-12">
                                                     <i class="feather-package fs-32 d-block mb-3 text-secondary"></i>
-                                                    <div class="fw-bold mb-1">No Assets Logged Yet</div>
-                                                    <div>Click "Log Asset" to start tracking hardware devices.</div>
+                                                    <div class="fw-bold mb-1">{{ __('hrms.assets.empty_registry_title') }}</div>
+                                                    <div>{{ __('hrms.assets.empty_registry_desc') }}</div>
                                                 </td>
                                             </tr>
                                         @endforelse
@@ -420,7 +435,7 @@
                     <div class="card border rounded bg-white shadow-sm">
                         <div class="card-header border-bottom d-flex flex-wrap justify-content-between align-items-center py-3 px-4 bg-white gap-3">
                             <div>
-                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">Asset Configurations & Categories</h5>
+                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.assets.categories_title') }}</h5>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                 <!-- Categories Search & Filter Form -->
@@ -434,23 +449,23 @@
                                     
                                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" name="category_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search categories..." value="{{ request('category_search') }}" style="box-shadow: none; height: 32px;">
+                                        <input type="text" name="category_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.assets.search_categories_placeholder') }}" value="{{ request('category_search') }}" style="box-shadow: none; height: 32px;">
                                     </div>
 
                                     <div class="d-flex gap-2">
-                                        <x-ui.sort-dropdown label="SORT">
-                                            <a class="dropdown-item py-2 {{ request('category_sort', 'name_asc') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'name_asc', this); event.preventDefault();">Name (A-Z)</a>
-                                            <a class="dropdown-item py-2 {{ request('category_sort') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'name_desc', this); event.preventDefault();">Name (Z-A)</a>
-                                            <a class="dropdown-item py-2 {{ request('category_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'newest', this); event.preventDefault();">Newest First</a>
+                                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                                            <a class="dropdown-item py-2 {{ request('category_sort', 'name_asc') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('category_sort') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('category_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('category', 'newest', this); event.preventDefault();">{{ __('hrms.assets.sort_newest') }}</a>
                                         </x-ui.sort-dropdown>
 
-                                        <x-ui.filter label="Filters" offset="0, 5">
-                                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                        <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
+                                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                             
                                             <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Organization Entity</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.org_entity') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="category_company_id">
-                                                    <option value="">All Companies</option>
+                                                    <option value="">{{ __('hrms.common.all_companies') }}</option>
                                                     @foreach($companies as $company)
                                                         <option value="{{ $company->id }}" {{ request('category_company_id') == $company->id ? 'selected' : '' }}>
                                                             {{ $company->company_name }}
@@ -460,8 +475,8 @@
                                             </div>
 
                                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                                <a href="{{ route('hrms.assets.index', request()->except(['category_search', 'category_company_id'])) }}" class="btn btn-sm btn-light border">Reset</a>
-                                                <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                                                <a href="{{ route('hrms.assets.index', request()->except(['category_search', 'category_company_id'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
+                                                <button type="submit" class="btn btn-sm btn-primary">{{ __('hrms.common.apply') }}</button>
                                             </div>
                                         </x-ui.filter>
 
@@ -494,7 +509,7 @@
                                                     {{ $category->name }}
                                                 </td>
                                                 <td class="text-start text-muted fs-12" style="max-width: 300px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
-                                                    {{ $category->description ?: 'No description provided.' }}
+                                                    {{ $category->description ?: __('hrms.assets.no_description_provided') }}
                                                 </td>
                                                 <td>
                                                     <span class="badge bg-soft-primary text-primary px-3 py-1 rounded-pill">{{ $category->assets()->count() }}</span>
@@ -510,19 +525,19 @@
                                                                 data-name="{{ $category->name }}"
                                                                 data-description="{{ $category->description }}">
                                                                 <i class="feather feather-edit-3 me-3"></i>
-                                                                <span>Edit</span>
+                                                                <span>{{ __('hrms.assets.edit') }}</span>
                                                             </a>
                                                         </li>
                                                         <li>
                                                             <hr class="dropdown-divider">
                                                         </li>
                                                         <li>
-                                                            <form action="{{ route('hrms.assets.category.destroy', $category->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this asset category? This action cannot be undone.');">
+                                                            <form action="{{ route('hrms.assets.category.destroy', $category->id) }}" method="POST" onsubmit="return confirm('{{ __('hrms.assets.confirm_delete_category') ?? 'Are you sure you want to delete this asset category? This action cannot be undone.' }}');">
                                                                 @csrf
                                                                 @method('DELETE')
                                                                 <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                                     <i class="feather feather-trash-2 me-3"></i>
-                                                                    <span>Delete</span>
+                                                                    <span>{{ __('hrms.assets.delete') }}</span>
                                                                 </button>
                                                             </form>
                                                         </li>
@@ -533,8 +548,8 @@
                                             <tr>
                                                 <td colspan="6" class="text-center py-5 text-muted fs-12">
                                                     <i class="feather-sliders fs-32 d-block mb-3 text-secondary"></i>
-                                                    <div class="fw-bold mb-1">No Categories Set</div>
-                                                    <div>Configure asset types like Laptops, Keys, Vehicles etc.</div>
+                                                    <div class="fw-bold mb-1">{{ __('hrms.assets.empty_categories_title') }}</div>
+                                                    <div>{{ __('hrms.assets.empty_categories_desc') }}</div>
                                                 </td>
                                             </tr>
                                         @endforelse
@@ -567,7 +582,7 @@
                     <div class="card border rounded bg-white shadow-sm">
                         <div class="card-header border-bottom d-flex flex-wrap justify-content-between align-items-center py-3 px-4 bg-white gap-3">
                             <div>
-                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">Employee Asset Requests</h5>
+                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.assets.requests_title') }}</h5>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                 <!-- Requests Search & Filter Form -->
@@ -581,24 +596,24 @@
                                     
                                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" name="request_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search requests..." value="{{ request('request_search') }}" style="box-shadow: none; height: 32px;">
+                                        <input type="text" name="request_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.assets.search_requests_placeholder') }}" value="{{ request('request_search') }}" style="box-shadow: none; height: 32px;">
                                     </div>
 
                                     <div class="d-flex gap-2">
-                                        <x-ui.sort-dropdown label="SORT">
-                                            <a class="dropdown-item py-2 {{ request('request_sort', 'newest') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'newest', this); event.preventDefault();">Newest First</a>
-                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'oldest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'oldest', this); event.preventDefault();">Oldest First</a>
-                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'status_asc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_asc', this); event.preventDefault();">Status (A-Z)</a>
-                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'status_desc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_desc', this); event.preventDefault();">Status (Z-A)</a>
+                                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                                            <a class="dropdown-item py-2 {{ request('request_sort', 'newest') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'newest', this); event.preventDefault();">{{ __('hrms.assets.sort_newest') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'oldest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'oldest', this); event.preventDefault();">{{ __('hrms.assets.sort_oldest') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'status_asc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_asc', this); event.preventDefault();">{{ __('hrms.assets.sort_status_asc') }}</a>
+                                            <a class="dropdown-item py-2 {{ request('request_sort') == 'status_desc' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'status_desc', this); event.preventDefault();">{{ __('hrms.assets.sort_status_desc') }}</a>
                                         </x-ui.sort-dropdown>
 
-                                        <x-ui.filter label="Filters" offset="0, 5">
-                                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                        <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
+                                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                             
                                             <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Requested Category</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.requested_category') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="request_category_id">
-                                                    <option value="">All Categories</option>
+                                                    <option value="">{{ __('hrms.assets.all_categories') }}</option>
                                                     @foreach($categories as $category)
                                                         <option value="{{ $category->id }}" {{ request('request_category_id') == $category->id ? 'selected' : '' }}>
                                                             {{ $category->name }}
@@ -608,9 +623,9 @@
                                             </div>
 
                                             <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Organization Entity</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.org_entity') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="request_company_id">
-                                                    <option value="">All Companies</option>
+                                                    <option value="">{{ __('hrms.common.all_companies') }}</option>
                                                     @foreach($companies as $company)
                                                         <option value="{{ $company->id }}" {{ request('request_company_id') == $company->id ? 'selected' : '' }}>
                                                             {{ $company->company_name }}
@@ -620,18 +635,18 @@
                                             </div>
 
                                             <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.status') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="request_status">
-                                                    <option value="">All Statuses</option>
-                                                    <option value="pending" {{ request('request_status') === 'pending' ? 'selected' : '' }}>Pending</option>
-                                                    <option value="allocated" {{ request('request_status') === 'allocated' ? 'selected' : '' }}>Allocated</option>
-                                                    <option value="rejected" {{ request('request_status') === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                                    <option value="pending" {{ request('request_status') === 'pending' ? 'selected' : '' }}>{{ __('hrms.assets.status_pending') }}</option>
+                                                    <option value="allocated" {{ request('request_status') === 'allocated' ? 'selected' : '' }}>{{ __('hrms.assets.status_allocated') }}</option>
+                                                    <option value="rejected" {{ request('request_status') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.assets.status_rejected') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
 
                                             <div class="d-flex gap-2 justify-content-end mt-4">
-                                                <a href="{{ route('hrms.assets.index', request()->except(['request_search', 'request_category_id', 'request_company_id', 'request_status'])) }}" class="btn btn-sm btn-light border">Reset</a>
-                                                <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+                                                <a href="{{ route('hrms.assets.index', request()->except(['request_search', 'request_category_id', 'request_company_id', 'request_status'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
+                                                <button type="submit" class="btn btn-sm btn-primary">{{ __('hrms.common.apply') }}</button>
                                             </div>
                                         </x-ui.filter>
 
@@ -675,13 +690,13 @@
                                                 <td class="text-muted fs-12">{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}</td>
                                                 <td>
                                                     @if($req->status === 'pending')
-                                                        <span class="badge bg-soft-warning text-warning px-2 py-1 text-capitalize">{{ $req->status }}</span>
+                                                        <span class="badge bg-soft-warning text-warning px-2 py-1 text-capitalize">{{ __('hrms.assets.status_' . $req->status) }}</span>
                                                     @elseif($req->status === 'allocated')
-                                                        <span class="badge bg-soft-success text-success px-2 py-1 text-capitalize">{{ $req->status }}</span>
+                                                        <span class="badge bg-soft-success text-success px-2 py-1 text-capitalize">{{ __('hrms.assets.status_' . $req->status) }}</span>
                                                     @elseif($req->status === 'rejected')
-                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 text-capitalize" title="{{ $req->admin_notes }}">{{ $req->status }}</span>
+                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 text-capitalize" title="{{ $req->admin_notes }}">{{ __('hrms.assets.status_' . $req->status) }}</span>
                                                     @else
-                                                        <span class="badge bg-light text-secondary px-2 py-1 text-capitalize">{{ $req->status }}</span>
+                                                        <span class="badge bg-light text-secondary px-2 py-1 text-capitalize">{{ __('hrms.assets.status_' . $req->status) }}</span>
                                                     @endif
                                                 </td>
                                                 <td class="text-end" style="padding-right: 20px;">
@@ -697,18 +712,18 @@
                                                                 data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
                                                                 data-category-id="{{ $req->asset_category_id }}"
                                                                 data-company-id="{{ $req->company_id }}">
-                                                                Allocate
+                                                                {{ __('hrms.assets.allocate') }}
                                                             </button>
 
                                                             <!-- Reject Trigger -->
                                                             <button type="button" class="btn btn-sm btn-outline-danger text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center reject-request-btn"
                                                                 style="font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;"
                                                                 data-request-id="{{ $req->id }}">
-                                                                Reject
+                                                                {{ __('hrms.assets.reject') }}
                                                             </button>
                                                         </div>
                                                     @elseif($req->status === 'allocated' && $req->allocatedAsset)
-                                                        <span class="text-muted fs-12">Allocated: <code class="fw-bold text-dark">{{ $req->allocatedAsset->asset_code }}</code></span>
+                                                        <span class="text-muted fs-12">{{ __('hrms.assets.allocated_lbl') }} <code class="fw-bold text-dark">{{ $req->allocatedAsset->asset_code }}</code></span>
                                                     @else
                                                         <span class="text-muted fs-12">-</span>
                                                     @endif
@@ -718,8 +733,8 @@
                                             <tr>
                                                 <td colspan="7" class="text-center py-5 text-muted fs-12">
                                                     <i class="feather-user-check fs-32 d-block mb-3 text-secondary"></i>
-                                                    <div class="fw-bold mb-1">No Asset Requests</div>
-                                                    <div>Pending request tickets from employees will be shown here.</div>
+                                                    <div class="fw-bold mb-1">{{ __('hrms.assets.empty_requests_title') }}</div>
+                                                    <div>{{ __('hrms.assets.empty_requests_desc') }}</div>
                                                 </td>
                                             </tr>
                                         @endforelse
@@ -756,7 +771,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="addAssetModalLabel">
-                        <i class="feather-package me-2 text-primary"></i>Log New Company Asset
+                        <i class="feather-package me-2 text-primary"></i>{{ __('hrms.assets.log_new_asset') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -765,51 +780,51 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Asset Category" name="asset_category_id" :required="true" select2-selector="default">
-                                    <option value="">Select Category</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.category') }}" name="asset_category_id" :required="true" select2-selector="default">
+                                    <option value="">{{ __('hrms.assets.select_category') }}</option>
                                     @foreach($categories as $category)
                                         <option value="{{ $category->id }}">{{ $category->name }} ({{ $category->company->company_name }})</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Asset Code" name="asset_code" placeholder="e.g. AST-IT-008" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.asset_code_label') }}" name="asset_code" placeholder="e.g. AST-IT-008" :required="true" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Asset Name" name="name" placeholder="e.g. MacBook Pro 16" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.asset_name_label') }}" name="name" placeholder="e.g. MacBook Pro 16" :required="true" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Brand / Vendor" name="brand" placeholder="e.g. Apple" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" placeholder="e.g. Apple" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Model Number" name="model_number" placeholder="e.g. A2442" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" placeholder="e.g. A2442" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Serial Number" name="serial_number" placeholder="e.g. C02FXXXX" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.serial_number') }}" name="serial_number" placeholder="e.g. C02FXXXX" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Purchase Date" name="purchase_date" inputType="date" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_date') }}" name="purchase_date" inputType="date" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Purchase Cost (₹)" name="purchase_cost" inputType="number" step="0.01" placeholder="0.00" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_cost') }}" name="purchase_cost" inputType="number" step="0.01" placeholder="0.00" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Asset Condition" name="condition" :required="true" select2-selector="default">
-                                    <option value="good">Good</option>
-                                    <option value="new">New</option>
-                                    <option value="fair">Fair</option>
-                                    <option value="damaged">Damaged</option>
-                                    <option value="scrapped">Scrapped</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.condition') }}" name="condition" :required="true" select2-selector="default">
+                                    <option value="good">{{ __('hrms.assets.cond_good') }}</option>
+                                    <option value="new">{{ __('hrms.assets.cond_new') }}</option>
+                                    <option value="fair">{{ __('hrms.assets.cond_fair') }}</option>
+                                    <option value="damaged">{{ __('hrms.assets.cond_damaged') }}</option>
+                                    <option value="scrapped">{{ __('hrms.assets.cond_scrapped') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" placeholder="Condition details, license specifications, configurations..." />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" placeholder="Condition details, license specifications, configurations..." />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Log Asset</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.log_asset') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
                     </div>
                 </form>
             </div>
@@ -822,7 +837,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="editAssetModalLabel">
-                        <i class="feather-edit-3 me-2 text-primary"></i>Modify Asset Details
+                        <i class="feather-edit-3 me-2 text-primary"></i>{{ __('hrms.assets.modify_asset_details') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -831,51 +846,51 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Asset Category" name="asset_category_id" id="edit_asset_category_id" :required="true" select2-selector="default">
-                                    <option value="">Select Category</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.category') }}" name="asset_category_id" id="edit_asset_category_id" :required="true" select2-selector="default">
+                                    <option value="">{{ __('hrms.assets.select_category') }}</option>
                                     @foreach($categories as $category)
                                         <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Asset Code" name="asset_code" id="edit_asset_code" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.asset_code_label') }}" name="asset_code" id="edit_asset_code" :required="true" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Asset Name" name="name" id="edit_name" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.asset_name_label') }}" name="name" id="edit_name" :required="true" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Brand / Vendor" name="brand" id="edit_brand" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" id="edit_brand" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Model Number" name="model_number" id="edit_model_number" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" id="edit_model_number" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Serial Number" name="serial_number" id="edit_serial_number" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.serial_number') }}" name="serial_number" id="edit_serial_number" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Purchase Date" name="purchase_date" id="edit_purchase_date" inputType="date" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_date') }}" name="purchase_date" id="edit_purchase_date" inputType="date" />
                             </div>
                             <div class="col-6">
-                                <x-ui.odoo-form-ui type="input" label="Purchase Cost (₹)" name="purchase_cost" id="edit_purchase_cost" inputType="number" step="0.01" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_cost') }}" name="purchase_cost" id="edit_purchase_cost" inputType="number" step="0.01" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Asset Condition" name="condition" id="edit_condition" :required="true" select2-selector="default">
-                                    <option value="good">Good</option>
-                                    <option value="new">New</option>
-                                    <option value="fair">Fair</option>
-                                    <option value="damaged">Damaged</option>
-                                    <option value="scrapped">Scrapped</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.condition') }}" name="condition" id="edit_condition" :required="true" select2-selector="default">
+                                    <option value="good">{{ __('hrms.assets.cond_good') }}</option>
+                                    <option value="new">{{ __('hrms.assets.cond_new') }}</option>
+                                    <option value="fair">{{ __('hrms.assets.cond_fair') }}</option>
+                                    <option value="damaged">{{ __('hrms.assets.cond_damaged') }}</option>
+                                    <option value="scrapped">{{ __('hrms.assets.cond_scrapped') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" id="edit_notes" />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" id="edit_notes" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Changes</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.common.save_changes') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
                     </div>
                 </form>
             </div>
@@ -888,86 +903,86 @@
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="importAssetModalLabel">
-                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>Import Assets
+                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.assets.import_assets') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="{{ route('hrms.assets.import') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ route('hrms.assets.import') }}" method="POST" enctype="multipart/file-data">
                     @csrf
                     <div class="modal-body text-start">
                         <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="feather-info text-primary fs-15"></i>
-                                <span class="fw-bold">Excel Template Instructions</span>
+                                <span class="fw-bold">{{ __('hrms.assets.import_instructions_title') }}</span>
                             </div>
                             <span class="text-muted leading-relaxed">
-                                Please download the Excel template, populate your asset details, and upload the completed file. Ensure mandatory columns (`asset_code`, `name`, `category_name`, and `company_name`) are filled correctly. New categories will be auto-created during the import.
+                                {{ __('hrms.assets.import_instructions_desc') }}
                             </span>
                             <div class="mt-1">
                                 <a href="{{ route('hrms.assets.import.template') }}" class="btn btn-xs btn-soft-primary d-inline-flex align-items-center fw-bold py-1.5 px-3" style="border-radius: 6px; font-size: 11px;">
-                                    <i class="feather-download me-1.5 fs-12"></i> Download Template
+                                    <i class="feather-download me-1.5 fs-12"></i> {{ __('hrms.assets.download_template') }}
                                 </a>
                             </div>
                         </div>
                         <div class="col-12">
-                            <div class="erp-custom-file-upload">
-                                <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="asset_import_file">
-                                    <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
-                                    <span class="file-text text-muted" id="asset_import_file_text">Select Excel (.xlsx) File</span>
-                                    <input type="file" name="file" id="asset_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('asset_import_file_text').innerText = this.files[0]?.name || 'Select Excel (.xlsx) File'">
-                                </label>
-                            </div>
+                             <div class="erp-custom-file-upload">
+                                 <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="asset_import_file">
+                                     <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
+                                     <span class="file-text text-muted" id="asset_import_file_text">{{ __('hrms.assets.select_excel_file') }}</span>
+                                     <input type="file" name="file" id="asset_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('asset_import_file_text').innerText = this.files[0]?.name || '{{ __('hrms.assets.select_excel_file') }}'">
+                                 </label>
+                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Import</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.import') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-
+ 
     <!-- IMPORT CATEGORY MODAL -->
     <div class="modal fade" id="importCategoryModal" tabindex="-1" aria-labelledby="importCategoryModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="importCategoryModalLabel">
-                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>Import Asset Categories
+                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.assets.import_categories') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="{{ route('hrms.assets.categories.import') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ route('hrms.assets.categories.import') }}" method="POST" enctype="multipart/file-data">
                     @csrf
                     <div class="modal-body text-start">
                         <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
                             <div class="d-flex align-items-center gap-2">
                                 <i class="feather-info text-primary fs-15"></i>
-                                <span class="fw-bold">Excel Template Instructions</span>
+                                <span class="fw-bold">{{ __('hrms.assets.import_instructions_title') }}</span>
                             </div>
                             <span class="text-muted leading-relaxed">
-                                Please download the Excel template, populate your category details, and upload the completed file. Ensure mandatory columns (`name` and `company_name`) are filled correctly.
+                                {{ __('hrms.assets.import_cat_instructions_desc') }}
                             </span>
                             <div class="mt-1">
                                 <a href="{{ route('hrms.assets.categories.import.template') }}" class="btn btn-xs btn-soft-primary d-inline-flex align-items-center fw-bold py-1.5 px-3" style="border-radius: 6px; font-size: 11px;">
-                                    <i class="feather-download me-1.5 fs-12"></i> Download Template
+                                    <i class="feather-download me-1.5 fs-12"></i> {{ __('hrms.assets.download_template') }}
                                 </a>
                             </div>
                         </div>
                         <div class="col-12">
-                            <div class="erp-custom-file-upload">
-                                <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="category_import_file">
-                                    <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
-                                    <span class="file-text text-muted" id="category_import_file_text">Select Excel (.xlsx) File</span>
-                                    <input type="file" name="file" id="category_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('category_import_file_text').innerText = this.files[0]?.name || 'Select Excel (.xlsx) File'">
-                                </label>
-                            </div>
+                             <div class="erp-custom-file-upload">
+                                 <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="category_import_file">
+                                     <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
+                                     <span class="file-text text-muted" id="category_import_file_text">{{ __('hrms.assets.select_excel_file') }}</span>
+                                     <input type="file" name="file" id="category_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('category_import_file_text').innerText = this.files[0]?.name || '{{ __('hrms.assets.select_excel_file') }}'">
+                                 </label>
+                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Import</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.import') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
                     </div>
                 </form>
             </div>
@@ -979,7 +994,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="allocateAssetModalLabel">
-                        <i class="feather-user-check me-2 text-primary"></i>Assign Asset to Employee
+                        <i class="feather-user-check me-2 text-primary"></i>{{ __('hrms.assets.assign_asset') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -991,44 +1006,44 @@
                             <!-- Container A: Registry Checkout (Pre-selected Asset, select Employee) -->
                             <div id="registry_checkout_container" class="col-12 p-0 m-0 row g-3">
                                 <div class="col-12">
-                                    <label class="info-label mb-1">Asset To Assign</label>
+                                    <label class="info-label mb-1">{{ __('hrms.assets.asset_to_assign') }}</label>
                                     <input type="text" id="allocate_asset_name_display" class="form-control bg-light" readonly>
                                 </div>
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="select" label="Employee" name="assigned_employee_id" id="registry_employee_select" :required="true" select2-selector="default">
-                                        <option value="">Select Employee</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.employee') }}" name="assigned_employee_id" id="registry_employee_select" :required="true" select2-selector="default">
+                                        <option value="">{{ __('hrms.assets.select_employee') }}</option>
                                         @foreach($employees as $employee)
                                             <option value="{{ $employee->id }}" data-company-id="{{ $employee->company_id }}">{{ $employee->display_name }} ({{ $employee->employee_id }})</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
                             </div>
-
+ 
                             <!-- Container B: Request Checkout (Pre-selected Employee, select Asset) -->
                             <div id="request_checkout_container" class="col-12 p-0 m-0 row g-3 d-none">
                                 <div class="col-12">
-                                    <label class="info-label mb-1">Employee</label>
+                                    <label class="info-label mb-1">{{ __('hrms.assets.employee') }}</label>
                                     <input type="text" id="allocate_employee_name_display" class="form-control bg-light" readonly>
                                     <input type="hidden" name="assigned_employee_id" id="request_employee_id" disabled>
                                 </div>
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="select" label="Select Asset" name="asset_id" id="request_asset_select" :required="true" select2-selector="default">
-                                        <option value="">Select Asset</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.select_asset') }}" name="asset_id" id="request_asset_select" :required="true" select2-selector="default">
+                                        <option value="">{{ __('hrms.assets.select_asset') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
                             </div>
-
+ 
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Allocation Date" name="allocated_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.allocation_date') }}" name="allocated_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Expected Return Date" name="expected_return_date" inputType="date" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.expected_return_date') }}" name="expected_return_date" inputType="date" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Confirm Allocation</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.confirm_allocation') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                     </div>
                 </form>
             </div>
@@ -1041,7 +1056,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="addCategoryModalLabel">
-                        <i class="feather-sliders me-2 text-primary"></i>Create Asset Category
+                        <i class="feather-sliders me-2 text-primary"></i>{{ __('hrms.assets.create_category') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -1050,37 +1065,37 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Belongs to Company" name="company_id" :required="true" select2-selector="default">
-                                    <option value="">Select Company</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.belongs_to_company') }}" name="company_id" :required="true" select2-selector="default">
+                                    <option value="">{{ __('hrms.assets.select_company') }}</option>
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Category Name" name="name" placeholder="e.g. IT Laptops, Office Car Keys" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.category_name') }}" name="name" placeholder="e.g. IT Laptops, Office Car Keys" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Brief details about what items go into this category..." />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" placeholder="Brief details about what items go into this category..." />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Create Category</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.add_category') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-
+ 
     <!-- MODAL 4B: EDIT CATEGORY -->
     <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="editCategoryModalLabel">
-                        <i class="feather-sliders me-2 text-primary"></i>Edit Asset Category
+                        <i class="feather-sliders me-2 text-primary"></i>{{ __('hrms.assets.edit_category') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -1089,24 +1104,24 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Belongs to Company" name="company_id" id="edit_category_company_id" :required="true" select2-selector="default">
-                                    <option value="">Select Company</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.belongs_to_company') }}" name="company_id" id="edit_category_company_id" :required="true" select2-selector="default">
+                                    <option value="">{{ __('hrms.assets.select_company') }}</option>
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Category Name" name="name" id="edit_category_name" placeholder="e.g. IT Laptops, Office Car Keys" :required="true" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.category_name') }}" name="name" id="edit_category_name" placeholder="e.g. IT Laptops, Office Car Keys" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_category_description" placeholder="Brief details about what items go into this category..." />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" id="edit_category_description" placeholder="Brief details about what items go into this category..." />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Save Changes</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.common.save_changes') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
                     </div>
                 </form>
             </div>
@@ -1117,7 +1132,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="returnAssetModalLabel">
-                        <i class="feather-corner-up-left me-2 text-primary"></i>Return Asset to Inventory
+                        <i class="feather-corner-up-left me-2 text-primary"></i>{{ __('hrms.assets.return_asset') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -1126,29 +1141,29 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="info-label mb-1">Asset To Return</label>
+                                <label class="info-label mb-1">{{ __('hrms.assets.asset_to_return') }}</label>
                                 <input type="text" id="return_asset_name_display" class="form-control bg-light" readonly>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Return Date" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.return_date') }}" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Return Condition" name="return_condition" :required="true" select2-selector="default">
-                                    <option value="good">Good</option>
-                                    <option value="new">New</option>
-                                    <option value="fair">Fair</option>
-                                    <option value="damaged">Damaged (Needs Maintenance)</option>
-                                    <option value="scrapped">Scrapped</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.return_condition') }}" name="return_condition" :required="true" select2-selector="default">
+                                    <option value="good">{{ __('hrms.assets.cond_good') }}</option>
+                                    <option value="new">{{ __('hrms.assets.cond_new') }}</option>
+                                    <option value="fair">{{ __('hrms.assets.cond_fair') }}</option>
+                                    <option value="damaged">{{ __('hrms.assets.cond_damaged') }} ({{ __('hrms.assets.needs_maintenance') }})</option>
+                                    <option value="scrapped">{{ __('hrms.assets.cond_scrapped') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Return Notes" name="return_notes" placeholder="Condition details, damage details, return notes..." />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.return_notes') }}" name="return_notes" placeholder="Condition details, damage details, return notes..." />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Process Return</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.process_return') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                     </div>
                 </form>
             </div>
@@ -1161,24 +1176,24 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="assetHistoryModalLabel">
-                        <i class="feather-clock me-2 text-primary"></i>Asset Allocation History
+                        <i class="feather-clock me-2 text-primary"></i>{{ __('hrms.assets.allocation_history') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-0">
                     <div class="p-3 bg-light border-bottom">
-                        <span class="text-muted">Asset:</span> <strong id="history_asset_name_display" class="text-dark"></strong>
+                        <span class="text-muted">{{ __('hrms.assets.asset_lbl') }}</span> <strong id="history_asset_name_display" class="text-dark"></strong>
                     </div>
                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                         <table class="table table-hover align-middle mb-0 text-center">
                             <thead class="table-light fs-11 text-uppercase">
                                 <tr>
-                                    <th class="text-start" style="padding-left: 20px;">Employee</th>
-                                    <th>Allocated At</th>
-                                    <th>Returned At</th>
-                                    <th>Alloc. Cond.</th>
-                                    <th>Return Cond.</th>
-                                    <th class="text-start" style="padding-right: 20px;">Notes</th>
+                                    <th class="text-start" style="padding-left: 20px;">{{ __('hrms.assets.employee') }}</th>
+                                    <th>{{ __('hrms.assets.allocation_date') }}</th>
+                                    <th>{{ __('hrms.assets.return_date') }}</th>
+                                    <th>{{ __('hrms.assets.alloc_cond_lbl') }}</th>
+                                    <th>{{ __('hrms.assets.return_cond_lbl') }}</th>
+                                    <th class="text-start" style="padding-right: 20px;">{{ __('hrms.assets.internal_notes') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="history_table_body">
@@ -1197,7 +1212,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="rejectRequestModalLabel">
-                        <i class="feather-alert-octagon me-2 text-danger"></i>Reject Asset Request
+                        <i class="feather-alert-octagon me-2 text-danger"></i>{{ __('hrms.assets.reject_request') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -1206,13 +1221,13 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Rejection Reason" name="admin_notes" placeholder="Please state the reason for rejecting this request..." :required="true" />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.rejection_reason') }}" name="admin_notes" placeholder="{{ __('hrms.assets.rejection_reason_placeholder') }}" :required="true" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">Reject Request</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Cancel</button>
+                        <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.reject_request_btn') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
                     </div>
                 </form>
             </div>

@@ -1431,8 +1431,8 @@
                 </div>
                 
                 <div class="row g-3">
-                    <div class="col-sm-6">
-                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">Company</label>
+                     <div class="col-sm-6">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.employees.tbl_company') }}</label>
                         <span class="fs-13 fw-bold text-dark" id="modal_view_shift_company"></span>
                     </div>
                     <div class="col-sm-6">
@@ -1477,8 +1477,8 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="Company (Legal Entity)" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
-                                <option value="">Shared (All Companies)</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.roster.company_legal_entity') }}" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
+                                <option value="">{{ __('hrms.roster.shared_all_companies') }}</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach
@@ -1535,8 +1535,8 @@
                 <div class="modal-body p-4">
                     <div class="row g-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="select" label="Company (Legal Entity)" name="company_id" id="edit_shift_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
-                                <option value="">Shared (All Companies)</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.roster.company_legal_entity') }}" name="company_id" id="edit_shift_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
+                                <option value="">{{ __('hrms.roster.shared_all_companies') }}</option>
                                 @foreach($companies as $company)
                                     <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                 @endforeach

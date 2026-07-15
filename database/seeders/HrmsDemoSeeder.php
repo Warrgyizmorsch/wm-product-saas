@@ -69,11 +69,14 @@ class HrmsDemoSeeder extends Seeder
         Schema::enableForeignKeyConstraints();
 
         // 1. Fetch Tenant and Admin User
-        $tenant = Tenant::where('slug', 'demo')->first();
+        $tenant = Tenant::where('slug', config('tenancy.local_fallback_slug', 'demo'))->first()
+            ?? Tenant::where('slug', 'demo')->first()
+            ?? Tenant::first();
+
         if (!$tenant) {
             $tenant = Tenant::create([
                 'name' => 'Demo Tenant',
-                'slug' => 'demo',
+                'slug' => config('tenancy.local_fallback_slug', 'demo'),
                 'status' => Tenant::STATUS_ACTIVE,
                 'plan' => Tenant::PLAN_ENTERPRISE,
                 'subscription_status' => Tenant::SUBSCRIPTION_ACTIVE,

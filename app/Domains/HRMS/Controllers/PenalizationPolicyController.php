@@ -144,6 +144,6 @@ class PenalizationPolicyController extends Controller
         );
 
         return redirect()->route('hrms.penalization-policy.index', ['policy_type' => $request->rule_type])
-            ->with('success', 'Penalization Policy updated successfully.');
+            ->with('success', __('hrms.penalization.policy_updated'));
     }
 }

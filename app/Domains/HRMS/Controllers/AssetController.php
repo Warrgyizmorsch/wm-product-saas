@@ -193,8 +193,8 @@ class AssetController extends Controller
         $validated['status'] = $status;
         
         Asset::create($validated);
-
-        return redirect()->route('hrms.assets.index')->with('success', 'Asset logged in the registry.');
+ 
+        return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_logged'));
     }
 
     /**
@@ -232,8 +232,8 @@ class AssetController extends Controller
         }
 
         $asset->update($validated);
-
-        return redirect()->route('hrms.assets.index')->with('success', 'Asset details updated.');
+ 
+        return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_updated'));
     }
 
     /**
@@ -243,8 +243,8 @@ class AssetController extends Controller
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
         $asset->delete();
-
-        return redirect()->route('hrms.assets.index')->with('success', 'Asset record removed.');
+ 
+        return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_deleted'));
     }
 
     /**
@@ -261,8 +261,8 @@ class AssetController extends Controller
         ]);
 
         AssetCategory::create($validated);
-
-        return redirect()->route('hrms.assets.index')->with('success', 'Asset category created.');
+ 
+        return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_cat_created'));
     }
 
     /**
@@ -279,8 +279,8 @@ class AssetController extends Controller
         ]);
 
         $assetCategory->update($validated);
-
-        return redirect()->route('hrms.assets.index')->with('success', 'Asset category updated.');
+ 
+        return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_cat_updated'));
     }
 
     /**
@@ -293,19 +293,19 @@ class AssetController extends Controller
         // Option 2: Check if there are assets linked to the category
         $assetCount = $assetCategory->assets()->count();
         if ($assetCount > 0) {
-            return redirect()->back()->with('error', "Cannot delete category '{$assetCategory->name}' because it has {$assetCount} assets linked to it. Please re-assign or delete those assets first.");
+            return redirect()->back()->with('error', __('hrms.assets.error_cat_has_assets', ['name' => $assetCategory->name, 'count' => $assetCount]));
         }
-
+ 
         // Also check if there are asset requests linked to this category
         $requestCount = AssetRequest::where('asset_category_id', $assetCategory->id)->count();
         if ($requestCount > 0) {
-            return redirect()->back()->with('error', "Cannot delete category '{$assetCategory->name}' because it has {$requestCount} asset requests linked to it. Please resolve or remove those requests first.");
+            return redirect()->back()->with('error', __('hrms.assets.error_cat_has_requests', ['name' => $assetCategory->name, 'count' => $requestCount]));
         }
-
+ 
         // Delete the category itself since it is empty
         $assetCategory->delete();
-
-        return redirect()->route('hrms.assets.index')->with('success', 'Asset category deleted successfully.');
+ 
+        return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_cat_deleted'));
     }
 
     /**
@@ -368,8 +368,8 @@ class AssetController extends Controller
                 ]);
             }
         }
-
-        return redirect()->back()->with('success', 'Asset successfully allocated.');
+ 
+        return redirect()->back()->with('success', __('hrms.assets.success_allocated'));
     }
 
     /**
@@ -418,8 +418,8 @@ class AssetController extends Controller
             'allocated_at' => null,
             'expected_return_date' => null,
         ]);
-
-        return redirect()->back()->with('success', 'Asset returned to inventory.');
+ 
+        return redirect()->back()->with('success', __('hrms.assets.success_returned'));
     }
 
     /**
@@ -439,8 +439,8 @@ class AssetController extends Controller
         $validated['status'] = 'pending';
 
         AssetRequest::create($validated);
-
-        return redirect()->back()->with('success', 'Asset request submitted successfully.');
+ 
+        return redirect()->back()->with('success', __('hrms.assets.success_req_submitted'));
     }
 
     /**
@@ -458,8 +458,8 @@ class AssetController extends Controller
             'status' => 'rejected',
             'admin_notes' => $validated['admin_notes'],
         ]);
-
-        return redirect()->back()->with('success', 'Asset request rejected.');
+ 
+        return redirect()->back()->with('success', __('hrms.assets.success_req_rejected'));
     }
 
     /**
@@ -612,7 +612,7 @@ class AssetController extends Controller
             $rows = \App\Domains\HRMS\Helpers\XlsxHelper::import($filePath);
 
             if (empty($rows)) {
-                return redirect()->back()->with('error', 'The Excel file is empty.');
+                return redirect()->back()->with('error', __('hrms.assets.error_empty_excel'));
             }
 
             $headers = array_shift($rows);
@@ -625,7 +625,7 @@ class AssetController extends Controller
             $required = ['asset_code', 'name', 'category_name'];
             foreach ($required as $req) {
                 if (!in_array($req, $headers)) {
-                    return redirect()->back()->with('error', "Missing required column: " . str_replace('_', ' ', $req));
+                    return redirect()->back()->with('error', __('hrms.assets.error_missing_column', ['column' => str_replace('_', ' ', $req)]));
                 }
             }
 
@@ -732,13 +732,13 @@ class AssetController extends Controller
             }
 
             if (!empty($errors)) {
-                return redirect()->back()->with('success', "Imported {$importedCount} assets successfully. Warnings/Errors: " . implode(', ', $errors));
+                return redirect()->back()->with('success', __('hrms.assets.success_imported_with_warnings', ['count' => $importedCount, 'warnings' => implode(', ', $errors)]));
             }
-
-            return redirect()->back()->with('success', "{$importedCount} assets imported successfully.");
-
+ 
+            return redirect()->back()->with('success', __('hrms.assets.success_assets_imported', ['count' => $importedCount]));
+ 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Import failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.assets.error_import_failed', ['message' => $e->getMessage()]));
         }
     }
 
@@ -836,7 +836,7 @@ class AssetController extends Controller
             $rows = \App\Domains\HRMS\Helpers\XlsxHelper::import($filePath);
 
             if (empty($rows)) {
-                return redirect()->back()->with('error', 'The Excel file is empty.');
+                return redirect()->back()->with('error', __('hrms.assets.error_empty_excel'));
             }
 
             $headers = array_shift($rows);
@@ -849,7 +849,7 @@ class AssetController extends Controller
             $required = ['name', 'company_name'];
             foreach ($required as $req) {
                 if (!in_array($req, $headers)) {
-                    return redirect()->back()->with('error', "Missing required column: " . str_replace('_', ' ', $req));
+                    return redirect()->back()->with('error', __('hrms.assets.error_missing_column', ['column' => str_replace('_', ' ', $req)]));
                 }
             }
 
@@ -894,13 +894,13 @@ class AssetController extends Controller
             }
 
             if (!empty($errors)) {
-                return redirect()->back()->with('success', "Imported {$importedCount} categories successfully. Warnings/Errors: " . implode(', ', $errors));
+                return redirect()->back()->with('success', __('hrms.assets.success_imported_with_warnings', ['count' => $importedCount, 'warnings' => implode(', ', $errors)]));
             }
-
-            return redirect()->back()->with('success', "{$importedCount} categories imported successfully.");
-
+ 
+            return redirect()->back()->with('success', __('hrms.assets.success_categories_imported', ['count' => $importedCount]));
+ 
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Import failed: ' . $e->getMessage());
+            return redirect()->back()->with('error', __('hrms.assets.error_import_failed', ['message' => $e->getMessage()]));
         }
     }
 }

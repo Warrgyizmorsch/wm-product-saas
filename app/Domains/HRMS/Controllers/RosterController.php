@@ -221,7 +221,7 @@ class RosterController extends Controller
         if (empty($employeeIds)) {
             return redirect()
                 ->back()
-                ->with('error', 'No employees found matching the selected filters.');
+                ->with('error', __('hrms.roster.no_emp_found'));
         }
 
         $period = CarbonPeriod::create($startDate, $endDate);
@@ -252,7 +252,7 @@ class RosterController extends Controller
                 'department_id' => $request->input('department_id'),
                 'start_date' => $request->input('start_date'),
             ])
-            ->with('success', 'Shifts assigned successfully.');
+            ->with('success', __('hrms.roster.shifts_assigned'));
     }
 
     public function updateCell(Request $request): JsonResponse
@@ -279,7 +279,7 @@ class RosterController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Roster cell updated successfully.',
+            'message' => __('hrms.roster.cell_updated'),
             'roster' => $roster
         ]);
     }
@@ -332,7 +332,7 @@ class RosterController extends Controller
         if (empty($employeeIds)) {
             return redirect()
                 ->back()
-                ->with('error', 'No employees found matching the filters.');
+                ->with('error', __('hrms.roster.no_emp_found'));
         }
 
         ShiftRoster::query()
@@ -346,7 +346,7 @@ class RosterController extends Controller
                 'department_id' => $request->input('department_id'),
                 'start_date' => $request->input('start_date'),
             ])
-            ->with('success', 'Roster entries cleared successfully.');
+            ->with('success', __('hrms.roster.entries_cleared'));
     }
 
     public function storeShift(Request $request)
@@ -386,7 +386,7 @@ class RosterController extends Controller
 
         return redirect()
             ->route('hrms.roster.index', ['tab' => 'shifts'])
-            ->with('success', 'Shift created successfully.');
+            ->with('success', __('hrms.roster.shift_created'));
     }
 
     public function updateShift(Request $request, ProductionShift $shift)
@@ -426,7 +426,7 @@ class RosterController extends Controller
 
         return redirect()
             ->route('hrms.roster.index', ['tab' => 'shifts'])
-            ->with('success', 'Shift updated successfully.');
+            ->with('success', __('hrms.roster.shift_updated'));
     }
 
     public function destroyShift(ProductionShift $shift)
@@ -436,6 +436,6 @@ class RosterController extends Controller
         $shift->delete();
         return redirect()
             ->route('hrms.roster.index', ['tab' => 'shifts'])
-            ->with('success', 'Shift deleted successfully.');
+            ->with('success', __('hrms.roster.shift_deleted'));
     }
 }

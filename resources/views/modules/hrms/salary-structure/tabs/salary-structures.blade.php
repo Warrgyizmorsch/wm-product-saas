@@ -25,56 +25,56 @@
                 <!-- Search Input (Placed before sort and filter in same line) -->
                 <div class="theme-search-container" style="max-width: 300px;">
                     <i class="feather-search"></i>
-                    <input type="text" id="struct_search_input" name="struct_search" class="theme-search-input" placeholder="Search structures..." value="{{ request('struct_search') }}">
+                    <input type="text" id="struct_search_input" name="struct_search" class="theme-search-input" placeholder="{{ __('hrms.salary.search_structures') }}" value="{{ request('struct_search') }}">
                 </div>
 
                 <!-- Sort Dropdown -->
-                <x-ui.sort-dropdown label="SORT">
+                <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'name_asc' || !request('struct_sort') ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeStructSort('name_asc', this); event.preventDefault();">
-                        <span>Name (A-Z)</span>
+                        <span>{{ __('hrms.common.sort_name_asc') }}</span>
                         @if(request('struct_sort') === 'name_asc' || !request('struct_sort')) <i class="feather-check ms-3"></i> @endif
                     </a>
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeStructSort('name_desc', this); event.preventDefault();">
-                        <span>Name (Z-A)</span>
+                        <span>{{ __('hrms.common.sort_name_desc') }}</span>
                         @if(request('struct_sort') === 'name_desc') <i class="feather-check ms-3"></i> @endif
                     </a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'min_ctc_asc' ? 'active' : '' }}" href="#" data-sort="min_ctc_asc" onclick="changeStructSort('min_ctc_asc', this); event.preventDefault();">
-                        <span>Min CTC (Low to High)</span>
+                        <span>{{ __('hrms.salary.min_ctc_low_high') }}</span>
                         @if(request('struct_sort') === 'min_ctc_asc') <i class="feather-check ms-3"></i> @endif
                     </a>
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'min_ctc_desc' ? 'active' : '' }}" href="#" data-sort="min_ctc_desc" onclick="changeStructSort('min_ctc_desc', this); event.preventDefault();">
-                        <span>Min CTC (High to Low)</span>
+                        <span>{{ __('hrms.salary.min_ctc_high_low') }}</span>
                         @if(request('struct_sort') === 'min_ctc_desc') <i class="feather-check ms-3"></i> @endif
                     </a>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'max_ctc_asc' ? 'active' : '' }}" href="#" data-sort="max_ctc_asc" onclick="changeStructSort('max_ctc_asc', this); event.preventDefault();">
-                        <span>Max CTC (Low to High)</span>
+                        <span>{{ __('hrms.salary.max_ctc_low_high') }}</span>
                         @if(request('struct_sort') === 'max_ctc_asc') <i class="feather-check ms-3"></i> @endif
                     </a>
                     <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('struct_sort') === 'max_ctc_desc' ? 'active' : '' }}" href="#" data-sort="max_ctc_desc" onclick="changeStructSort('max_ctc_desc', this); event.preventDefault();">
-                        <span>Max CTC (High to Low)</span>
+                        <span>{{ __('hrms.salary.max_ctc_high_low') }}</span>
                         @if(request('struct_sort') === 'max_ctc_desc') <i class="feather-check ms-3"></i> @endif
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- Filter Dropdown -->
-                <x-ui.filter label="FILTER">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.status') }}</label>
                         <x-ui.odoo-form-ui type="select" name="struct_filter_status" id="struct_filter_status">
-                            <option value="">All Statuses</option>
-                            <option value="1" @selected(request('struct_status') === '1')>Active</option>
-                            <option value="0" @selected(request('struct_status') === '0')>Inactive</option>
+                            <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                            <option value="1" @selected(request('struct_status') === '1')>{{ __('hrms.employees.frm_status_active') }}</option>
+                            <option value="0" @selected(request('struct_status') === '0')>{{ __('hrms.employees.frm_status_inactive') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
                     
                     <div class="dropdown-divider my-3"></div>
 
                     <div class="d-flex gap-2">
-                        <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyStructFilter()">Apply Filters</x-ui.button>
-                        <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetStructFilters()">Reset</x-ui.button>
+                        <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyStructFilter()">{{ __('hrms.common.apply') }}</x-ui.button>
+                        <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetStructFilters()">{{ __('hrms.common.reset') }}</x-ui.button>
                     </div>
                 </x-ui.filter>
             </div>
@@ -84,12 +84,12 @@
                     <thead class="table-light">
                         <tr>
                             <th width="60">#</th>
-                            <th>Structure Name</th>
-                            <th>Min Yearly CTC</th>
-                            <th>Max Yearly CTC</th>
-                            <th>Rules Count</th>
-                            <th>Status</th>
-                            <th width="150" class="text-end">Actions</th>
+                            <th>{{ __('hrms.salary.structure_name') }}</th>
+                            <th>{{ __('hrms.salary.min_yearly_ctc') }}</th>
+                            <th>{{ __('hrms.salary.max_yearly_ctc') }}</th>
+                            <th>{{ __('hrms.salary.rules_count') }}</th>
+                            <th>{{ __('hrms.org.status') }}</th>
+                            <th width="150" class="text-end">{{ __('hrms.assets.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -107,36 +107,36 @@
                                 </td>
                                 <td>
                                     <span class="badge bg-soft-info text-info rounded-pill px-2">
-                                        {{ $structure->items->count() }} Components
+                                        {{ $structure->items->count() }} {{ __('hrms.salary.salary_components_tab') }}
                                     </span>
                                 </td>
                                 <td>
                                     @if($structure->status)
-                                        <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                                        <x-ui.badge variant="success" soft>{{ __('hrms.employees.frm_status_active') }}</x-ui.badge>
                                     @else
-                                        <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                                        <x-ui.badge variant="danger" soft>{{ __('hrms.employees.frm_status_inactive') }}</x-ui.badge>
                                     @endif
                                 </td>
                                 <td class="text-end">
-                                    <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this structure slab?');">
+                                    <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.salary.delete_structure_confirm') }}');">
                                         @csrf
                                         @method('DELETE')
                                         <div class="hstack gap-2 justify-content-end">
-                                            <a href="javascript:void(0)" class="action-dropdown-btn toggle-structure-details text-secondary p-2" data-target="#structure-details-{{ $structure->id }}" title="Show Components" data-bs-toggle="tooltip">
+                                            <a href="javascript:void(0)" class="action-dropdown-btn toggle-structure-details text-secondary p-2" data-target="#structure-details-{{ $structure->id }}" title="{{ __('hrms.salary.show_components') }}" data-bs-toggle="tooltip">
                                                 <i class="feather feather-chevron-down"></i>
                                             </a>
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item edit-structure-btn" href="javascript:void(0)" data-structure="{{ base64_encode($structure->toJson()) }}">
                                                         <i class="feather feather-edit-3 me-3"></i>
-                                                        <span>Edit</span>
+                                                        <span>{{ __('hrms.salary.edit') }}</span>
                                                     </a>
                                                 </li>
                                                 <li class="dropdown-divider"></li>
                                                 <li>
                                                     <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                         <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>Delete</span>
+                                                        <span>{{ __('hrms.salary.delete') }}</span>
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -153,15 +153,15 @@
                                                 @forelse($structure->items as $item)
                                                     @php
                                                         $calcTypeLabel = match($item->calculation_type) {
-                                                            'fixed' => 'Fixed Amount',
-                                                            'percentage_of_ctc' => 'of CTC',
-                                                            'percentage_of_basic' => 'of Basic',
-                                                            'balancing' => 'Balancing / Remainder',
+                                                            'fixed' => __('hrms.salary.fixed_amount'),
+                                                            'percentage_of_ctc' => __('hrms.salary.of_ctc'),
+                                                            'percentage_of_basic' => __('hrms.salary.of_basic'),
+                                                            'balancing' => __('hrms.salary.balancing'),
                                                             default => $item->calculation_type
                                                         };
                                                         $typeBadge = $item->component->type == 'earning' 
-                                                            ? '<span class="badge bg-soft-success text-success">Earning</span>' 
-                                                            : '<span class="badge bg-soft-danger text-danger">Deduction</span>';
+                                                            ? '<span class="badge bg-soft-success text-success">' . __('hrms.org.earning') . '</span>' 
+                                                            : '<span class="badge bg-soft-danger text-danger">' . __('hrms.org.deduction') . '</span>';
                                                     @endphp
                                                     <div class="col-xl-3 col-lg-4 col-md-6 col-12">
                                                         <div class="p-3 border rounded bg-white shadow-sm h-100 d-flex flex-column justify-content-between">
@@ -187,7 +187,7 @@
                                                     </div>
                                                 @empty
                                                     <div class="col-12 text-muted text-center py-2">
-                                                        <i class="feather-alert-circle me-1"></i>No components configured for this structure.
+                                                        <i class="feather-alert-circle me-1"></i>{{ __('hrms.salary.no_components_for_structure') }}
                                                     </div>
                                                 @endforelse
                                             </div>
@@ -199,7 +199,7 @@
                             <tr>
                                 <td colspan="8" class="text-center py-5 text-muted">
                                     <i class="feather-alert-circle fs-32 mb-2 d-block text-secondary"></i>
-                                    No Salary Structure slabs defined yet. Click "Add Structure" to get started.
+                                    {{ __('hrms.salary.no_structures_defined') }}
                                 </td>
                             </tr>
                         @endforelse
@@ -235,7 +235,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="addSalaryStructureModalLabel">Create Salary Structure Slab</h5>
+                <h5 class="modal-title fw-bold" id="addSalaryStructureModalLabel">{{ __('hrms.salary.create_slab') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{{ route('hrms.salary-structure.structure.store') }}" method="POST">
@@ -243,35 +243,35 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="input" label="Structure/Slab Name" name="name" placeholder="e.g. Slab 0 - 6 Lakhs" :required="true" :errorText="$errors->first('name')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.structure_slab_name') }}" name="name" placeholder="e.g. Slab 0 - 6 Lakhs" :required="true" :errorText="$errors->first('name')" />
                         </div>
                         <input type="hidden" name="company_id" id="add_structure_company_id">
                         <input type="hidden" name="pay_group_id" id="add_structure_pay_group_id" value="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}">
                         <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="input" label="Min Yearly CTC (₹)" name="min_ctc" inputType="number" placeholder="0" min="0" :required="true" :errorText="$errors->first('min_ctc')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.min_yearly_ctc_lbl') }}" name="min_ctc" inputType="number" placeholder="0" min="0" :required="true" :errorText="$errors->first('min_ctc')" />
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="input" label="Max Yearly CTC (₹)" name="max_ctc" inputType="number" placeholder="600000" min="0" :required="true" :errorText="$errors->first('max_ctc')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.max_yearly_ctc_lbl') }}" name="max_ctc" inputType="number" placeholder="600000" min="0" :required="true" :errorText="$errors->first('max_ctc')" />
                         </div>
                         <div class="col-md-12 col-12">
-                            <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
-                                <option value="1">Active</option>
-                                <option value="0">Inactive</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
+                                <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
                     </div>
 
                     <!-- Component Configuration Table -->
                     <div class="mt-4">
-                        <h6 class="fw-bold border-bottom pb-2 mb-3">Configure Component Calculation Rules</h6>
+                        <h6 class="fw-bold border-bottom pb-2 mb-3">{{ __('hrms.salary.configure_rules') }}</h6>
                         <div class="table-responsive border rounded bg-light">
                             <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Component Name</th>
-                                        <th>Type</th>
-                                        <th>Calculation Rule</th>
-                                        <th width="160">Rule Value</th>
+                                        <th>{{ __('hrms.org.component_name') }}</th>
+                                        <th>{{ __('hrms.org.type') }}</th>
+                                        <th>{{ __('hrms.salary.calculation_rule') }}</th>
+                                        <th width="160">{{ __('hrms.salary.rule_value') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -283,9 +283,9 @@
                                             </td>
                                             <td>
                                                 @if($comp->type == 'earning')
-                                                    <span class="badge bg-soft-success text-success">Earning</span>
+                                                    <span class="badge bg-soft-success text-success">{{ __('hrms.org.earning') }}</span>
                                                 @else
-                                                    <span class="badge bg-soft-warning text-warning">Deduction</span>
+                                                    <span class="badge bg-soft-warning text-warning">{{ __('hrms.org.deduction') }}</span>
                                                 @endif
                                             </td>
                                             <td>
@@ -294,11 +294,11 @@
                                                         class="add-calc-type-select"
                                                         data-comp-id="{{ $comp->id }}"
                                                         onchange="handleCalcTypeChange('add', {{ $comp->id }})">
-                                                    <option value="not_included">Not Included</option>
-                                                    <option value="fixed">Fixed Amount</option>
-                                                    <option value="percentage_of_ctc">Percentage of CTC</option>
-                                                    <option value="percentage_of_basic">Percentage of Basic</option>
-                                                    <option value="balancing">Balancing / Remainder</option>
+                                                    <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
+                                                    <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
+                                                    <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
+                                                    <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                    <option value="balancing">{{ __('hrms.salary.balancing') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </td>
                                             <td>
@@ -314,7 +314,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="4" class="text-center text-muted">No components found. Create components first.</td>
+                                            <td colspan="4" class="text-center text-muted">{{ __('hrms.salary.no_components_found') }}</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -323,8 +323,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
-                    <x-ui.button type="submit" variant="primary">Create Structure</x-ui.button>
+                    <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.salary.create_structure') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -338,7 +338,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="editSalaryStructureModalLabel">Edit Salary Structure Slab</h5>
+                <h5 class="modal-title fw-bold" id="editSalaryStructureModalLabel">{{ __('hrms.salary.edit_slab') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="editSalaryStructureForm" method="POST">
@@ -346,35 +346,35 @@
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="input" label="Structure/Slab Name" name="name" id="edit_name" :required="true" :errorText="$errors->first('name')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.structure_slab_name') }}" name="name" id="edit_name" :required="true" :errorText="$errors->first('name')" />
                         </div>
                         <input type="hidden" name="company_id" id="edit_company_id">
                         <input type="hidden" name="pay_group_id" id="edit_structure_pay_group_id">
                         <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="input" label="Min Yearly CTC (₹)" name="min_ctc" id="edit_min_ctc" inputType="number" :required="true" :errorText="$errors->first('min_ctc')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.min_yearly_ctc_lbl') }}" name="min_ctc" id="edit_min_ctc" inputType="number" :required="true" :errorText="$errors->first('min_ctc')" />
                         </div>
                         <div class="col-md-6 col-12">
-                            <x-ui.odoo-form-ui type="input" label="Max Yearly CTC (₹)" name="max_ctc" id="edit_max_ctc" inputType="number" :required="true" :errorText="$errors->first('max_ctc')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.salary.max_yearly_ctc_lbl') }}" name="max_ctc" id="edit_max_ctc" inputType="number" :required="true" :errorText="$errors->first('max_ctc')" />
                         </div>
                         <div class="col-md-12 col-12">
-                            <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
-                                <option value="1">Active</option>
-                                <option value="0">Inactive</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="edit_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
+                                <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
                     </div>
 
                     <!-- Component Configuration Table -->
                     <div class="mt-4">
-                        <h6 class="fw-bold border-bottom pb-2 mb-3">Configure Component Calculation Rules</h6>
+                        <h6 class="fw-bold border-bottom pb-2 mb-3">{{ __('hrms.salary.configure_rules') }}</h6>
                         <div class="table-responsive border rounded bg-light">
                             <table class="table table-sm table-hover align-middle mb-0" style="font-size: 13px;">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Component Name</th>
-                                        <th>Type</th>
-                                        <th>Calculation Rule</th>
-                                        <th width="160">Rule Value</th>
+                                        <th>{{ __('hrms.org.component_name') }}</th>
+                                        <th>{{ __('hrms.org.type') }}</th>
+                                        <th>{{ __('hrms.salary.calculation_rule') }}</th>
+                                        <th width="160">{{ __('hrms.salary.rule_value') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -386,9 +386,9 @@
                                             </td>
                                             <td>
                                                 @if($comp->type == 'earning')
-                                                    <span class="badge bg-soft-success text-success">Earning</span>
+                                                    <span class="badge bg-soft-success text-success">{{ __('hrms.org.earning') }}</span>
                                                 @else
-                                                    <span class="badge bg-soft-warning text-warning">Deduction</span>
+                                                    <span class="badge bg-soft-warning text-warning">{{ __('hrms.org.deduction') }}</span>
                                                 @endif
                                             </td>
                                             <td>
@@ -398,11 +398,11 @@
                                                         data-comp-id="{{ $comp->id }}"
                                                         id="edit-calc-type-{{ $comp->id }}"
                                                         onchange="handleCalcTypeChange('edit', {{ $comp->id }})">
-                                                    <option value="not_included">Not Included</option>
-                                                    <option value="fixed">Fixed Amount</option>
-                                                    <option value="percentage_of_ctc">Percentage of CTC</option>
-                                                    <option value="percentage_of_basic">Percentage of Basic</option>
-                                                    <option value="balancing">Balancing / Remainder</option>
+                                                    <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
+                                                    <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>
+                                                    <option value="percentage_of_ctc">{{ __('hrms.salary.percentage_of_ctc') }}</option>
+                                                    <option value="percentage_of_basic">{{ __('hrms.salary.percentage_of_basic') }}</option>
+                                                    <option value="balancing">{{ __('hrms.salary.balancing') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </td>
                                             <td>
@@ -423,8 +423,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
-                    <x-ui.button type="submit" variant="primary">Save Changes</x-ui.button>
+                    <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                    <x-ui.button type="submit" variant="primary">{{ __('hrms.common.save_changes') }}</x-ui.button>
                 </div>
             </form>
         </div>
@@ -432,17 +432,17 @@
 </div>
 
 <!-- CTC CALCULATOR DRAWER -->
-<x-ui.drawer id="ctcCalculatorDrawer" title="CTC Calculator & Simulator" position="end" :close-on-outside-click="true" style="width: 540px; max-width: 100%;">
+<x-ui.drawer id="ctcCalculatorDrawer" title="{{ __('hrms.salary.ctc_calculator_simulator') }}" position="end" :close-on-outside-click="true" style="width: 540px; max-width: 100%;">
     <div class="mb-4">
-        <x-ui.odoo-form-ui type="input" inputType="number" label="Yearly CTC (₹)" name="sim_ctc" id="sim_ctc" placeholder="e.g. 600000" onkeyup="calculateSimulator()" onchange="calculateSimulator()" />
-        <small class="text-muted d-block mt-1" style="margin-left: 170px;">Slabs will automatically match based on range limits.</small>
+        <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('hrms.salary.yearly_ctc') }}" name="sim_ctc" id="sim_ctc" placeholder="e.g. 600000" onkeyup="calculateSimulator()" onchange="calculateSimulator()" />
+        <small class="text-muted d-block mt-1" style="margin-left: 170px;">{{ __('hrms.salary.simulator_help') }}</small>
     </div>
 
     <div id="sim-error-msg" class="alert alert-soft-danger py-3 px-3 align-items-center" style="display: none;"></div>
 
     <div id="sim-results-card" style="display: none;">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <span class="text-muted fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">Matched Slab:</span>
+            <span class="text-muted fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">{{ __('hrms.salary.matched_slab') }}</span>
             <span id="sim-slab-name" class="badge bg-soft-primary text-primary px-3 py-1 fw-bold fs-12"></span>
         </div>
 
@@ -450,10 +450,10 @@
             <table class="table table-sm table-hover mb-0 align-middle" style="font-size: 13px;">
                 <thead class="table-light">
                     <tr>
-                        <th>Component</th>
-                        <th>Type</th>
-                        <th class="text-end">Monthly</th>
-                        <th class="text-end">Yearly</th>
+                        <th>{{ __('hrms.salary.component') }}</th>
+                        <th>{{ __('hrms.org.type') }}</th>
+                        <th class="text-end">{{ __('hrms.salary.monthly') }}</th>
+                        <th class="text-end">{{ __('hrms.salary.yearly') }}</th>
                     </tr>
                 </thead>
                 <tbody id="sim-results-body">
@@ -463,7 +463,7 @@
     </div>
 
     <x-slot name="footer">
-        <x-ui.button variant="light" data-bs-dismiss="offcanvas">Close Panel</x-ui.button>
+        <x-ui.button variant="light" data-bs-dismiss="offcanvas">{{ __('hrms.salary.close_panel') }}</x-ui.button>
     </x-slot>
 </x-ui.drawer>
 
@@ -495,11 +495,11 @@
             if (targetRow.hasClass('d-none')) {
                 targetRow.removeClass('d-none');
                 icon.removeClass('feather-chevron-down').addClass('feather-chevron-up');
-                $(this).attr('title', 'Hide Components');
+                $(this).attr('title', '{{ __('hrms.salary.hide_components') }}');
             } else {
                 targetRow.addClass('d-none');
                 icon.removeClass('feather-chevron-up').addClass('feather-chevron-down');
-                $(this).attr('title', 'Show Components');
+                $(this).attr('title', '{{ __('hrms.salary.show_components') }}');
             }
         });
 
@@ -665,7 +665,7 @@
     function calculateSimulator() {
         let ctc = parseFloat($('#sim_ctc').val());
         if (isNaN(ctc) || ctc < 0) {
-            $('#sim-error-msg').text('Please enter a valid CTC amount.').show();
+            $('#sim-error-msg').text('{{ __('hrms.salary.enter_valid_ctc') }}').show();
             $('#sim-results-card').hide();
             return;
         }
@@ -684,7 +684,7 @@
         }
 
         if (!matched) {
-            $('#sim-error-msg').html(`<i class="feather-alert-triangle me-2"></i>No active Salary Structure slab matches the entered CTC of <strong>₹${ctc.toLocaleString('en-IN')}</strong>. Please configure a matching slab.`).show();
+            $('#sim-error-msg').html(`<i class="feather-alert-triangle me-2"></i>{{ __('hrms.salary.no_slab_match') }} <strong>₹${ctc.toLocaleString('en-IN')}</strong>.`).show();
             $('#sim-results-card').hide();
             return;
         }
@@ -707,13 +707,13 @@
 
             if (item.calculation_type === 'fixed') {
                 valYearly = parseFloat(item.value);
-                ruleText = `Fixed: ₹${valYearly.toLocaleString('en-IN')}`;
+                ruleText = `{{ __('hrms.salary.fixed_amount') }}: ₹${valYearly.toLocaleString('en-IN')}`;
             } else if (item.calculation_type === 'percentage_of_ctc') {
                 valYearly = (parseFloat(item.value) / 100) * ctc;
-                ruleText = `${parseFloat(item.value)}% of CTC`;
+                ruleText = `${parseFloat(item.value)}% {{ __('hrms.salary.of_ctc') }}`;
             } else if (item.calculation_type === 'percentage_of_basic') {
                 valYearly = (parseFloat(item.value) / 100) * basicYearly;
-                ruleText = `${parseFloat(item.value)}% of Basic`;
+                ruleText = `${parseFloat(item.value)}% {{ __('hrms.salary.of_basic') }}`;
             }
 
             if (item.component.code.toLowerCase() === 'basic') {
@@ -742,7 +742,7 @@
                 name: item.component.name,
                 code: item.component.code,
                 type: item.component.type,
-                rule: 'Remaining Balance (Balancing)',
+                rule: '{{ __('hrms.salary.remaining_balance') }}',
                 yearly: valYearly,
                 monthly: valYearly / 12
             });
@@ -756,8 +756,8 @@
 
         rows.forEach((r, idx) => {
             let typeBadge = r.type === 'earning' 
-                ? '<span class="badge bg-soft-success text-success">Earning</span>' 
-                : '<span class="badge bg-soft-danger text-danger">Deduction</span>';
+                ? '<span class="badge bg-soft-success text-success">{{ __('hrms.org.earning') }}</span>' 
+                : '<span class="badge bg-soft-danger text-danger">{{ __('hrms.org.deduction') }}</span>';
 
             tbody.append(`
                 <tr>
@@ -795,17 +795,17 @@
         // Add summary rows
         tbody.append(`
             <tr class="table-light fw-bold border-top">
-                <td colspan="2">Gross Salary (Total CTC)</td>
+                <td colspan="2">{{ __('hrms.salary.gross_salary_ctc') }}</td>
                 <td class="text-end text-success">₹${grossMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end text-success">₹${grossYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
             <tr class="table-light fw-bold">
-                <td colspan="2">Total Deductions (PF / taxes)</td>
+                <td colspan="2">{{ __('hrms.salary.total_deductions') }}</td>
                 <td class="text-end text-danger">₹${deductionsMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end text-danger">₹${deductionsYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
             <tr class="fw-bold border-top border-bottom" style="background-color: rgba(30, 64, 175, 0.08) !important;">
-                <td colspan="2"><span class="text-primary">Net Salary (In-Hand / Take Home)</span></td>
+                <td colspan="2"><span class="text-primary">{{ __('hrms.salary.net_salary') }}</span></td>
                 <td class="text-end text-primary">₹${netMonthly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td class="text-end text-primary">₹${netYearly.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
             </tr>
