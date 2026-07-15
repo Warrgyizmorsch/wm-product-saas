@@ -2,9 +2,9 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 
-class Department extends Model
+class Department extends BaseModel
 {
     protected $fillable = [
         'company_id',

@@ -292,16 +292,7 @@ class OrgController extends Controller {
             'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        // Ensure default organization exists for foreign key constraint
-        Organization::firstOrCreate(
-            ['id' => 1],
-            [
-                'name' => 'Default Organization',
-                'slug' => 'default-organization',
-                'subscription_plan' => 'enterprise',
-                'status' => true,
-            ]
-        );
+        $organization = Organization::currentDefault();
 
         $logo = null;
 
@@ -321,7 +312,7 @@ class OrgController extends Controller {
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active');
 
         Company::create([
-            'organization_id' => 1,
+            'organization_id' => $organization->id,
             'company_name' => $request->company_name,
             'legal_name' => $request->legal_name,
             'gst_number' => $request->gst_number,
@@ -845,7 +836,7 @@ class OrgController extends Controller {
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
         SalaryComponent::create([
-            'organization_id' => 1,
+            'organization_id' => Organization::currentDefault()->id,
             'company_id' => $request->company_id,
             'name' => $request->name,
             'code' => $request->code,

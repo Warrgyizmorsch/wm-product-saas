@@ -2,10 +2,10 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class EmployeeEmploymentHistory extends Model
+class EmployeeEmploymentHistory extends BaseModel
 {
     protected $table = 'employee_employment_histories';
 

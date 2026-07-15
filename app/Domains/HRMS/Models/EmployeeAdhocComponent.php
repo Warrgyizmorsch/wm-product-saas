@@ -2,9 +2,9 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 
-class EmployeeAdhocComponent extends Model
+class EmployeeAdhocComponent extends BaseModel
 {
     protected $table = 'employee_adhoc_components';
 

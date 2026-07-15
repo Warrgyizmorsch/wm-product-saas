@@ -98,6 +98,7 @@ class HrmsDemoSeeder extends Seeder
 
         // 2. Organization & Company
         $org = Organization::create([
+            'tenant_id' => $tenant->id,
             'name' => 'Acme Corporation',
             'slug' => 'acme-corp',
             'logo' => null,
@@ -109,6 +110,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $company = Company::create([
+            'tenant_id' => $tenant->id,
             'organization_id' => $org->id,
             'company_name' => 'Acme India Pvt Ltd',
             'legal_name' => 'Acme India Private Limited',
@@ -131,6 +133,7 @@ class HrmsDemoSeeder extends Seeder
 
         // 3. Pay Groups
         $payGroupStandard = PayGroup::create([
+            'tenant_id' => $tenant->id,
             'organization_id' => $org->id,
             'company_id' => $company->id,
             'name' => 'Standard Employees Pay Group',
@@ -139,6 +142,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $payGroupExecutive = PayGroup::create([
+            'tenant_id' => $tenant->id,
             'organization_id' => $org->id,
             'company_id' => $company->id,
             'name' => 'Executive Pay Group',
@@ -148,6 +152,7 @@ class HrmsDemoSeeder extends Seeder
 
         // 4. Salary Components
         $basicComp = SalaryComponent::create([
+            'tenant_id' => $tenant->id,
             'organization_id' => $org->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
@@ -162,6 +167,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $hraComp = SalaryComponent::create([
+            'tenant_id' => $tenant->id,
             'organization_id' => $org->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
@@ -176,6 +182,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $pfComp = SalaryComponent::create([
+            'tenant_id' => $tenant->id,
             'organization_id' => $org->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
@@ -190,6 +197,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $bonusComp = SalaryComponent::create([
+            'tenant_id' => $tenant->id,
             'organization_id' => $org->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
@@ -205,6 +213,7 @@ class HrmsDemoSeeder extends Seeder
 
         // 5. Salary Structures & Items
         $salaryStructureStandard = SalaryStructure::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
             'name' => 'Standard Developer Structure',
@@ -214,6 +223,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
             'salary_structure_id' => $salaryStructureStandard->id,
             'salary_component_id' => $basicComp->id,
             'calculation_type' => 'percentage_of_ctc',
@@ -222,6 +232,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
             'salary_structure_id' => $salaryStructureStandard->id,
             'salary_component_id' => $hraComp->id,
             'calculation_type' => 'percentage_of_basic',
@@ -230,6 +241,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         SalaryStructureItem::create([
+            'tenant_id' => $tenant->id,
             'salary_structure_id' => $salaryStructureStandard->id,
             'salary_component_id' => $pfComp->id,
             'calculation_type' => 'fixed',
@@ -239,6 +251,7 @@ class HrmsDemoSeeder extends Seeder
 
         // 6. Leave Plans & Leave Types
         $leavePlan = LeavePlan::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'name' => 'Standard India Leave Plan 2026',
             'effective_from' => '2026-01-01',
@@ -247,6 +260,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $leaveSick = LeaveType::create([
+            'tenant_id' => $tenant->id,
             'leave_plan_id' => $leavePlan->id,
             'name' => 'Sick Leave',
             'code' => 'SL',
@@ -259,6 +273,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $leaveCasual = LeaveType::create([
+            'tenant_id' => $tenant->id,
             'leave_plan_id' => $leavePlan->id,
             'name' => 'Casual Leave',
             'code' => 'CL',
@@ -271,6 +286,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $leaveUnpaid = LeaveType::create([
+            'tenant_id' => $tenant->id,
             'leave_plan_id' => $leavePlan->id,
             'name' => 'Loss of Pay',
             'code' => 'LOP',
@@ -284,6 +300,7 @@ class HrmsDemoSeeder extends Seeder
 
         // 7. Attendance Penalties
         $attendancePenalty = AttendancePenalty::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'rule_type' => 'late_arrival',
             'grace_period_minutes' => 15,
@@ -300,6 +317,7 @@ class HrmsDemoSeeder extends Seeder
 
         // 8. Organizational Structure (Initial setup, manager relations set to null)
         $buManufacturing = BusinessUnit::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'name' => 'Manufacturing Business Unit',
             'code' => 'BU-MFG',
@@ -309,6 +327,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $buServices = BusinessUnit::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'name' => 'Professional Services',
             'code' => 'BU-SRV',
@@ -318,6 +337,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $branchHQ = Branch::create([
+            'tenant_id' => $tenant->id,
             'business_unit_id' => $buServices->id,
             'company_id' => $company->id,
             'name' => 'Corporate HQ Bangalore',
@@ -334,6 +354,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $branchFactory = Branch::create([
+            'tenant_id' => $tenant->id,
             'business_unit_id' => $buManufacturing->id,
             'company_id' => $company->id,
             'name' => 'Mumbai Factory & Depot',
@@ -350,6 +371,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $deptHR = Department::create([
+            'tenant_id' => $tenant->id,
             'branch_id' => $branchHQ->id,
             'company_id' => $company->id,
             'business_unit_id' => $buServices->id,
@@ -361,6 +383,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $deptProd = Department::create([
+            'tenant_id' => $tenant->id,
             'branch_id' => $branchFactory->id,
             'company_id' => $company->id,
             'business_unit_id' => $buManufacturing->id,
@@ -372,6 +395,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $desigHRManager = Designation::create([
+            'tenant_id' => $tenant->id,
             'department_id' => $deptHR->id,
             'name' => 'HR Manager',
             'level' => 'L4',
@@ -380,6 +404,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $desigProdLead = Designation::create([
+            'tenant_id' => $tenant->id,
             'department_id' => $deptProd->id,
             'name' => 'Production Lead',
             'level' => 'L3',
@@ -388,6 +413,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $desigOperator = Designation::create([
+            'tenant_id' => $tenant->id,
             'department_id' => $deptProd->id,
             'name' => 'Machine Operator',
             'level' => 'L1',
@@ -411,6 +437,7 @@ class HrmsDemoSeeder extends Seeder
         // 9. Employees
         // HR Manager (reports to none)
         $employeeHR = Employee::create([
+            'tenant_id' => $tenant->id,
             'employee_id' => 'ACM-0001',
             'company_id' => $company->id,
             'business_unit_id' => $buServices->id,
@@ -463,6 +490,7 @@ class HrmsDemoSeeder extends Seeder
 
         // Production Lead (reports to HR Manager)
         $employeeLead = Employee::create([
+            'tenant_id' => $tenant->id,
             'employee_id' => 'ACM-0002',
             'company_id' => $company->id,
             'business_unit_id' => $buManufacturing->id,
@@ -515,6 +543,7 @@ class HrmsDemoSeeder extends Seeder
 
         // Standard Operator (reports to Production Lead)
         $employeeOperator = Employee::create([
+            'tenant_id' => $tenant->id,
             'employee_id' => 'ACM-0003',
             'company_id' => $company->id,
             'business_unit_id' => $buManufacturing->id,
@@ -577,6 +606,7 @@ class HrmsDemoSeeder extends Seeder
 
         // 11. Employee Logs & Histories
         EmployeeEmploymentHistory::create([
+            'tenant_id' => $tenant->id,
             'employee_id' => $employeeHR->id,
             'company_name' => 'Global Logistics Corp',
             'designation' => 'Senior HR Generalist',
@@ -586,6 +616,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         EmployeeEmploymentHistory::create([
+            'tenant_id' => $tenant->id,
             'employee_id' => $employeeOperator->id,
             'company_name' => 'Tata Engineering Works',
             'designation' => 'Apprentice Welder',
@@ -595,6 +626,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         EmployeePenalty::create([
+            'tenant_id' => $tenant->id,
             'employee_id' => $employeeOperator->id,
             'date' => '2026-06-15',
             'rule_type' => 'late_arrival',
@@ -605,6 +637,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         EmployeeAdhocComponent::create([
+            'tenant_id' => $tenant->id,
             'employee_id' => $employeeOperator->id,
             'salary_component_id' => $bonusComp->id,
             'amount' => 5000.00,
@@ -637,18 +670,21 @@ class HrmsDemoSeeder extends Seeder
 
         // 13. Asset Management (Equipment)
         $assetCatElectronics = AssetCategory::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'name' => 'IT Electronics & Accessories',
             'description' => 'Laptops, mobile devices, external drives, and monitors.',
         ]);
 
         $assetCatSafety = AssetCategory::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'name' => 'Safety & Technical Gear',
             'description' => 'Welding masks, fireproof suits, and specialized toolsets.',
         ]);
 
         $assetLaptop = Asset::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatElectronics->id,
             'asset_code' => 'AST-LAP-001',
@@ -667,6 +703,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $assetWeldingMask = Asset::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatSafety->id,
             'asset_code' => 'AST-SAF-002',
@@ -685,6 +722,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         $assetSpareLaptop = Asset::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatElectronics->id,
             'asset_code' => 'AST-LAP-003',
@@ -703,6 +741,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         AssetAllocation::create([
+            'tenant_id' => $tenant->id,
             'asset_id' => $assetLaptop->id,
             'employee_id' => $employeeHR->id,
             'allocated_at' => '2025-05-15',
@@ -713,6 +752,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         AssetAllocation::create([
+            'tenant_id' => $tenant->id,
             'asset_id' => $assetWeldingMask->id,
             'employee_id' => $employeeOperator->id,
             'allocated_at' => '2026-02-10',
@@ -723,6 +763,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         AssetRequest::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'employee_id' => $employeeOperator->id,
             'asset_category_id' => $assetCatElectronics->id,
@@ -734,6 +775,7 @@ class HrmsDemoSeeder extends Seeder
         ]);
 
         AssetRequest::create([
+            'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'employee_id' => $employeeLead->id,
             'asset_category_id' => $assetCatElectronics->id,

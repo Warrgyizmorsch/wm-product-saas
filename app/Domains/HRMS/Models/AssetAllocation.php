@@ -2,10 +2,10 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class AssetAllocation extends Model
+class AssetAllocation extends BaseModel
 {
     protected $fillable = [
         'asset_id',

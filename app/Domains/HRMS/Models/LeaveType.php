@@ -2,9 +2,9 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 
-class LeaveType extends Model
+class LeaveType extends BaseModel
 {
     protected $fillable = [
         'leave_plan_id',

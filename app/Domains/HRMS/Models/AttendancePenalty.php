@@ -2,9 +2,9 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 
-class AttendancePenalty extends Model
+class AttendancePenalty extends BaseModel
 {
     protected $fillable = [
         'company_id',

@@ -2,11 +2,11 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class AssetCategory extends Model
+class AssetCategory extends BaseModel
 {
     protected $table = 'asset_categories';
 

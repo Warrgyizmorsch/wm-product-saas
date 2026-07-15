@@ -2,9 +2,9 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 
-class SalaryStructure extends Model
+class SalaryStructure extends BaseModel
 {
     protected $fillable = [
         'company_id',

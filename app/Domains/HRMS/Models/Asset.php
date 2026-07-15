@@ -2,10 +2,10 @@
 
 namespace App\Domains\HRMS\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Asset extends Model
+class Asset extends BaseModel
 {
     protected $table = 'assets';
 
