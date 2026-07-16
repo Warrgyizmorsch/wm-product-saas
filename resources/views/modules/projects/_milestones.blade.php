@@ -77,6 +77,10 @@
                    placeholder="{{ __('projects.milestone_search_and_desc_placeholder') }}">
         </div>
 
+        <button type="submit" class="btn btn-primary btn-sm">
+            <i class="feather-search me-1"></i>{{ __('ui.search') }}
+        </button>
+
         <x-ui.filter :label="__('ui.filter')" offset="0, 5">
             <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i>{{ __('projects.filter_options') }}</h6>
 
@@ -121,10 +125,6 @@
                 <button type="submit" class="btn btn-sm btn-primary">{{ __('projects.apply_filters') }}</button>
             </div>
         </x-ui.filter>
-
-        <button type="submit" class="btn btn-light-brand btn-sm">
-            <i class="feather-search me-1"></i>{{ __('ui.search') }}
-        </button>
     </form>
 
     @if ($canManageMilestones)
