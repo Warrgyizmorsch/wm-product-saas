@@ -166,28 +166,42 @@ class CapacityPlanningService
         $workCenters = WorkCenter::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $days = [];
 
+        // Pre-fetch all operations for date range in a single query
+        $allOps = ProductionScheduleOperation::where('tenant_id', $tenantId)
+            ->whereBetween('planned_start', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
+            ->get();
+
+        // Pre-fetch all machine downtimes in a single query
+        $allDowntimes = ProductionMachineDowntime::where('tenant_id', $tenantId)
+            ->whereBetween('start_time', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->get();
+
         $date = $startDate->copy()->startOfDay();
         while ($date->lte($endDate)) {
+            $currentDateStr = $date->toDateString();
             foreach ($workCenters as $wc) {
                 $capacity = $this->schedulingService->calculateCapacity($wc->id, $date);
 
-                $ops = ProductionScheduleOperation::where('tenant_id', $tenantId)
-                    ->where('work_center_id', $wc->id)
-                    ->whereDate('planned_start', $date)
-                    ->whereNotIn('status', ['completed', 'cancelled', 'skipped'])
-                    ->get();
+                // Filter operations in-memory
+                $ops = $allOps->filter(function ($op) use ($wc, $currentDateStr) {
+                    return $op->work_center_id === $wc->id 
+                        && $op->planned_start->toDateString() === $currentDateStr;
+                });
 
                 $required = (float) $ops->sum('planned_duration_minutes');
-                $downtime = (float) ProductionMachineDowntime::where('tenant_id', $tenantId)
-                    ->where('work_center_id', $wc->id)
-                    ->whereDate('start_time', $date)
-                    ->sum('duration_minutes');
+
+                // Filter downtimes in-memory
+                $downtime = (float) $allDowntimes->filter(function ($dt) use ($wc, $currentDateStr) {
+                    return $dt->work_center_id === $wc->id 
+                        && $dt->start_time->toDateString() === $currentDateStr;
+                })->sum('duration_minutes');
 
                 $available = max(0.0, $capacity - $downtime);
                 $utilization = $available > 0 ? ($required / $available) * 100 : ($required > 0 ? 100.0 : 0.0);
 
                 $days[] = [
-                    'date' => $date->toDateString(),
+                    'date' => $currentDateStr,
                     'work_center' => $wc,
                     'available_hours' => round($available / 60.0, 2),
                     'used_hours' => round($required / 60.0, 2),

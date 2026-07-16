@@ -345,6 +345,10 @@ class ProductionWipService
                 throw new InvalidArgumentException("Cannot adjust WIP: Parent order is closed or cancelled.");
             }
 
+            if ($quantity < 0) {
+                throw new InvalidArgumentException("WIP quantity cannot be negative.");
+            }
+
             $oldQty = $wip->quantity;
             $oldAvailable = $wip->available_quantity;
 
@@ -481,8 +485,8 @@ class ProductionWipService
         DB::transaction(function () use ($wipId, $warehouseId, $remarks, $userId) {
             $wip = ProductionWip::lockForUpdate()->findOrFail($wipId);
 
-            if ($wip->status !== 'completed' && $wip->available_quantity <= 0) {
-                throw new InvalidArgumentException("Cannot convert WIP: Quantity is not completed at the final routing operation stage.");
+            if ($wip->status === 'completed' || $wip->available_quantity <= 0) {
+                throw new InvalidArgumentException("Cannot convert WIP: This tracking card has already been completed or has no remaining available quantity.");
             }
 
             $qtyToComplete = $wip->available_quantity;

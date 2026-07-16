@@ -40,7 +40,7 @@ class WipController extends Controller
         }
 
         $query = ProductionWip::where('tenant_id', $tenantId)
-            ->with(['order', 'product', 'currentRoutingOperation', 'currentWorkCenter', 'currentMachine']);
+            ->with(['order', 'product', 'currentRoutingOperation', 'currentWorkCenter', 'currentMachine', 'batch']);
 
         if ($request->filled('search')) {
             $search = '%' . $request->input('search') . '%';

@@ -209,6 +209,7 @@ Route::prefix('production')
         Route::get('intelligence/analytics', [AnalyticsController::class, 'historical'])->name('intelligence.analytics');
         Route::get('intelligence/reports', [ReportsController::class, 'index'])->name('intelligence.reports.index');
         Route::get('intelligence/reports/{type}', [ReportsController::class, 'show'])->name('intelligence.reports.show');
+        Route::get('intelligence/reports/{type}/export', [ReportsController::class, 'export'])->name('intelligence.reports.export');
         Route::get('intelligence/alerts', [AlertController::class, 'index'])->name('intelligence.alerts.index');
         Route::post('intelligence/alerts/{id}', [AlertController::class, 'update'])->name('intelligence.alerts.update');
         Route::resource('kpi-targets', KpiTargetController::class)->only(['index', 'store']);

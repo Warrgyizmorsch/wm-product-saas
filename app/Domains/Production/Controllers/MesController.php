@@ -227,7 +227,7 @@ class MesController extends Controller
         // Determine list of active assignments
         $assignment = ProductionOperatorAssignment::where('tenant_id', $tenantId)
             ->where('production_order_operation_id', $opId)
-            ->where('status', 'accepted')
+            ->whereIn('status', ['assigned', 'accepted'])
             ->first();
 
         // Get list of all operators for quick reassignment list
