@@ -69,10 +69,13 @@
             <div>{{ $milestone->start_date?->format('d/m/Y') ?: '—' }} &rarr; {{ $milestone->due_date?->format('d/m/Y') ?: '—' }}</div>
         </div>
 
-        <div class="flex-shrink-0" style="min-width: 110px;" title="{{ $milestone->health_reason }}">
+        <div class="flex-shrink-0 d-inline-flex align-items-center gap-1" style="min-width: 110px;">
             <x-ui.badge variant="{{ $rowHealthVariant }}" soft>
                 {{ __('projects.health_states.' . $milestone->health_state) }}
             </x-ui.badge>
+            @if ($milestone->health_reason)
+                <i class="feather-info text-muted fs-12" data-bs-toggle="tooltip" title="{{ $milestone->health_reason }}" style="cursor: pointer;"></i>
+            @endif
         </div>
 
         <div class="flex-shrink-0" style="min-width: 100px;">
@@ -176,9 +179,14 @@
         </div>
 
         <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-            <x-ui.badge variant="{{ $rowHealthVariant }}" soft>
-                {{ __('projects.health_states.' . $milestone->health_state) }}
-            </x-ui.badge>
+            <span class="d-inline-flex align-items-center gap-1">
+                <x-ui.badge variant="{{ $rowHealthVariant }}" soft>
+                    {{ __('projects.health_states.' . $milestone->health_state) }}
+                </x-ui.badge>
+                @if ($milestone->health_reason)
+                    <i class="feather-info text-muted fs-12" data-bs-toggle="tooltip" title="{{ $milestone->health_reason }}" style="cursor: pointer;"></i>
+                @endif
+            </span>
             @if ($milestone->status)
                 <x-ui.badge variant="{{ $rowStatusVariant }}" soft>
                     {{ __('projects.statuses.' . $milestone->status) }}

@@ -16,6 +16,7 @@ use App\Domains\Projects\Services\TaskListService;
 use App\Domains\Projects\Services\TaskService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -228,11 +229,28 @@ class MilestoneController extends Controller
         })->values();
     }
 
-    public function store(StoreMilestoneRequest $request, Project $project): RedirectResponse
+    public function store(StoreMilestoneRequest $request, Project $project): RedirectResponse|JsonResponse
     {
         $this->authorize('manage', [Milestone::class, $project]);
 
-        $this->milestones->create($project, $request->validated());
+        $milestone = $this->milestones->create($project, $request->validated());
+
+        if ($request->wantsJson()) {
+            $milestone->load('owner');
+            $health = $this->milestones->resolveHealth($milestone);
+            $milestone->health_state = $health['state'];
+            $milestone->health_reason = $health['reason'];
+            $milestone->tasks_count = 0;
+            $milestone->completed_tasks_count = 0;
+
+            $html = view('modules.projects.milestones._row', [
+                'project' => $project,
+                'milestone' => $milestone,
+                'canManageMilestones' => auth()->user()->can('manage', [Milestone::class, $project]),
+            ])->render();
+
+            return response()->json(['html' => $html, 'id' => $milestone->id]);
+        }
 
         return redirect()
             ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'milestones', 'milestone_page' => 1]))

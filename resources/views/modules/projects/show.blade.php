@@ -320,6 +320,7 @@
 
     @push('scripts')
         <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
+        <script src="{{ asset('assets/js/milestones/inline-create.js') }}"></script>
         <script>
             function openActivityDrawer(url) {
                 var drawerEl = document.getElementById('activityLogDrawer');

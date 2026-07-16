@@ -46,10 +46,13 @@
                 <x-ui.badge variant="{{ $heroStatusVariant }}" soft>
                     {{ __('projects.statuses.' . $milestone->status) }}
                 </x-ui.badge>
-                <span title="{{ $milestone->health_reason }}">
+                <span class="d-inline-flex align-items-center gap-1">
                     <x-ui.badge variant="{{ $heroHealthVariant }}" soft>
                         {{ __('projects.health_states.' . $milestone->health_state) }}
                     </x-ui.badge>
+                    @if ($milestone->health_reason)
+                        <i class="feather-info text-muted fs-14" data-bs-toggle="tooltip" title="{{ $milestone->health_reason }}" style="cursor: pointer;"></i>
+                    @endif
                 </span>
             </h4>
             @if ($milestone->description)
