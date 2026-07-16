@@ -53,12 +53,6 @@ class ProjectController extends Controller
         ];
 
         $canCreate = auth()->user()->can('create', Project::class);
-        $canUpdateAny = $data['projects']->contains(fn (Project $project) => auth()->user()->can('update', $project));
-
-        if ($canCreate || $canUpdateAny) {
-            $data['customers'] = Customer::query()->orderBy('name')->get();
-            $data['users'] = User::query()->orderBy('name')->get();
-        }
 
         if ($canCreate) {
             $data['nextCode'] = $this->projects->getNextProjectCode();
@@ -168,6 +162,10 @@ class ProjectController extends Controller
             'name' => [
                 'rules'   => ['required', 'string', 'max:255'],
                 'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'name', $value),
+            ],
+            'description' => [
+                'rules'   => ['nullable', 'string'],
+                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'description', $value),
             ],
             'budget_amount' => [
                 'rules'   => ['nullable', 'numeric', 'min:0'],

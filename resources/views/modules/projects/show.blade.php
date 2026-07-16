@@ -6,24 +6,6 @@
 
 @section('page-actions')
     <div class="d-flex gap-2">
-        <a href="javascript:void(0);" onclick="openActivityDrawer('{{ route('projects.activity', $project) }}')"
-            class="btn btn-light">
-            <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
-        </a>
-        @can('update', $project)
-            <button type="button" class="btn btn-light" data-bs-toggle="modal"
-                data-bs-target="#editProjectModal-{{ $project->id }}">
-                <i class="feather-edit-2 me-2"></i>{{ __('projects.edit') }}
-            </button>
-        @endcan
-        <form action="{{ route('projects.destroy', $project) }}" method="POST"
-            onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
-            @csrf
-            @method('DELETE')
-            <button type="submit" class="btn btn-danger">
-                <i class="feather-trash-2 me-2"></i>{{ __('projects.delete') }}
-            </button>
-        </form>
         <a href="{{ route('projects.index') }}" class="btn btn-light">
             <i class="feather-arrow-left me-2"></i>{{ __('projects.back') }}
         </a>
@@ -32,10 +14,7 @@
 
 @section('content')
     <div class="erp-single-panel bg-white">
-        {{-- The edit-project modal shows its own scoped inline errors (see _form-fields.blade.php),
-        so this page-level banner is suppressed for that form to avoid showing the same
-        errors twice. It still covers tasklist/task forms, which don't have inline errorText. --}}
-        @if ($errors->any() && !old('_modal'))
+        @if ($errors->any())
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                 <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
                 <ul class="mb-0 fs-12 ps-3">
@@ -48,31 +27,59 @@
         @endif
 
         {{-- Header Identity Row --}}
+        @php
+            $projectStatusVariant = match ($project->status) {
+                'Active' => 'success',
+                'On Hold' => 'warning',
+                'Completed' => 'primary',
+                'Closed' => 'dark',
+                default => 'secondary',
+            };
+        @endphp
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4 pb-3 border-bottom">
-            <h4 class="fw-bold text-dark mb-0">
-                <i class="feather-briefcase me-2 text-primary"></i>{{ $project->project_code }} —
-                @if ($canUpdateProject)
-                    <x-ui.inline-edit field="name" :value="$project->name" :url="route('projects.field', $project)" />
-                @else
-                    {{ $project->name }}
-                @endif
+            <h4 class="fw-bold text-dark mb-0 d-flex flex-wrap align-items-center gap-2">
+                <span>
+                    <i class="feather-briefcase me-2 text-primary"></i>{{ $project->project_code }} —
+                    @if ($canUpdateProject)
+                        <x-ui.inline-edit field="name" :value="$project->name" :url="route('projects.field', $project)" />
+                    @else
+                        {{ $project->name }}
+                    @endif
+                </span>
+                <x-ui.badge variant="{{ $projectStatusVariant }}" soft>
+                    {{ __('projects.statuses.' . $project->status) }}
+                </x-ui.badge>
             </h4>
-            @php
-                $projectStatusVariant = match ($project->status) {
-                    'Active' => 'success',
-                    'On Hold' => 'warning',
-                    'Completed' => 'primary',
-                    'Closed' => 'dark',
-                    default => 'secondary',
-                };
-            @endphp
-            <x-ui.badge variant="{{ $projectStatusVariant }}" soft>
-                {{ __('projects.statuses.' . $project->status) }}
-            </x-ui.badge>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="javascript:void(0);" onclick="openActivityDrawer('{{ route('projects.activity', $project) }}')"
+                    class="btn btn-light">
+                    <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
+                </a>
+                <form action="{{ route('projects.destroy', $project) }}" method="POST"
+                    onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">
+                        <i class="feather-trash-2 me-2"></i>{{ __('projects.delete') }}
+                    </button>
+                </form>
+            </div>
         </div>
 
         {{-- Identity / Meta Grid --}}
-        <div class="row g-4 mb-4">
+        <div class="accordion mb-4" id="projectDetailsAccordion">
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#projectDetailsCollapse" aria-expanded="true"
+                        aria-controls="projectDetailsCollapse">
+                        <i class="feather-info me-2 text-primary"></i>{{ __('projects.details') }}
+                    </button>
+                </h2>
+                <div id="projectDetailsCollapse" class="accordion-collapse collapse show"
+                    data-bs-parent="#projectDetailsAccordion">
+                    <div class="accordion-body">
+                        <div class="row g-4">
             <div class="col-lg-4 col-md-6">
                 <div class="row erp-form-row mb-2">
                     <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.client') }}:</span>
@@ -85,7 +92,7 @@
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
                                 <x-ui.inline-edit field="customer_id" :value="$project->customer_id"
-                                    :url="route('projects.field', $project)" type="select2" :options="$clientOptions" />
+                                    :url="route('projects.field', $project)" type="select2" :options="$clientOptions" :label="__('projects.client')" />
                             @else
                                 {{ $project->customer?->name ?: '—' }}
                             @endif
@@ -101,7 +108,7 @@
                                 @php
                                     $ownerOptions = $users->pluck('name', 'id');
                                 @endphp
-                                <x-ui.inline-edit field="owner_id" :value="$project->owner_id" :url="route('projects.field', $project)" type="select2" :options="$ownerOptions" />
+                                <x-ui.inline-edit field="owner_id" :value="$project->owner_id" :url="route('projects.field', $project)" type="select2" :options="$ownerOptions" :label="__('projects.project_owner')" />
                             @else
                                 {{ $project->owner?->name ?: '—' }}
                             @endif
@@ -118,7 +125,7 @@
                                     $managerOptions = $users->pluck('name', 'id')
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
-                                <x-ui.inline-edit field="manager_id" :value="$project->manager_id" :url="route('projects.field', $project)" type="select2" :options="$managerOptions" />
+                                <x-ui.inline-edit field="manager_id" :value="$project->manager_id" :url="route('projects.field', $project)" type="select2" :options="$managerOptions" :label="__('projects.project_manager')" />
                             @else
                                 {{ $project->manager?->name ?: '—' }}
                             @endif
@@ -135,7 +142,7 @@
                                     $priorityOptions = collect(\App\Domains\Projects\Models\Project::PRIORITIES)
                                         ->mapWithKeys(fn($priority) => [$priority => __('projects.priorities.' . $priority)]);
                                 @endphp
-                                <x-ui.inline-edit field="priority" :value="$project->priority" :url="route('projects.field', $project)" type="select" :options="$priorityOptions" />
+                                <x-ui.inline-edit field="priority" :value="$project->priority" :url="route('projects.field', $project)" type="select" :options="$priorityOptions" :label="__('projects.priority')" />
                             @else
                                 {{ __('projects.priorities.' . $project->priority) }}
                             @endif
@@ -152,7 +159,7 @@
                                     $statusOptions = collect(\App\Domains\Projects\Models\Project::EDITABLE_STATUSES)
                                         ->mapWithKeys(fn($status) => [$status => __('projects.statuses.' . $status)]);
                                 @endphp
-                                <x-ui.inline-edit field="status" :value="$project->status" :url="route('projects.field', $project)" type="select" :options="$statusOptions" />
+                                <x-ui.inline-edit field="status" :value="$project->status" :url="route('projects.field', $project)" type="select" :options="$statusOptions" :label="__('projects.status')" />
                             @else
                                 {{ __('projects.statuses.' . $project->status) }}
                             @endif
@@ -162,15 +169,24 @@
             </div>
             <div class="col-lg-4 col-md-6">
                 <div class="row erp-form-row mb-2">
-                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.start_date') }} /
-                            {{ __('projects.end_date') }}:</span></div>
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.start_date') }}:</span></div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
-                                <x-ui.inline-edit field="start_date" :value="$project->start_date" :url="route('projects.field', $project)" type="date" /> – <x-ui.inline-edit field="end_date" :value="$project->end_date"
-                                    :url="route('projects.field', $project)" type="date" />
+                                <x-ui.inline-edit field="start_date" :value="$project->start_date" :url="route('projects.field', $project)" type="date" :label="__('projects.start_date')" />
                             @else
-                                {{ $project->start_date?->format('d/m/Y') ?: '—' }} –
+                                {{ $project->start_date?->format('d/m/Y') ?: '—' }}
+                            @endif
+                        </span>
+                    </div>
+                </div>
+                <div class="row erp-form-row mb-2">
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('projects.end_date') }}:</span></div>
+                    <div class="col-md-8">
+                        <span class="text-dark fw-bold fs-13">
+                            @if ($canUpdateProject)
+                                <x-ui.inline-edit field="end_date" :value="$project->end_date" :url="route('projects.field', $project)" type="date" :label="__('projects.end_date')" />
+                            @else
                                 {{ $project->end_date?->format('d/m/Y') ?: '—' }}
                             @endif
                         </span>
@@ -188,7 +204,7 @@
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
                                 <x-ui.inline-edit field="billing_method" :value="$project->billing_method"
-                                    :url="route('projects.field', $project)" type="select2" :options="$billingMethodOptions" />
+                                    :url="route('projects.field', $project)" type="select2" :options="$billingMethodOptions" :label="__('projects.billing_method')" />
                             @else
                                 {{ $project->billing_method ? __('projects.billing_methods.' . $project->billing_method) : '—' }}
                             @endif
@@ -207,7 +223,7 @@
                                         ->prepend(__('projects.none_option'), '');
                                 @endphp
                                 <x-ui.inline-edit field="budget_type" :value="$project->budget_type"
-                                    :url="route('projects.field', $project)" type="select2" :options="$budgetTypeOptions" />
+                                    :url="route('projects.field', $project)" type="select2" :options="$budgetTypeOptions" :label="__('projects.budget_type')" />
                             @else
                                 {{ $project->budget_type ? __('projects.budget_types.' . $project->budget_type) : '—' }}
                             @endif
@@ -221,7 +237,7 @@
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
                                 <x-ui.inline-edit field="budget_amount" :value="$project->budget_amount"
-                                    :url="route('projects.field', $project)" type="number" />
+                                    :url="route('projects.field', $project)" type="number" :label="__('projects.budget_amount')" />
                             @else
                                 {{ $project->budget_amount !== null ? number_format((float) $project->budget_amount, 2) : '—' }}
                             @endif
@@ -235,7 +251,7 @@
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
                                 <x-ui.inline-edit field="budget_hours" :value="$project->budget_hours"
-                                    :url="route('projects.field', $project)" type="number" />
+                                    :url="route('projects.field', $project)" type="number" :label="__('projects.budget_hours')" />
                             @else
                                 {{ $project->budget_hours !== null ? number_format((float) $project->budget_hours, 2) : '—' }}
                             @endif
@@ -246,14 +262,22 @@
             <div class="col-lg-4">
                 @include('modules.projects._collaborators')
             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        @if ($project->description)
-            <div class="mb-4 bg-light p-3 rounded border border-dashed">
-                <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
-                <p class="mb-0 text-dark fs-13">{{ $project->description }}</p>
-            </div>
-        @endif
+        <div class="mb-4 bg-light p-3 rounded border border-dashed">
+            <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
+            @if ($canUpdateProject)
+                <div class="text-dark fs-13">
+                    <x-ui.inline-edit field="description" :value="$project->description" :url="route('projects.field', $project)" type="textarea" :label="__('projects.description')" />
+                </div>
+            @else
+                <p class="mb-0 text-dark fs-13">{{ $project->description ?: '—' }}</p>
+            @endif
+        </div>
 
         {{-- Tab Navigation --}}
         @php
@@ -335,9 +359,6 @@
         </script>
     @endpush
 
-    @can('update', $project)
-        @include('modules.projects._edit-modal', ['project' => $project, 'customers' => $customers, 'users' => $users])
-    @endcan
 
     @include('modules.projects._modal-reopen-script')
 @endsection

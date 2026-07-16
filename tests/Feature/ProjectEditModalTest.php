@@ -14,11 +14,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Covers the modal-based create/edit refactor in ProjectController: the shared
- * _form-fields.blade.php now scopes old()/$errors to a single modal via a hidden
- * "_modal" input (see resources/views/modules/projects/_form-fields.blade.php),
- * since old() and $errors are global to the request but the index page renders
- * one edit modal per visible project.
+ * Covers the modal-based create/edit refactor in ProjectController. Description is
+ * the only field still edited via the full-form "editProjectModal-{id}" (see
+ * resources/views/modules/projects/_edit-description-modal.blade.php); every other
+ * field uses inline editing instead. The modal scopes old()/$errors to itself via a
+ * hidden "_modal" input, since old() and $errors are global to the request but the
+ * index page renders one edit modal per visible project.
  */
 class ProjectEditModalTest extends TestCase
 {

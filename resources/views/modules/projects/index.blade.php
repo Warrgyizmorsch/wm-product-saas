@@ -169,7 +169,7 @@
                                     @can('update', $project)
                                         <li>
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editProjectModal-{{ $project->id }}">
-                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('projects.edit') }}
+                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('projects.edit_description') }}
                                             </button>
                                         </li>
                                         <li><hr class="dropdown-divider"></li>
@@ -229,7 +229,7 @@
 
     @foreach ($paginatedProjects as $project)
         @can('update', $project)
-            @include('modules.projects._edit-modal', ['project' => $project, 'customers' => $customers ?? collect(), 'users' => $users ?? collect()])
+            @include('modules.projects._edit-description-modal', ['project' => $project])
         @endcan
     @endforeach
 
