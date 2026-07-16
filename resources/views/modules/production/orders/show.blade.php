@@ -178,6 +178,7 @@
     <div class="erp-tabs-nav">
         <a class="erp-tabs-link active" id="btn-tab-overview"      onclick="switchTab('overview')">Overview</a>
         <a class="erp-tabs-link"        id="btn-tab-operations"    onclick="switchTab('operations')">Operations</a>
+        <a class="erp-tabs-link"        id="btn-tab-wip"           onclick="switchTab('wip')">WIP Tracking</a>
         <a class="erp-tabs-link"        id="btn-tab-reservations"  onclick="switchTab('reservations')">Reservations</a>
         <a class="erp-tabs-link"        id="btn-tab-issues"        onclick="switchTab('issues')">Material Issues</a>
         <a class="erp-tabs-link"        id="btn-tab-progress"      onclick="switchTab('progress')">Progress Logs</a>
@@ -247,6 +248,134 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        {{-- Tab: WIP Tracking --}}
+        <div class="tab-pane-custom d-none" id="tab-wip">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-dark mb-0"><i class="feather-activity text-primary me-2"></i> WIP Tracking Status</h5>
+                <span class="fs-12 text-muted">Tracks active shop floor progress and accrued costing sheets.</span>
+            </div>
+
+            @if($order->wips->isNotEmpty())
+                @foreach($order->wips as $wip)
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-6">
+                            <div class="card shadow-sm border-0 bg-light p-3">
+                                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">WIP Reference: WIP-#{{ str_pad($wip->id, 5, '0', STR_PAD_LEFT) }}</h6>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Current Stage</small>
+                                        <span class="fw-bold text-dark">{{ $wip->currentRoutingOperation ? $wip->currentRoutingOperation->name : 'N/A' }}</span>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">Work Center</small>
+                                        <span class="fw-bold text-dark">{{ $wip->currentWorkCenter ? $wip->currentWorkCenter->name : 'N/A' }}</span>
+                                    </div>
+                                    <div class="col-6 border-top pt-2">
+                                        <small class="text-muted d-block">Available Qty</small>
+                                        <span class="fw-bold fs-15 text-dark">{{ number_format($wip->available_quantity, 2) }}</span>
+                                    </div>
+                                    <div class="col-6 border-top pt-2">
+                                        <small class="text-muted d-block">Completed Qty</small>
+                                        <span class="fw-bold fs-15 text-success">{{ number_format($wip->completed_quantity, 2) }}</span>
+                                    </div>
+                                    <div class="col-6 border-top pt-2">
+                                        <small class="text-muted d-block">Rejections / Scrap</small>
+                                        <span class="fw-semibold text-danger">{{ number_format($wip->rejected_quantity, 2) }} / {{ number_format($wip->scrap_quantity, 2) }}</span>
+                                    </div>
+                                    <div class="col-6 border-top pt-2">
+                                        <small class="text-muted d-block">Status</small>
+                                        @if($wip->status === 'active')
+                                            <span class="badge bg-soft-success text-success text-uppercase">Active</span>
+                                        @elseif($wip->status === 'quality_hold')
+                                            <span class="badge bg-soft-warning text-warning text-uppercase">Quality Hold</span>
+                                        @elseif($wip->status === 'rework')
+                                            <span class="badge bg-soft-danger text-danger text-uppercase">Rework</span>
+                                        @else
+                                            <span class="badge bg-soft-secondary text-secondary text-uppercase">Completed</span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <a href="{{ route('production.wip.show', $wip->id) }}" class="btn btn-sm btn-primary w-100">
+                                        <i class="feather-external-link me-1"></i> Open Dedicated WIP Detail Card
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card shadow-sm border-0 bg-light p-3">
+                                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">WIP Costing Sheet</h6>
+                                <table class="w-100 fs-13">
+                                    <tr class="border-bottom py-1">
+                                        <td class="text-muted py-2">Material Cost</td>
+                                        <td class="text-end fw-semibold text-dark">${{ number_format($wip->material_cost, 2) }}</td>
+                                    </tr>
+                                    <tr class="border-bottom py-1">
+                                        <td class="text-muted py-2">Labor Cost</td>
+                                        <td class="text-end fw-semibold text-dark">${{ number_format($wip->labor_cost, 2) }}</td>
+                                    </tr>
+                                    <tr class="border-bottom py-1">
+                                        <td class="text-muted py-2">Machine Cost</td>
+                                        <td class="text-end fw-semibold text-dark">${{ number_format($wip->machine_cost, 2) }}</td>
+                                    </tr>
+                                    <tr class="border-bottom py-1">
+                                        <td class="text-muted py-2">Overhead Cost</td>
+                                        <td class="text-end fw-semibold text-dark">${{ number_format($wip->overhead_cost, 2) }}</td>
+                                    </tr>
+                                    <tr class="py-1">
+                                        <td class="fw-bold text-primary pt-2">Total Accrued Value</td>
+                                        <td class="text-end fw-bold text-primary pt-2 fs-15">${{ number_format($wip->total_value, 2) }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mt-3">
+                            <h6 class="fw-bold text-dark mb-2">Stage Transaction Log</h6>
+                            <div class="table-responsive">
+                                <table class="erp-thin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Type</th>
+                                            <th>From Stage</th>
+                                            <th>To Stage</th>
+                                            <th class="text-end">Quantity</th>
+                                            <th class="text-end">Cost Added</th>
+                                            <th>Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($wip->transactions as $tx)
+                                            <tr>
+                                                <td class="font-monospace text-muted">{{ $tx->transaction_at->format('Y-m-d H:i') }}</td>
+                                                <td><span class="badge bg-soft-secondary text-secondary text-uppercase">{{ str_replace('_', ' ', $tx->transaction_type) }}</span></td>
+                                                <td>{{ $tx->fromOperation ? $tx->fromOperation->name : '—' }}</td>
+                                                <td>{{ $tx->toOperation ? $tx->toOperation->name : '—' }}</td>
+                                                <td class="text-end fw-semibold">{{ number_format($tx->quantity, 2) }}</td>
+                                                <td class="text-end text-success fw-semibold">{{ $tx->cost_added > 0 ? '+$' . number_format($tx->cost_added, 2) : '—' }}</td>
+                                                <td class="text-muted">{{ $tx->remarks }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted py-3">No transactions recorded yet.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            @else
+                <div class="text-center py-5 text-muted bg-light rounded">
+                    <i class="feather-alert-circle fs-24 mb-2 d-block text-warning"></i>
+                    No WIP tracking active. WIP is initialized automatically when a draft order is released.
+                </div>
+            @endif
         </div>
 
         {{-- Tab 2: Operations --}}

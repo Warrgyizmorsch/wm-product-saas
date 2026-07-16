@@ -5,6 +5,7 @@ use App\Domains\Production\Controllers\AnalyticsController;
 use App\Domains\Production\Controllers\AndonController;
 use App\Domains\Production\Controllers\BatchProductionController;
 use App\Domains\Production\Controllers\CalendarController;
+use App\Domains\Production\Controllers\CapacityController;
 use App\Domains\Production\Controllers\CapaController;
 use App\Domains\Production\Controllers\DeviationController;
 use App\Domains\Production\Controllers\DowntimeController;
@@ -35,6 +36,7 @@ use App\Domains\Production\Controllers\ScannerController;
 use App\Domains\Production\Controllers\ScrapController;
 use App\Domains\Production\Controllers\SerialNumberController;
 use App\Domains\Production\Controllers\ShiftController;
+use App\Domains\Production\Controllers\WipController;
 use App\Domains\Production\Controllers\WorkCenterController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
 use App\Domains\Production\Controllers\ProductionImportExportController;
@@ -114,6 +116,13 @@ Route::prefix('production')
         Route::post('orders/{order}/cancel', [ProductionOrderController::class, 'cancel'])->name('orders.cancel');
         Route::resource('orders', ProductionOrderController::class);
 
+        // ── Work-in-Progress (WIP) Management ───────────────────────────────
+        Route::post('wip/{wip}/transfer', [WipController::class, 'transfer'])->name('wip.transfer');
+        Route::post('wip/{wip}/adjust', [WipController::class, 'adjust'])->name('wip.adjust');
+        Route::post('wip/{wip}/convert', [WipController::class, 'convertToFg'])->name('wip.convert');
+        Route::get('wip', [WipController::class, 'index'])->name('wip.index');
+        Route::get('wip/{wip}', [WipController::class, 'show'])->name('wip.show');
+
         // ── Production Scheduling ─────────────────────────────────────────────
         // Static named routes must be registered before the resource to avoid conflicts
         Route::get('schedules/calendar', [ProductionScheduleController::class, 'calendarView'])->name('schedules.calendar');
@@ -121,6 +130,11 @@ Route::prefix('production')
         Route::post('schedules/{schedule}/release', [ProductionScheduleController::class, 'release'])->name('schedules.release');
         Route::post('schedules/{schedule}/cancel', [ProductionScheduleController::class, 'cancel'])->name('schedules.cancel');
         Route::resource('schedules', ProductionScheduleController::class)->except(['edit', 'update']);
+
+        // ── Capacity Planning ──────────────────────────────────────────────────
+        Route::get('capacity', [CapacityController::class, 'index'])->name('capacity.index');
+        Route::post('capacity/{id}/reschedule', [CapacityController::class, 'reschedule'])->name('capacity.reschedule');
+        Route::get('capacity/{id}/suggest', [CapacityController::class, 'suggest'])->name('capacity.suggest');
 
         // ── Shifts & Calendars ────────────────────────────────────────────────
         Route::resource('shifts', ShiftController::class)->except(['show']);
