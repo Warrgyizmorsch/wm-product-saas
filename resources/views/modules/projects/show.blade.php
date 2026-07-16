@@ -263,20 +263,19 @@
                 @include('modules.projects._collaborators')
             </div>
                         </div>
+                        <div class="mt-4 pt-3 border-top">
+                            <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
+                            @if ($canUpdateProject)
+                                <div class="text-dark fs-13">
+                                    <x-ui.inline-edit field="description" :value="$project->description" :url="route('projects.field', $project)" type="textarea" :label="__('projects.description')" />
+                                </div>
+                            @else
+                                <p class="mb-0 text-dark fs-13">{{ $project->description ?: '—' }}</p>
+                            @endif
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="mb-4 bg-light p-3 rounded border border-dashed">
-            <span class="fw-semibold text-muted d-block fs-11 text-uppercase mb-2">{{ __('projects.description') }}</span>
-            @if ($canUpdateProject)
-                <div class="text-dark fs-13">
-                    <x-ui.inline-edit field="description" :value="$project->description" :url="route('projects.field', $project)" type="textarea" :label="__('projects.description')" />
-                </div>
-            @else
-                <p class="mb-0 text-dark fs-13">{{ $project->description ?: '—' }}</p>
-            @endif
         </div>
 
         {{-- Tab Navigation --}}

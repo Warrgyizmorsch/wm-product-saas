@@ -20,4 +20,10 @@ interface TaskDependencyRepositoryInterface
      * used for in-memory cycle detection before inserting a new edge.
      */
     public function allEdgesForProject(int $projectId): Collection;
+
+    /**
+     * Whether any task under the given milestone depends on a task that
+     * isn't Completed yet — used to derive the milestone's "Blocked" health state.
+     */
+    public function hasOpenDependenciesForMilestone(int $milestoneId): bool;
 }
