@@ -37,6 +37,7 @@ return [
     'erp_module_readiness' => 'ERP Module Readiness',
     'executive_dashboard' => 'Executive Dashboard',
     'filter' => 'Filter',
+    'search' => 'Search',
     'finance_people' => 'Finance & People',
     'front_office' => 'Front Office',
     'home' => 'Home',

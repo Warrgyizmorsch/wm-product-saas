@@ -38,6 +38,7 @@ Route::prefix('projects')
             ->as('milestones.')
             ->scopeBindings()
             ->group(function (): void {
+                Route::get('{milestone}', [MilestoneController::class, 'show'])->name('show');
                 Route::post('/', [MilestoneController::class, 'store'])->name('store');
                 Route::put('{milestone}', [MilestoneController::class, 'update'])->name('update');
                 Route::delete('{milestone}', [MilestoneController::class, 'destroy'])->name('destroy');
@@ -58,8 +59,10 @@ Route::prefix('projects')
             ->as('tasks.')
             ->scopeBindings()
             ->group(function (): void {
+                Route::get('{task}', [TaskController::class, 'show'])->name('show');
                 Route::post('/', [TaskController::class, 'store'])->name('store');
                 Route::put('{task}', [TaskController::class, 'update'])->name('update');
+                Route::patch('{task}/field', [TaskController::class, 'updateField'])->name('field');
                 Route::delete('{task}', [TaskController::class, 'destroy'])->name('destroy');
                 Route::patch('{task}/status', [TaskController::class, 'updateStatus'])->name('update-status');
                 Route::patch('{task}/assign', [TaskController::class, 'assign'])->name('assign');

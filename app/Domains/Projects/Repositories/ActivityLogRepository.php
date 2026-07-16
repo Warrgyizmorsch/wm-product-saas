@@ -22,4 +22,28 @@ class ActivityLogRepository implements ActivityLogRepositoryInterface
             ->limit($limit)
             ->get();
     }
+
+    public function forSubjects(int $projectId, array $subjectTypeToIds, int $limit = 50): Collection
+    {
+        $subjectTypeToIds = array_filter($subjectTypeToIds);
+
+        if ($subjectTypeToIds === []) {
+            return new Collection();
+        }
+
+        return ActivityLog::query()
+            ->with('triggeredBy')
+            ->where('project_id', $projectId)
+            ->where(function ($query) use ($subjectTypeToIds) {
+                foreach ($subjectTypeToIds as $subjectType => $ids) {
+                    $query->orWhere(function ($subQuery) use ($subjectType, $ids) {
+                        $subQuery->where('subject_type', $subjectType)->whereIn('subject_id', $ids);
+                    });
+                }
+            })
+            ->latest('created_at')
+            ->latest('id')
+            ->limit($limit)
+            ->get();
+    }
 }
