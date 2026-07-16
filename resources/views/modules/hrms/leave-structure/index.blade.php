@@ -6,7 +6,7 @@
 
 @section('page-actions')
     <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
-        Add Leave Plan
+        {{ __('hrms.leave.add_plan') }}
     </x-ui.button>
 @endsection
 
@@ -170,6 +170,12 @@
         <!-- Content Column -->
         <div class="settings-content-col">
 
+            @if(session('success'))
+                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
+                    {{ session('success') }}
+                </x-ui.alert>
+            @endif
+
             @if(session('error'))
                 <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                     {{ session('error') }}
@@ -177,38 +183,38 @@
             @endif
 
             <div class="col-12">
-                <x-ui.card title="Leave Plans" bodyClass="p-0" stretch>
+                <x-ui.card title="{{ __('hrms.leave.leave_plans') }}" bodyClass="p-0" stretch>
                     <x-slot name="headerAction">
                         <div class="d-flex align-items-center gap-2">
                             <!-- Search Input -->
                             <div class="theme-search-container" style="width: 240px !important; position: relative;">
                                 <i class="feather-search"></i>
-                                <input type="text" id="leavePlanSearch" class="theme-search-input" placeholder="Search leave plans...">
+                                <input type="text" id="leavePlanSearch" class="theme-search-input" placeholder="{{ __('hrms.leave.search_plans') }}">
                             </div>
 
                             <!-- Sort Dropdown -->
-                            <x-ui.sort-dropdown label="SORT">
-                                <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortLeavePlans('name_asc', this); event.preventDefault();">Name (A-Z)</a>
-                                <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortLeavePlans('name_desc', this); event.preventDefault();">Name (Z-A)</a>
-                                <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortLeavePlans('newest', this); event.preventDefault();">Newest First</a>
+                            <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                                <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortLeavePlans('name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
+                                <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortLeavePlans('name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
+                                <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortLeavePlans('newest', this); event.preventDefault();">{{ __('hrms.salary.newest_first') }}</a>
                             </x-ui.sort-dropdown>
 
                             <!-- Filter Dropdown -->
-                            <x-ui.filter label="FILTER">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="lp_status" id="lp_filter_status">
-                                        <option value="">All Statuses</option>
-                                        <option value="1">Active</option>
-                                        <option value="0">Inactive</option>
+                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                        <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                        <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Company</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.leave.legal_entity') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="lp_company" id="lp_filter_company">
-                                        <option value="">All Companies</option>
+                                        <option value="">{{ __('hrms.salary.all_companies') }}</option>
                                         @foreach($companies as $company)
                                             <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                         @endforeach
@@ -218,8 +224,8 @@
                                 <div class="dropdown-divider my-3"></div>
 
                                 <div class="d-flex gap-2">
-                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterLeavePlans()">Apply Filters</x-ui.button>
-                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeavePlanFilters()">Reset</x-ui.button>
+                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterLeavePlans()">{{ __('hrms.common.apply') }}</x-ui.button>
+                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeavePlanFilters()">{{ __('hrms.common.reset') }}</x-ui.button>
                                 </div>
                             </x-ui.filter>
                         </div>
@@ -249,7 +255,7 @@
                                 @empty
                                     <div class="text-center py-5 text-muted px-3">
                                         <i class="feather-calendar fs-24 mb-2 d-block text-secondary"></i>
-                                        <span>No leave plans configured yet.</span>
+                                        <span>{{ __('hrms.leave.no_plans') }}</span>
                                     </div>
                                 @endforelse
                             </div>
@@ -267,36 +273,36 @@
                                             <div>
                                                 <h5 class="fw-bold text-dark mb-1" style="font-size: 16px;">{{ $selectedPlan->name }}</h5>
                                                 <div class="text-muted d-flex align-items-center gap-2" style="font-size: 12px;">
-                                                    <span><i class="feather-briefcase me-1"></i>{{ $selectedPlan->company ? $selectedPlan->company->company_name : 'All Companies' }}</span>
+                                                    <span><i class="feather-briefcase me-1"></i>{{ $selectedPlan->company ? $selectedPlan->company->company_name : __('hrms.salary.all_companies') }}</span>
                                                     <span>&bull;</span>
-                                                    <span><i class="feather-calendar me-1"></i>Effective From: <strong>{{ $selectedPlan->effective_from ? $selectedPlan->effective_from->format('d M, Y') : '-' }}</strong></span>
+                                                    <span><i class="feather-calendar me-1"></i>{{ __('hrms.leave.effective_from') }}: <strong>{{ $selectedPlan->effective_from ? $selectedPlan->effective_from->format('d M, Y') : '-' }}</strong></span>
                                                     <span>&bull;</span>
                                                     <span>
                                                         @if($selectedPlan->status)
-                                                            <span class="text-success"><i class="feather-check-circle me-1"></i>Active</span>
+                                                            <span class="text-success"><i class="feather-check-circle me-1"></i>{{ __('hrms.employees.frm_status_active') }}</span>
                                                         @else
-                                                            <span class="text-danger"><i class="feather-slash me-1"></i>Inactive</span>
+                                                            <span class="text-danger"><i class="feather-slash me-1"></i>{{ __('hrms.employees.frm_status_inactive') }}</span>
                                                         @endif
                                                     </span>
                                                 </div>
                                             </div>
                                             
                                             <!-- Actions Dropdown for Leave Plan -->
-                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $selectedPlan->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this plan and all its configured leave types?');">
+                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $selectedPlan->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.leave.delete_plan_confirm') }}');">
                                                 @csrf
                                                 @method('DELETE')
                                                 <x-ui.action-dropdown>
                                                     <li>
                                                         <a class="dropdown-item edit-plan-btn" href="javascript:void(0)" data-plan="{{ base64_encode($selectedPlan->toJson()) }}">
                                                             <i class="feather feather-edit-3 me-3"></i>
-                                                            <span>Edit Plan</span>
+                                                            <span>{{ __('hrms.leave.edit_plan') }}</span>
                                                         </a>
                                                     </li>
                                                     <li class="dropdown-divider"></li>
                                                     <li>
                                                         <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                             <i class="feather feather-trash-2 me-3"></i>
-                                                            <span>Delete Plan</span>
+                                                            <span>{{ __('hrms.leave.delete_plan') }}</span>
                                                         </button>
                                                     </li>
                                                 </x-ui.action-dropdown>
@@ -311,9 +317,9 @@
 
                                         <!-- Sub-header for Leave Types list -->
                                         <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">Leave Types</h6>
+                                            <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">{{ __('hrms.leave.leave_types') }}</h6>
                                             <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-type-trigger-btn" data-plan-id="{{ $selectedPlan->id }}" data-bs-toggle="modal" data-bs-target="#addLeaveTypeModal">
-                                                Add Leave Type
+                                                {{ __('hrms.leave.add_leave_type') }}
                                             </x-ui.button>
                                         </div>
 
@@ -322,43 +328,43 @@
                                             <!-- Search Input -->
                                             <div class="theme-search-container flex-grow-1">
                                                 <i class="feather-search"></i>
-                                                <input type="text" class="theme-search-input leave-type-search-input" data-plan-id="{{ $selectedPlan->id }}" placeholder="Search leave types..." value="{{ $ltSearch }}">
+                                                <input type="text" class="theme-search-input leave-type-search-input" data-plan-id="{{ $selectedPlan->id }}" placeholder="{{ __('hrms.leave.search_types') }}" value="{{ $ltSearch }}">
                                             </div>
 
                                             <!-- Sort Dropdown -->
-                                            <x-ui.sort-dropdown label="SORT" style="flex-shrink: 0;">
+                                            <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}" style="flex-shrink: 0;">
                                                 <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $ltSort === 'name_asc' ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeLeaveTypeSort('{{ $selectedPlan->id }}', 'name_asc', this); event.preventDefault();">
-                                                    <span>Name (A-Z)</span>
+                                                    <span>{{ __('hrms.common.sort_name_asc') }}</span>
                                                 </a>
                                                 <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $ltSort === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeLeaveTypeSort('{{ $selectedPlan->id }}', 'name_desc', this); event.preventDefault();">
-                                                    <span>Name (Z-A)</span>
+                                                    <span>{{ __('hrms.common.sort_name_desc') }}</span>
                                                 </a>
                                                 <div class="dropdown-divider"></div>
                                                 <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $ltSort === 'quota_asc' ? 'active' : '' }}" href="#" data-sort="quota_asc" onclick="changeLeaveTypeSort('{{ $selectedPlan->id }}', 'quota_asc', this); event.preventDefault();">
-                                                    <span>Quota (Low to High)</span>
+                                                    <span>{{ __('hrms.leave.quota_low_high') }}</span>
                                                 </a>
                                                 <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $ltSort === 'quota_desc' ? 'active' : '' }}" href="#" data-sort="quota_desc" onclick="changeLeaveTypeSort('{{ $selectedPlan->id }}', 'quota_desc', this); event.preventDefault();">
-                                                    <span>Quota (High to Low)</span>
+                                                    <span>{{ __('hrms.leave.quota_high_low') }}</span>
                                                 </a>
                                             </x-ui.sort-dropdown>
 
                                             <!-- Filter Dropdown -->
-                                            <x-ui.filter label="FILTER" style="flex-shrink: 0;">
-                                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                                            <x-ui.filter label="{{ __('hrms.common.filter') }}" style="flex-shrink: 0;">
+                                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                                 <div class="mb-3 leave-type-filter-select-wrapper" data-plan-id="{{ $selectedPlan->id }}">
-                                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
+                                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.type') }}</label>
                                                     <x-ui.odoo-form-ui type="select" name="lt_filter_type" id="lt_filter_type">
-                                                        <option value="">All Types</option>
-                                                        <option value="paid" @selected($ltType === 'paid')>Paid</option>
-                                                        <option value="unpaid" @selected($ltType === 'unpaid')>Unpaid</option>
+                                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                                        <option value="paid" @selected($ltType === 'paid')>{{ __('hrms.leave.paid') }}</option>
+                                                        <option value="unpaid" @selected($ltType === 'unpaid')>{{ __('hrms.leave.unpaid') }}</option>
                                                     </x-ui.odoo-form-ui>
                                                 </div>
 
                                                 <div class="dropdown-divider my-3"></div>
 
                                                 <div class="d-flex gap-2">
-                                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyLeaveTypeFilter('{{ $selectedPlan->id }}')">Apply Filters</x-ui.button>
-                                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeaveTypeFilters('{{ $selectedPlan->id }}')">Reset</x-ui.button>
+                                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyLeaveTypeFilter('{{ $selectedPlan->id }}')">{{ __('hrms.common.apply') }}</x-ui.button>
+                                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetLeaveTypeFilters('{{ $selectedPlan->id }}')">{{ __('hrms.common.reset') }}</x-ui.button>
                                                 </div>
                                             </x-ui.filter>
                                         </div>
@@ -367,9 +373,9 @@
                                             <table class="table table-hover mb-0 align-middle" style="font-size: 13px;" id="leaveTypesTable">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th>Leave Type</th>
-                                                        <th>Quota</th>
-                                                        <th width="120" class="text-end">Action</th>
+                                                        <th>{{ __('hrms.leave.leave_types') }}</th>
+                                                        <th>{{ __('hrms.leave.yearly_quota') }}</th>
+                                                        <th width="120" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -385,33 +391,33 @@
                                                                     </span>
                                                                     <span class="fw-semibold text-dark type-name">{{ $type->name }}</span>
                                                                     @if($type->type === 'unpaid')
-                                                                        <span class="text-muted fs-11">(Unpaid)</span>
+                                                                        <span class="text-muted fs-11">({{ __('hrms.leave.unpaid') }})</span>
                                                                     @endif
                                                                 </div>
                                                             </td>
                                                             <td>
-                                                                <span class="fw-bold text-dark">{{ floatval($type->quota) }} Days</span>
+                                                                <span class="fw-bold text-dark">{{ floatval($type->quota) }} {{ __('hrms.leave.days') }}</span>
                                                             </td>
                                                             <td class="text-end">
-                                                                <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this leave type?');">
+                                                                <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.leave.delete_type_confirm') }}');">
                                                                     @csrf
                                                                     @method('DELETE')
                                                                     <div class="hstack gap-2 justify-content-end">
-                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-rules="{{ json_encode($type->rules) }}" title="Configure Rules" data-bs-toggle="tooltip">
+                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-rules="{{ json_encode($type->rules) }}" title="{{ __('hrms.leave.configure_rules') }}" data-bs-toggle="tooltip">
                                                                             <i class="feather feather-settings"></i>
                                                                         </a>
                                                                         <x-ui.action-dropdown>
                                                                             <li>
                                                                                 <a class="dropdown-item edit-type-btn" href="javascript:void(0)" data-type="{{ base64_encode($type->toJson()) }}">
                                                                                     <i class="feather feather-edit-3 me-3"></i>
-                                                                                    <span>Edit Type</span>
+                                                                                    <span>{{ __('hrms.leave.edit_type') }}</span>
                                                                                 </a>
                                                                             </li>
                                                                             <li class="dropdown-divider"></li>
                                                                             <li>
                                                                                 <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                                                     <i class="feather feather-trash-2 me-3"></i>
-                                                                                    <span>Delete Type</span>
+                                                                                    <span>{{ __('hrms.leave.delete_type') }}</span>
                                                                                 </button>
                                                                             </li>
                                                                         </x-ui.action-dropdown>
@@ -422,7 +428,7 @@
                                                     @empty
                                                         <tr>
                                                             <td colspan="3" class="text-center py-4 text-muted">
-                                                                No leave types configured for this plan yet. Click "Add Leave Type" above to configure.
+                                                                {{ __('hrms.leave.no_types_for_plan') }}
                                                             </td>
                                                         </tr>
                                                     @endforelse
@@ -453,8 +459,8 @@
                                 <!-- Empty state when no plan selected/exists -->
                                 <div class="text-center py-5 text-muted my-5">
                                     <i class="feather-calendar text-secondary mb-3 d-block" style="font-size: 48px;"></i>
-                                    <h5 class="fw-bold text-dark">No Leave Plan Selected</h5>
-                                    <p class="text-muted">Please select a leave plan from the left list or create a new plan.</p>
+                                    <h5 class="fw-bold text-dark">{{ __('hrms.leave.no_plan_selected') }}</h5>
+                                    <p class="text-muted">{{ __('hrms.leave.select_plan_desc') }}</p>
                                 </div>
                             @endif
                         </div>
@@ -472,7 +478,7 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="addLeavePlanModalLabel">Create Leave Plan</h5>
+                    <h5 class="modal-title fw-bold" id="addLeavePlanModalLabel">{{ __('hrms.leave.create_plan') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.leave-structure.plan.store') }}" method="POST">
@@ -480,33 +486,33 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Plan Name" name="name" placeholder="e.g. Corporate Plan 2026" :required="true" :errorText="$errors->first('name')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.plan_name') }}" name="name" placeholder="{{ __('hrms.leave.plan_name_placeholder') }}" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="select" label="Legal Entity (Company)" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
-                                    <option value="">Apply to All Companies</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.leave.legal_entity') }}" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
+                                    <option value="">{{ __('hrms.org.apply_to_all_companies') }}</option>
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Effective From" name="effective_from" inputType="date" :required="true" :errorText="$errors->first('effective_from')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.effective_from') }}" name="effective_from" inputType="date" :required="true" :errorText="$errors->first('effective_from')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
-                                    <option value="1">Active</option>
-                                    <option value="0">Inactive</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
+                                    <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Provide details about the plan parameters..." rows="3" :errorText="$errors->first('description')" />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.leave.description') }}" name="description" placeholder="{{ __('hrms.leave.desc_placeholder') }}" rows="3" :errorText="$errors->first('description')" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
-                        <x-ui.button type="submit" variant="primary">Create Plan</x-ui.button>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.leave.create_plan') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -520,7 +526,7 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="editLeavePlanModalLabel">Edit Leave Plan</h5>
+                    <h5 class="modal-title fw-bold" id="editLeavePlanModalLabel">{{ __('hrms.leave.edit_plan') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="editLeavePlanForm" method="POST">
@@ -528,33 +534,33 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Plan Name" name="name" id="edit_plan_name" :required="true" :errorText="$errors->first('name')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.plan_name') }}" name="name" id="edit_plan_name" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="select" label="Legal Entity (Company)" name="company_id" id="edit_plan_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
-                                    <option value="">Apply to All Companies</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.leave.legal_entity') }}" name="company_id" id="edit_plan_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
+                                    <option value="">{{ __('hrms.org.apply_to_all_companies') }}</option>
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Effective From" name="effective_from" id="edit_plan_effective_from" inputType="date" :required="true" :errorText="$errors->first('effective_from')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.effective_from') }}" name="effective_from" id="edit_plan_effective_from" inputType="date" :required="true" :errorText="$errors->first('effective_from')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_plan_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
-                                    <option value="1">Active</option>
-                                    <option value="0">Inactive</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="edit_plan_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
+                                    <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_plan_description" rows="3" :errorText="$errors->first('description')" />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.leave.description') }}" name="description" id="edit_plan_description" rows="3" :errorText="$errors->first('description')" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
-                        <x-ui.button type="submit" variant="primary">Save Changes</x-ui.button>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.common.save_changes') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -568,7 +574,7 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="addLeaveTypeModalLabel">Add Leave Type</h5>
+                    <h5 class="modal-title fw-bold" id="addLeaveTypeModalLabel">{{ __('hrms.leave.add_type_title') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.leave-structure.type.store') }}" method="POST">
@@ -577,47 +583,47 @@
                         <div class="row g-3">
                             <input type="hidden" name="leave_plan_id" id="add_type_plan_id" value="{{ $selectedPlan ? $selectedPlan->id : '' }}">
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Type Name" name="name" placeholder="e.g. Sick Leave" :required="true" :errorText="$errors->first('name')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.type_name') }}" name="name" placeholder="{{ __('hrms.leave.type_name_placeholder') }}" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Color Theme" name="color" inputType="color" value="#3b82f6" class="form-control-color" style="width: 50px;" :required="true" helperText="Click to select color" :errorText="$errors->first('color')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.color_theme') }}" name="color" inputType="color" value="#3b82f6" class="form-control-color" style="width: 50px;" :required="true" helperText="{{ __('hrms.leave.click_select_color') }}" :errorText="$errors->first('color')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Code" name="code" placeholder="e.g. SL" :required="true" :errorText="$errors->first('code')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.code') }}" name="code" placeholder="{{ __('hrms.leave.code_placeholder') }}" :required="true" :errorText="$errors->first('code')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Annual Quota (Days)" name="quota" inputType="number" step="0.5" placeholder="e.g. 12" min="0" :required="true" :errorText="$errors->first('quota')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.annual_quota') }}" name="quota" inputType="number" step="0.5" placeholder="{{ __('hrms.leave.quota_placeholder') }}" min="0" :required="true" :errorText="$errors->first('quota')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="radio" label="Classification" :required="true" :errorText="$errors->first('type')">
+                                <x-ui.odoo-form-ui type="radio" label="{{ __('hrms.leave.classification') }}" :required="true" :errorText="$errors->first('type')">
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="type" id="add_type_paid" value="paid" checked required>
                                         <label class="form-check-label fw-semibold text-dark" for="add_type_paid">
-                                            Paid Leave
+                                            {{ __('hrms.leave.paid_leave') }}
                                         </label>
                                     </div>
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="type" id="add_type_unpaid" value="unpaid" required>
                                         <label class="form-check-label fw-semibold text-dark" for="add_type_unpaid">
-                                            Unpaid Leave
+                                            {{ __('hrms.leave.unpaid_leave') }}
                                         </label>
                                     </div>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="select" label="Status" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
-                                    <option value="1">Active</option>
-                                    <option value="0">Inactive</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
+                                    <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Allotment rules, carry forward specifications, etc..." rows="3" :errorText="$errors->first('description')" />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.leave.description') }}" name="description" placeholder="{{ __('hrms.leave.desc_type_placeholder') }}" rows="3" :errorText="$errors->first('description')" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
-                        <x-ui.button type="submit" variant="primary">Add Type</x-ui.button>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.leave.add_leave_type') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -631,7 +637,7 @@
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="editLeaveTypeModalLabel">Edit Leave Type</h5>
+                    <h5 class="modal-title fw-bold" id="editLeaveTypeModalLabel">{{ __('hrms.leave.edit_type_title') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="editLeaveTypeForm" method="POST">
@@ -640,47 +646,47 @@
                         <div class="row g-3">
                             <input type="hidden" name="leave_plan_id" id="edit_type_plan_id">
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Type Name" name="name" id="edit_type_name" :required="true" :errorText="$errors->first('name')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.type_name') }}" name="name" id="edit_type_name" :required="true" :errorText="$errors->first('name')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Color Theme" name="color" id="edit_type_color" inputType="color" class="form-control-color" style="width: 50px;" :required="true" helperText="Click to select color" :errorText="$errors->first('color')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.color_theme') }}" name="color" id="edit_type_color" inputType="color" class="form-control-color" style="width: 50px;" :required="true" helperText="{{ __('hrms.leave.click_select_color') }}" :errorText="$errors->first('color')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Code" name="code" id="edit_type_code" :required="true" :errorText="$errors->first('code')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.code') }}" name="code" id="edit_type_code" :required="true" :errorText="$errors->first('code')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="input" label="Annual Quota (Days)" name="quota" id="edit_type_quota" inputType="number" step="0.5" min="0" :required="true" :errorText="$errors->first('quota')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.leave.annual_quota') }}" name="quota" id="edit_type_quota" inputType="number" step="0.5" min="0" :required="true" :errorText="$errors->first('quota')" />
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="radio" label="Classification" :required="true" :errorText="$errors->first('type')">
+                                <x-ui.odoo-form-ui type="radio" label="{{ __('hrms.leave.classification') }}" :required="true" :errorText="$errors->first('type')">
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="type" id="edit_type_paid" value="paid" required>
                                         <label class="form-check-label fw-semibold text-dark" for="edit_type_paid">
-                                            Paid Leave
+                                            {{ __('hrms.leave.paid_leave') }}
                                         </label>
                                     </div>
                                     <div class="form-check">
                                         <input class="form-check-input" type="radio" name="type" id="edit_type_unpaid" value="unpaid" required>
                                         <label class="form-check-label fw-semibold text-dark" for="edit_type_unpaid">
-                                            Unpaid Leave
+                                            {{ __('hrms.leave.unpaid_leave') }}
                                         </label>
                                     </div>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6 col-12">
-                                <x-ui.odoo-form-ui type="select" label="Status" name="status" id="edit_type_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
-                                    <option value="1">Active</option>
-                                    <option value="0">Inactive</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="edit_type_status" select2-selector="default" :required="true" :errorText="$errors->first('status')">
+                                    <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-12 col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="Description" name="description" id="edit_type_description" rows="3" :errorText="$errors->first('description')" />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.leave.description') }}" name="description" id="edit_type_description" rows="3" :errorText="$errors->first('description')" />
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <x-ui.button variant="light" data-bs-dismiss="modal">Close</x-ui.button>
-                        <x-ui.button type="submit" variant="primary">Save Changes</x-ui.button>
+                        <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary">{{ __('hrms.common.save_changes') }}</x-ui.button>
                     </div>
                 </form>
             </div>
@@ -693,8 +699,8 @@
             <div class="modal-content border-0 shadow">
                 <div class="modal-header bg-light px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
                     <div>
-                        <h5 class="modal-title fw-bold text-dark" id="leaveRulesModalLabel">Leave Rules Configuration</h5>
-                        <p class="text-muted mb-0 fs-12">Set up policies, accruals, and constraints for <strong class="text-primary" id="rules-leave-type-name">Casual Leave</strong></p>
+                        <h5 class="modal-title fw-bold text-dark" id="leaveRulesModalLabel">{{ __('hrms.leave.rules_config_title') }}</h5>
+                        <p class="text-muted mb-0 fs-12">{{ __('hrms.leave.rules_config_subtitle') }} <strong class="text-primary" id="rules-leave-type-name">Casual Leave</strong></p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -704,12 +710,12 @@
                         <!-- Left Navigation Column (col-3) -->
                         <div class="col-md-3 border-end bg-light-subtle" style="min-height: 480px;">
                             <div class="nav flex-column nav-pills p-3 gap-2" id="rulesTabList" role="tablist">
-                                <button class="nav-link text-start active py-2.5 px-3 d-flex align-items-center gap-2" id="tab-accrual" data-bs-toggle="pill" data-bs-target="#pane-accrual" type="button" role="tab"><i class="feather-calendar"></i> Accrual</button>
-                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-application" data-bs-toggle="pill" data-bs-target="#pane-application" type="button" role="tab"><i class="feather-file-text"></i> Leave Application</button>
-                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-approval" data-bs-toggle="pill" data-bs-target="#pane-approval" type="button" role="tab"><i class="feather-check-square"></i> Approval</button>
-                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-yearend" data-bs-toggle="pill" data-bs-target="#pane-yearend" type="button" role="tab"><i class="feather-refresh-cw"></i> Year End Processing</button>
-                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-probation" data-bs-toggle="pill" data-bs-target="#pane-probation" type="button" role="tab"><i class="feather-shield"></i> Probation</button>
-                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-notice" data-bs-toggle="pill" data-bs-target="#pane-notice" type="button" role="tab"><i class="feather-alert-triangle"></i> Notice Period</button>
+                                <button class="nav-link text-start active py-2.5 px-3 d-flex align-items-center gap-2" id="tab-accrual" data-bs-toggle="pill" data-bs-target="#pane-accrual" type="button" role="tab"><i class="feather-calendar"></i> {{ __('hrms.leave.accrual') }}</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-application" data-bs-toggle="pill" data-bs-target="#pane-application" type="button" role="tab"><i class="feather-file-text"></i> {{ __('hrms.leave.application') }}</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-approval" data-bs-toggle="pill" data-bs-target="#pane-approval" type="button" role="tab"><i class="feather-check-square"></i> {{ __('hrms.leave.approval') }}</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-yearend" data-bs-toggle="pill" data-bs-target="#pane-yearend" type="button" role="tab"><i class="feather-refresh-cw"></i> {{ __('hrms.leave.yearend') }}</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-probation" data-bs-toggle="pill" data-bs-target="#pane-probation" type="button" role="tab"><i class="feather-shield"></i> {{ __('hrms.leave.probation') }}</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-notice" data-bs-toggle="pill" data-bs-target="#pane-notice" type="button" role="tab"><i class="feather-alert-triangle"></i> {{ __('hrms.leave.notice') }}</button>
                             </div>
                         </div>
                         
@@ -720,35 +726,35 @@
                             <div class="tab-content" id="rulesTabContent">
                                 <!-- Accrual Tab Pane -->
                                 <div class="tab-pane fade show active" id="pane-accrual" role="tabpanel">
-                                    <h5 class="fw-bold text-dark mb-3">Accrual</h5>
+                                    <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.accrual') }}</h5>
                                     
                                     <!-- Yearly Quota -->
                                     <div class="card border mb-3 bg-light-subtle rounded-3 shadow-none">
                                         <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapseQuota" aria-expanded="true">
-                                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-calendar me-2 text-muted"></i>Yearly Quota</h6>
+                                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-calendar me-2 text-muted"></i>{{ __('hrms.leave.yearly_quota') }}</h6>
                                         </div>
                                         <div id="collapseQuota" class="collapse show">
                                             <div class="card-body bg-white border-top p-3 fs-13">
                                                 <div class="row align-items-center mb-3">
-                                                    <div class="col-sm-4 text-muted">This leave is calculated in:</div>
+                                                    <div class="col-sm-4 text-muted">{{ __('hrms.leave.quota_calculated_in') }}</div>
                                                     <div class="col-sm-8 d-flex gap-3">
                                                         <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer">
-                                                            <input type="radio" name="accrual_calculate_in" value="days" class="form-check-input me-2" checked> Days
+                                                            <input type="radio" name="accrual_calculate_in" value="days" class="form-check-input me-2" checked> {{ __('hrms.leave.days') }}
                                                         </label>
                                                         <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer">
-                                                            <input type="radio" name="accrual_calculate_in" value="hours" class="form-check-input me-2"> Hours
+                                                            <input type="radio" name="accrual_calculate_in" value="hours" class="form-check-input me-2"> {{ __('hrms.leave.hours') }}
                                                         </label>
                                                     </div>
                                                 </div>
                                                 <div class="row align-items-center">
-                                                    <div class="col-sm-4 text-muted">Yearly quota:</div>
+                                                    <div class="col-sm-4 text-muted">{{ __('hrms.leave.yearly_quota') }}:</div>
                                                     <div class="col-sm-8 d-flex align-items-center gap-2">
                                                         <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer me-3">
                                                             <input type="radio" name="accrual_quota_type" value="fixed" class="form-check-input me-2" checked> 
-                                                            <input type="number" id="accrual_quota_value" class="odoo-table-input text-center d-inline-block mx-1" style="width: 70px;" value="12"> days
+                                                            <input type="number" id="accrual_quota_value" class="odoo-table-input text-center d-inline-block mx-1" style="width: 70px;" value="12"> {{ __('hrms.leave.days') }}
                                                         </label>
                                                         <label class="form-check-label d-flex align-items-center gap-2 cursor-pointer">
-                                                            <input type="radio" name="accrual_quota_type" value="unlimited" class="form-check-input me-2"> Unlimited
+                                                            <input type="radio" name="accrual_quota_type" value="unlimited" class="form-check-input me-2"> {{ __('hrms.leave.unlimited') }}
                                                         </label>
                                                     </div>
                                                 </div>
@@ -759,38 +765,38 @@
                                     <!-- Allocation & Accrual Rate -->
                                     <div class="card border mb-3 bg-light-subtle rounded-3 shadow-none">
                                         <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapseRate" aria-expanded="true">
-                                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-trending-up me-2 text-muted"></i>Allocation & Accrual Rate</h6>
+                                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-trending-up me-2 text-muted"></i>{{ __('hrms.leave.allocation_accrual_rate') }}</h6>
                                         </div>
                                         <div id="collapseRate" class="collapse show">
                                             <div class="card-body bg-white border-top p-3 fs-13 d-flex flex-column gap-3">
                                                 <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                     <input type="radio" name="accrual_rate" value="periodic" class="form-check-input mt-1">
                                                     <div>
-                                                        <span class="fw-semibold text-dark d-block">Leave accrued periodically</span>
-                                                        <span class="text-muted fs-11">Leaves are credited automatically on a schedule (e.g. 1.5 days every month).</span>
+                                                        <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_periodically') }}</span>
+                                                        <span class="text-muted fs-11">{{ __('hrms.leave.accrued_periodically_desc') }}</span>
                                                      </div>
                                                  </label>
                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                      <input type="radio" name="accrual_rate" value="attendance" class="form-check-input mt-1">
                                                      <div>
-                                                         <span class="fw-semibold text-dark d-block">Leave accrues based on attendance</span>
-                                                         <span class="text-muted fs-11">Leaves are earned based on actual days worked (e.g. 1 day for every 20 worked days).</span>
+                                                         <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_attendance') }}</span>
+                                                         <span class="text-muted fs-11">{{ __('hrms.leave.accrued_attendance_desc') }}</span>
                                                      </div>
                                                  </label>
                                                  <div class="ps-4 mt-1 mb-2 d-none" id="accrual_attendance_div">
                                                      <div class="d-flex align-items-center gap-2 fs-13">
-                                                         <span>Earn</span>
+                                                         <span>{{ __('hrms.leave.earn') }}</span>
                                                          <input type="number" id="accrual_attendance_earn" class="odoo-table-input text-center" style="width: 70px;" value="1">
-                                                         <span>day(s) of leave for every</span>
+                                                         <span>{{ __('hrms.leave.days_of_leave_for_every') }}</span>
                                                          <input type="number" id="accrual_attendance_period" class="odoo-table-input text-center" style="width: 70px;" value="20">
-                                                         <span>days worked.</span>
+                                                         <span>{{ __('hrms.leave.days_worked') }}</span>
                                                      </div>
                                                  </div>
                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                      <input type="radio" name="accrual_rate" value="immediate" class="form-check-input mt-1" checked>
                                                      <div>
-                                                         <span class="fw-semibold text-dark d-block">Leave quota available immediately</span>
-                                                         <span class="text-muted fs-11">The full annual quota is credited upfront on the start of the year or joining date.</span>
+                                                         <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.immediate_quota') }}</span>
+                                                         <span class="text-muted fs-11">{{ __('hrms.leave.immediate_quota_desc') }}</span>
                                                      </div>
                                                  </label>
                                              </div>
@@ -800,19 +806,19 @@
                                      <!-- Accrual Restrictions -->
                                      <div class="card border bg-light-subtle rounded-3 shadow-none">
                                          <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapseRestrictions" aria-expanded="true">
-                                             <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-alert-circle me-2 text-muted"></i>Accrual Restrictions</h6>
+                                             <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-alert-circle me-2 text-muted"></i>{{ __('hrms.leave.accrual_restrictions') }}</h6>
                                          </div>
                                          <div id="collapseRestrictions" class="collapse show">
                                              <div class="card-body bg-white border-top p-3 fs-13">
                                                  <div class="form-check form-switch mb-1">
                                                      <input class="form-check-input" type="checkbox" id="accrual_limit_carry">
-                                                     <label class="form-check-label fw-bold text-dark ms-2" for="accrual_limit_carry">Limit maximum accumulation of leaves</label>
-                                                     <div class="text-muted fs-11 ms-2">Cap total leaves an employee can accumulate at any given point.</div>
+                                                     <label class="form-check-label fw-bold text-dark ms-2" for="accrual_limit_carry">{{ __('hrms.leave.limit_max_accumulation') }}</label>
+                                                     <div class="text-muted fs-11 ms-2">{{ __('hrms.leave.limit_max_accumulation_desc') }}</div>
                                                  </div>
                                                  <div class="ps-4 mt-2 d-none" id="accrual_max_accum_div">
                                                      <div class="d-flex align-items-center gap-2">
-                                                         <span>Maximum accumulation balance:</span>
-                                                         <input type="number" id="accrual_max_accum_val" class="odoo-table-input text-center" style="width: 70px;" value="30"> days
+                                                         <span>{{ __('hrms.leave.max_accum_balance') }}</span>
+                                                         <input type="number" id="accrual_max_accum_val" class="odoo-table-input text-center" style="width: 70px;" value="30"> {{ __('hrms.leave.days') }}
                                                      </div>
                                                  </div>
                                              </div>
@@ -822,20 +828,20 @@
                                  
                                  <!-- Leave Application Tab Pane -->
                                  <div class="tab-pane fade" id="pane-application" role="tabpanel">
-                                     <h5 class="fw-bold text-dark mb-3">Leave Application Settings</h5>
+                                     <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.app_settings_title') }}</h5>
                                      
                                      <!-- Advance application -->
                                      <div class="card border mb-3 rounded-3 shadow-none">
                                          <div class="card-body p-3 fs-13">
                                              <div class="form-check form-switch mb-1">
                                                  <input class="form-check-input" type="checkbox" id="app_apply_in_advance">
-                                                 <label class="form-check-label fw-bold text-dark ms-2" for="app_apply_in_advance">Must apply in advance</label>
-                                                 <div class="text-muted fs-11 ms-2">Restrict leaves from being applied at the last minute or retroactively.</div>
+                                                 <label class="form-check-label fw-bold text-dark ms-2" for="app_apply_in_advance">{{ __('hrms.leave.apply_in_advance') }}</label>
+                                                 <div class="text-muted fs-11 ms-2">{{ __('hrms.leave.apply_in_advance_desc') }}</div>
                                              </div>
                                              <div class="ps-4 mt-2 d-none" id="app_advance_days_div">
                                                  <div class="d-flex align-items-center gap-2">
-                                                     <span>Apply at least</span>
-                                                     <input type="number" id="app_advance_days" class="odoo-table-input text-center" style="width: 70px;" value="3"> days before leave start date.
+                                                     <span>{{ __('hrms.leave.apply_at_least') }}</span>
+                                                     <input type="number" id="app_advance_days" class="odoo-table-input text-center" style="width: 70px;" value="3"> {{ __('hrms.leave.days_before_start') }}
                                                  </div>
                                              </div>
                                          </div>
@@ -844,17 +850,17 @@
                                      <!-- Duration bounds -->
                                      <div class="card border mb-3 rounded-3 shadow-none">
                                          <div class="card-body p-3 fs-13">
-                                             <h6 class="fw-bold text-dark mb-3">Duration Constraints</h6>
+                                             <h6 class="fw-bold text-dark mb-3">{{ __('hrms.leave.duration_constraints') }}</h6>
                                              <div class="row align-items-center mb-3">
-                                                 <div class="col-sm-5 text-muted">Minimum duration per request:</div>
+                                                 <div class="col-sm-5 text-muted">{{ __('hrms.leave.min_duration') }}</div>
                                                  <div class="col-sm-7 d-flex align-items-center gap-2">
-                                                     <input type="number" id="app_min_duration" class="odoo-table-input text-center" style="width: 70px;" value="1"> day(s)
+                                                     <input type="number" id="app_min_duration" class="odoo-table-input text-center" style="width: 70px;" value="1"> {{ __('hrms.leave.days') }}
                                                  </div>
                                              </div>
                                              <div class="row align-items-center">
-                                                 <div class="col-sm-5 text-muted">Maximum duration per request:</div>
+                                                 <div class="col-sm-5 text-muted">{{ __('hrms.leave.max_duration') }}</div>
                                                  <div class="col-sm-7 d-flex align-items-center gap-2">
-                                                     <input type="number" id="app_max_duration" class="odoo-table-input text-center" style="width: 70px;" value="10"> day(s)
+                                                     <input type="number" id="app_max_duration" class="odoo-table-input text-center" style="width: 70px;" value="10"> {{ __('hrms.leave.days') }}
                                                  </div>
                                              </div>
                                          </div>
@@ -865,13 +871,13 @@
                                          <div class="card-body p-3 fs-13">
                                              <div class="form-check form-switch mb-1">
                                                  <input class="form-check-input" type="checkbox" id="app_require_attachment">
-                                                 <label class="form-check-label fw-bold text-dark" for="app_require_attachment">Require attachment/document proof</label>
-                                                 <div class="text-muted fs-11">Force attachments (e.g. medical certificates) for long leaves.</div>
+                                                 <label class="form-check-label fw-bold text-dark" for="app_require_attachment">{{ __('hrms.leave.require_attachment') }}</label>
+                                                 <div class="text-muted fs-11">{{ __('hrms.leave.require_attachment_desc') }}</div>
                                              </div>
                                              <div class="ps-4 mt-2 d-none" id="app_attachment_days_div">
                                                  <div class="d-flex align-items-center gap-2">
-                                                     <span>Mandatory if leave duration exceeds</span>
-                                                     <input type="number" id="app_attachment_days" class="odoo-table-input text-center" style="width: 70px;" value="3"> day(s).
+                                                     <span>{{ __('hrms.leave.mandatory_if_exceeds') }}</span>
+                                                     <input type="number" id="app_attachment_days" class="odoo-table-input text-center" style="width: 70px;" value="3"> {{ __('hrms.leave.days') }}.
                                                  </div>
                                              </div>
                                          </div>
@@ -880,32 +886,32 @@
                                  
                                   <!-- Approval Tab Pane -->
                                   <div class="tab-pane fade" id="pane-approval" role="tabpanel">
-                                      <h5 class="fw-bold text-dark mb-3">Approval Workflow</h5>
+                                      <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.approval_workflow') }}</h5>
                                       
                                       <!-- Approval Level -->
                                       <div class="card border mb-3 rounded-3 shadow-none">
                                           <div class="card-body p-3 fs-13">
-                                              <h6 class="fw-bold text-dark mb-3">Approval Routing Level</h6>
+                                              <h6 class="fw-bold text-dark mb-3">{{ __('hrms.leave.approval_routing_level') }}</h6>
                                               <div class="d-flex flex-column gap-3">
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="approval_workflow_level" value="auto" class="form-check-input mt-1">
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Auto-Approved</span>
-                                                          <span class="text-muted fs-11">Requests are approved automatically without manager reviews.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.auto_approved') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.auto_approved_desc') }}</span>
                                                       </div>
                                                   </label>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="approval_workflow_level" value="1_level" class="form-check-input mt-1" checked>
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">1-Level Approval</span>
-                                                          <span class="text-muted fs-11">Requires approval from one supervisor before being active.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.one_level_approval') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.one_level_approval_desc') }}</span>
                                                       </div>
                                                   </label>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="approval_workflow_level" value="2_level" class="form-check-input mt-1">
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">2-Level Approval</span>
-                                                          <span class="text-muted fs-11">Requires sequence of two approvals (e.g. Reporting Manager then HR).</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.two_level_approval') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.two_level_approval_desc') }}</span>
                                                       </div>
                                                   </label>
                                               </div>
@@ -915,24 +921,24 @@
                                       <!-- Approver roles definition -->
                                       <div class="card border rounded-3 shadow-none" id="approver_roles_card">
                                           <div class="card-body p-3 fs-13">
-                                              <h6 class="fw-bold text-dark mb-3">Workflow Roles</h6>
+                                              <h6 class="fw-bold text-dark mb-3">{{ __('hrms.leave.workflow_roles') }}</h6>
                                               <div class="row align-items-center mb-3" id="first_approver_row">
-                                                  <div class="col-sm-4 text-muted">First Approver:</div>
+                                                  <div class="col-sm-4 text-muted">{{ __('hrms.leave.first_approver') }}</div>
                                                   <div class="col-sm-8">
                                                       <select id="approval_first_approver" class="odoo-table-select" style="max-width: 250px;">
-                                                          <option value="reporting_manager">Reporting Manager</option>
-                                                          <option value="department_head">Department Head</option>
-                                                          <option value="hr_manager">HR Manager</option>
+                                                          <option value="reporting_manager">{{ __('hrms.leave.reporting_manager') }}</option>
+                                                          <option value="department_head">{{ __('hrms.leave.department_head') }}</option>
+                                                          <option value="hr_manager">{{ __('hrms.leave.hr_manager') }}</option>
                                                       </select>
                                                   </div>
                                               </div>
                                               <div class="row align-items-center d-none" id="second_approver_row">
-                                                  <div class="col-sm-4 text-muted">Second Approver:</div>
+                                                  <div class="col-sm-4 text-muted">{{ __('hrms.leave.second_approver') }}</div>
                                                   <div class="col-sm-8">
                                                       <select id="approval_second_approver" class="odoo-table-select" style="max-width: 250px;">
-                                                          <option value="hr_manager" selected>HR Manager</option>
-                                                          <option value="department_head">Department Head</option>
-                                                          <option value="ceo">CEO / Director</option>
+                                                          <option value="hr_manager" selected>{{ __('hrms.leave.hr_manager') }}</option>
+                                                          <option value="department_head">{{ __('hrms.leave.department_head') }}</option>
+                                                          <option value="ceo">{{ __('hrms.leave.ceo') }}</option>
                                                       </select>
                                                   </div>
                                               </div>
@@ -942,31 +948,31 @@
                                   
                                   <!-- Year End Processing Tab Pane -->
                                   <div class="tab-pane fade" id="pane-yearend" role="tabpanel">
-                                      <h5 class="fw-bold text-dark mb-3">Year End Processing</h5>
+                                      <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.yearend') }}</h5>
                                       
                                       <div class="card border rounded-3 shadow-none">
                                           <div class="card-body p-3 fs-13">
-                                              <h6 class="fw-bold text-dark mb-3">Action on Unused Balance</h6>
+                                              <h6 class="fw-bold text-dark mb-3">{{ __('hrms.leave.action_unused_balance') }}</h6>
                                               <div class="d-flex flex-column gap-3">
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="yearend_action" value="lapse" class="form-check-input mt-1" checked>
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Lapse (Use it or lose it)</span>
-                                                          <span class="text-muted fs-11">Unused leaves will reset to 0 at the end of the year.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.lapse') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.lapse_desc') }}</span>
                                                       </div>
                                                   </label>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="yearend_action" value="carry_forward" class="form-check-input mt-1">
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Carry Forward to next year</span>
-                                                          <span class="text-muted fs-11">Transfer unused balances forward, subject to limit rules.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.carry_forward') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.carry_forward_desc') }}</span>
                                                       </div>
                                                   </label>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="yearend_action" value="encash" class="form-check-input mt-1">
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Encashment (Pay out)</span>
-                                                          <span class="text-muted fs-11">Compensate employees monetarily for unused leave balance.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.encashment') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.encashment_desc') }}</span>
                                                       </div>
                                                   </label>
                                               </div>
@@ -974,16 +980,16 @@
                                               <!-- Carry forward value option -->
                                               <div class="border-top pt-3 mt-3 d-none" id="yearend_carry_limit_div">
                                                   <div class="d-flex align-items-center gap-2">
-                                                      <span>Maximum days to carry forward:</span>
-                                                      <input type="number" id="yearend_max_carry" class="odoo-table-input text-center" style="width: 70px;" value="6"> days
+                                                      <span>{{ __('hrms.leave.max_carry') }}</span>
+                                                      <input type="number" id="yearend_max_carry" class="odoo-table-input text-center" style="width: 70px;" value="6"> {{ __('hrms.leave.days') }}
                                                   </div>
                                               </div>
                                               
                                               <!-- Encashment limit value option -->
                                               <div class="border-top pt-3 mt-3 d-none" id="yearend_encash_limit_div">
                                                   <div class="d-flex align-items-center gap-2">
-                                                      <span>Maximum days to encash:</span>
-                                                      <input type="number" id="yearend_max_encash" class="odoo-table-input text-center" style="width: 70px;" value="5"> days
+                                                      <span>{{ __('hrms.leave.max_encash') }}</span>
+                                                      <input type="number" id="yearend_max_encash" class="odoo-table-input text-center" style="width: 70px;" value="5"> {{ __('hrms.leave.days') }}
                                                   </div>
                                               </div>
                                           </div>
@@ -992,31 +998,31 @@
                                   
                                   <!-- Probation Tab Pane -->
                                   <div class="tab-pane fade" id="pane-probation" role="tabpanel">
-                                      <h5 class="fw-bold text-dark mb-3">Probation Period Rules</h5>
+                                      <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.probation_rules') }}</h5>
                                       
                                       <div class="card border rounded-3 shadow-none">
                                           <div class="card-body p-3 fs-13">
-                                              <h6 class="fw-bold text-dark mb-3">Usage during Probation</h6>
+                                              <h6 class="fw-bold text-dark mb-3">{{ __('hrms.leave.usage_during_probation') }}</h6>
                                               <div class="d-flex flex-column gap-3">
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="probation_rule" value="allow" class="form-check-input mt-1" checked>
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Allow applying during probation</span>
-                                                          <span class="text-muted fs-11">Employees can take this leave immediately after joining.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.allow_probation') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.allow_probation_desc') }}</span>
                                                       </div>
                                                   </label>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="probation_rule" value="disallow" class="form-check-input mt-1">
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Do not allow applying during probation</span>
-                                                          <span class="text-muted fs-11">Leave option remains locked until employee gets confirmed.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.disallow_probation') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.disallow_probation_desc') }}</span>
                                                       </div>
                                                   </label>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="probation_rule" value="allow_after_months" class="form-check-input mt-1">
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Allow after a certain period</span>
-                                                          <span class="text-muted fs-11">Employees can apply for this leave after a specific length of service.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.allow_after_period') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.allow_after_period_desc') }}</span>
                                                       </div>
                                                   </label>
                                               </div>
@@ -1024,8 +1030,8 @@
                                               <!-- Month value option -->
                                               <div class="border-top pt-3 mt-3 d-none" id="probation_months_div">
                                                   <div class="d-flex align-items-center gap-2">
-                                                      <span>Allowed after completing</span>
-                                                      <input type="number" id="probation_months" class="odoo-table-input text-center" style="width: 70px;" value="3"> month(s) of joining.
+                                                      <span>{{ __('hrms.leave.allowed_after_completing') }}</span>
+                                                      <input type="number" id="probation_months" class="odoo-table-input text-center" style="width: 70px;" value="3"> {{ __('hrms.leave.months_of_joining') }}
                                                   </div>
                                               </div>
                                           </div>
@@ -1034,31 +1040,31 @@
                                   
                                   <!-- Notice Period Tab Pane -->
                                   <div class="tab-pane fade" id="pane-notice" role="tabpanel">
-                                      <h5 class="fw-bold text-dark mb-3">Notice Period Rules</h5>
+                                      <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.notice_rules') }}</h5>
                                       
                                       <div class="card border rounded-3 shadow-none">
                                           <div class="card-body p-3 fs-13">
-                                              <h6 class="fw-bold text-dark mb-3">Usage during Notice Period</h6>
+                                              <h6 class="fw-bold text-dark mb-3">{{ __('hrms.leave.usage_during_notice') }}</h6>
                                               <div class="d-flex flex-column gap-3">
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="notice_rule" value="allow" class="form-check-input mt-1" checked>
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Allow applying during notice period</span>
-                                                          <span class="text-muted fs-11">Employees on notice period can apply for this leave normally.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.allow_notice') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.allow_notice_desc') }}</span>
                                                       </div>
                                                   </label>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="notice_rule" value="disallow" class="form-check-input mt-1">
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Do not allow applying during notice period</span>
-                                                          <span class="text-muted fs-11">Leave option becomes unavailable once exit clearance starts.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.disallow_notice') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.disallow_notice_desc') }}</span>
                                                       </div>
                                                   </label>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="notice_rule" value="special_approval" class="form-check-input mt-1">
                                                       <div>
-                                                          <span class="fw-semibold text-dark d-block">Requires special HR approval</span>
-                                                          <span class="text-muted fs-11">Bypasses default flow; direct approval from Corporate HR is mandatory.</span>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.special_hr_approval') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.special_hr_approval_desc') }}</span>
                                                       </div>
                                                   </label>
                                               </div>
@@ -1066,14 +1072,14 @@
                                       </div>
                                   </div>
                              </div>
-                         </div>
-                     </div>
-                 </div>
-                 
-                 <div class="modal-footer bg-light border-top d-flex justify-content-end gap-2 px-4 py-3">
-                     <button type="button" class="btn btn-light fs-13" data-bs-dismiss="modal">Close</button>
-                     <button type="button" class="btn btn-primary fs-13" onclick="saveLeaveRules()">Save Rules</button>
-                 </div>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div class="modal-footer bg-light border-top d-flex justify-content-end gap-2 px-4 py-3">
+                      <button type="button" class="btn btn-light fs-13" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                      <button type="button" class="btn btn-primary fs-13" onclick="saveLeaveRules()">{{ __('hrms.leave.save_rules') }}</button>
+                  </div></div>
              </div>
          </div>
      </div>
@@ -1456,7 +1462,7 @@
                             <div class="toast show align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
                               <div class="d-flex">
                                 <div class="toast-body d-flex align-items-center gap-2">
-                                  <i class="feather-check-circle"></i> Rules successfully saved to the database.
+                                  <i class="feather-check-circle"></i> {{ __('hrms.leave.rules_saved') }}
                                 </div>
                                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
                               </div>
@@ -1468,7 +1474,7 @@
                         }, 3000);
                     },
                     error: function(xhr) {
-                        alert('Error saving rules to the database. Make sure migrations are run.');
+                        alert('{{ __('hrms.leave.rules_save_error') }}');
                     }
                 });
             };

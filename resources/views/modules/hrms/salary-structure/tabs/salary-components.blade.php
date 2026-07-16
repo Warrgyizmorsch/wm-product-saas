@@ -60,71 +60,71 @@
                         <!-- Search Input (Placed before sort and filter in same line) -->
                         <div class="theme-search-container" style="max-width: 300px;">
                             <i class="feather-search"></i>
-                            <input type="text" id="rec_search_input" name="rec_search" class="theme-search-input" placeholder="Search components..." value="{{ request('rec_search') }}">
+                            <input type="text" id="rec_search_input" name="rec_search" class="theme-search-input" placeholder="{{ __('hrms.salary.search_components') }}" value="{{ request('rec_search') }}">
                         </div>
-
+ 
                         <!-- Sort Dropdown -->
-                        <x-ui.sort-dropdown label="SORT">
+                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'name_asc' || !request('rec_sort') ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeRecSort('name_asc', this); event.preventDefault();">
-                                <span>Name (A-Z)</span>
+                                <span>{{ __('hrms.common.sort_name_asc') }}</span>
                                 @if(request('rec_sort') === 'name_asc' || !request('rec_sort')) <i class="feather-check ms-3"></i> @endif
                             </a>
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeRecSort('name_desc', this); event.preventDefault();">
-                                <span>Name (Z-A)</span>
+                                <span>{{ __('hrms.common.sort_name_desc') }}</span>
                                 @if(request('rec_sort') === 'name_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <div class="dropdown-divider"></div>
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'code_asc' ? 'active' : '' }}" href="#" data-sort="code_asc" onclick="changeRecSort('code_asc', this); event.preventDefault();">
-                                <span>Code (A-Z)</span>
+                                <span>{{ __('hrms.common.sort_code_asc') }}</span>
                                 @if(request('rec_sort') === 'code_asc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('rec_sort') === 'code_desc' ? 'active' : '' }}" href="#" data-sort="code_desc" onclick="changeRecSort('code_desc', this); event.preventDefault();">
-                                <span>Code (Z-A)</span>
+                                <span>{{ __('hrms.common.sort_code_desc') }}</span>
                                 @if(request('rec_sort') === 'code_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                         </x-ui.sort-dropdown>
-
+ 
                         <!-- Filter Dropdown -->
-                        <x-ui.filter label="FILTER">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="rec_filter_status" id="rec_filter_status">
-                                    <option value="">All Statuses</option>
-                                    <option value="1" @selected(request('rec_status') === '1')>Active</option>
-                                    <option value="0" @selected(request('rec_status') === '0')>Inactive</option>
+                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                    <option value="1" @selected(request('rec_status') === '1')>{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0" @selected(request('rec_status') === '0')>{{ __('hrms.employees.frm_status_inactive') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
-
+ 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.type') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="rec_filter_type" id="rec_filter_type">
-                                    <option value="">All Types</option>
-                                    <option value="earning" @selected(request('rec_type') === 'earning')>Earning</option>
-                                    <option value="deduction" @selected(request('rec_type') === 'deduction')>Deduction</option>
+                                    <option value="">{{ __('hrms.org.select_type') ?? __('hrms.org.type') }}</option>
+                                    <option value="earning" @selected(request('rec_type') === 'earning')>{{ __('hrms.org.earning') }}</option>
+                                    <option value="deduction" @selected(request('rec_type') === 'deduction')>{{ __('hrms.org.deduction') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
-
+ 
                             <div class="dropdown-divider my-3"></div>
-
+ 
                             <div class="d-flex gap-2">
-                                <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyRecFilter()">Apply Filters</x-ui.button>
-                                <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetRecFilters()">Reset</x-ui.button>
+                                <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyRecFilter()">{{ __('hrms.common.apply') }}</x-ui.button>
+                                <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetRecFilters()">{{ __('hrms.common.reset') }}</x-ui.button>
                             </div>
                         </x-ui.filter>
                     </div>
-
+ 
                     <div class="table-responsive">
                         <table class="table table-hover mb-0 align-middle" id="recurringComponentsTable">
                             <thead class="table-light">
                                 <tr>
                                     <th width="60">#</th>
-                                    <th>Component Name</th>
-                                    <th>Code</th>
-                                    <th>Type</th>
-                                    <th>Status</th>
-                                    <th width="150" class="text-end">Actions</th>
+                                    <th>{{ __('hrms.org.component_name') }}</th>
+                                    <th>{{ __('hrms.org.tbl_code') }}</th>
+                                    <th>{{ __('hrms.org.type') }}</th>
+                                    <th>{{ __('hrms.org.status') }}</th>
+                                    <th width="150" class="text-end">{{ __('hrms.assets.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -135,34 +135,34 @@
                                     <td><code class="component-code">{{ $sc->code }}</code></td>
                                     <td>
                                         @if($sc->type == 'earning')
-                                            <x-ui.badge variant="success" soft>Earning</x-ui.badge>
+                                            <x-ui.badge variant="success" soft>{{ __('hrms.org.earning') }}</x-ui.badge>
                                         @else
-                                            <x-ui.badge variant="warning" soft>Deduction</x-ui.badge>
+                                            <x-ui.badge variant="warning" soft>{{ __('hrms.org.deduction') }}</x-ui.badge>
                                         @endif
                                     </td>
                                     <td>
                                         @if($sc->status)
-                                            <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                                            <x-ui.badge variant="success" soft>{{ __('hrms.employees.frm_status_active') }}</x-ui.badge>
                                         @else
-                                            <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                                            <x-ui.badge variant="danger" soft>{{ __('hrms.employees.frm_status_inactive') }}</x-ui.badge>
                                         @endif
                                     </td>
                                     <td class="text-end">
-                                        <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this salary component?');">
+                                        <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.salary.delete_component_confirm') }}');">
                                             @csrf
                                             @method('DELETE')
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item btn-edit-salary-component" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}">
                                                         <i class="feather feather-edit-3 me-3"></i>
-                                                        <span>Edit</span>
+                                                        <span>{{ __('hrms.assets.edit') }}</span>
                                                     </a>
                                                 </li>
                                                 <li class="dropdown-divider"></li>
                                                 <li>
                                                     <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                         <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>Delete</span>
+                                                        <span>{{ __('hrms.assets.delete') }}</span>
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -172,7 +172,7 @@
                                 @empty
                                 <tr>
                                     <td colspan="7" class="text-center py-5 text-muted">
-                                        No Recurring Components configured yet. Click "Add Component" to configure.
+                                        {{ __('hrms.salary.no_recurring_components') }}
                                     </td>
                                 </tr>
                                 @endforelse
@@ -207,10 +207,10 @@
     <div class="tab-pane fade {{ request()->get('subtab') === 'adhoc' ? 'show active' : '' }}" id="adhoc-pane" role="tabpanel" aria-labelledby="adhoc-subtab">
         <div class="row">
             <div class="col-12">
-                <x-ui.card title="Ad-hoc Components (Variable / One-time)" stretch bodyClass="p-0">
+                <x-ui.card title="{{ __('hrms.salary.adhoc_components_title') }}" stretch bodyClass="p-0">
                     <x-slot name="headerAction">
                         <x-ui.button variant="primary" size="sm" icon="feather-plus" class="add-component-trigger" data-pay-group-id="{{ $selectedPayGroup ? $selectedPayGroup->id : '' }}" data-is-adhoc="1" data-bs-toggle="modal" data-bs-target="#addSalaryComponentModal">
-                            Add Component
+                            {{ __('hrms.salary.add_component') }}
                         </x-ui.button>
                     </x-slot>
 
@@ -222,57 +222,57 @@
                         <!-- Search Input (Placed before sort and filter in same line) -->
                         <div class="theme-search-container" style="max-width: 300px;">
                             <i class="feather-search"></i>
-                            <input type="text" id="adhoc_search_input" name="adhoc_search" class="theme-search-input" placeholder="Search components..." value="{{ request('adhoc_search') }}">
+                            <input type="text" id="adhoc_search_input" name="adhoc_search" class="theme-search-input" placeholder="{{ __('hrms.salary.search_components') }}" value="{{ request('adhoc_search') }}">
                         </div>
 
                         <!-- Sort Dropdown -->
-                        <x-ui.sort-dropdown label="SORT">
+                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'name_asc' || !request('adhoc_sort') ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeAdhocSort('name_asc', this); event.preventDefault();">
-                                <span>Name (A-Z)</span>
+                                <span>{{ __('hrms.common.sort_name_asc') }}</span>
                                 @if(request('adhoc_sort') === 'name_asc' || !request('adhoc_sort')) <i class="feather-check ms-3"></i> @endif
                             </a>
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeAdhocSort('name_desc', this); event.preventDefault();">
-                                <span>Name (Z-A)</span>
+                                <span>{{ __('hrms.common.sort_name_desc') }}</span>
                                 @if(request('adhoc_sort') === 'name_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <div class="dropdown-divider"></div>
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'code_asc' ? 'active' : '' }}" href="#" data-sort="code_asc" onclick="changeAdhocSort('code_asc', this); event.preventDefault();">
-                                <span>Code (A-Z)</span>
+                                <span>{{ __('hrms.common.sort_code_asc') }}</span>
                                 @if(request('adhoc_sort') === 'code_asc') <i class="feather-check ms-3"></i> @endif
                             </a>
                             <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ request('adhoc_sort') === 'code_desc' ? 'active' : '' }}" href="#" data-sort="code_desc" onclick="changeAdhocSort('code_desc', this); event.preventDefault();">
-                                <span>Code (Z-A)</span>
+                                <span>{{ __('hrms.common.sort_code_desc') }}</span>
                                 @if(request('adhoc_sort') === 'code_desc') <i class="feather-check ms-3"></i> @endif
                             </a>
                         </x-ui.sort-dropdown>
 
                         <!-- Filter Dropdown -->
-                        <x-ui.filter label="FILTER">
-                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                             
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.status') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="adhoc_filter_status" id="adhoc_filter_status">
-                                    <option value="">All Statuses</option>
-                                    <option value="1" @selected(request('adhoc_status') === '1')>Active</option>
-                                    <option value="0" @selected(request('adhoc_status') === '0')>Inactive</option>
+                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                    <option value="1" @selected(request('adhoc_status') === '1')>{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0" @selected(request('adhoc_status') === '0')>{{ __('hrms.employees.frm_status_inactive') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.type') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="adhoc_filter_type" id="adhoc_filter_type">
-                                    <option value="">All Types</option>
-                                    <option value="earning" @selected(request('adhoc_type') === 'earning')>Earning</option>
-                                    <option value="deduction" @selected(request('adhoc_type') === 'deduction')>Deduction</option>
+                                    <option value="">{{ __('hrms.org.select_type') ?? __('hrms.org.type') }}</option>
+                                    <option value="earning" @selected(request('adhoc_type') === 'earning')>{{ __('hrms.org.earning') }}</option>
+                                    <option value="deduction" @selected(request('adhoc_type') === 'deduction')>{{ __('hrms.org.deduction') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
 
                             <div class="dropdown-divider my-3"></div>
 
                             <div class="d-flex gap-2">
-                                <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyAdhocFilter()">Apply Filters</x-ui.button>
-                                <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetAdhocFilters()">Reset</x-ui.button>
+                                <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="applyAdhocFilter()">{{ __('hrms.common.apply') }}</x-ui.button>
+                                <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetAdhocFilters()">{{ __('hrms.common.reset') }}</x-ui.button>
                             </div>
                         </x-ui.filter>
                     </div>
@@ -282,11 +282,11 @@
                             <thead class="table-light">
                                 <tr>
                                     <th width="60">#</th>
-                                    <th>Component Name</th>
-                                    <th>Code</th>
-                                    <th>Type</th>
-                                    <th>Status</th>
-                                    <th width="150" class="text-end">Actions</th>
+                                    <th>{{ __('hrms.org.component_name') }}</th>
+                                    <th>{{ __('hrms.org.tbl_code') }}</th>
+                                    <th>{{ __('hrms.org.type') }}</th>
+                                    <th>{{ __('hrms.org.status') }}</th>
+                                    <th width="150" class="text-end">{{ __('hrms.assets.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -297,34 +297,34 @@
                                     <td><code class="component-code">{{ $sc->code }}</code></td>
                                     <td>
                                         @if($sc->type == 'earning')
-                                            <x-ui.badge variant="success" soft>Earning</x-ui.badge>
+                                            <x-ui.badge variant="success" soft>{{ __('hrms.org.earning') }}</x-ui.badge>
                                         @else
-                                            <x-ui.badge variant="warning" soft>Deduction</x-ui.badge>
+                                            <x-ui.badge variant="warning" soft>{{ __('hrms.org.deduction') }}</x-ui.badge>
                                         @endif
                                     </td>
                                     <td>
                                         @if($sc->status)
-                                            <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                                            <x-ui.badge variant="success" soft>{{ __('hrms.employees.frm_status_active') }}</x-ui.badge>
                                         @else
-                                            <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                                            <x-ui.badge variant="danger" soft>{{ __('hrms.employees.frm_status_inactive') }}</x-ui.badge>
                                         @endif
                                     </td>
                                     <td class="text-end">
-                                        <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this salary component?');">
+                                        <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.destroy', ['salaryComponent' => $sc->id]) : route('hrms.salary-component.destroy', ['salaryComponent' => $sc->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.salary.delete_component_confirm') }}');">
                                             @csrf
                                             @method('DELETE')
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item btn-edit-salary-component" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}">
                                                         <i class="feather feather-edit-3 me-3"></i>
-                                                        <span>Edit</span>
+                                                        <span>{{ __('hrms.assets.edit') }}</span>
                                                     </a>
                                                 </li>
                                                 <li class="dropdown-divider"></li>
                                                 <li>
                                                     <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                         <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>Delete</span>
+                                                        <span>{{ __('hrms.assets.delete') }}</span>
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -334,7 +334,7 @@
                                 @empty
                                 <tr>
                                     <td colspan="7" class="text-center py-5 text-muted">
-                                        No Ad-hoc Components configured yet. Click "Add Component" to configure.
+                                        {{ __('hrms.salary.no_adhoc_components') }}
                                     </td>
                                 </tr>
                                 @endforelse

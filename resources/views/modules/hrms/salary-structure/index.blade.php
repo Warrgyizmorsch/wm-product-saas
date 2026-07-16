@@ -6,7 +6,7 @@
 
 @section('page-actions')
     <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addPayGroupModal">
-        Add Pay Group
+        {{ __('hrms.org.add_pay_group') }}
     </x-ui.button>
 @endsection
 
@@ -187,39 +187,39 @@
             @endif
 
             <div class="col-12">
-                <x-ui.card title="Pay Groups" bodyClass="p-0" stretch>
+                <x-ui.card title="{{ __('hrms.salary.pay_groups') }}" bodyClass="p-0" stretch>
                     <x-slot name="headerAction">
                         <div class="d-flex align-items-center gap-2">
                             <!-- Search Input -->
                             <div class="theme-search-container" style="width: 240px !important; position: relative;">
                                 <i class="feather-search"></i>
-                                <input type="text" id="payGroupSearch" class="theme-search-input" placeholder="Search pay groups...">
+                                <input type="text" id="payGroupSearch" class="theme-search-input" placeholder="{{ __('hrms.salary.search_pay_groups') }}">
                             </div>
 
                             <!-- Sort Dropdown -->
-                            <x-ui.sort-dropdown label="SORT">
-                                <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortPayGroups('name_asc', this); event.preventDefault();">Name (A-Z)</a>
-                                <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortPayGroups('name_desc', this); event.preventDefault();">Name (Z-A)</a>
-                                <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortPayGroups('newest', this); event.preventDefault();">Newest First</a>
+                            <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                                <a class="dropdown-item py-2 active" href="#" data-sort="name_asc" onclick="sortPayGroups('name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
+                                <a class="dropdown-item py-2" href="#" data-sort="name_desc" onclick="sortPayGroups('name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
+                                <a class="dropdown-item py-2" href="#" data-sort="newest" onclick="sortPayGroups('newest', this); event.preventDefault();">{{ __('hrms.salary.newest_first') }}</a>
                             </x-ui.sort-dropdown>
 
                             <!-- Filter Dropdown -->
-                            <x-ui.filter label="FILTER">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                 
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="pg_status" id="pg_filter_status">
-                                        <option value="">All Statuses</option>
-                                        <option value="1">Active</option>
-                                        <option value="0">Inactive</option>
+                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                        <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                        <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Company</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.org.tbl_company') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="pg_company" id="pg_filter_company">
-                                        <option value="">All Companies</option>
+                                        <option value="">{{ __('hrms.common.all_companies') }}</option>
                                         @foreach($companies as $company)
                                             <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                         @endforeach
@@ -229,8 +229,8 @@
                                 <div class="dropdown-divider my-3"></div>
 
                                 <div class="d-flex gap-2">
-                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterPayGroups()">Apply Filters</x-ui.button>
-                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetPayGroupFilters()">Reset</x-ui.button>
+                                    <x-ui.button type="button" variant="primary" size="sm" class="flex-grow-1" onclick="filterPayGroups()">{{ __('hrms.common.apply') }}</x-ui.button>
+                                    <x-ui.button type="button" variant="light" size="sm" class="border flex-grow-1" onclick="resetPayGroupFilters()">{{ __('hrms.common.reset') }}</x-ui.button>
                                 </div>
                             </x-ui.filter>
                         </div>
@@ -254,13 +254,13 @@
                                             {{ $pg->name }}
                                         </span>
                                         <div class="fs-11 text-muted text-capitalize mt-1">
-                                            {{ $pg->status ? 'Active' : 'Inactive' }} &bull; {{ $pg->company ? $pg->company->company_name : 'No Company' }}
+                                            {{ $pg->status ? __('hrms.employees.frm_status_active') : __('hrms.employees.frm_status_inactive') }} &bull; {{ $pg->company ? $pg->company->company_name : __('hrms.salary.no_company') }}
                                         </div>
                                     </a>
                                 @empty
                                     <div class="text-center py-5 text-muted px-3">
                                         <i class="feather-grid fs-24 mb-2 d-block text-secondary"></i>
-                                        <span>No Pay Groups configured yet.</span>
+                                        <span>{{ __('hrms.salary.no_pay_groups') }}</span>
                                     </div>
                                 @endforelse
                             </div>
@@ -275,60 +275,60 @@
                                         <div>
                                             <h5 class="fw-bold text-dark mb-1" style="font-size: 16px;">{{ $selectedPayGroup->name }}</h5>
                                             <div class="text-muted d-flex align-items-center gap-2" style="font-size: 12px;">
-                                                <span><i class="feather-briefcase me-1"></i>{{ $selectedPayGroup->company ? $selectedPayGroup->company->company_name : 'All Companies' }}</span>
+                                                <span><i class="feather-briefcase me-1"></i>{{ $selectedPayGroup->company ? $selectedPayGroup->company->company_name : __('hrms.org.apply_to_all_companies') }}</span>
                                                 <span>&bull;</span>
                                                 <span>
                                                     @if($selectedPayGroup->status)
-                                                        <span class="text-success"><i class="feather-check-circle me-1"></i>Active</span>
+                                                        <span class="text-success"><i class="feather-check-circle me-1"></i>{{ __('hrms.employees.frm_status_active') }}</span>
                                                     @else
-                                                        <span class="text-danger"><i class="feather-slash me-1"></i>Inactive</span>
+                                                        <span class="text-danger"><i class="feather-slash me-1"></i>{{ __('hrms.employees.frm_status_inactive') }}</span>
                                                     @endif
                                                 </span>
                                             </div>
                                         </div>
-
+ 
                                         <!-- Actions Dropdown for Pay Group -->
-                                        <form action="{{ route('hrms.salary-structure.pay-group.destroy', $selectedPayGroup->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this Pay Group? Linked components and structures will be unassigned.');">
+                                        <form action="{{ route('hrms.salary-structure.pay-group.destroy', $selectedPayGroup->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.salary.delete_pay_group_confirm') }}');">
                                             @csrf
                                             @method('DELETE')
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item edit-pay-group-btn" href="javascript:void(0)" data-pay-group="{{ base64_encode($selectedPayGroup->toJson()) }}">
                                                         <i class="feather feather-edit-3 me-3"></i>
-                                                        <span>Edit Pay Group</span>
+                                                        <span>{{ __('hrms.org.edit_pay_group') }}</span>
                                                     </a>
                                                 </li>
                                                 <li class="dropdown-divider"></li>
                                                 <li>
                                                     <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                         <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>Delete Pay Group</span>
+                                                        <span>{{ __('hrms.org.delete_pay_group') }}</span>
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
                                         </form>
                                     </div>
-
+ 
                                     @if($selectedPayGroup->description)
                                         <div class="p-3 bg-light rounded mb-4" style="font-size: 13px; color: #475569;">
                                             <i class="feather-info me-2 text-primary"></i>{{ $selectedPayGroup->description }}
                                         </div>
                                     @endif
-
+ 
                                     <!-- Nav tabs inside the selected Pay Group details -->
                                     <ul class="nav gap-2 border-bottom mb-4" id="salaryStructureTabs" role="tablist">
                                         <li class="nav-item" role="presentation">
                                             <button class="nav-link {{ request()->get('tab', 'structures') === 'structures' ? 'active' : '' }} px-4 py-3" id="structures-tab" data-bs-toggle="tab" data-bs-target="#structures-pane" type="button" role="tab" aria-controls="structures-pane" aria-selected="true">
-                                                <i class="feather-grid me-2"></i>Salary Structures (Slabs)
+                                                <i class="feather-grid me-2"></i>{{ __('hrms.salary.structures_slabs') }}
                                             </button>
                                         </li>
                                         <li class="nav-item" role="presentation">
                                             <button class="nav-link {{ request()->get('tab') === 'components' ? 'active' : '' }} px-4 py-3" id="components-tab" data-bs-toggle="tab" data-bs-target="#components-pane" type="button" role="tab" aria-controls="components-pane" aria-selected="false">
-                                                <i class="feather-list me-2"></i>Salary Components
+                                                <i class="feather-list me-2"></i>{{ __('hrms.salary.salary_components_tab') }}
                                             </button>
                                         </li>
                                     </ul>
-
+ 
                                     <div class="tab-content" id="settingsSubSidebarContent">
                                         <div class="tab-pane fade {{ request()->get('tab', 'structures') === 'structures' ? 'show active' : '' }}" id="structures-pane" role="tabpanel" aria-labelledby="structures-tab">
                                             @include('modules.hrms.salary-structure.tabs.salary-structures')
@@ -341,7 +341,7 @@
                             @else
                                 <div class="text-center py-5 text-muted">
                                     <i class="feather-info fs-32 mb-2 d-block text-secondary"></i>
-                                    <span>Please select or add a Pay Group to configure its settings.</span>
+                                    <span>{{ __('hrms.salary.select_pay_group_desc') }}</span>
                                 </div>
                             @endif
                         </div>

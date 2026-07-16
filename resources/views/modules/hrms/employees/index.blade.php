@@ -21,6 +21,22 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
+    <style>
+        .btn-outline-primary {
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+            background-color: transparent !important;
+        }
+        .btn-outline-primary:hover,
+        .btn-outline-primary:focus,
+        .btn-outline-primary:active,
+        .btn-outline-primary.active,
+        .btn-outline-primary.show {
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            color: #fff !important;
+        }
+    </style>
 @endpush
 
 @push('scripts')
@@ -664,6 +680,8 @@
             const editEmployeeModal = document.getElementById('editEmployeeModal');
             const importEmployeeModal = document.getElementById('importEmployeeModal');
 
+            let syncFilterDepartments;
+
             [addEmployeeModal, editEmployeeModal, importEmployeeModal].forEach(function (modal) {
                 if (modal && modal.parentElement !== document.body) {
                     document.body.appendChild(modal);
@@ -1114,7 +1132,7 @@
                 if (filterCompanySelect && filterDeptSelect) {
                     const originalSelectedDept = @json($filters['department_id']) || '';
 
-                    function syncFilterDepartments() {
+                    syncFilterDepartments = function() {
                         const companyId = filterCompanySelect.value;
                         const availableDepts = departments.filter(function (dept) {
                             return !companyId || String(dept.company_id) === String(companyId);
@@ -1176,175 +1194,166 @@
             let searchTimeout;
             let activeEmployeeRequest;
 
-            function employeeParams(overrides) {
-                const params = new URLSearchParams();
-                const searchInput = document.querySelector('#employeeSearchForm input[name="search"]');
-                const filterForm = document.getElementById('employeeFilterForm');
-                const sortInput = document.querySelector('#employeeSearchForm input[name="sort"]');
-
-                if (searchInput?.value) {
-                    params.set('search', searchInput.value);
-                }
-
-                if (filterForm) {
-                    new FormData(filterForm).forEach(function (value, key) {
-                        if (!['search', 'sort'].includes(key)) {
-                            params.set(key, value);
-                        }
-                    });
-                }
-
-                if (sortInput?.value) {
-                    params.set('sort', sortInput.value);
-                }
-
-                Object.entries(overrides || {}).forEach(function ([key, value]) {
-                    if (value === null || value === undefined || value === '') {
-                        params.delete(key);
-                    } else {
-                        params.set(key, value);
-                    }
-                });
-
-                Array.from(params.keys()).forEach(function (key) {
-                    if (!params.get(key)) {
-                        params.delete(key);
-                    }
-                });
-
-                return params;
-            }
-
-            function syncEmployeeForms(params) {
-                ['search', 'company_id', 'department_id', 'status', 'sort'].forEach(function (name) {
-                    document.querySelectorAll(`[name="${name}"]`).forEach(function (field) {
-                        field.value = params.get(name) || '';
-                        if (field.tagName === 'SELECT' && $(field).hasClass('select2-hidden-accessible')) {
-                            $(field).trigger('change.select2');
-                        }
-                    });
-                });
-
-                // Synchronize the active state and checkmark icon of sorting dropdown links
-                const currentSort = params.get('sort') || 'name_asc';
-                document.querySelectorAll('.employee-sort-link').forEach(function (link) {
-                    const sortVal = link.dataset.sort;
-                    link.classList.remove('active');
-                    link.querySelector('.feather-check')?.remove();
-
-                    if (sortVal === currentSort) {
-                        link.classList.add('active');
-                        const checkIcon = document.createElement('i');
-                        checkIcon.className = 'feather-check ms-3';
-                        link.appendChild(checkIcon);
-                    }
-                });
-            }
-
-            function refreshEmployeeList(url, options) {
-                const listCard = document.getElementById('employeeListCard');
-                const targetUrl = url instanceof URL ? url : new URL(url, window.location.origin);
+            function loadEmployeeList(url, closeFilter = false) {
+                const listCard = $('#employeeListCard');
+                listCard.addClass('is-loading');
 
                 if (activeEmployeeRequest) {
                     activeEmployeeRequest.abort();
                 }
 
-                const controller = new AbortController();
-                activeEmployeeRequest = controller;
-                listCard?.classList.add('is-loading');
-
-                fetch(targetUrl.toString(), {
+                activeEmployeeRequest = $.ajax({
+                    url: url,
+                    type: 'GET',
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-Requested-With': 'XMLHttpRequest'
                     },
-                    signal: controller.signal,
-                })
-                    .then(function (response) {
-                        if (!response.ok) {
-                            throw new Error('Unable to refresh employees.');
+                    success: function(response) {
+                        var parser = new DOMParser();
+                        var doc = parser.parseFromString(response, 'text/html');
+                        
+                        // Update table using native selector to be 100% reliable
+                        var newTable = doc.querySelector('.table-responsive');
+                        var oldTable = document.querySelector('.table-responsive');
+                        if (oldTable && newTable) {
+                            oldTable.innerHTML = newTable.innerHTML;
                         }
-
-                        return response.text();
-                    })
-                    .then(function (html) {
-                        const doc = new DOMParser().parseFromString(html, 'text/html');
-                        const newBody = doc.getElementById('employeeTableBody');
-                        const oldBody = document.getElementById('employeeTableBody');
-                        const newPagination = doc.getElementById('employeePaginationWrapper');
-                        const oldPagination = document.getElementById('employeePaginationWrapper');
-
-                        if (newBody && oldBody) {
-                            oldBody.innerHTML = newBody.innerHTML;
-                        }
-
-                        if (newPagination && oldPagination) {
+                        
+                        // Update pagination
+                        var newPagination = doc.querySelector('#employeePaginationWrapper');
+                        var oldPagination = document.querySelector('#employeePaginationWrapper');
+                        if (oldPagination && newPagination) {
                             oldPagination.innerHTML = newPagination.innerHTML;
                         }
 
-                        syncEmployeeForms(targetUrl.searchParams);
-                        history.pushState(null, '', targetUrl.toString());
+                        // Sync sorting active classes in dropdown only (non-disruptive, does not touch inputs)
+                        var newUrl = new URL(url, window.location.href);
+                        var sortVal = newUrl.searchParams.get('sort') || 'name_asc';
+                        $('.employee-sort-link').each(function() {
+                            var $link = $(this);
+                            var sortData = $link.data('sort');
+                            $link.removeClass('active');
+                            $link.find('.feather-check').remove();
 
-                        if (options?.closeFilter) {
+                            if (sortData === sortVal) {
+                                $link.addClass('active');
+                                $link.append('<i class="feather-check ms-3"></i>');
+                            }
+                        });
+
+                        if (closeFilter) {
                             $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
                             $('.erp-filter-dropdown.show').removeClass('show');
                         }
-                    })
-                    .catch(function (error) {
-                        if (error.name !== 'AbortError') {
-                            window.location.href = targetUrl.toString();
-                        }
-                    })
-                    .finally(function () {
-                        if (activeEmployeeRequest === controller) {
-                            listCard?.classList.remove('is-loading');
-                            activeEmployeeRequest = null;
-                        }
-                    });
+                    },
+                    complete: function() {
+                        activeEmployeeRequest = null;
+                        listCard.removeClass('is-loading');
+                    }
+                });
             }
 
-            function refreshEmployeesWithParams(params, options) {
-                const url = new URL(employeeIndexUrl, window.location.origin);
-                url.search = params.toString();
-                refreshEmployeeList(url, options);
-            }
-
-            $(document).on('input', '#employeeSearchForm input[name="search"]', function () {
+            // Live Search (AJAX) as user types with debounce
+            $(document).on('input', '#employeeSearchForm input[name="search"]', function() {
+                var $input = $(this);
                 clearTimeout(searchTimeout);
-                const params = employeeParams({
-                    search: this.value,
-                    page: null,
-                });
+                
+                searchTimeout = setTimeout(function() {
+                    // Update search value in filter form hidden input
+                    $('#employeeFilterForm input[name="search"]').val($input.val());
 
-                searchTimeout = setTimeout(function () {
-                    refreshEmployeesWithParams(params);
-                }, 250);
+                    var form = $('#employeeSearchForm');
+                    var formData = form.serialize();
+                    var url = form.attr('action') + '?' + formData;
+
+                    loadEmployeeList(url);
+                }, 300);
             });
 
-            $(document).on('submit', '#employeeSearchForm, #employeeFilterForm', function (event) {
-                event.preventDefault();
-                refreshEmployeesWithParams(employeeParams({ page: null }), {
-                    closeFilter: this.id === 'employeeFilterForm',
-                });
+            // Prevent default form submit on Enter and trigger AJAX load
+            $(document).on('submit', '#employeeSearchForm', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var form = $(this);
+                var formData = form.serialize();
+                var url = form.attr('action') + '?' + formData;
+                loadEmployeeList(url);
             });
 
-            $(document).on('click', '.employee-filter-reset', function (event) {
-                event.preventDefault();
-                refreshEmployeeList(this.href, { closeFilter: true });
+            // Apply filter form submit
+            $(document).on('submit', '#employeeFilterForm', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var form = $(this);
+
+                // Sync filter select values to search form hidden inputs
+                $('#employeeSearchForm input[name="company_id"]').val(form.find('select[name="company_id"]').val());
+                $('#employeeSearchForm input[name="department_id"]').val(form.find('select[name="department_id"]').val());
+                $('#employeeSearchForm input[name="status"]').val(form.find('select[name="status"]').val());
+
+                var formData = form.serialize();
+                var url = form.attr('action') + '?' + formData;
+                loadEmployeeList(url, true);
             });
 
-            $(document).on('click', '.employee-sort-link', function (event) {
-                event.preventDefault();
-                refreshEmployeesWithParams(employeeParams({
-                    sort: this.dataset.sort,
-                    page: null,
-                }));
-            });
+            // Reset filter button
+            $(document).on('click', '.employee-filter-reset', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var url = $(this).attr('href');
 
-            $(document).on('click', '#employeeListCard .pagination a, #employeeListCard .erp-pagination a', function (event) {
-                event.preventDefault();
-                if (this.href) {
-                    refreshEmployeeList(this.href);
+                // Clear all search/filter fields on reset
+                $('#employeeSearchForm input[name="search"]').val('');
+                $('#employeeFilterForm input[name="search"]').val('');
+                $('#employeeSearchForm input[name="sort"]').val('name_asc');
+                $('#employeeFilterForm input[name="sort"]').val('name_asc');
+                $('#employeeSearchForm input[name="company_id"]').val('');
+                $('#employeeSearchForm input[name="department_id"]').val('');
+                $('#employeeSearchForm input[name="status"]').val('');
+
+                var companySelect = $('#employeeFilterForm select[name="company_id"]');
+                if (companySelect.length) {
+                    companySelect.val('').trigger('change.select2');
                 }
+                var deptSelect = $('#employeeFilterForm select[name="department_id"]');
+                if (deptSelect.length) {
+                    if (typeof syncFilterDepartments === 'function') {
+                        syncFilterDepartments();
+                    }
+                    deptSelect.val('').trigger('change.select2');
+                }
+                var statusSelect = $('#employeeFilterForm select[name="status"]');
+                if (statusSelect.length) {
+                    statusSelect.val('').trigger('change.select2');
+                }
+
+                loadEmployeeList(url, true);
+            });
+
+            // Sort click
+            $(document).on('click', '.employee-sort-link', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var sortCriteria = $(this).data('sort');
+                
+                // Update hidden inputs in both forms
+                $('#employeeSearchForm input[name="sort"]').val(sortCriteria);
+                $('#employeeFilterForm input[name="sort"]').val(sortCriteria);
+
+                // Submit search form to trigger reload with new sort criteria
+                var form = $('#employeeSearchForm');
+                var formData = form.serialize();
+                var url = form.attr('action') + '?' + formData;
+                loadEmployeeList(url);
+            });
+
+            // Pagination click
+            $(document).on('click', '#employeePaginationWrapper a', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var url = $(this).attr('href');
+                if (!url || url.indexOf('javascript') === 0 || url.startsWith('#')) return;
+                loadEmployeeList(url);
             });
         });
     </script>

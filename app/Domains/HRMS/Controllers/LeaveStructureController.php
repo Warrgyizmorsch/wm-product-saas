@@ -90,7 +90,7 @@ class LeaveStructureController extends Controller
             'status' => $status,
         ]);
 
-        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $newPlan->id])->with('success', 'Leave Plan created successfully.');
+        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $newPlan->id])->with('success', __('hrms.leave.plan_created'));
     }
 
     public function updatePlan(Request $request, LeavePlan $leavePlan)
@@ -115,7 +115,7 @@ class LeaveStructureController extends Controller
             'status' => $status,
         ]);
 
-        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $leavePlan->id])->with('success', 'Leave Plan updated successfully.');
+        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $leavePlan->id])->with('success', __('hrms.leave.plan_updated'));
     }
 
     public function destroyPlan(LeavePlan $leavePlan)
@@ -123,7 +123,7 @@ class LeaveStructureController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $leavePlan->delete();
-        return redirect()->route('hrms.leave-structure.index')->with('success', 'Leave Plan deleted successfully.');
+        return redirect()->route('hrms.leave-structure.index')->with('success', __('hrms.leave.plan_deleted'));
     }
 
     public function storeType(Request $request)
@@ -154,7 +154,7 @@ class LeaveStructureController extends Controller
             'status' => $status,
         ]);
 
-        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $request->leave_plan_id])->with('success', 'Leave Type created successfully.');
+        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $request->leave_plan_id])->with('success', __('hrms.leave.type_created'));
     }
 
     public function updateType(Request $request, LeaveType $leaveType)
@@ -185,7 +185,7 @@ class LeaveStructureController extends Controller
             'status' => $status,
         ]);
 
-        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $request->leave_plan_id])->with('success', 'Leave Type updated successfully.');
+        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $request->leave_plan_id])->with('success', __('hrms.leave.type_updated'));
     }
 
     public function destroyType(LeaveType $leaveType)
@@ -194,7 +194,7 @@ class LeaveStructureController extends Controller
 
         $planId = $leaveType->leave_plan_id;
         $leaveType->delete();
-        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $planId])->with('success', 'Leave Type deleted successfully.');
+        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $planId])->with('success', __('hrms.leave.type_deleted'));
     }
 
     public function updateRules(Request $request, LeaveType $leaveType)

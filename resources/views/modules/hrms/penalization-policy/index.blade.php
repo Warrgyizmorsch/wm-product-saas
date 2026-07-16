@@ -282,16 +282,16 @@
 
             <!-- Single Outer Card spanning full width -->
             <div class="col-12">
-                <x-ui.card title="Penalization Policies" subtitle="Configure thresholds, grace periods, and deductions for attendance infractions" bodyClass="p-0" stretch>
+                <x-ui.card title="{{ __('hrms.penalization.title') }}" subtitle="{{ __('hrms.penalization.subtitle') }}" bodyClass="p-0" stretch>
                     <div class="row g-0">
                         <!-- LEFT COLUMN: RULES CATEGORIES ONLY -->
                         <div class="col-md-3 col-12 border-end">
                             <div class="list-group list-group-flush rounded-0" style="min-height: 400px;">
                                 @php
                                     $policyTypes = [
-                                        'late_arrival' => ['Late Arrival', 'feather-clock'],
-                                        'under_hours' => ['Work Hours Deficit', 'feather-trending-down'],
-                                        'missing_logs' => ['Missing Logs', 'feather-alert-triangle']
+                                        'late_arrival' => [__('hrms.penalization.late_arrival'), 'feather-clock'],
+                                        'under_hours' => [__('hrms.penalization.under_hours'), 'feather-trending-down'],
+                                        'missing_logs' => [__('hrms.penalization.missing_logs'), 'feather-alert-triangle']
                                     ];
                                     $lateArrivalRule = $rules->get('late_arrival');
                                     $savedLateTiers = ($lateArrivalRule && $lateArrivalRule->penalty_tiers) ? $lateArrivalRule->penalty_tiers : null;
@@ -338,13 +338,13 @@
                                         <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
                                             <div>
                                                 <h5 class="fw-bold text-dark mb-1" style="font-size: 16px;">
-                                                    <i class="{{ $typeData[1] }} text-primary me-2 fs-18"></i>Configure {{ $typeData[0] }} Rules
+                                                    <i class="{{ $typeData[1] }} text-primary me-2 fs-18"></i>{{ __('hrms.penalization.configure_rules', ['type' => $typeData[0]]) }}
                                                 </h5>
-                                                <span class="text-muted fs-12">Set thresholds, deductions, and active policy scope</span>
+                                                <span class="text-muted fs-12">{{ __('hrms.penalization.set_thresholds_desc') }}</span>
                                             </div>
                                             <div>
                                                 <x-ui.badge variant="{{ $statusVal === '1' ? 'success' : 'danger' }}" soft class="px-2 py-1">
-                                                    {{ $statusVal === '1' ? 'Active' : 'Inactive' }}
+                                                    {{ $statusVal === '1' ? __('hrms.employees.frm_status_active') : __('hrms.employees.frm_status_inactive') }}
                                                 </x-ui.badge>
                                             </div>
                                         </div>
@@ -352,8 +352,8 @@
                                         <div class="row g-3 mb-4">
                                             <!-- Entity Scope -->
                                             <div class="col-md-6 col-12">
-                                                <x-ui.odoo-form-ui type="select" label="Company Scope" name="company_id" select2-selector="default">
-                                                    <option value="">Apply Globally (All Entities)</option>
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.company_scope') }}" name="company_id" select2-selector="default">
+                                                    <option value="">{{ __('hrms.penalization.apply_globally') }}</option>
                                                     @foreach($companies as $company)
                                                         <option value="{{ $company->id }}" {{ ($rule && $rule->company_id === $company->id) ? 'selected' : '' }}>
                                                             {{ $company->company_name }}
@@ -364,9 +364,9 @@
 
                                             <!-- Status -->
                                             <div class="col-md-6 col-12">
-                                                <x-ui.odoo-form-ui type="select" label="Policy Status" name="status" select2-selector="default" :required="true">
-                                                    <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>Active (Enforce Policy)</option>
-                                                    <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>Inactive (Ignore Violations)</option>
+                                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.penalization.policy_status') }}" name="status" select2-selector="default" :required="true">
+                                                    <option value="1" {{ $statusVal === '1' ? 'selected' : '' }}>{{ __('hrms.penalization.active_enforce') }}</option>
+                                                    <option value="0" {{ $statusVal === '0' ? 'selected' : '' }}>{{ __('hrms.penalization.inactive_ignore') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
 
@@ -376,17 +376,17 @@
                                                  <div class="col-12">
                                                      <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-3 m-0 rounded-3 text-dark fs-13 flex-nowrap">
                                                          <i class="feather-info text-primary fs-16"></i>
-                                                         <span>Late arrival grace period is</span>
+                                                         <span>{{ __('hrms.penalization.late_arrival_grace') }}</span>
                                                          <input type="number" name="grace_period_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
-                                                         <span>minutes relative to shift start time.</span>
+                                                         <span>{{ __('hrms.penalization.minutes_relative') }}</span>
                                                      </div>
                                                  </div>
 
                                                  <div class="col-12 border-top my-4 pt-4">
                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                         <i class="feather-grid text-primary fs-16"></i> Configure Penalty Tiers
+                                                         <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
                                                      </h6>
-                                                     <span class="text-muted fs-11 d-block mb-3">Define occurrence boundaries and corresponding penalty actions</span>
+                                                     <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.define_boundaries') }}</span>
                                                  </div>
 
                                                  <div class="col-12">
@@ -394,12 +394,12 @@
                                                          <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="late-arrival-tiers-table" style="font-size: 13px;">
                                                              <thead class="table-light">
                                                                  <tr>
-                                                                     <th style="width: 10%; min-width: 95px;">Min Occurrences</th>
-                                                                     <th style="width: 10%; min-width: 105px;">Max Occurrences</th>
-                                                                     <th style="width: 30%; min-width: 240px;">Penalty Settlement Method</th>
-                                                                     <th style="width: 12%; min-width: 115px;">Deduction Value (Days)</th>
-                                                                     <th style="width: 28%; min-width: 210px;">Deduct From Leave Type</th>
-                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">Action</th>
+                                                                     <th style="width: 10%; min-width: 95px;">{{ __('hrms.penalization.min_occurrences') }}</th>
+                                                                     <th style="width: 10%; min-width: 105px;">{{ __('hrms.penalization.max_occurrences') }}</th>
+                                                                     <th style="width: 30%; min-width: 240px;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                     <th style="width: 12%; min-width: 115px;">{{ __('hrms.penalization.deduction_value') }}</th>
+                                                                     <th style="width: 28%; min-width: 210px;">{{ __('hrms.penalization.deduct_leave_type') }}</th>
+                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">{{ __('hrms.penalization.action') }}</th>
                                                                  </tr>
                                                              </thead>
                                                              <tbody id="late-arrival-tiers-tbody">
@@ -409,7 +409,7 @@
                                                      </div>
                                                      <div class="mt-3">
                                                          <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-tier" icon="feather-plus">
-                                                             Add Penalty Tier
+                                                             {{ __('hrms.penalization.add_tier') }}
                                                          </x-ui.button>
                                                      </div>
                                                  </div>
@@ -420,23 +420,23 @@
                                                  <div class="col-12 d-flex flex-column gap-2">
                                                      <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-2.5 m-0 rounded-3 text-dark fs-13 flex-nowrap">
                                                          <i class="feather-info text-primary fs-16"></i>
-                                                         <span>Shift working hours target is</span>
+                                                         <span>{{ __('hrms.penalization.shift_target_hours') }}</span>
                                                          <input type="number" name="grace_period_hours" step="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? ($rule->grace_period_minutes / 60) : 8 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
-                                                         <span>hours.</span>
+                                                         <span>{{ __('hrms.penalization.hours') }}</span>
                                                      </div>
                                                      <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-2.5 m-0 rounded-3 text-dark fs-13 flex-nowrap">
                                                          <i class="feather-calendar text-primary fs-16"></i>
-                                                         <span>Allowed monthly grace of</span>
+                                                         <span>{{ __('hrms.penalization.allowed_monthly_grace') }}</span>
                                                          <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
-                                                         <span>deficit occurrences before penalties trigger.</span>
+                                                         <span>{{ __('hrms.penalization.deficit_before_trigger') }}</span>
                                                      </div>
                                                  </div>
 
                                                  <div class="col-12 border-top my-4 pt-4">
                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                         <i class="feather-grid text-primary fs-16"></i> Configure Penalty Tiers
+                                                         <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
                                                      </h6>
-                                                     <span class="text-muted fs-11 d-block mb-3">Define occurrence boundaries and corresponding penalty actions</span>
+                                                     <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.define_boundaries') }}</span>
                                                  </div>
 
                                                  <div class="col-12">
@@ -444,11 +444,11 @@
                                                          <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="under-hours-tiers-table" style="font-size: 13px;">
                                                              <thead class="table-light">
                                                                  <tr>
-                                                                     <th style="width: 18%; min-width: 150px;">If Shift Hours Less Than</th>
-                                                                     <th style="width: 32%; min-width: 240px;">Penalty Settlement Method</th>
-                                                                     <th style="width: 12%; min-width: 115px;">Deduction Value (Days)</th>
-                                                                     <th style="width: 28%; min-width: 210px;">Deduct From Leave Type</th>
-                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">Action</th>
+                                                                     <th style="width: 18%; min-width: 150px;">{{ __('hrms.penalization.if_hours_less') }}</th>
+                                                                     <th style="width: 32%; min-width: 240px;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                     <th style="width: 12%; min-width: 115px;">{{ __('hrms.penalization.deduction_value') }}</th>
+                                                                     <th style="width: 28%; min-width: 210px;">{{ __('hrms.penalization.deduct_leave_type') }}</th>
+                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">{{ __('hrms.penalization.action') }}</th>
                                                                  </tr>
                                                              </thead>
                                                              <tbody id="under-hours-tiers-tbody">
@@ -458,7 +458,7 @@
                                                      </div>
                                                      <div class="mt-3">
                                                          <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-deficit-tier" icon="feather-plus">
-                                                             Add Penalty Tier
+                                                             {{ __('hrms.penalization.add_tier') }}
                                                          </x-ui.button>
                                                      </div>
                                                  </div>
@@ -469,17 +469,17 @@
                                                  <div class="col-12">
                                                      <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-3 m-0 rounded-3 text-dark fs-13 flex-nowrap">
                                                          <i class="feather-info text-primary fs-16"></i>
-                                                         <span>Employees are allowed a monthly grace of</span>
+                                                         <span>{{ __('hrms.penalization.employees_allowed_grace') }}</span>
                                                          <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
-                                                         <span>missing logs before penalties trigger.</span>
+                                                         <span>{{ __('hrms.penalization.missing_before_trigger') }}</span>
                                                      </div>
                                                  </div>
 
                                                  <div class="col-12 border-top my-4 pt-4">
                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
-                                                         <i class="feather-grid text-primary fs-16"></i> Configure Penalty Tiers
+                                                         <i class="feather-grid text-primary fs-16"></i> {{ __('hrms.penalization.configure_tiers') }}
                                                      </h6>
-                                                     <span class="text-muted fs-11 d-block mb-3">Define occurrence boundaries and corresponding penalty actions</span>
+                                                     <span class="text-muted fs-11 d-block mb-3">{{ __('hrms.penalization.define_boundaries') }}</span>
                                                  </div>
 
                                                  <div class="col-12">
@@ -487,12 +487,12 @@
                                                          <table class="table table-sm table-hover align-middle mb-0 erp-thin-table" id="missing-logs-tiers-table" style="font-size: 13px;">
                                                              <thead class="table-light">
                                                                  <tr>
-                                                                     <th style="width: 11%; min-width: 95px;">Min Occurrences</th>
-                                                                     <th style="width: 12%; min-width: 105px;">Max Occurrences</th>
-                                                                     <th style="width: 25%; min-width: 195px;">Penalty Settlement Method</th>
-                                                                     <th style="width: 15%; min-width: 115px;">Deduction Value (Days)</th>
-                                                                     <th style="width: 27%; min-width: 175px;">Deduct From Leave Type</th>
-                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">Action</th>
+                                                                     <th style="width: 11%; min-width: 95px;">{{ __('hrms.penalization.min_occurrences') }}</th>
+                                                                     <th style="width: 12%; min-width: 105px;">{{ __('hrms.penalization.max_occurrences') }}</th>
+                                                                     <th style="width: 25%; min-width: 195px;">{{ __('hrms.penalization.settlement_method') }}</th>
+                                                                     <th style="width: 15%; min-width: 115px;">{{ __('hrms.penalization.deduction_value') }}</th>
+                                                                     <th style="width: 27%; min-width: 175px;">{{ __('hrms.penalization.deduct_leave_type') }}</th>
+                                                                     <th style="width: 10%; min-width: 60px;" class="text-center">{{ __('hrms.penalization.action') }}</th>
                                                                  </tr>
                                                              </thead>
                                                              <tbody id="missing-logs-tiers-tbody">
@@ -502,22 +502,22 @@
                                                      </div>
                                                      <div class="mt-3">
                                                          <x-ui.button type="button" variant="soft-primary" size="sm" id="btn-add-missing-tier" icon="feather-plus">
-                                                             Add Penalty Tier
+                                                             {{ __('hrms.penalization.add_tier') }}
                                                          </x-ui.button>
                                                      </div>
                                                  </div>
                                              @endif
                                          </div>
 
-                                        <!-- Save Footer Button -->
-                                        <div class="border-top pt-3 d-flex justify-content-end">
-                                            <x-ui.button type="submit" variant="primary" icon="feather-save">
-                                                Save Policy Settings
-                                            </x-ui.button>
-                                        </div>
-                                    </form>
-                                </div>
-                            @endforeach
+                                         <!-- Save Footer Button -->
+                                         <div class="border-top pt-3 d-flex justify-content-end">
+                                             <x-ui.button type="submit" variant="primary" icon="feather-save">
+                                                 {{ __('hrms.penalization.save_policy') }}
+                                             </x-ui.button>
+                                         </div>
+                                     </form>
+                                 </div>
+                             @endforeach
                         </div>
                     </div>
                 </x-ui.card>
@@ -617,7 +617,7 @@
             function addTierRow(min_occ = '', max_occ = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#late-arrival-tiers-tbody');
                 
-                let leaveOptions = `<option value="">Select Leave Quota</option>`;
+                let leaveOptions = `<option value="">{{ __('hrms.penalization.select_leave_quota') }}</option>`;
                 @foreach($leaveTypes as $lType)
                     leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
                 @endforeach
@@ -633,14 +633,14 @@
                             <input type="number" name="penalty_tiers[${tierIndex}][min_occurrence]" class="odoo-table-input min-occ" min="1" value="${min_occ}" required>
                         </td>
                         <td>
-                            <input type="number" name="penalty_tiers[${tierIndex}][max_occurrence]" class="odoo-table-input max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="Unlimited">
+                            <input type="number" name="penalty_tiers[${tierIndex}][max_occurrence]" class="odoo-table-input max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="{{ __('hrms.penalization.unlimited') }}">
                         </td>
                         <td>
                             <select name="penalty_tiers[${tierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
-                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Leave)</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction_free') }}</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.loss_of_pay') }}</option>
+                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_leave_balance') }}</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_settlements') }}</option>
                             </select>
                         </td>
                         <td>
@@ -715,7 +715,7 @@
             function addDeficitTierRow(hours_threshold = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#under-hours-tiers-tbody');
                 
-                let leaveOptions = `<option value="">Select Leave Quota</option>`;
+                let leaveOptions = `<option value="">{{ __('hrms.penalization.select_leave_quota') }}</option>`;
                 @foreach($leaveTypes as $lType)
                     leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
                 @endforeach
@@ -732,10 +732,10 @@
                         </td>
                         <td>
                             <select name="penalty_tiers[${deficitTierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
-                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Leave)</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction_free') }}</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.loss_of_pay') }}</option>
+                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_leave_balance') }}</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_settlements') }}</option>
                             </select>
                         </td>
                         <td>
@@ -799,7 +799,7 @@
             function addMissingTierRow(min_occ = '', max_occ = '', penalty_action = 'no_deduction', penalty_value = 0, leave_type_id = '') {
                 let tbody = $('#missing-logs-tiers-tbody');
                 
-                let leaveOptions = `<option value="">Select Leave Quota</option>`;
+                let leaveOptions = `<option value="">{{ __('hrms.penalization.select_leave_quota') }}</option>`;
                 @foreach($leaveTypes as $lType)
                     leaveOptions += `<option value="{{ $lType->id }}" ${leave_type_id == "{{ $lType->id }}" ? 'selected' : ''}>{{ $lType->name }} ({{ strtoupper($lType->code) }})</option>`;
                 @endforeach
@@ -815,14 +815,14 @@
                             <input type="number" name="penalty_tiers[${missingTierIndex}][min_occurrence]" class="odoo-table-input missing-min-occ" min="1" value="${min_occ}" required>
                         </td>
                         <td>
-                            <input type="number" name="penalty_tiers[${missingTierIndex}][max_occurrence]" class="odoo-table-input missing-max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="Unlimited">
+                            <input type="number" name="penalty_tiers[${missingTierIndex}][max_occurrence]" class="odoo-table-input missing-max-occ" min="1" value="${max_occ !== null ? max_occ : ''}" placeholder="{{ __('hrms.penalization.unlimited') }}">
                         </td>
                         <td>
                             <select name="penalty_tiers[${missingTierIndex}][penalty_action]" class="odoo-table-select tier-action-select" required>
-                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>No Deduction (Free)</option>
-                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>Loss of Pay (Salary)</option>
-                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>Deduct Leave Balance</option>
-                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>Both (Salary & Leave)</option>
+                                <option value="no_deduction" ${penalty_action === 'no_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.no_deduction_free') }}</option>
+                                <option value="salary_deduction" ${penalty_action === 'salary_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.loss_of_pay') }}</option>
+                                <option value="leave_deduction" ${penalty_action === 'leave_deduction' ? 'selected' : ''}>{{ __('hrms.penalization.deduct_leave_balance') }}</option>
+                                <option value="both_deductions" ${penalty_action === 'both_deductions' ? 'selected' : ''}>{{ __('hrms.penalization.both_settlements') }}</option>
                             </select>
                         </td>
                         <td>

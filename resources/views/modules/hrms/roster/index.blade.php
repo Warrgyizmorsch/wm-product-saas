@@ -221,12 +221,12 @@
                             <ul class="nav gap-2 border-bottom pb-2" id="rosterTabs" role="tablist">
                                 <li class="nav-item" role="presentation">
                                     <a class="nav-link {{ $tab === 'shifts' ? 'active' : '' }}" href="{{ route('hrms.roster.index', ['tab' => 'shifts']) }}">
-                                        <i class="feather-clock me-2"></i>Shift Master
+                                        <i class="feather-clock me-2"></i>{{ __('hrms.roster.shift_master') }}
                                     </a>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <a class="nav-link {{ $tab === 'roster' ? 'active' : '' }}" href="{{ route('hrms.roster.index', ['tab' => 'roster']) }}">
-                                        <i class="feather-calendar me-2"></i>Roster Board
+                                        <i class="feather-calendar me-2"></i>{{ __('hrms.roster.roster_board') }}
                                     </a>
                                 </li>
                             </ul>
@@ -238,7 +238,7 @@
                                 <!-- SHIFT MASTER TAB (Default View) -->
                                 <div class="row">
                                     <div class="col-12">
-                                        <x-ui.card title="Shifts" stretch bodyClass="p-0">
+                                        <x-ui.card title="{{ __('hrms.roster.shifts') }}" stretch bodyClass="p-0">
                                             <input type="hidden" id="shift_sort_value" value="{{ $shiftSort }}">
                                             <x-slot name="headerAction">
                                                  <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -246,47 +246,47 @@
                                                      <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftSearchForm" class="d-flex align-items-center bg-light border rounded px-3 py-1" style="min-width: 240px; height: 38px;">
                                                          <input type="hidden" name="tab" value="shifts">
                                                          <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                                         <input type="text" name="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search shifts..." value="{{ $shiftSearch }}" style="box-shadow: none; height: 32px; outline: none;">
+                                                         <input type="text" name="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.roster.search_shifts') }}" value="{{ $shiftSearch }}" style="box-shadow: none; height: 32px; outline: none;">
                                                      </form>
 
                                                      <!-- Sort Dropdown -->
-                                                     <x-ui.sort-dropdown label="SORT">
+                                                     <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                                                          <div id="shift_sort_dropdown_menu">
                                                              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_asc' ? 'active' : '' }}" href="#" data-sort="name_asc" onclick="changeShiftSort('name_asc', this); event.preventDefault();">
-                                                                 <span>Name (A-Z)</span>
+                                                                 <span>{{ __('hrms.common.sort_name_asc') }}</span>
                                                                  @if($shiftSort === 'name_asc') <i class="feather-check ms-3"></i> @endif
                                                              </a>
                                                              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'name_desc' ? 'active' : '' }}" href="#" data-sort="name_desc" onclick="changeShiftSort('name_desc', this); event.preventDefault();">
-                                                                 <span>Name (Z-A)</span>
+                                                                 <span>{{ __('hrms.common.sort_name_desc') }}</span>
                                                                  @if($shiftSort === 'name_desc') <i class="feather-check ms-3"></i> @endif
                                                              </a>
                                                              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_asc' ? 'active' : '' }}" href="#" data-sort="code_asc" onclick="changeShiftSort('code_asc', this); event.preventDefault();">
-                                                                 <span>Code (A-Z)</span>
+                                                                 <span>{{ __('hrms.roster.sort_code_asc') }}</span>
                                                                  @if($shiftSort === 'code_asc') <i class="feather-check ms-3"></i> @endif
                                                              </a>
                                                              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'code_desc' ? 'active' : '' }}" href="#" data-sort="code_desc" onclick="changeShiftSort('code_desc', this); event.preventDefault();">
-                                                                 <span>Code (Z-A)</span>
+                                                                 <span>{{ __('hrms.roster.sort_code_desc') }}</span>
                                                                  @if($shiftSort === 'code_desc') <i class="feather-check ms-3"></i> @endif
                                                              </a>
                                                              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_asc' ? 'active' : '' }}" href="#" data-sort="start_asc" onclick="changeShiftSort('start_asc', this); event.preventDefault();">
-                                                                 <span>Start Time (Asc)</span>
+                                                                 <span>{{ __('hrms.roster.sort_start_asc') }}</span>
                                                                  @if($shiftSort === 'start_asc') <i class="feather-check ms-3"></i> @endif
                                                              </a>
                                                              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 {{ $shiftSort === 'start_desc' ? 'active' : '' }}" href="#" data-sort="start_desc" onclick="changeShiftSort('start_desc', this); event.preventDefault();">
-                                                                 <span>Start Time (Desc)</span>
+                                                                 <span>{{ __('hrms.roster.sort_start_desc') }}</span>
                                                                  @if($shiftSort === 'start_desc') <i class="feather-check ms-3"></i> @endif
                                                              </a>
                                                          </div>
                                                      </x-ui.sort-dropdown>
 
                                                      <!-- Filter Dropdown -->
-                                                     <x-ui.filter label="FILTER">
-                                                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> Filter Options</h6>
+                                                     <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                                                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
                                                          <form method="GET" action="{{ route('hrms.roster.index') }}" id="shiftFilterForm">
                                                               <div class="mb-3">
-                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">COMPANY</label>
+                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.roster.companies') }}</label>
                                                                   <x-ui.odoo-form-ui type="select" name="shift_company_id" id="shift_filter_company_id">
-                                                                      <option value="">All Companies</option>
+                                                                      <option value="">{{ __('hrms.common.all_companies') }}</option>
                                                                       @foreach($companies as $company)
                                                                           <option value="{{ $company->id }}" @selected((string) request('shift_company_id') === (string) $company->id)>{{ $company->company_name }}</option>
                                                                       @endforeach
@@ -294,26 +294,26 @@
                                                               </div>
 
                                                               <div class="mb-3">
-                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">STATUS</label>
+                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.org.status') }}</label>
                                                                   <x-ui.odoo-form-ui type="select" name="shift_status" id="shift_filter_status">
-                                                                      <option value="">All Statuses</option>
-                                                                      <option value="1" @selected($shiftStatus === '1')>Active</option>
-                                                                      <option value="0" @selected($shiftStatus === '0')>Inactive</option>
+                                                                      <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                                                      <option value="1" @selected($shiftStatus === '1')>{{ __('hrms.employees.frm_status_active') }}</option>
+                                                                      <option value="0" @selected($shiftStatus === '0')>{{ __('hrms.employees.frm_status_inactive') }}</option>
                                                                   </x-ui.odoo-form-ui>
                                                               </div>
 
                                                               <div class="mb-3">
-                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">OVERTIME</label>
+                                                                  <label class="form-label fw-bold fs-11 text-muted text-uppercase mb-1">{{ __('hrms.roster.overtime') }}</label>
                                                                   <x-ui.odoo-form-ui type="select" name="shift_overtime" id="shift_filter_overtime">
-                                                                      <option value="">All</option>
-                                                                      <option value="1" @selected($shiftOvertime === '1')>Allowed</option>
-                                                                      <option value="0" @selected($shiftOvertime === '0')>Not Allowed</option>
+                                                                      <option value="">{{ __('hrms.common.all') }}</option>
+                                                                      <option value="1" @selected($shiftOvertime === '1')>{{ __('hrms.roster.allowed') }}</option>
+                                                                      <option value="0" @selected($shiftOvertime === '0')>{{ __('hrms.roster.not_allowed') }}</option>
                                                                   </x-ui.odoo-form-ui>
                                                               </div>
 
                                                               <div class="d-flex gap-2 justify-content-end mt-4">
-                                                                  <a href="#" id="btn-reset-shift-filters" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3 border" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border-color: #cbd5e1; color: #475569;">RESET</a>
-                                                                  <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">APPLY FILTERS</button>
+                                                                  <a href="#" id="btn-reset-shift-filters" class="btn btn-sm btn-light text-uppercase fw-bold py-2 px-3 border" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em; background-color: #f1f5f9; border-color: #cbd5e1; color: #475569;">{{ __('hrms.common.reset') }}</a>
+                                                                  <button type="submit" class="btn btn-sm btn-primary text-uppercase fw-bold py-2 px-3 text-white" style="border-radius: 6px; font-size: 11px; letter-spacing: 0.05em;">{{ __('hrms.common.apply') }}</button>
                                                               </div>
                                                          </form>
                                                      </x-ui.filter>
@@ -325,15 +325,15 @@
                                                      <thead class="table-light">
                                                          <tr>
                                                              <th width="60">#</th>
-                                                             <th>Shift Code</th>
-                                                             <th>Shift Name</th>
-                                                             <th>Company</th>
-                                                             <th>Start Time</th>
-                                                             <th>End Time</th>
-                                                             <th>Break Duration</th>
-                                                             <th>Overtime Allowed</th>
-                                                             <th>Status</th>
-                                                             <th width="150" class="text-end">Actions</th>
+                                                             <th>{{ __('hrms.roster.shift_code') }}</th>
+                                                             <th>{{ __('hrms.roster.shift_name') }}</th>
+                                                             <th>{{ __('hrms.org.company') }}</th>
+                                                             <th>{{ __('hrms.org.start_time') }}</th>
+                                                             <th>{{ __('hrms.org.end_time') }}</th>
+                                                             <th>{{ __('hrms.roster.break_duration') }}</th>
+                                                             <th>{{ __('hrms.roster.overtime_allowed') }}</th>
+                                                             <th>{{ __('hrms.org.status') }}</th>
+                                                             <th width="150" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                                                          </tr>
                                                      </thead>
                                                      <tbody>
@@ -350,46 +350,46 @@
                                                                  @if($sf->company)
                                                                      <span class="text-muted fs-12">{{ $sf->company->company_name }}</span>
                                                                  @else
-                                                                     <span class="badge bg-soft-secondary text-secondary">Shared (All)</span>
+                                                                     <span class="badge bg-soft-secondary text-secondary">{{ __('hrms.roster.shared_all') }}</span>
                                                                  @endif
                                                              </td>
                                                              <td><span class="font-monospace text-muted">{{ substr($sf->start_time, 0, 5) }}</span></td>
                                                              <td><span class="font-monospace text-muted">{{ substr($sf->end_time, 0, 5) }}</span></td>
-                                                             <td><span>{{ $sf->break_minutes ?? 0 }} mins</span></td>
+                                                             <td><span>{{ $sf->break_minutes ?? 0 }} {{ __('hrms.roster.mins') }}</span></td>
                                                              <td>
                                                                  @if($sf->overtime_allowed)
-                                                                     <x-ui.badge variant="success" soft>Yes</x-ui.badge>
+                                                                     <x-ui.badge variant="success" soft>{{ __('hrms.common.yes') }}</x-ui.badge>
                                                                  @else
-                                                                     <x-ui.badge variant="danger" soft>No</x-ui.badge>
+                                                                     <x-ui.badge variant="danger" soft>{{ __('hrms.common.no') }}</x-ui.badge>
                                                                  @endif
                                                              </td>
                                                              <td>
                                                                  @if($sf->active)
-                                                                     <x-ui.badge variant="success" soft>Active</x-ui.badge>
+                                                                     <x-ui.badge variant="success" soft>{{ __('hrms.employees.frm_status_active') }}</x-ui.badge>
                                                                  @else
-                                                                     <x-ui.badge variant="danger" soft>Inactive</x-ui.badge>
+                                                                     <x-ui.badge variant="danger" soft>{{ __('hrms.employees.frm_status_inactive') }}</x-ui.badge>
                                                                  @endif
                                                              </td>
                                                              <td class="text-end">
-                                                                 <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this shift?');">
+                                                                 <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.roster.delete_shift_confirm') }}');">
                                                                      @csrf
                                                                      @method('DELETE')
                                                                     <div class="hstack gap-2 justify-content-end">
-                                                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-shift" data-bs-toggle="modal" data-bs-target="#viewShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}" title="View Details" data-bs-toggle="tooltip">
+                                                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-shift" data-bs-toggle="modal" data-bs-target="#viewShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}" title="{{ __('hrms.roster.view_details') }}" data-bs-toggle="tooltip">
                                                                             <i class="feather feather-eye"></i>
                                                                         </a>
                                                                         <x-ui.action-dropdown>
                                                                             <li>
                                                                                 <a class="dropdown-item btn-edit-shift" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}">
                                                                                     <i class="feather feather-edit-3 me-3"></i>
-                                                                                    <span>Edit</span>
+                                                                                    <span>{{ __('hrms.assets.edit') }}</span>
                                                                                 </a>
                                                                             </li>
                                                                             <li class="dropdown-divider"></li>
                                                                             <li>
                                                                                 <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                                                     <i class="feather feather-trash-2 me-3"></i>
-                                                                                    <span>Delete</span>
+                                                                                    <span>{{ __('hrms.common.delete') }}</span>
                                                                                 </button>
                                                                             </li>
                                                                         </x-ui.action-dropdown>
@@ -401,7 +401,7 @@
                                                         @if($shifts->isEmpty())
                                                         <tr>
                                                             <td colspan="9" class="text-center py-5 text-muted">
-                                                                No Shifts found. Click "Add Shift" to create one.
+                                                                {{ __('hrms.roster.no_shifts_found') }}
                                                             </td>
                                                         </tr>
                                                         @endif
@@ -428,98 +428,98 @@
                                 </div>
                             @else
                                 <!-- ROSTER BOARD TAB -->
-                                <x-ui.card title="Roster Scheduler Grid" stretch>
-                                    <x-slot name="headerAction">
-                                        <form method="GET" action="{{ route('hrms.roster.index') }}" id="rosterFilterForm" class="d-flex align-items-center gap-2">
-                                            <input type="hidden" name="tab" value="roster">
-                                            <input type="hidden" name="sort" id="filterSortInput" value="{{ $sortBy }}">
-
-                                            <!-- 1. Search Bar (Order 1: Single element, soft grey bg, rounded) -->
-                                            <div class="position-relative" style="width: 240px;">
-                                                <i class="feather-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" style="font-size: 14px;"></i>
-                                                <input type="text" id="rosterSearch" name="search" class="form-control form-control-sm ps-5 border-0" placeholder="Search employees..." value="{{ $search }}" style="height: 38px; border-radius: 8px; font-size: 13px; color: #475569; background-color: #f1f5f9;">
-                                            </div>
-
-                                            <!-- 2. SORT Button (using Duralux component) -->
-                                            <x-ui.sort-dropdown label="SORT">
-                                                <button type="button" class="dropdown-item sort-option {{ $sortBy === 'name-asc' ? 'active' : '' }}" data-sort="name-asc">
-                                                    Name (A - Z)
-                                                </button>
-                                                <button type="button" class="dropdown-item sort-option {{ $sortBy === 'name-desc' ? 'active' : '' }}" data-sort="name-desc">
-                                                    Name (Z - A)
-                                                </button>
-                                                <button type="button" class="dropdown-item sort-option {{ $sortBy === 'designation-asc' || $sortBy === 'designation' ? 'active' : '' }}" data-sort="designation-asc">
-                                                    Designation (A - Z)
-                                                </button>
-                                                <button type="button" class="dropdown-item sort-option {{ $sortBy === 'designation-desc' ? 'active' : '' }}" data-sort="designation-desc">
-                                                    Designation (Z - A)
-                                                </button>
-                                            </x-ui.sort-dropdown>
-
-                                            <!-- 3. FILTER Button (using Duralux component) -->
-                                            <x-ui.filter label="FILTER">
-                                                <div class="d-flex align-items-center gap-2 mb-3">
-                                                    <i class="feather-sliders text-primary fs-14"></i>
-                                                    <h6 class="fw-bold mb-0 text-dark" style="font-size: 13px;">Filter Options</h6>
-                                                </div>
-
-                                                <div class="mb-3">
-                                                    <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">Company</label>
-                                                    <x-ui.odoo-form-ui type="select" name="company_id" id="roster_filter_company">
-                                                        <option value="">All Companies</option>
-                                                        @foreach($companies as $company)
-                                                            <option value="{{ $company->id }}" {{ $selectedCompanyId == $company->id ? 'selected' : '' }}>
-                                                                {{ $company->company_name }}
-                                                            </option>
-                                                        @endforeach
-                                                    </x-ui.odoo-form-ui>
-                                                </div>
-
-                                                <div class="mb-3">
-                                                    <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">Department</label>
-                                                    <x-ui.odoo-form-ui type="select" name="department_id" id="roster_filter_department">
-                                                        <option value="">All Departments</option>
-                                                        @foreach($departments as $dept)
-                                                            <option value="{{ $dept->id }}" data-company-id="{{ $dept->company_id }}" {{ $selectedDepartmentId == $dept->id ? 'selected' : '' }}>
-                                                                {{ $dept->name }}
-                                                            </option>
-                                                        @endforeach
-                                                    </x-ui.odoo-form-ui>
-                                                </div>
-
-                                                <div class="mb-3">
-                                                    <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">Designation</label>
-                                                    <x-ui.odoo-form-ui type="select" name="designation_id" id="roster_filter_designation">
-                                                        <option value="">All Designations</option>
-                                                        @foreach($designations as $desg)
-                                                            <option value="{{ $desg->id }}" {{ $selectedDesignationId == $desg->id ? 'selected' : '' }}>
-                                                                {{ $desg->name }}
-                                                            </option>
-                                                        @endforeach
-                                                    </x-ui.odoo-form-ui>
-                                                </div>
-
-                                                <div class="mb-3">
-                                                    <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">Start Date</label>
-                                                    <input type="date" name="start_date" class="form-control form-control-sm" value="{{ $startDate->format('Y-m-d') }}" style="border-color: #cbd5e1; border-radius: 6px;">
-                                                </div>
-
-                                                <div class="dropdown-divider my-3"></div>
-
-                                                <div class="d-flex gap-2">
-                                                    <button type="submit" class="btn btn-sm roster-filter-apply-btn w-100 fw-bold py-2 text-uppercase">APPLY FILTERS</button>
-                                                    <a href="#" id="btn-reset-roster-filters" class="btn btn-sm roster-filter-reset-btn w-100 fw-bold py-2 text-center text-uppercase">RESET</a>
-                                                </div>
-                                            </x-ui.filter>
-                                        </form>
-                                    </x-slot>
+                                 <x-ui.card title="{{ __('hrms.roster.roster_scheduler_grid') }}" stretch>
+                                     <x-slot name="headerAction">
+                                         <form method="GET" action="{{ route('hrms.roster.index') }}" id="rosterFilterForm" class="d-flex align-items-center gap-2">
+                                             <input type="hidden" name="tab" value="roster">
+                                             <input type="hidden" name="sort" id="filterSortInput" value="{{ $sortBy }}">
+ 
+                                             <!-- 1. Search Bar (Order 1: Single element, soft grey bg, rounded) -->
+                                             <div class="position-relative" style="width: 240px;">
+                                                 <i class="feather-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted" style="font-size: 14px;"></i>
+                                                 <input type="text" id="rosterSearch" name="search" class="form-control form-control-sm ps-5 border-0" placeholder="{{ __('hrms.roster.search_employees') }}" value="{{ $search }}" style="height: 38px; border-radius: 8px; font-size: 13px; color: #475569; background-color: #f1f5f9;">
+                                             </div>
+ 
+                                             <!-- 2. SORT Button (using Duralux component) -->
+                                             <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
+                                                 <button type="button" class="dropdown-item sort-option {{ $sortBy === 'name-asc' ? 'active' : '' }}" data-sort="name-asc">
+                                                     {{ __('hrms.common.sort_name_asc') }}
+                                                 </button>
+                                                 <button type="button" class="dropdown-item sort-option {{ $sortBy === 'name-desc' ? 'active' : '' }}" data-sort="name-desc">
+                                                     {{ __('hrms.common.sort_name_desc') }}
+                                                 </button>
+                                                 <button type="button" class="dropdown-item sort-option {{ $sortBy === 'designation-asc' || $sortBy === 'designation' ? 'active' : '' }}" data-sort="designation-asc">
+                                                     {{ __('hrms.roster.sort_designation_asc') }}
+                                                 </button>
+                                                 <button type="button" class="dropdown-item sort-option {{ $sortBy === 'designation-desc' ? 'active' : '' }}" data-sort="designation-desc">
+                                                     {{ __('hrms.roster.sort_designation_desc') }}
+                                                 </button>
+                                             </x-ui.sort-dropdown>
+ 
+                                             <!-- 3. FILTER Button (using Duralux component) -->
+                                             <x-ui.filter label="{{ __('hrms.common.filter') }}">
+                                                 <div class="d-flex align-items-center gap-2 mb-3">
+                                                     <i class="feather-sliders text-primary fs-14"></i>
+                                                     <h6 class="fw-bold mb-0 text-dark" style="font-size: 13px;">{{ __('hrms.common.filter_options') }}</h6>
+                                                 </div>
+ 
+                                                 <div class="mb-3">
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_company') }}</label>
+                                                     <x-ui.odoo-form-ui type="select" name="company_id" id="roster_filter_company">
+                                                         <option value="">{{ __('hrms.common.all_companies') }}</option>
+                                                         @foreach($companies as $company)
+                                                             <option value="{{ $company->id }}" {{ $selectedCompanyId == $company->id ? 'selected' : '' }}>
+                                                                 {{ $company->company_name }}
+                                                             </option>
+                                                         @endforeach
+                                                     </x-ui.odoo-form-ui>
+                                                 </div>
+ 
+                                                 <div class="mb-3">
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_department') }}</label>
+                                                     <x-ui.odoo-form-ui type="select" name="department_id" id="roster_filter_department">
+                                                         <option value="">{{ __('hrms.roster.all_departments') }}</option>
+                                                         @foreach($departments as $dept)
+                                                             <option value="{{ $dept->id }}" data-company-id="{{ $dept->company_id }}" {{ $selectedDepartmentId == $dept->id ? 'selected' : '' }}>
+                                                                 {{ $dept->name }}
+                                                             </option>
+                                                         @endforeach
+                                                     </x-ui.odoo-form-ui>
+                                                 </div>
+ 
+                                                 <div class="mb-3">
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.employees.tbl_designation') }}</label>
+                                                     <x-ui.odoo-form-ui type="select" name="designation_id" id="roster_filter_designation">
+                                                         <option value="">{{ __('hrms.roster.all_designations') }}</option>
+                                                         @foreach($designations as $desg)
+                                                             <option value="{{ $desg->id }}" {{ $selectedDesignationId == $desg->id ? 'selected' : '' }}>
+                                                                 {{ $desg->name }}
+                                                             </option>
+                                                         @endforeach
+                                                     </x-ui.odoo-form-ui>
+                                                 </div>
+ 
+                                                 <div class="mb-3">
+                                                     <label class="form-label fw-bold text-secondary fs-10 text-uppercase mb-1" style="letter-spacing: 0.05em; color: #64748b !important;">{{ __('hrms.roster.start_date') }}</label>
+                                                     <input type="date" name="start_date" class="form-control form-control-sm" value="{{ $startDate->format('Y-m-d') }}" style="border-color: #cbd5e1; border-radius: 6px;">
+                                                 </div>
+ 
+                                                 <div class="dropdown-divider my-3"></div>
+ 
+                                                 <div class="d-flex gap-2">
+                                                     <button type="submit" class="btn btn-sm roster-filter-apply-btn w-100 fw-bold py-2 text-uppercase">{{ __('hrms.common.apply') }}</button>
+                                                     <a href="#" id="btn-reset-roster-filters" class="btn btn-sm roster-filter-reset-btn w-100 fw-bold py-2 text-center text-uppercase">{{ __('hrms.common.reset') }}</a>
+                                                 </div>
+                                             </x-ui.filter>
+                                         </form>
+                                     </x-slot>
 
                                     <!-- Grid Board Matrix (Fixed Column Width Layout to prevent viewport overflow) -->
                                     <div class="table-responsive border rounded bg-white" id="rosterBoardGrid">
                                         <table class="table table-bordered table-hover mb-0 align-middle text-center roster-grid-table">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th class="employee-head">Employee Name</th>
+                                                    <th class="employee-head">{{ __('hrms.roster.employee_name') }}</th>
                                                     @foreach($dates as $date)
                                                         <th class="date-head">
                                                             <div class="fw-bold text-dark">{{ $date->format('D') }}</div>
@@ -538,7 +538,7 @@
                                                                 </div>
                                                                 <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">
                                                                     <div class="fw-bold text-dark fs-12 employee-name-label" style="font-size: 12px; line-height: 1.2;">{{ $employee->full_name }}</div>
-                                                                    <div class="text-muted fs-10 employee-designation-label" style="font-size: 10px; line-height: 1.2;">{{ $employee->designation?->name ?? 'No Designation' }}</div>
+                                                                    <div class="text-muted fs-10 employee-designation-label" style="font-size: 10px; line-height: 1.2;">{{ $employee->designation?->name ?? __('hrms.roster.no_designation') }}</div>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -567,10 +567,10 @@
                                                                     data-date="{{ $dateStr }}"
                                                                 >
                                                                     <option value="" {{ is_null($assignedShiftId) && !$roster ? 'selected' : '' }}>
-                                                                        {{ $employee->shift?->code ? $employee->shift->code . ' (D)' : 'Off (D)' }}
+                                                                        {{ $employee->shift?->code ? $employee->shift->code . ' (D)' : __('hrms.roster.off_default') }}
                                                                     </option>
                                                                     <option value="off" class="text-secondary fw-bold" {{ $roster && is_null($roster->shift_id) ? 'selected' : '' }}>
-                                                                        OFF
+                                                                        {{ __('hrms.roster.off') }}
                                                                     </option>
                                                                     @foreach($activeShifts as $ashift)
                                                                         <option value="{{ $ashift->id }}" class="text-primary fw-bold" {{ $assignedShiftId == $ashift->id ? 'selected' : '' }}>
@@ -585,7 +585,7 @@
                                                 @if($employees->isEmpty())
                                                     <tr>
                                                         <td colspan="{{ count($dates) + 1 }}" class="text-center py-5 text-muted">
-                                                            No employees found matching the current filters.
+                                                            {{ __('hrms.roster.no_employees_matching') }}
                                                         </td>
                                                     </tr>
                                                 @endif
@@ -622,7 +622,7 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="assignRosterModalLabel"><i class="feather-calendar me-2 text-primary"></i>Assign Roster</h5>
+                    <h5 class="modal-title fw-bold" id="assignRosterModalLabel"><i class="feather-calendar me-2 text-primary"></i>{{ __('hrms.roster.assign_roster') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.roster.assign') }}" method="POST">
@@ -633,57 +633,57 @@
                         <div class="row g-3">
                             <!-- 1. Cascading Organization Group Multi-Selectors (Vertical, No labels cutoff) -->
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Companies</label>
-                                <select id="assign_company_select" name="bulk_company_ids[]" class="form-control select2-modal" multiple data-placeholder="All Companies">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.companies') }}</label>
+                                <select id="assign_company_select" name="bulk_company_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.common.all_companies') }}">
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Business Units</label>
-                                <select id="assign_bu_select" name="bulk_business_unit_ids[]" class="form-control select2-modal" multiple data-placeholder="All Business Units">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.business_units') }}</label>
+                                <select id="assign_bu_select" name="bulk_business_unit_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.roster.business_units') }}">
                                     @foreach($businessUnits as $bu)
                                         <option value="{{ $bu->id }}" data-company-id="{{ $bu->company_id }}">{{ $bu->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Branches</label>
-                                <select id="assign_branch_select" name="bulk_branch_ids[]" class="form-control select2-modal" multiple data-placeholder="All Branches">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.branches') }}</label>
+                                <select id="assign_branch_select" name="bulk_branch_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.roster.branches') }}">
                                     @foreach($branches as $br)
                                         <option value="{{ $br->id }}" data-business-unit-id="{{ $br->business_unit_id }}">{{ $br->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Departments</label>
-                                <select id="assign_dept_select" name="bulk_department_ids[]" class="form-control select2-modal" multiple data-placeholder="All Departments">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.departments') }}</label>
+                                <select id="assign_dept_select" name="bulk_department_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.roster.departments') }}">
                                     @foreach($departments as $dept)
                                         <option value="{{ $dept->id }}" data-company-id="{{ $dept->company_id }}">{{ $dept->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Designations</label>
-                                <select id="assign_desg_select" name="bulk_designation_ids[]" class="form-control select2-modal" multiple data-placeholder="All Designations">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.designations') }}</label>
+                                <select id="assign_desg_select" name="bulk_designation_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.roster.designations') }}">
                                     @foreach($designations as $desg)
                                         <option value="{{ $desg->id }}">{{ $desg->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
-
+ 
                             <!-- 2. Dynamic Search & Checkboxes (Employee List) -->
                             <div class="col-12 mt-4">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Select Employees</label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.select_employees') }}</label>
                                 <div class="input-group input-group-sm mb-2">
                                     <span class="input-group-text bg-light"><i class="feather-search text-muted"></i></span>
-                                    <input type="text" id="assignEmpSearch" class="form-control form-control-sm" placeholder="Type name to filter list...">
+                                    <input type="text" id="assignEmpSearch" class="form-control form-control-sm" placeholder="{{ __('hrms.roster.filter_list_placeholder') }}">
                                 </div>
                                 <div class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
                                     <div class="form-check mb-2">
                                         <input class="form-check-input" type="checkbox" id="selectAllAssignEmployees">
-                                        <label class="form-check-label fw-bold text-primary" for="selectAllAssignEmployees">Select All Visible</label>
+                                        <label class="form-check-label fw-bold text-primary" for="selectAllAssignEmployees">{{ __('hrms.roster.select_all_visible') }}</label>
                                     </div>
                                     <hr class="my-2">
                                     <div id="assignEmployeeList">
@@ -699,57 +699,57 @@
                                                 <label class="form-check-label text-dark fs-12" for="emp_assign_{{ $emp->id }}">
                                                     {{ $emp->full_name }} 
                                                     <span class="text-muted" style="font-size: 10px;">
-                                                        ({{ $emp->department?->name ?? 'No Dept' }} / {{ $emp->designation?->name ?? 'No Desg' }})
+                                                        ({{ $emp->department?->name ?? __('hrms.roster.no_dept') }} / {{ $emp->designation?->name ?? __('hrms.roster.no_desg') }})
                                                     </span>
                                                 </label>
                                             </div>
                                         @endforeach
                                     </div>
                                     <div id="assignNoEmployeesMsg" class="text-center text-muted py-3 d-none">
-                                        No employees match the current filters.
+                                        {{ __('hrms.roster.no_employees_matching_filters') }}
                                     </div>
                                 </div>
-                                <div class="text-muted fs-11 mt-1">If no checkboxes are selected, shifts will assign to everyone matching the filters selected above.</div>
+                                <div class="text-muted fs-11 mt-1">{{ __('hrms.roster.assign_help') }}</div>
                             </div>
-
+ 
                             <!-- 3. Scheduling Settings (Vertical Date Fields, No cut-offs) -->
                             <div class="col-12 mt-4">
                                 <hr class="my-2">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Shift to Assign</label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.shift_to_assign') }}</label>
                                 <select name="shift_id" class="form-select form-select-sm">
-                                    <option value="">— Day Off (OFF) —</option>
+                                    <option value="">{{ __('hrms.roster.day_off') }}</option>
                                     @foreach($activeShifts as $ashift)
                                         <option value="{{ $ashift->id }}">{{ $ashift->name }} ({{ $ashift->code }})</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Status</label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.org.status') }}</label>
                                 <select name="status" class="form-select form-select-sm">
-                                    <option value="scheduled" selected>Scheduled</option>
-                                    <option value="approved">Approved</option>
-                                    <option value="cancelled">Cancelled</option>
+                                    <option value="scheduled" selected>{{ __('hrms.roster.scheduled') }}</option>
+                                    <option value="approved">{{ __('hrms.roster.approved') }}</option>
+                                    <option value="cancelled">{{ __('hrms.roster.cancelled') }}</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Start Date <span class="text-danger">*</span></label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.start_date') }} <span class="text-danger">*</span></label>
                                 <input type="date" name="start_date" class="form-control form-control-sm" required value="{{ $startDate->format('Y-m-d') }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">End Date <span class="text-danger">*</span></label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.end_date') }} <span class="text-danger">*</span></label>
                                 <input type="date" name="end_date" class="form-control form-control-sm" required value="{{ $startDate->copy()->addDays(6)->format('Y-m-d') }}">
                             </div>
                             <div class="col-12">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Notes</label>
-                                <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Optional comments or rotation notes..."></textarea>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.notes') }}</label>
+                                <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="{{ __('hrms.roster.notes_placeholder') }}"></textarea>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Assign Shift</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.roster.assign_shift') }}</button>
                     </div>
                 </form>
             </div>
@@ -761,7 +761,7 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold text-danger" id="clearRosterModalLabel"><i class="feather-trash me-2"></i>Clear Roster Assignments</h5>
+                    <h5 class="modal-title fw-bold text-danger" id="clearRosterModalLabel"><i class="feather-trash me-2"></i>{{ __('hrms.roster.clear_assignments') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.roster.clear') }}" method="POST">
@@ -774,57 +774,57 @@
                         <div class="row g-3">
                             <!-- 1. Cascading Organization Group Multi-Selectors -->
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Companies</label>
-                                <select id="clear_company_select" name="bulk_company_ids[]" class="form-control select2-modal" multiple data-placeholder="All Companies">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.companies') }}</label>
+                                <select id="clear_company_select" name="bulk_company_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.common.all_companies') }}">
                                     @foreach($companies as $company)
                                         <option value="{{ $company->id }}">{{ $company->company_name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Business Units</label>
-                                <select id="clear_bu_select" name="bulk_business_unit_ids[]" class="form-control select2-modal" multiple data-placeholder="All Business Units">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.business_units') }}</label>
+                                <select id="clear_bu_select" name="bulk_business_unit_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.roster.business_units') }}">
                                     @foreach($businessUnits as $bu)
                                         <option value="{{ $bu->id }}" data-company-id="{{ $bu->company_id }}">{{ $bu->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Branches</label>
-                                <select id="clear_branch_select" name="bulk_branch_ids[]" class="form-control select2-modal" multiple data-placeholder="All Branches">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.branches') }}</label>
+                                <select id="clear_branch_select" name="bulk_branch_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.roster.branches') }}">
                                     @foreach($branches as $br)
                                         <option value="{{ $br->id }}" data-business-unit-id="{{ $br->business_unit_id }}">{{ $br->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Departments</label>
-                                <select id="clear_dept_select" name="bulk_department_ids[]" class="form-control select2-modal" multiple data-placeholder="All Departments">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.departments') }}</label>
+                                <select id="clear_dept_select" name="bulk_department_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.roster.departments') }}">
                                     @foreach($departments as $dept)
                                         <option value="{{ $dept->id }}" data-company-id="{{ $dept->company_id }}">{{ $dept->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Designations</label>
-                                <select id="clear_desg_select" name="bulk_designation_ids[]" class="form-control select2-modal" multiple data-placeholder="All Designations">
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.designations') }}</label>
+                                <select id="clear_desg_select" name="bulk_designation_ids[]" class="form-control select2-modal" multiple data-placeholder="{{ __('hrms.roster.designations') }}">
                                     @foreach($designations as $desg)
                                         <option value="{{ $desg->id }}">{{ $desg->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
-
+ 
                             <!-- 2. Dynamic Checkbox Container -->
                             <div class="col-12 mt-4">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Select Employees to Clear</label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.select_employees_clear') }}</label>
                                 <div class="input-group input-group-sm mb-2">
                                     <span class="input-group-text bg-light"><i class="feather-search text-muted"></i></span>
-                                    <input type="text" id="clearEmpSearch" class="form-control form-control-sm" placeholder="Type name to filter list...">
+                                    <input type="text" id="clearEmpSearch" class="form-control form-control-sm" placeholder="{{ __('hrms.roster.filter_list_placeholder') }}">
                                 </div>
                                 <div class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
                                     <div class="form-check mb-2">
                                         <input class="form-check-input" type="checkbox" id="selectAllClearEmployees">
-                                        <label class="form-check-label fw-bold text-danger" for="selectAllClearEmployees">Select All Visible</label>
+                                        <label class="form-check-label fw-bold text-danger" for="selectAllClearEmployees">{{ __('hrms.roster.select_all_visible') }}</label>
                                     </div>
                                     <hr class="my-2">
                                     <div id="clearEmployeeList">
@@ -844,28 +844,28 @@
                                         @endforeach
                                     </div>
                                     <div id="clearNoEmployeesMsg" class="text-center text-muted py-3 d-none">
-                                        No employees match the current filters.
+                                        {{ __('hrms.roster.no_employees_matching_filters') }}
                                     </div>
                                 </div>
-                                <div class="text-muted fs-11 mt-1">If no checkboxes are selected, assignments will clear for everyone in the selected groups.</div>
+                                <div class="text-muted fs-11 mt-1">{{ __('hrms.roster.clear_help') }}</div>
                             </div>
-
+ 
                             <div class="col-12 mt-4">
                                 <hr class="my-2">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">Start Date <span class="text-danger">*</span></label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.start_date') }} <span class="text-danger">*</span></label>
                                 <input type="date" name="start_date" class="form-control form-control-sm" required value="{{ $startDate->format('Y-m-d') }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-12 mb-1">End Date <span class="text-danger">*</span></label>
+                                <label class="form-label fw-bold text-dark fs-12 mb-1">{{ __('hrms.roster.end_date') }} <span class="text-danger">*</span></label>
                                 <input type="date" name="end_date" class="form-control form-control-sm" required value="{{ $startDate->copy()->addDays(6)->format('Y-m-d') }}">
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer bg-light py-2">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-danger">Clear Entries</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-danger">{{ __('hrms.roster.clear_entries') }}</button>
                     </div>
                 </form>
             </div>
@@ -1211,14 +1211,14 @@
 
                         if (typeof Swal !== 'undefined') {
                             Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true })
-                                .fire({ icon: 'success', title: data.message || 'Roster updated successfully.' });
+                                .fire({ icon: 'success', title: data.message || "{{ __('hrms.roster.cell_updated') }}" });
                         }
-                    } else alert('An error occurred while saving the shift.');
+                    } else alert("{{ __('hrms.roster.save_error') }}");
                 })
                 .catch(error => {
                     this.style.opacity = '1';
                     console.error('Error updating roster:', error);
-                    alert('Network error. Failed to save shift.');
+                    alert("{{ __('hrms.roster.network_error') }}");
                 });
             });
 
@@ -1230,12 +1230,12 @@
                         let shift = JSON.parse(atob(this.dataset.shift));
                         document.getElementById('modal_view_shift_name').innerText = shift.name;
                         document.getElementById('modal_view_shift_code').innerText = shift.code;
-                        document.getElementById('modal_view_shift_company').innerText = (shift.company ? shift.company.company_name : 'Shared (All Companies)');
+                        document.getElementById('modal_view_shift_company').innerText = (shift.company ? shift.company.company_name : "{{ __('hrms.roster.shared_all_companies') }}");
                         document.getElementById('modal_view_shift_start').innerText = shift.start_time ? shift.start_time.substring(0, 5) : 'N/A';
                         document.getElementById('modal_view_shift_end').innerText = shift.end_time ? shift.end_time.substring(0, 5) : 'N/A';
-                        document.getElementById('modal_view_shift_break').innerText = (shift.break_minutes || 0) + ' mins';
-                        document.getElementById('modal_view_shift_overtime').innerHTML = (shift.overtime_allowed ? '<span class="badge bg-soft-success text-success">Yes</span>' : '<span class="badge bg-soft-danger text-danger">No</span>');
-                        document.getElementById('modal_view_shift_status').innerHTML = (shift.active ? '<span class="badge bg-soft-success text-success">Active</span>' : '<span class="badge bg-soft-danger text-danger">Inactive</span>');
+                         document.getElementById('modal_view_shift_break').innerText = (shift.break_minutes || 0) + ' ' + "{{ __('hrms.roster.mins') }}";
+                         document.getElementById('modal_view_shift_overtime').innerHTML = (shift.overtime_allowed ? '<span class="badge bg-soft-success text-success">{{ __('hrms.common.yes') }}</span>' : '<span class="badge bg-soft-danger text-danger">{{ __('hrms.common.no') }}</span>');
+                         document.getElementById('modal_view_shift_status').innerHTML = (shift.active ? '<span class="badge bg-soft-success text-success">{{ __('hrms.employees.frm_status_active') }}</span>' : '<span class="badge bg-soft-danger text-danger">{{ __('hrms.employees.frm_status_inactive') }}</span>');
                     });
                 });
             }
