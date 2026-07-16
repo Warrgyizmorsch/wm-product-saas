@@ -68,6 +68,7 @@ Route::prefix('production')
         Route::post('boms/{bom}/reject', [ProductionBomController::class, 'reject'])->name('boms.reject');
         Route::post('boms/{bom}/cancel', [ProductionBomController::class, 'cancel'])->name('boms.cancel');
         Route::post('boms/{bom}/duplicate', [ProductionBomController::class, 'duplicateVersion'])->name('boms.duplicate');
+        Route::post('boms/bulk-action', [ProductionBomController::class, 'bulkAction'])->name('boms.bulk-action');
         Route::resource('boms', ProductionBomController::class);
 
         // ── Work Centers ──────────────────────────────────────────────────────
