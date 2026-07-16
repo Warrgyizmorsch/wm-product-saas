@@ -283,6 +283,108 @@ class ProductionBomController extends Controller
             ->with('success', 'BOM deleted successfully.');
     }
 
+    public function bulkAction(Request $request): RedirectResponse
+    {
+        $action = $request->input('action');
+        $ids = $request->input('ids');
+
+        if (empty($ids) || !is_array($ids)) {
+            return redirect()
+                ->back()
+                ->with('error', 'No BOMs selected.');
+        }
+
+        $tenantId = require_tenant_id();
+        $boms = ProductionBom::whereIn('id', $ids)
+            ->where('tenant_id', $tenantId)
+            ->get();
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        switch ($action) {
+            case 'delete':
+                foreach ($boms as $bom) {
+                    if (auth()->user()->can('delete', $bom)) {
+                        $this->bomRepository->delete($bom->id);
+                        $successCount++;
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "deleted";
+                break;
+
+            case 'submit_approval':
+                foreach ($boms as $bom) {
+                    if (($bom->isDraft() || $bom->isUnderRevision()) && auth()->user()->can('update', $bom)) {
+                        try {
+                            $this->bomService->submitApproval($bom->id);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "submitted for approval";
+                break;
+
+            case 'approve':
+                foreach ($boms as $bom) {
+                    if ($bom->isPendingApproval() && auth()->user()->can('approve', $bom)) {
+                        try {
+                            $this->bomService->approve($bom->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "approved";
+                break;
+
+            case 'cancel':
+                foreach ($boms as $bom) {
+                    if (auth()->user()->can('cancel', $bom)) {
+                        try {
+                            $this->bomService->cancel($bom->id, auth()->id() ?: 1, 'Bulk cancelled.');
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "cancelled";
+                break;
+
+            default:
+                return redirect()
+                    ->back()
+                    ->with('error', 'Invalid action.');
+        }
+
+        if ($failedCount > 0) {
+            if ($successCount > 0) {
+                return redirect()
+                    ->route('production.boms.index')
+                    ->with('success', "Successfully {$messagePrefix} {$successCount} BOM(s). {$failedCount} BOM(s) could not be processed due to status or permission rules.");
+            }
+            return redirect()
+                ->route('production.boms.index')
+                ->with('error', "No BOMs could be {$messagePrefix}. Check status restrictions and your permissions.");
+        }
+
+        return redirect()
+            ->route('production.boms.index')
+            ->with('success', "Successfully {$messagePrefix} {$successCount} BOM(s).");
+    }
+
     public function submitApproval(int $id): RedirectResponse
     {
         $bom = $this->bomRepository->find($id);

@@ -669,4 +669,186 @@ class ProductionBomTest extends TestCase
         $response->assertStatus(200)
             ->assertSee('value="' . $this->subAssemblyA->id . '"', false);
     }
+
+    public function test_bulk_delete_boms_successfully_deletes_drafts(): void
+    {
+        $bom1 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-A-T1',
+            'bom_name' => 'BOM Test 1',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.0',
+            'status' => 'draft',
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $bom2 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-A-T2',
+            'bom_name' => 'BOM Test 2',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.1',
+            'status' => 'draft',
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $bom3 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-A-T3',
+            'bom_name' => 'BOM Test 3',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.2',
+            'status' => 'approved',
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.boms.bulk-action'), [
+                'action' => 'delete',
+                'ids' => [$bom1->id, $bom2->id, $bom3->id]
+            ]);
+
+        $response->assertRedirect(route('production.boms.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('production_boms', ['id' => $bom1->id]);
+        $this->assertDatabaseMissing('production_boms', ['id' => $bom2->id]);
+        $this->assertDatabaseHas('production_boms', ['id' => $bom3->id]);
+    }
+
+    public function test_bulk_submit_approval_boms(): void
+    {
+        $bom1 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-SUB-1',
+            'bom_name' => 'BOM Sub 1',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.0',
+            'status' => 'draft',
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $bom2 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-SUB-2',
+            'bom_name' => 'BOM Sub 2',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.1',
+            'status' => 'approved', // already approved, cannot submit
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.boms.bulk-action'), [
+                'action' => 'submit_approval',
+                'ids' => [$bom1->id, $bom2->id]
+            ]);
+
+        $response->assertRedirect(route('production.boms.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertEquals('pending_approval', $bom1->refresh()->status);
+        $this->assertEquals('approved', $bom2->refresh()->status);
+    }
+
+    public function test_bulk_approve_boms(): void
+    {
+        $bom1 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-APP-1',
+            'bom_name' => 'BOM App 1',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.0',
+            'status' => 'pending_approval',
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $bom2 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-APP-2',
+            'bom_name' => 'BOM App 2',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.1',
+            'status' => 'draft', // draft cannot be approved directly
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.boms.bulk-action'), [
+                'action' => 'approve',
+                'ids' => [$bom1->id, $bom2->id]
+            ]);
+
+        $response->assertRedirect(route('production.boms.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertEquals('approved', $bom1->refresh()->status);
+        $this->assertEquals('draft', $bom2->refresh()->status);
+    }
+
+    public function test_bulk_cancel_boms(): void
+    {
+        $bom1 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-CAN-1',
+            'bom_name' => 'BOM Can 1',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.0',
+            'status' => 'approved',
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $bom2 = ProductionBom::create([
+            'tenant_id' => $this->tenantA->id,
+            'bom_number' => 'BOM-CAN-2',
+            'bom_name' => 'BOM Can 2',
+            'bom_type' => 'manufacturing',
+            'product_id' => $this->finishedGoodA->id,
+            'base_quantity' => 1.0,
+            'base_uom_id' => $this->uomA->id,
+            'version' => '1.0.1',
+            'status' => 'draft', // cancellation rules might allow but let's test isolation or normal cancel
+            'effective_date' => now()->toDateString(),
+        ]);
+
+        $response = $this->actingAs($this->userA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.boms.bulk-action'), [
+                'action' => 'cancel',
+                'ids' => [$bom1->id, $bom2->id]
+            ]);
+
+        $response->assertRedirect(route('production.boms.index'));
+        $response->assertSessionHas('success');
+
+        $this->assertEquals('cancelled', $bom1->refresh()->status);
+        $this->assertEquals('cancelled', $bom2->refresh()->status);
+    }
 }

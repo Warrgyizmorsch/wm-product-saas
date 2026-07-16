@@ -289,65 +289,10 @@
         }
     </script>
 
-    <!-- Global confirmation modal, replacing native window.confirm() dialogs throughout the app.
-         Bootstrap's modal stacks at z-index 1055, above offcanvas drawers (1051), so it always
-         renders correctly on top even when triggered from inside an open drawer. -->
-    <div class="modal fade" id="globalConfirmModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="globalConfirmModalTitle">{{ __('ui.confirm_title') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p id="globalConfirmModalMessage" class="mb-0"></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal" id="globalConfirmModalCancelBtn">{{ __('ui.confirm_cancel') }}</button>
-                    <button type="button" class="btn btn-danger" id="globalConfirmModalConfirmBtn">{{ __('ui.confirm_yes') }}</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Upgraded Custom Premium Confirmation Modal Component -->
+    <x-ui.confirmation-modal />
 
     <script>
-        function confirmAction(message, onConfirm, options) {
-            options = options || {};
-
-            var modalEl = document.getElementById('globalConfirmModal');
-            if (!modalEl || !window.bootstrap) {
-                // Fallback if the modal markup or Bootstrap JS failed to load for any reason.
-                if (window.confirm(message) && typeof onConfirm === 'function') {
-                    onConfirm();
-                }
-                return;
-            }
-
-            document.getElementById('globalConfirmModalTitle').textContent = options.title || @js(__('ui.confirm_title'));
-            document.getElementById('globalConfirmModalMessage').textContent = message;
-
-            var cancelBtn = document.getElementById('globalConfirmModalCancelBtn');
-            cancelBtn.textContent = options.cancelButtonText || @js(__('ui.confirm_cancel'));
-
-            var confirmBtn = document.getElementById('globalConfirmModalConfirmBtn');
-            confirmBtn.textContent = options.confirmButtonText || @js(__('ui.confirm_yes'));
-            confirmBtn.className = 'btn ' + (options.confirmButtonClass || 'btn-danger');
-
-            // Clone-and-replace clears any listener bound by a previous confirmAction() call.
-            var freshConfirmBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(freshConfirmBtn, confirmBtn);
-
-            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-            freshConfirmBtn.addEventListener('click', function () {
-                modal.hide();
-                if (typeof onConfirm === 'function') {
-                    onConfirm();
-                }
-            }, { once: true });
-
-            modal.show();
-        }
-
         // Helper for plain <form onsubmit="return confirmFormSubmit(event, '...')"> usages.
         function confirmFormSubmit(event, message, options) {
             event.preventDefault();

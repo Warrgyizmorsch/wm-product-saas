@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Create BOM | SaaS ERP')
-@section('page-title', 'Create Bill of Materials')
-@section('breadcrumb', 'Create BOM')
+@section('title', __('production.create_bom') . ' | SaaS ERP')
+@section('page-title', __('production.create_bom'))
+@section('breadcrumb', __('production.create_bom'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -48,7 +48,7 @@
 
         <!-- Validation Errors & Warning Banners (Rendered via Toast Component) -->
         @if ($errors->any())
-            <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
+            <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') ?? 'Validation Failed' }}: {{ $errors->first() }}" />
         @endif
 
         @if (session('error'))
@@ -64,7 +64,7 @@
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Header with Close Button -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-                    <h4 class="fw-bold text-dark mb-0">New Bill of Materials</h4>
+                    <h4 class="fw-bold text-dark mb-0">{{ __('production.new_bill_of_materials') }}</h4>
                     <a href="{{ route('production.boms.index') }}" class="text-muted hover-danger fs-18">
                         <i class="feather-x"></i>
                     </a>
@@ -74,52 +74,52 @@
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="BOM Number" name="bom_number" placeholder="e.g. BOM-XYZ-001 or AUTO" :value="old('bom_number', 'AUTO')" :required="true" :error-text="$errors->first('bom_number')" alpineError="errors.bom_number" />
-                        <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" id="product_id" :required="true" data-master="product" :error-text="$errors->first('product_id')" alpineError="errors.product_id">
-                            <option value="">Select Product...</option>
-                            <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
+                        <x-ui.odoo-form-ui type="input" :label="__('production.bom_number')" name="bom_number" placeholder="e.g. BOM-XYZ-001 or AUTO" :value="old('bom_number', 'AUTO')" :required="true" :error-text="$errors->first('bom_number')" alpineError="errors.bom_number" />
+                        <x-ui.odoo-form-ui type="select" :label="__('production.item_to_produce')" name="product_id" id="product_id" :required="true" data-master="product" :error-text="$errors->first('product_id')" alpineError="errors.product_id">
+                            <option value="">{{ __('production.select_product') }}</option>
+                            <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_product') }}</option>
                             @foreach ($products as $p)
                                 <option value="{{ $p->id }}" @selected(old('product_id', $selectedProductId ?? '') == $p->id)>{{ $p->name }} ({{ $p->sku }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" label="BOM Name" name="bom_name" placeholder="e.g. Standard Red Door BOM" :value="old('bom_name')" :required="true" :error-text="$errors->first('bom_name')" alpineError="errors.bom_name" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.bom_name')" name="bom_name" placeholder="e.g. Standard Red Door BOM" :value="old('bom_name')" :required="true" :error-text="$errors->first('bom_name')" alpineError="errors.bom_name" />
 
-                        <x-ui.odoo-form-ui type="select" label="BOM Type" name="bom_type" :required="true" :error-text="$errors->first('bom_type')" alpineError="errors.bom_type">
-                            <option value="manufacturing" @selected(old('bom_type', 'manufacturing') === 'manufacturing')>Manufacturing BOM (Standard)</option>
-                            <option value="engineering" @selected(old('bom_type') === 'engineering')>Engineering BOM (R&D)</option>
-                            <option value="sales" @selected(old('bom_type') === 'sales')>Sales BOM (Kit)</option>
-                            <option value="phantom" @selected(old('bom_type') === 'phantom')>Phantom (Blow-Through)</option>
-                            <option value="subcontracting" @selected(old('bom_type') === 'subcontracting')>Subcontracting (Outsourced)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.bom_type')" name="bom_type" :required="true" :error-text="$errors->first('bom_type')" alpineError="errors.bom_type">
+                            <option value="manufacturing" @selected(old('bom_type', 'manufacturing') === 'manufacturing')>{{ __('production.bom_type_manufacturing') }}</option>
+                            <option value="engineering" @selected(old('bom_type') === 'engineering')>{{ __('production.bom_type_engineering') }}</option>
+                            <option value="sales" @selected(old('bom_type') === 'sales')>{{ __('production.bom_type_sales') }}</option>
+                            <option value="phantom" @selected(old('bom_type') === 'phantom')>{{ __('production.bom_type_phantom') }}</option>
+                            <option value="subcontracting" @selected(old('bom_type') === 'subcontracting')>{{ __('production.bom_type_subcontracting') }}</option>
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="select" label="Usage Context" name="usage_context" :required="true" :error-text="$errors->first('usage_context')" alpineError="errors.usage_context">
-                            <option value="manufacturing" @selected(old('usage_context', 'manufacturing') === 'manufacturing')>Manufacturing (Production execution ready)</option>
-                            <option value="engineering" @selected(old('usage_context') === 'engineering')>Engineering (R&D staging)</option>
-                            <option value="prototype" @selected(old('usage_context') === 'prototype')>Prototype (Sample testing)</option>
-                            <option value="costing" @selected(old('usage_context') === 'costing')>Costing (Simulation only)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.usage_context')" name="usage_context" :required="true" :error-text="$errors->first('usage_context')" alpineError="errors.usage_context">
+                            <option value="manufacturing" @selected(old('usage_context', 'manufacturing') === 'manufacturing')>{{ __('production.usage_context_manufacturing') }}</option>
+                            <option value="engineering" @selected(old('usage_context') === 'engineering')>{{ __('production.usage_context_engineering') }}</option>
+                            <option value="prototype" @selected(old('usage_context') === 'prototype')>{{ __('production.usage_context_prototype') }}</option>
+                            <option value="costing" @selected(old('usage_context') === 'costing')>{{ __('production.usage_context_costing') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Base Quantity" name="base_quantity" inputType="number" step="any" placeholder="1.0" :value="old('base_quantity', '1.0000')" :required="true" :error-text="$errors->first('base_quantity')" alpineError="errors.base_quantity" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.base_quantity')" name="base_quantity" inputType="number" step="any" placeholder="1.0" :value="old('base_quantity', '1.0000')" :required="true" :error-text="$errors->first('base_quantity')" alpineError="errors.base_quantity" />
                         
-                        <x-ui.odoo-form-ui type="select" label="Base Unit" name="base_uom_id" :required="true" data-master="uom" :error-text="$errors->first('base_uom_id')" alpineError="errors.base_uom_id">
-                            <option value="">Select UOM...</option>
-                            <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.base_uom')" name="base_uom_id" :required="true" data-master="uom" :error-text="$errors->first('base_uom_id')" alpineError="errors.base_uom_id">
+                            <option value="">{{ __('production.select_uom') }}</option>
+                            <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_uom') }}</option>
                             @foreach ($uoms as $uom)
                                 <option value="{{ $uom->id }}" @selected(old('base_uom_id') == $uom->id)>{{ $uom->name }} ({{ $uom->code }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>                        
-                        <x-ui.odoo-form-ui type="textarea" label="Description" name="notes" placeholder="Max. 500 characters" rows="3" :error-text="$errors->first('notes')" alpineError="errors.notes">{{ old('notes') }}</x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" :label="__('production.revision_notes')" name="notes" placeholder="Max. 500 characters" rows="3" :error-text="$errors->first('notes')" alpineError="errors.notes">{{ old('notes') }}</x-ui.odoo-form-ui>
                     </div>
                 </div>
 
                 <!-- Advanced Configuration Collapsible settings using Alpine.js -->
                 <div class="border rounded mb-4">
                     <div class="bg-light py-2 px-3 fs-13 fw-semibold text-dark d-flex justify-content-between align-items-center c-pointer" @click="showAdvanced = !showAdvanced">
-                        <span><i class="feather-settings me-2"></i>Advanced Configuration &amp; Lifecycle Dates</span>
+                        <span><i class="feather-settings me-2"></i>{{ __('production.advanced_configuration') ?? 'Advanced Configuration & Lifecycle Dates' }}</span>
                         <i class="feather-chevron-down transition-all" style="transition: transform 0.2s;" :style="showAdvanced ? 'transform: rotate(180deg);' : ''"></i>
                     </div>
                     <div class="bg-white" 
@@ -127,24 +127,24 @@
                          :style="showAdvanced ? 'max-height: 1000px; padding: 1rem; opacity: 1; border-top: 1px solid #dee2e6;' : 'max-height: 0px; padding: 0 1rem; opacity: 0; border-top: none;'">
                         <div class="row g-3 fs-13 text-dark">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Version ID" name="version" placeholder="e.g. 1.0.0" :value="old('version', '1.0.0')" :required="true" :error-text="$errors->first('version')" alpineError="errors.version" />
+                                <x-ui.odoo-form-ui type="input" :label="__('production.version')" name="version" placeholder="e.g. 1.0.0" :value="old('version', '1.0.0')" :required="true" :error-text="$errors->first('version')" alpineError="errors.version" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="select" label="Routing Reference" name="routing_id" id="routing_id" x-model="selectedRoutingId" :error-text="$errors->first('routing_id')" alpineError="errors.routing_id">
-                                    <option value="">No Routing Reference</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('production.routing_reference')" name="routing_id" id="routing_id" x-model="selectedRoutingId" :error-text="$errors->first('routing_id')" alpineError="errors.routing_id">
+                                    <option value="">{{ __('production.no_routing') }}</option>
                                     @foreach($routings as $rt)
                                         <option value="{{ $rt->id }}" data-product-id="{{ $rt->product_id }}">{{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Start Date" name="effective_date" inputType="date" :value="old('effective_date', date('Y-m-d'))" :required="true" :error-text="$errors->first('effective_date')" alpineError="errors.effective_date" />
+                                <x-ui.odoo-form-ui type="input" :label="__('production.start_date') ?? 'Start Date'" name="effective_date" inputType="date" :value="old('effective_date', date('Y-m-d'))" :required="true" :error-text="$errors->first('effective_date')" alpineError="errors.effective_date" />
                             </div>
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" label="Expiry Date" name="expiry_date" inputType="date" :value="old('expiry_date')" :error-text="$errors->first('expiry_date')" alpineError="errors.expiry_date" />
+                                <x-ui.odoo-form-ui type="input" :label="__('production.expiry_date') ?? 'Expiry Date'" name="expiry_date" inputType="date" :value="old('expiry_date')" :error-text="$errors->first('expiry_date')" alpineError="errors.expiry_date" />
                             </div>
                             <div class="col-md-12">
-                                <x-ui.odoo-form-ui type="input" label="Revision Reason" name="revision_reason" placeholder="e.g. Engineering specification update" :value="old('revision_reason')" :error-text="$errors->first('revision_reason')" alpineError="errors.revision_reason" />
+                                <x-ui.odoo-form-ui type="input" :label="__('production.revision_reason') ?? 'Revision Reason'" name="revision_reason" placeholder="e.g. Engineering specification update" :value="old('revision_reason')" :error-text="$errors->first('revision_reason')" alpineError="errors.revision_reason" />
                             </div>
                         </div>
                     </div>
@@ -152,27 +152,27 @@
 
                 <!-- Tab Headers -->
                 <x-ui.horizontal-tabs id="bomFormTabs" :tabs="[
-                    ['id' => 'tab-components', 'label' => 'Components', 'active' => true, 'icon' => 'feather-list'],
-                    ['id' => 'tab-operations', 'label' => 'Operations', 'icon' => 'feather-sliders']
+                    ['id' => 'tab-components', 'label' => __('production.components'), 'active' => true, 'icon' => 'feather-list'],
+                    ['id' => 'tab-operations', 'label' => __('production.operations'), 'icon' => 'feather-sliders']
                 ]" />
 
                 <div class="tab-content mt-3">
                     <!-- Tab 1: Components Panel -->
                     <div class="tab-pane fade show active" id="tab-components" role="tabpanel" aria-labelledby="tab-components-tab">
-                        <h5 class="fw-bold text-dark mb-3">Add Component*</h5>
+                        <h5 class="fw-bold text-dark mb-3">{{ __('production.add_material_item') }}*</h5>
                         <div class="table-responsive mb-4">
                             <x-ui.odoo-form-ui type="table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 5%" class="text-center">Seq</th>
-                                        <th style="width: 25%">Material Component</th>
-                                        <th style="width: 10%">Quantity</th>
-                                        <th style="width: 12%">UOM</th>
-                                        <th style="width: 10%">Scrap %</th>
-                                        <th style="width: 8%">Priority</th>
-                                        <th style="width: 15%">Validity (From - To)</th>
-                                        <th style="width: 12%">Alternative</th>
-                                        <th style="width: 5%" class="text-center">Action</th>
+                                        <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
+                                        <th style="width: 25%">{{ __('production.component_product') }}</th>
+                                        <th style="width: 10%">{{ __('production.quantity') }}</th>
+                                        <th style="width: 12%">{{ __('production.uom') }}</th>
+                                        <th style="width: 10%">{{ __('production.scrap_percent') }}</th>
+                                        <th style="width: 8%">{{ __('production.priority') }}</th>
+                                        <th style="width: 15%">{{ __('production.validity') }}</th>
+                                        <th style="width: 12%">{{ __('production.alternative') }}</th>
+                                        <th style="width: 5%" class="text-center">{{ __('production.action') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -184,8 +184,8 @@
                                             <!-- Material Selection -->
                                             <td class="align-middle">
                                                 <x-ui.odoo-form-ui type="select" name="items[][material_id]" x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required select2Selector="default" data-master="product" alpineError="errors['items.' + index + '.material_id']">
-                                                    <option value="">Select Material...</option>
-                                                    <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New Product</option>
+                                                    <option value="">{{ __('production.select_component') }}</option>
+                                                    <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_product') }}</option>
                                                     @foreach($materials as $material)
                                                         <option value="{{ $material->id }}" data-type="{{ $material->type }}" data-sku="{{ $material->sku }}">{{ $material->name }} ({{ $material->sku }})</option>
                                                     @endforeach
@@ -193,14 +193,14 @@
                                                 <input type="hidden" x-bind:name="'items['+index+'][child_bom_id]'" x-model="item.child_bom_id">
                                                 <template x-if="item.child_bom_loading">
                                                     <div class="mt-2 text-muted fs-11">
-                                                        <span class="spinner-border spinner-border-sm text-secondary me-1" role="status" style="width: 12px; height: 12px;"></span>Checking child BOM...
+                                                        <span class="spinner-border spinner-border-sm text-secondary me-1" role="status" style="width: 12px; height: 12px;"></span>{{ __('production.checking_child_bom') }}
                                                     </div>
                                                 </template>
                                                 <template x-if="!item.child_bom_loading && item.child_bom_versions && item.child_bom_versions.length > 0">
                                                     <div class="mt-2 p-2 border rounded bg-light" style="max-width: 250px;">
-                                                        <label class="fs-10 fw-bold text-muted mb-1 d-block">Link specific BOM version:</label>
+                                                        <label class="fs-10 fw-bold text-muted mb-1 d-block">{{ __('production.link_specific_bom') }}</label>
                                                         <select class="form-select form-select-xs py-0.5 fs-11" x-model="item.child_bom_id">
-                                                            <option value="">-- Explicit Selection --</option>
+                                                            <option value="">{{ __('production.explicit_selection') }}</option>
                                                             <template x-for="v in item.child_bom_versions" :key="v.id">
                                                                 <option :value="v.id" x-text="'v' + v.version + ' (' + v.status + ')'"></option>
                                                             </template>
@@ -209,11 +209,11 @@
                                                             <div class="d-flex gap-1 align-items-center">
                                                                 <template x-if="item.child_bom_id">
                                                                     <a :href="'/production/boms/' + item.child_bom_id" target="_blank" class="btn btn-xs btn-soft-info py-0.5 px-1 fs-9 text-nowrap">
-                                                                        <i class="feather-eye"></i> View
+                                                                        <i class="feather-eye"></i> {{ __('production.view') }}
                                                                     </a>
                                                                 </template>
                                                                 <template x-if="item.child_bom_id && item.child_bom_versions.find(x => x.id == item.child_bom_id)?.status !== 'approved'">
-                                                                    <span class="badge bg-soft-danger text-danger fs-9" title="Draft / non-approved versions warn user"><i class="feather-alert-triangle"></i> Non-Approved</span>
+                                                                    <span class="badge bg-soft-danger text-danger fs-9" title="Draft / non-approved versions warn user"><i class="feather-alert-triangle"></i> {{ __('production.non_approved') }}</span>
                                                                 </template>
                                                             </div>
                                                             <div class="d-flex gap-1">
@@ -221,7 +221,7 @@
                                                                     <form :action="'/production/boms/' + item.child_bom_id + '/create-revision'" method="POST" target="_blank" class="d-inline">
                                                                         @csrf
                                                                         <button type="submit" class="btn btn-xs btn-soft-warning py-0.5 px-1 fs-9 text-nowrap">
-                                                                            <i class="feather-copy"></i> Revise
+                                                                            <i class="feather-copy"></i> {{ __('production.revise') }}
                                                                          </button>
                                                                     </form>
                                                                 </template>
@@ -232,7 +232,7 @@
                                                 <template x-if="!item.child_bom_loading && (!item.child_bom_versions || item.child_bom_versions.length === 0) && (getMaterialType(item.material_id) === 'semi_finished' || getMaterialType(item.material_id) === 'finished_good')">
                                                     <div class="erp-child-bom-cta mt-2">
                                                         <a x-bind:href="'{{ route('production.boms.create') }}?product_id=' + item.material_id + '&parent_product_id=' + (document.getElementById('product_id')?.value || '')" target="_blank" class="btn btn-xs btn-soft-primary py-0.5 px-1.5 fs-9 text-nowrap">
-                                                            <i class="feather-plus me-0.5"></i>Create Child BOM
+                                                            <i class="feather-plus me-0.5"></i>{{ __('production.configure_sub_bom') }}
                                                         </a>
                                                     </div>
                                                 </template>
@@ -246,8 +246,8 @@
                                             <!-- UOM -->
                                             <td class="align-middle">
                                                 <x-ui.odoo-form-ui type="select" name="items[][uom_id]" x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required select2Selector="default" data-master="uom" alpineError="errors['items.' + index + '.uom_id']">
-                                                    <option value="">Select UOM...</option>
-                                                    <option value="__ADD_NEW__" class="fw-bold text-primary">+ Add New UOM</option>
+                                                    <option value="">{{ __('production.select_uom') }}</option>
+                                                    <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_uom') }}</option>
                                                     @foreach($uoms as $uom)
                                                         <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
                                                     @endforeach
@@ -278,7 +278,7 @@
                                                     <div>
                                                         <input type="hidden" x-bind:name="'items['+index+'][is_alternative]'" :value="item.is_alternative ? 1 : 0">
                                                         <x-ui.odoo-form-ui type="checkbox" name="items[][is_alternative]" x-model="item.is_alternative" x-bind:id="'is_alternative_create_' + index">
-                                                            Is Alternative
+                                                            {{ __('production.is_alternative') }}
                                                         </x-ui.odoo-form-ui>
                                                     </div>
                                                     <div x-show="item.is_alternative">
@@ -302,18 +302,18 @@
                         <!-- Add Row Action -->
                         <div class="mb-4">
                             <button type="button" class="btn btn-light-brand" @click="addItem()">
-                                <i class="feather-plus me-2"></i>Add Component Row
+                                <i class="feather-plus me-2"></i>{{ __('production.add_material_line') }}
                             </button>
                         </div>
                     </div>
 
                     <!-- Tab 2: Operations Panel (Linked to Routing reference dropdown) -->
                     <div class="tab-pane fade" id="tab-operations" role="tabpanel" aria-labelledby="tab-operations-tab">
-                        <h5 class="fw-bold text-dark mb-3">Routing Operations List</h5>
+                        <h5 class="fw-bold text-dark mb-3">{{ __('production.workflow_routing') }}</h5>
                         
                         <template x-if="!selectedRoutingId">
                             <div class="p-4 text-center border rounded bg-light text-muted">
-                                <i class="feather-info me-2"></i>Select routing to see operations
+                                <i class="feather-info me-2"></i>{{ __('production.select_routing_see_ops') }}
                             </div>
                         </template>
                         
@@ -321,13 +321,13 @@
                             <div>
                                 <template x-if="loadingOperations">
                                     <div class="p-4 text-center">
-                                        <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading operations...
+                                        <div class="spinner-border spinner-border-sm text-primary me-2"></div>{{ __('production.loading_operations') }}
                                     </div>
                                 </template>
                                 
                                 <template x-if="!loadingOperations && operations.length === 0">
                                     <div class="p-4 text-center border rounded bg-light text-muted">
-                                        No operations defined for this routing.
+                                        {{ __('production.no_operations_defined') }}
                                     </div>
                                 </template>
                                 
@@ -336,12 +336,12 @@
                                         <x-ui.odoo-form-ui type="table">
                                             <thead>
                                                 <tr>
-                                                    <th style="width: 10%" class="text-center">Seq</th>
-                                                    <th style="width: 25%">Operation Stage</th>
-                                                    <th style="width: 15%">Type</th>
-                                                    <th style="width: 20%">Work Center</th>
-                                                    <th style="width: 15%">Machine</th>
-                                                    <th style="width: 15%" class="text-end">Times & Yield</th>
+                                                    <th style="width: 10%" class="text-center">{{ __('production.seq') }}</th>
+                                                    <th style="width: 25%">{{ __('production.operation_stage') }}</th>
+                                                    <th style="width: 15%">{{ __('production.type') }}</th>
+                                                    <th style="width: 20%">{{ __('production.work_center') }}</th>
+                                                    <th style="width: 15%">{{ __('production.machine') }}</th>
+                                                    <th style="width: 15%" class="text-end">{{ __('production.times_yield') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -353,9 +353,9 @@
                                                         <td class="align-middle" x-text="op.work_center_name"></td>
                                                         <td class="align-middle" x-text="op.machine_name"></td>
                                                         <td class="text-end align-middle">
-                                                            <div class="fs-11 text-muted">Setup: <span class="fw-semibold text-dark" x-text="op.setup_time_minutes + 'm'"></span></div>
-                                                            <div class="fs-11 text-muted">Run: <span class="fw-semibold text-dark" x-text="op.processing_time_minutes + 'm'"></span></div>
-                                                            <div class="fs-11 text-muted">Yield: <span class="fw-semibold text-dark" x-text="op.expected_yield_percentage + '%'"></span></div>
+                                                            <div class="fs-11 text-muted">{{ __('production.setup') }}: <span class="fw-semibold text-dark" x-text="op.setup_time_minutes + 'm'"></span></div>
+                                                            <div class="fs-11 text-muted">{{ __('production.run') }}: <span class="fw-semibold text-dark" x-text="op.processing_time_minutes + 'm'"></span></div>
+                                                            <div class="fs-11 text-muted">{{ __('production.yield') }}: <span class="fw-semibold text-dark" x-text="op.expected_yield_percentage + '%'"></span></div>
                                                         </td>
                                                     </tr>
                                                 </template>
@@ -370,8 +370,8 @@
 
                 <!-- Footer Save and Cancel buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">Save Recipe as Draft</button>
-                    <a href="{{ route('production.boms.index') }}" class="btn btn-secondary px-4">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4">{{ __('production.save_bom') }}</button>
+                    <a href="{{ route('production.boms.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>
@@ -594,7 +594,7 @@
                     if (this.items.length > 1) {
                         this.items.splice(index, 1);
                     } else {
-                        alert("BOM must contain at least one material component row.");
+                        alert(@js(__('production.must_contain_material_row')));
                     }
                 },
 
