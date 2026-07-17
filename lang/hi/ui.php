@@ -37,6 +37,7 @@ return [
     'erp_module_readiness' => 'ERP मॉड्यूल तैयारी',
     'executive_dashboard' => 'कार्यकारी डैशबोर्ड',
     'filter' => 'फिल्टर',
+    'search' => 'Search',
     'finance_people' => 'वित्त और लोग',
     'front_office' => 'फ्रंट ऑफिस',
     'home' => 'होम',

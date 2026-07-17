@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Repositories;
 
+use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TaskDependency;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -38,5 +39,17 @@ class TaskDependencyRepository implements TaskDependencyRepositoryInterface
         return TaskDependency::query()
             ->where('project_id', $projectId)
             ->get(['task_id', 'depends_on_task_id']);
+    }
+
+    public function hasOpenDependenciesForMilestone(int $milestoneId): bool
+    {
+        return TaskDependency::query()
+            ->whereHas('task', function ($query) use ($milestoneId) {
+                $query->where('milestone_id', $milestoneId);
+            })
+            ->whereHas('dependsOn', function ($query) {
+                $query->where('status', '!=', Task::STATUS_COMPLETED);
+            })
+            ->exists();
     }
 }
