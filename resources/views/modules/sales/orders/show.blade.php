@@ -76,7 +76,7 @@
     @php
         $soTabs = [
             ['id' => 'tab-order', 'label' => 'Sales Order Details', 'active' => true, 'icon' => 'feather-shopping-cart'],
-            ['id' => 'tab-deliveries', 'label' => 'Delivery Orders (' . $order->deliveries->count() . ')', 'active' => false, 'icon' => 'feather-truck'],
+            ['id' => 'tab-deliveries', 'label' => 'Material Requirements (' . $order->materialRequirements->count() . ')', 'active' => false, 'icon' => 'feather-clipboard'],
             ['id' => 'tab-invoices', 'label' => 'Invoices (' . $order->invoices->count() . ')', 'active' => false, 'icon' => 'feather-file-text'],
             ['id' => 'tab-payments', 'label' => 'Payments (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
             ['id' => 'tab-returns', 'label' => 'Returns (' . $order->returns->count() . ')', 'active' => false, 'icon' => 'feather-rotate-ccw'],
@@ -435,13 +435,13 @@
                     </div>
                 </div>
 
-                <!-- TAB 2: Delivery Orders -->
+                <!-- TAB 2: Material Requirements -->
                 <div class="tab-pane fade" id="tab-deliveries">
                     <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
-                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-truck me-2 text-primary"></i>Fulfillment History (Delivery Orders)</h5>
+                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-clipboard me-2 text-primary"></i>Fulfillment History (Material Requirements)</h5>
                         @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                            <x-ui.button href="{{ route('sales.deliveries.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
-                                Create Delivery Order
+                            <x-ui.button href="{{ route('sales.material-requirements.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
+                                Create Material Requirement
                             </x-ui.button>
                         @endif
                     </div>
@@ -449,7 +449,7 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                                 <tr>
-                                    <th class="ps-4">Delivery Number</th>
+                                    <th class="ps-4">Requirement Number</th>
                                     <th>Date</th>
                                     <th>Carrier</th>
                                     <th>Tracking Number</th>
@@ -458,18 +458,18 @@
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
-                                @forelse ($order->deliveries as $do)
+                                @forelse ($order->materialRequirements as $do)
                                     @php
                                         $doBadge = 'bg-soft-secondary text-secondary';
                                         if ($do->status === 'Shipped') $doBadge = 'bg-soft-success text-success';
                                         elseif ($do->status === 'Cancelled') $doBadge = 'bg-soft-danger text-danger';
 
                                         // Check if this specific shipment has already been invoiced
-                                        $invoiced = $order->invoices->where('delivery_order_id', $do->id)->first();
+                                        $invoiced = $order->invoices->where('material_requirement_id', $do->id)->first();
                                     @endphp
                                     <tr>
-                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.deliveries.show', $do->id) }}" class="text-primary">{{ $do->delivery_number }}</a></td>
-                                        <td>{{ $do->delivery_date->format('d/m/Y') }}</td>
+                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.material-requirements.show', $do->id) }}" class="text-primary">{{ $do->requirement_number }}</a></td>
+                                        <td>{{ $do->requirement_date->format('d/m/Y') }}</td>
                                         <td>{{ $do->carrier ?: '—' }}</td>
                                         <td>{{ $do->tracking_number ?: '—' }}</td>
                                         <td><span class="badge {{ $doBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $do->status }}</span></td>
@@ -479,15 +479,15 @@
                                                     <span class="fs-12 text-muted me-2">
                                                         Invoiced: <a href="{{ route('sales.invoices.show', $invoiced->id) }}" class="text-success fw-bold">{{ $invoiced->invoice_number }}</a>
                                                     </span>
-                                                    <x-ui.action-dropdown :viewUrl="route('sales.deliveries.show', $do->id)">
-                                                        <x-ui.dropdown-item href="{{ route('sales.deliveries.show', $do->id) }}" icon="feather-eye">
+                                                    <x-ui.action-dropdown :viewUrl="route('sales.material-requirements.show', $do->id)">
+                                                        <x-ui.dropdown-item href="{{ route('sales.material-requirements.show', $do->id) }}" icon="feather-eye">
                                                             View Details
                                                         </x-ui.dropdown-item>
                                                     </x-ui.action-dropdown>
                                                 </div>
                                             @else
-                                                <x-ui.action-dropdown :viewUrl="route('sales.deliveries.show', $do->id)">
-                                                    <x-ui.dropdown-item href="{{ route('sales.deliveries.show', $do->id) }}" icon="feather-eye">
+                                                <x-ui.action-dropdown :viewUrl="route('sales.material-requirements.show', $do->id)">
+                                                    <x-ui.dropdown-item href="{{ route('sales.material-requirements.show', $do->id) }}" icon="feather-eye">
                                                         View Details
                                                     </x-ui.dropdown-item>
                                                     @php
@@ -497,7 +497,7 @@
                                                             : ($do->status === 'Delivered');
                                                     @endphp
                                                     @if ($canInvoice && !$invoiced)
-                                                        <x-ui.dropdown-item href="{{ route('sales.invoices.create', ['delivery_order_id' => $do->id]) }}" icon="feather-file-text">
+                                                        <x-ui.dropdown-item href="{{ route('sales.invoices.create', ['material_requirement_id' => $do->id]) }}" icon="feather-file-text">
                                                             Create Invoice
                                                         </x-ui.dropdown-item>
                                                     @endif
@@ -553,9 +553,9 @@
                                         <td class="ps-4 fw-bold"><a href="{{ route('sales.invoices.show', $inv->id) }}" class="text-primary">{{ $inv->invoice_number }}</a></td>
                                         <td>{{ date('d/m/Y', strtotime($inv->invoice_date)) }}</td>
                                         <td>
-                                            @if ($inv->deliveryOrder)
-                                                <a href="{{ route('sales.deliveries.show', $inv->delivery_order_id) }}" class="text-muted fw-semibold">
-                                                    {{ $inv->deliveryOrder->delivery_number }}
+                                            @if ($inv->materialRequirement)
+                                                <a href="{{ route('sales.material-requirements.show', $inv->material_requirement_id) }}" class="text-muted fw-semibold">
+                                                    {{ $inv->materialRequirement->requirement_number }}
                                                 </a>
                                             @else
                                                 <span class="text-muted">Full Order Billing</span>

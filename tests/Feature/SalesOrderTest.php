@@ -234,12 +234,12 @@ class SalesOrderTest extends TestCase
         $order->refresh();
         $this->assertEquals('Confirmed', $order->status);
 
-        // 2. Ship via Delivery Order
-        $do = \App\Domains\Sales\Models\DeliveryOrder::create([
+        // 2. Ship via Material Requirement
+        $do = \App\Domains\Sales\Models\MaterialRequirement::create([
             'tenant_id' => $this->tenant->id,
             'sales_order_id' => $order->id,
-            'delivery_number' => 'DO-001',
-            'delivery_date' => now(),
+            'requirement_number' => 'MR-001',
+            'requirement_date' => now(),
             'status' => 'Draft',
         ]);
         $doItem = $do->items()->create([
@@ -251,7 +251,7 @@ class SalesOrderTest extends TestCase
 
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
-            ->post(route('sales.deliveries.ship', $do->id));
+            ->post(route('sales.material-requirements.ship', $do->id));
 
         $order->refresh();
         $this->assertEquals('Shipped', $order->status);
@@ -380,10 +380,10 @@ class SalesOrderTest extends TestCase
         // Confirm Order
         $order->update(['status' => 'Confirmed']);
 
-        // 1. Create Delivery Order — verify only Buy item is present
+        // 1. Create Material Requirement — verify only Buy item is present
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'test-tenant')
-            ->get(route('sales.deliveries.create', ['sales_order_id' => $order->id]));
+            ->get(route('sales.material-requirements.create', ['sales_order_id' => $order->id]));
 
         $response->assertStatus(200);
         $response->assertSee('Buy Widget');

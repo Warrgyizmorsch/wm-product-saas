@@ -3,7 +3,7 @@
 namespace App\Domains\Sales\Controllers;
 
 use App\Domains\Sales\Models\SalesOrder;
-use App\Domains\Sales\Models\DeliveryOrder;
+use App\Domains\Sales\Models\MaterialRequirement;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\SalesReturn;
 use App\Domains\Sales\Models\SalesReturnItem;
@@ -20,7 +20,7 @@ class SalesReturnController extends Controller
     {
         $this->authorize('viewAny', SalesReturn::class);
 
-        $returns = SalesReturn::with(['salesOrder.customer', 'deliveryOrder', 'invoice'])->latest()->get();
+        $returns = SalesReturn::with(['salesOrder.customer', 'materialRequirement', 'invoice'])->latest()->get();
 
         return view('modules.sales.returns.index', [
             'returns' => $returns,
@@ -32,7 +32,7 @@ class SalesReturnController extends Controller
         $this->authorize('create', SalesReturn::class);
 
         $salesOrders = SalesOrder::with('customer')->orderBy('sales_order_number')->get();
-        $deliveries = DeliveryOrder::orderBy('delivery_number')->get();
+        $deliveries = MaterialRequirement::orderBy('requirement_number')->get();
         $invoices = Invoice::orderBy('invoice_number')->get();
 
         // Calculate next return number
@@ -46,7 +46,7 @@ class SalesReturnController extends Controller
             'invoices' => $invoices,
             'nextReturnNumber' => $nextReturnNumber,
             'prefillSalesOrderId' => $request->input('sales_order_id'),
-            'prefillDeliveryOrderId' => $request->input('delivery_order_id'),
+            'prefillDeliveryOrderId' => $request->input('material_requirement_id'),
             'prefillInvoiceId' => $request->input('invoice_id'),
         ]);
     }
@@ -59,7 +59,7 @@ class SalesReturnController extends Controller
             'return_number' => 'required|string',
             'return_date' => 'required|date',
             'sales_order_id' => 'nullable|exists:sales_orders,id',
-            'delivery_order_id' => 'nullable|exists:delivery_orders,id',
+            'material_requirement_id' => 'nullable|exists:material_requirements,id',
             'invoice_id' => 'nullable|exists:invoices,id',
             'reason' => 'nullable|string',
             'items' => 'required|array',
@@ -77,7 +77,7 @@ class SalesReturnController extends Controller
 
             $return = SalesReturn::create([
                 'sales_order_id' => $validated['sales_order_id'] ?? null,
-                'delivery_order_id' => $validated['delivery_order_id'] ?? null,
+                'material_requirement_id' => $validated['material_requirement_id'] ?? null,
                 'invoice_id' => $validated['invoice_id'] ?? null,
                 'return_number' => $validated['return_number'],
                 'return_date' => $validated['return_date'],
@@ -106,7 +106,7 @@ class SalesReturnController extends Controller
 
     public function show(int $id): View
     {
-        $return = SalesReturn::with(['salesOrder.customer', 'deliveryOrder', 'invoice', 'items.product', 'items.warehouse'])->findOrFail($id);
+        $return = SalesReturn::with(['salesOrder.customer', 'materialRequirement', 'invoice', 'items.product', 'items.warehouse'])->findOrFail($id);
 
         $this->authorize('view', $return);
 

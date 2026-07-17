@@ -27,7 +27,7 @@ class ProductionPlanService
                 ->where('status', 'draft')
                 ->whereNull('production_plan_id')
                 ->whereNull('production_order_id')
-                ->with('deliveryOrderItem.deliveryOrder')
+                ->with('materialRequirementItem.materialRequirement')
                 ->lockForUpdate()
                 ->findOrFail($dto->production_order_request_id);
 
@@ -38,8 +38,8 @@ class ProductionPlanService
                 start_date: $dto->start_date,
                 end_date: $dto->end_date,
                 production_order_request_id: $dto->production_order_request_id,
-                sales_order_id: $request->deliveryOrderItem?->deliveryOrder?->sales_order_id,
-                sales_order_item_id: $request->deliveryOrderItem?->sales_order_item_id,
+                sales_order_id: $request->materialRequirementItem?->materialRequirement?->sales_order_id,
+                sales_order_item_id: $request->materialRequirementItem?->sales_order_item_id,
                 bom_id: $dto->bom_id,
                 routing_id: $dto->routing_id,
                 description: $dto->description,

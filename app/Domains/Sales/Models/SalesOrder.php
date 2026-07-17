@@ -79,9 +79,9 @@ class SalesOrder extends BaseModel
         return $this->hasMany(SalesOrderItem::class);
     }
 
-    public function deliveries(): HasMany
+    public function materialRequirements(): HasMany
     {
-        return $this->hasMany(DeliveryOrder::class);
+        return $this->hasMany(MaterialRequirement::class);
     }
 
     public function invoices(): HasMany

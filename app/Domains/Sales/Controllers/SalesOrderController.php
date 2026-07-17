@@ -14,8 +14,8 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use App\Domains\Sales\Models\DeliveryOrder;
-use App\Domains\Sales\Models\DeliveryOrderItem;
+use App\Domains\Sales\Models\MaterialRequirement;
+use App\Domains\Sales\Models\MaterialRequirementItem;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -142,7 +142,7 @@ class SalesOrderController extends Controller
             'quotation', 
             'items.product', 
             'items.warehouse',
-            'deliveries.items', 
+            'materialRequirements.items', 
             'invoices.items', 
             'allocations.payment', 
             'returns.items',
@@ -271,12 +271,12 @@ class SalesOrderController extends Controller
                 'status' => 'Confirmed',
             ]);
 
-            // Auto-create one Delivery Order linked to the Sales Order
-            $delivery = DeliveryOrder::create([
+            // Auto-create one Material Requirement linked to the Sales Order
+            $delivery = MaterialRequirement::create([
                 'tenant_id' => $order->tenant_id,
                 'sales_order_id' => $order->id,
-                'delivery_number' => app(\App\Domains\Sales\Services\DeliveryOrderService::class)->getNextDeliveryNumber(),
-                'delivery_date' => now(),
+                'requirement_number' => app(\App\Domains\Sales\Services\MaterialRequirementService::class)->getNextRequirementNumber(),
+                'requirement_date' => now(),
                 'status' => 'Pending',
             ]);
 
@@ -285,8 +285,8 @@ class SalesOrderController extends Controller
                 ->first()?->id ?? 1;
 
             foreach ($order->items as $soItem) {
-                DeliveryOrderItem::create([
-                    'delivery_order_id' => $delivery->id,
+                MaterialRequirementItem::create([
+                    'material_requirement_id' => $delivery->id,
                     'sales_order_item_id' => $soItem->id,
                     'product_id' => $soItem->product_id,
                     'warehouse_id' => $soItem->warehouse_id ?? $defaultWarehouseId,
@@ -301,7 +301,7 @@ class SalesOrderController extends Controller
         });
 
         return redirect()->route('sales.orders.show', $order->id)
-            ->with('success', 'Sales Order confirmed and Delivery Order generated successfully!');
+            ->with('success', 'Sales Order confirmed and Material Requirement generated successfully!');
     }
 
     public function cancel(int $id): RedirectResponse

@@ -113,8 +113,8 @@
                             <option value="">Select Draft Sales Request...</option>
                             @foreach($productionOrderRequests as $request)
                                 @php
-                                    $deliveryItem = $request->deliveryOrderItem;
-                                    $delivery = $deliveryItem?->deliveryOrder;
+                                    $deliveryItem = $request->materialRequirementItem;
+                                    $delivery = $deliveryItem?->materialRequirement;
                                     $sales = $delivery?->salesOrder ?? $deliveryItem?->salesOrderItem?->salesOrder;
                                     $product = $request->product;
                                 @endphp
@@ -126,7 +126,7 @@
                                     @selected(old('production_order_request_id') == $request->id)>
                                     {{ $sales?->sales_order_number ?? 'Sales Order #' . ($sales?->id ?? 'N/A') }}
                                     @if($delivery)
-                                        / {{ $delivery->delivery_number }}
+                                        / {{ $delivery->requirement_number }}
                                     @endif
                                     @if($product)
                                         — {{ $product->name }} ({{ $product->sku }})

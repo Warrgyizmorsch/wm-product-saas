@@ -16,8 +16,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $tenantSlug = config('tenancy.local_fallback_slug') ?: 'warrgyizmorsch';
         $tenant = Tenant::query()->updateOrCreate(
-            ['slug' => 'demo'],
+            ['slug' => $tenantSlug],
             [
                 'name' => 'Demo Tenant',
                 'domain' => null,

@@ -15,7 +15,7 @@ class DispatchOrder extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'delivery_order_id',
+        'material_requirement_id',
         'sales_order_id',
         'dispatch_number',
         'dispatch_date',
@@ -32,9 +32,9 @@ class DispatchOrder extends BaseModel
         'dispatch_date' => 'date',
     ];
 
-    public function deliveryOrder(): BelongsTo
+    public function materialRequirement(): BelongsTo
     {
-        return $this->belongsTo(DeliveryOrder::class, 'delivery_order_id');
+        return $this->belongsTo(MaterialRequirement::class, 'material_requirement_id');
     }
 
     public function salesOrder(): BelongsTo

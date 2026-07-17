@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Create Delivery Order | SaaS ERP')
-@section('page-title', 'Create Delivery Order')
-@section('breadcrumb', 'Sales / Deliveries / Create')
+@section('title', 'Create Material Requirement | SaaS ERP')
+@section('page-title', 'Create Material Requirement')
+@section('breadcrumb', 'Sales / Material Requirements / Create')
 
 @section('content')
     @if ($errors->any())
@@ -16,15 +16,15 @@
         </x-ui.alert>
     @endif
 
-    <form action="{{ route('sales.deliveries.store') }}" method="POST" id="deliveryForm">
+    <form action="{{ route('sales.material-requirements.store') }}" method="POST" id="deliveryForm">
         @csrf
         <input type="hidden" name="sales_order_id" value="{{ $salesOrder->id }}">
 
         <x-ui.odoo-form-ui type="sheet" class="erp-single-panel bg-white p-4">
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                 <div>
-                    <h5 class="fw-bold text-dark mb-0">New Delivery Order (Fulfillment)</h5>
-                    <span class="fs-12 text-muted">Fulfillment for Sales Order: <strong>{{ $salesOrder->sales_order_number }}</strong></span>
+                    <h5 class="fw-bold text-dark mb-0">New Material Requirement</h5>
+                    <span class="fs-12 text-muted">Requirement for Sales Order: <strong>{{ $salesOrder->sales_order_number }}</strong></span>
                 </div>
                 <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" size="sm" class="border">Cancel</x-ui.button>
             </div>
@@ -41,22 +41,22 @@
 
                 <!-- Column 2: Delivery Meta -->
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" label="Delivery Number" name="delivery_number" :value="old('delivery_number', $nextDeliveryNumber)" :readonly="true" :required="true" style="font-weight: bold; color: #495057;" />
+                    <x-ui.odoo-form-ui type="input" label="Requirement Number" name="requirement_number" :value="old('requirement_number', $nextDeliveryNumber)" :readonly="true" :required="true" style="font-weight: bold; color: #495057;" />
 
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Delivery Date" name="delivery_date" :value="old('delivery_date', date('Y-m-d'))" :required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="Requirement Date" name="requirement_date" :value="old('requirement_date', date('Y-m-d'))" :required="true" />
                 </div>
             </div>
 
             <!-- Notes -->
             <div class="row g-4 mt-1 border-top pt-3 fs-13 text-dark">
                 <div class="col-md-12">
-                    <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" rows="2" placeholder="Private internal shipping remarks...">{{ old('notes') }}</x-ui.odoo-form-ui>
+                    <x-ui.odoo-form-ui type="textarea" label="Internal Notes" name="notes" rows="2" placeholder="Private internal remarks...">{{ old('notes') }}</x-ui.odoo-form-ui>
                 </div>
             </div>
 
             <!-- Delivery Lines Table -->
             <div class="border-top pt-4 mt-4">
-                <h5 class="fw-bold text-dark mb-3 fs-14">Items to Ship</h5>
+                <h5 class="fw-bold text-dark mb-3 fs-14">Items to Require</h5>
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table" id="deliveryItemsTable">
                         <thead>
@@ -65,7 +65,7 @@
                                 <th style="width: 25%;">Source Warehouse</th>
                                 <th class="text-end" style="width: 13%;">Ordered Qty</th>
                                 <th class="text-end" style="width: 13%;">Shipped Qty</th>
-                                <th class="text-end pe-3" style="width: 14%;">Qty to Deliver</th>
+                                <th class="text-end pe-3" style="width: 14%;">Qty to Require</th>
                             </tr>
                         </thead>
                         <tbody class="fs-13 text-dark">
@@ -96,7 +96,7 @@
                                                 @foreach ($warehouses as $wh)
                                                     <option value="{{ $wh->id }}" {{ $selectedWhId == $wh->id ? 'selected' : '' }}>
                                                         {{ $wh->name }}
-                                                    </option>
+                                                     </option>
                                                 @endforeach
                                             </select>
                                             <span class="available-qty-display d-block fs-11 mt-1 font-monospace text-muted" id="avail-qty-{{ $item->id }}">Available: 0</span>
@@ -116,7 +116,7 @@
                                                        style="width: 100px; margin-left: auto;">
                                                 <div class="text-end text-danger fw-semibold mt-1 fs-11 validation-error-msg" id="error-{{ $item->id }}" style="display: none;"></div>
                                             @else
-                                                <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11">Fully Delivered</span>
+                                                <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11">Fully Required</span>
                                                 <input type="hidden" name="items[{{ $item->id }}][quantity]" value="0">
                                             @endif
                                         </td>
@@ -130,7 +130,7 @@
 
             <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
                 <x-ui.button href="{{ route('sales.orders.show', $salesOrder->id) }}" variant="light" size="md" class="border py-2 px-4 fs-12 shadow-sm">Discard</x-ui.button>
-                <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">Save Delivery Order</x-ui.button>
+                <x-ui.button type="submit" variant="primary" size="md" class="py-2 px-5 fw-bold fs-12 shadow-sm" style="background-color: #1e40af; border-color: #1e40af;">Save Material Requirement</x-ui.button>
             </div>
         </x-ui.odoo-form-ui>
     </form>

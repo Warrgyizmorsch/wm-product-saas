@@ -3,6 +3,8 @@
 namespace App\Domains\Production\Controllers;
 
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\DTO\ProductionPlanDTO;
 use App\Domains\Production\Models\ProductionBom;
 use App\Domains\Production\Models\ProductionOrderRequest;
@@ -104,8 +106,8 @@ class ProductionPlanController extends Controller
             ->whereNull('production_order_id')
             ->with([
                 'product',
-                'deliveryOrderItem.deliveryOrder.salesOrder.customer',
-                'deliveryOrderItem.salesOrderItem.salesOrder',
+                'materialRequirementItem.materialRequirement.salesOrder.customer',
+                'materialRequirementItem.salesOrderItem.salesOrder',
             ])
             ->orderByDesc('id')
             ->get();
@@ -360,5 +362,113 @@ class ProductionPlanController extends Controller
             'boms' => $boms,
             'routings' => $routings,
         ]);
+    }
+
+    public function getBomExplosion(Request $request)
+    {
+        $productId = $request->input('product_id');
+        $bomId = $request->input('bom_id');
+        $qtyToManufacture = (float) $request->input('quantity', 1.0);
+        $tenantId = require_tenant_id();
+
+        $warehouse = Warehouse::where('tenant_id', $tenantId)->orderByDesc('is_default')->first();
+        $warehouseId = $warehouse?->id ?? 0;
+
+        $items = [];
+        $visited = [];
+
+        $this->explodeBOMRecursively(
+            $productId,
+            $bomId,
+            $qtyToManufacture,
+            $tenantId,
+            "",
+            $warehouseId,
+            $items,
+            $visited
+        );
+
+        if (empty($items)) {
+            return response()->json(['success' => false, 'message' => 'No approved BOM found for this product.']);
+        }
+
+        return response()->json([
+            'success' => true,
+            'items' => $items,
+            'warehouse_name' => $warehouse?->name ?? 'Default Warehouse'
+        ]);
+    }
+
+    private function explodeBOMRecursively(int $productId, ?int $bomId, float $qty, int $tenantId, string $prefix, int $warehouseId, array &$items, array &$visited)
+    {
+        if (isset($visited[$productId])) {
+            return; // Prevent loops
+        }
+        $visited[$productId] = true;
+
+        if ($bomId) {
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $bomId)
+                ->with(['items.material', 'items.uom'])
+                ->first();
+        } else {
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('product_id', $productId)
+                ->where('status', 'approved')
+                ->with(['items.material', 'items.uom'])
+                ->first();
+        }
+
+        if (!$bom) {
+            return;
+        }
+
+        $baseQty = $bom->base_quantity > 0 ? $bom->base_quantity : 1.0;
+        $multiplier = $qty / $baseQty;
+
+        $index = 1;
+        foreach ($bom->items as $item) {
+            if (!$item->material) continue;
+
+            $reqQty = $item->quantity * $multiplier;
+            $availQty = StockService::getAvailableStock($item->material_id, $warehouseId);
+            $forProdQty = max(0.0, $reqQty - $availQty);
+            $rate = (float) ($item->material->unit_cost ?? 0.0);
+            $amount = $reqQty * $rate;
+
+            $itemPrefix = $prefix === "" ? (string)$index : $prefix . "." . $index;
+
+            $items[] = [
+                'prefix' => $itemPrefix,
+                'component_name' => $item->material->name,
+                'component_sku' => $item->material->sku,
+                'type' => ucfirst(str_replace('_', ' ', $item->material->type)),
+                'quantity_required' => $reqQty,
+                'available_quantity' => $availQty,
+                'for_production_qty' => $forProdQty,
+                'uom' => $item->uom ? $item->uom->code : 'PCS',
+                'rate' => $rate,
+                'amount' => $amount,
+                'notes' => $item->remarks ?? '',
+            ];
+
+            if ($item->material->type === 'semi_finished') {
+                $subVisited = $visited;
+                $this->explodeBOMRecursively(
+                    $item->material_id,
+                    $item->child_bom_id,
+                    $reqQty,
+                    $tenantId,
+                    $itemPrefix,
+                    $warehouseId,
+                    $items,
+                    $subVisited
+                );
+            }
+
+            $index++;
+        }
     }
 }

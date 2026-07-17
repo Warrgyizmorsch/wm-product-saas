@@ -17,8 +17,8 @@ use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Services\MrpEngineService;
 use App\Domains\Production\Services\PlanningValidationService;
-use App\Domains\Sales\Models\DeliveryOrder;
-use App\Domains\Sales\Models\DeliveryOrderItem;
+use App\Domains\Sales\Models\MaterialRequirement;
+use App\Domains\Sales\Models\MaterialRequirementItem;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\SalesOrderItem;
 use App\Models\Tenant;
@@ -254,15 +254,15 @@ class ProductionPlanningTest extends TestCase
             'unit_price' => 100,
             'amount' => 500,
         ]);
-        $delivery = DeliveryOrder::create([
+        $delivery = MaterialRequirement::create([
             'tenant_id' => $this->tenant->id,
             'sales_order_id' => $salesOrder->id,
-            'delivery_number' => 'DO-2001',
-            'delivery_date' => today(),
+            'requirement_number' => 'MR-2001',
+            'requirement_date' => today(),
             'status' => 'Waiting Production',
         ]);
-        $deliveryItem = DeliveryOrderItem::create([
-            'delivery_order_id' => $delivery->id,
+        $deliveryItem = MaterialRequirementItem::create([
+            'material_requirement_id' => $delivery->id,
             'sales_order_item_id' => $salesOrderItem->id,
             'product_id' => $this->finishedGood->id,
             'warehouse_id' => $warehouse->id,
@@ -273,7 +273,7 @@ class ProductionPlanningTest extends TestCase
         ]);
         $productionRequest = ProductionOrderRequest::create([
             'tenant_id' => $this->tenant->id,
-            'delivery_order_item_id' => $deliveryItem->id,
+            'material_requirement_item_id' => $deliveryItem->id,
             'product_id' => $this->finishedGood->id,
             'quantity_requested' => 5,
             'status' => 'draft',
@@ -285,7 +285,7 @@ class ProductionPlanningTest extends TestCase
             ->get(route('production.plans.create'))
             ->assertOk()
             ->assertSee('SO-2001')
-            ->assertSee('DO-2001');
+            ->assertSee('MR-2001');
 
         $response = $this->actingAs($this->user)
             ->withHeader('X-Tenant', 'planning-test')

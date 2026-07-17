@@ -3,7 +3,7 @@
 namespace App\Domains\Sales\Controllers;
 
 use App\Domains\Sales\Models\SalesOrder;
-use App\Domains\Sales\Models\DeliveryOrder;
+use App\Domains\Sales\Models\MaterialRequirement;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\InvoiceItem;
 use App\Domains\Sales\Models\PaymentAllocation;
@@ -32,11 +32,11 @@ class InvoiceController extends Controller
         $this->authorize('create', Invoice::class);
 
         $salesOrderId = $request->input('sales_order_id');
-        $deliveryOrderId = $request->input('delivery_order_id');
+        $deliveryOrderId = $request->input('material_requirement_id');
 
         $deliveryOrder = null;
         if ($deliveryOrderId) {
-            $deliveryOrder = DeliveryOrder::with('items.product', 'items.warehouse', 'items.salesOrderItem')->findOrFail($deliveryOrderId);
+            $deliveryOrder = MaterialRequirement::with('items.product', 'items.warehouse', 'items.salesOrderItem')->findOrFail($deliveryOrderId);
             $salesOrderId = $deliveryOrder->sales_order_id;
         }
 
@@ -71,7 +71,7 @@ class InvoiceController extends Controller
 
                 $invoiceItems[] = [
                     'sales_order_item_id' => $soItem?->id,
-                    'delivery_order_item_id' => $doItem->id,
+                    'material_requirement_item_id' => $doItem->id,
                     'product_id' => $doItem->product_id,
                     'product_name' => $doItem->product?->name ?? ($soItem?->item_name ?? 'Product'),
                     'sku' => $doItem->product?->sku,
@@ -88,8 +88,9 @@ class InvoiceController extends Controller
             foreach ($salesOrder->items as $soItem) {
                 if (!$soItem->product_id) continue;
                 $invoiceItems[] = [
+                    'sales_order_id' => $salesOrder->id,
                     'sales_order_item_id' => $soItem->id,
-                    'delivery_order_item_id' => null,
+                    'material_requirement_item_id' => null,
                     'product_id' => $soItem->product_id,
                     'product_name' => $soItem->item_name,
                     'sku' => $soItem->product?->sku,
@@ -106,7 +107,7 @@ class InvoiceController extends Controller
 
         return view('modules.sales.invoices.create', [
             'salesOrder' => $salesOrder,
-            'deliveryOrder' => $deliveryOrder,
+            'materialRequirement' => $deliveryOrder,
             'invoiceItems' => $invoiceItems,
             'nextInvoiceNumber' => $nextInvoiceNumber,
             'advanceAllocations' => $advanceAllocations,
@@ -119,14 +120,14 @@ class InvoiceController extends Controller
 
         $validated = $request->validate([
             'sales_order_id' => 'required|exists:sales_orders,id',
-            'delivery_order_id' => 'nullable|exists:delivery_orders,id',
+            'material_requirement_id' => 'nullable|exists:material_requirements,id',
             'invoice_number' => 'required|string',
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
             'notes' => 'nullable|string',
             'items' => 'required|array',
             'items.*.sales_order_item_id' => 'nullable|integer',
-            'items.*.delivery_order_item_id' => 'nullable|integer',
+            'items.*.material_requirement_item_id' => 'nullable|integer',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.warehouse_id' => 'required|exists:warehouses,id',
             'items.*.quantity' => 'required|numeric|min:0.0001',
@@ -163,7 +164,7 @@ class InvoiceController extends Controller
             $invoice = Invoice::create([
                 'tenant_id' => $salesOrder->tenant_id,
                 'sales_order_id' => $salesOrder->id,
-                'delivery_order_id' => $validated['delivery_order_id'] ?? null,
+                'material_requirement_id' => $validated['material_requirement_id'] ?? null,
                 'invoice_number' => $validated['invoice_number'],
                 'invoice_date' => $validated['invoice_date'],
                 'due_date' => $validated['due_date'],
@@ -186,7 +187,7 @@ class InvoiceController extends Controller
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
                     'sales_order_item_id' => $itemData['sales_order_item_id'] ?? null,
-                    'delivery_order_item_id' => $itemData['delivery_order_item_id'] ?? null,
+                    'material_requirement_item_id' => $itemData['material_requirement_item_id'] ?? null,
                     'product_id' => $itemData['product_id'],
                     'warehouse_id' => $itemData['warehouse_id'],
                     'quantity' => $qty,
@@ -228,7 +229,7 @@ class InvoiceController extends Controller
 
     public function show(int $id): View
     {
-        $invoice = Invoice::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'allocations.payment', 'deliveryOrder'])->findOrFail($id);
+        $invoice = Invoice::with(['salesOrder.customer', 'items.product', 'items.warehouse', 'allocations.payment', 'materialRequirement'])->findOrFail($id);
 
         $this->authorize('view', $invoice);
 

@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Concerns\BelongsToTenant;
 
-class DeliveryOrderItem extends Model
+class MaterialRequirementItem extends Model
 {
     use BelongsToTenant, HasFactory;
 
-    protected $table = 'delivery_order_items';
+    protected $table = 'material_requirement_items';
 
     protected $fillable = [
-        'delivery_order_id',
+        'material_requirement_id',
         'sales_order_item_id',
         'product_id',
         'warehouse_id',
@@ -29,7 +29,7 @@ class DeliveryOrderItem extends Model
     ];
 
     protected $casts = [
-        'delivery_order_id' => 'integer',
+        'material_requirement_id' => 'integer',
         'sales_order_item_id' => 'integer',
         'product_id' => 'integer',
         'warehouse_id' => 'integer',
@@ -41,9 +41,9 @@ class DeliveryOrderItem extends Model
         'production_order_id' => 'integer',
     ];
 
-    public function deliveryOrder(): BelongsTo
+    public function materialRequirement(): BelongsTo
     {
-        return $this->belongsTo(DeliveryOrder::class);
+        return $this->belongsTo(MaterialRequirement::class, 'material_requirement_id');
     }
 
     public function salesOrderItem(): BelongsTo
@@ -68,7 +68,7 @@ class DeliveryOrderItem extends Model
 
     public function serialNumbers(): HasMany
     {
-        return $this->hasMany(\App\Domains\Inventory\Models\SerialNumber::class, 'delivery_order_item_id');
+        return $this->hasMany(\App\Domains\Inventory\Models\SerialNumber::class, 'material_requirement_item_id');
     }
 
     public function purchaseRequisition(): BelongsTo
@@ -83,14 +83,14 @@ class DeliveryOrderItem extends Model
 
     public function dispatchItems(): HasMany
     {
-        return $this->hasMany(DispatchOrderItem::class, 'delivery_order_item_id');
+        return $this->hasMany(DispatchOrderItem::class, 'material_requirement_item_id');
     }
 
     protected static function booted(): void
     {
         static::creating(function (self $item) {
-            if (empty($item->tenant_id) && $item->deliveryOrder) {
-                $item->tenant_id = $item->deliveryOrder->tenant_id;
+            if (empty($item->tenant_id) && $item->materialRequirement) {
+                $item->tenant_id = $item->materialRequirement->tenant_id;
             }
         });
     }

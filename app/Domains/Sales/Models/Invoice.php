@@ -11,7 +11,7 @@ class Invoice extends BaseModel
     protected $fillable = [
         'tenant_id',
         'sales_order_id',
-        'delivery_order_id',
+        'material_requirement_id',
         'invoice_number',
         'invoice_date',
         'due_date',
@@ -28,9 +28,9 @@ class Invoice extends BaseModel
         return $this->belongsTo(SalesOrder::class);
     }
 
-    public function deliveryOrder(): BelongsTo
+    public function materialRequirement(): BelongsTo
     {
-        return $this->belongsTo(DeliveryOrder::class);
+        return $this->belongsTo(MaterialRequirement::class, 'material_requirement_id');
     }
 
     public function items(): HasMany

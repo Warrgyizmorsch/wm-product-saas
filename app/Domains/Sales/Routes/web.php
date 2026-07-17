@@ -17,29 +17,29 @@ Route::prefix('sales')
         Route::post('orders/{order}/cancel', [SalesOrderController::class, 'cancel'])->name('orders.cancel');
         Route::get('orders/{order}/download', [SalesOrderController::class, 'downloadPdf'])->name('orders.download');
 
-        // Delivery Orders Routes
-        Route::get('deliveries', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'index'])->name('deliveries.index');
-        Route::get('deliveries/create', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'create'])->name('deliveries.create');
-        Route::post('deliveries', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'store'])->name('deliveries.store');
-        Route::get('deliveries/{delivery}', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'show'])->name('deliveries.show');
-        Route::post('deliveries/{delivery}/ship', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'ship'])->name('deliveries.ship');
-        Route::post('deliveries/{delivery}/cancel', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'cancel'])->name('deliveries.cancel');
+        // Material Requirements Routes
+        Route::get('material-requirements', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'index'])->name('material-requirements.index');
+        Route::get('material-requirements/create', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'create'])->name('material-requirements.create');
+        Route::post('material-requirements', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'store'])->name('material-requirements.store');
+        Route::get('material-requirements/{delivery}', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'show'])->name('material-requirements.show');
+        Route::post('material-requirements/{delivery}/ship', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'ship'])->name('material-requirements.ship');
+        Route::post('material-requirements/{delivery}/cancel', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'cancel'])->name('material-requirements.cancel');
 
-        Route::post('deliveries/items/{itemId}/warehouse', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'updateWarehouse'])->name('deliveries.update-warehouse');
-        Route::post('deliveries/items/{itemId}/reserve', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'reserveQty'])->name('deliveries.reserve-qty');
-        Route::post('deliveries/items/{itemId}/indent', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'mockIndent'])->name('deliveries.mock-indent');
-        Route::post('deliveries/items/{itemId}/mo', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'mockMo'])->name('deliveries.mock-mo');
-        Route::post('deliveries/{delivery}/picking', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'startPicking'])->name('deliveries.picking');
-        Route::post('deliveries/{delivery}/pack', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'pack'])->name('deliveries.pack');
-        Route::post('deliveries/{delivery}/dispatch', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'dispatch'])->name('deliveries.dispatch');
-        Route::post('deliveries/{delivery}/dispatch-order', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'storeDispatchOrder'])->name('deliveries.dispatch-order.store');
-        Route::post('deliveries/{delivery}/deliver', [\App\Domains\Sales\Controllers\DeliveryOrderController::class, 'deliver'])->name('deliveries.deliver');
+        Route::post('material-requirements/items/{itemId}/warehouse', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'updateWarehouse'])->name('material-requirements.update-warehouse');
+        Route::post('material-requirements/items/{itemId}/reserve', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'reserveQty'])->name('material-requirements.reserve-qty');
+        Route::post('material-requirements/items/{itemId}/indent', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'mockIndent'])->name('material-requirements.mock-indent');
+        Route::post('material-requirements/items/{itemId}/mo', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'mockMo'])->name('material-requirements.mock-mo');
+        Route::post('material-requirements/{delivery}/picking', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'startPicking'])->name('material-requirements.picking');
+        Route::post('material-requirements/{delivery}/pack', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'pack'])->name('material-requirements.pack');
+        Route::post('material-requirements/{delivery}/dispatch', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'dispatch'])->name('material-requirements.dispatch');
+        Route::post('material-requirements/{delivery}/dispatch-order', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'storeDispatchOrder'])->name('material-requirements.dispatch-order.store');
+        Route::post('material-requirements/{delivery}/deliver', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'deliver'])->name('material-requirements.deliver');
 
         // Dispatch Orders Routes
         Route::get('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'index'])->name('dispatches.index');
         Route::get('dispatches/create', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'create'])->name('dispatches.create');
         Route::post('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'store'])->name('dispatches.store');
-        Route::get('dispatches/delivery-orders', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'pendingDeliveryOrders'])->name('dispatches.pending-do');
+        Route::get('dispatches/material-requirements', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');
         Route::get('dispatches/warehouse/{warehouse}/address', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'warehouseAddress'])->name('dispatches.warehouse-address');
         Route::get('dispatches/{dispatch}', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'show'])->name('dispatches.show');
 

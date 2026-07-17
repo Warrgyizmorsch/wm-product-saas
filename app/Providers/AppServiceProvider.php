@@ -296,8 +296,8 @@ class AppServiceProvider extends ServiceProvider
         );
 
         \Illuminate\Support\Facades\Gate::policy(
-            \App\Domains\Sales\Models\DeliveryOrder::class,
-            \App\Domains\Sales\Policies\DeliveryOrderPolicy::class
+            \App\Domains\Sales\Models\MaterialRequirement::class,
+            \App\Domains\Sales\Policies\MaterialRequirementPolicy::class
         );
 
         \Illuminate\Support\Facades\Gate::policy(

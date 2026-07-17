@@ -4,40 +4,40 @@ namespace App\Domains\Sales\Services;
 
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\SalesOrderItem;
-use App\Domains\Sales\Models\DeliveryOrder;
-use App\Domains\Sales\Models\DeliveryOrderItem;
+use App\Domains\Sales\Models\MaterialRequirement;
+use App\Domains\Sales\Models\MaterialRequirementItem;
 use App\Domains\Inventory\Services\StockService;
 use App\Domains\Inventory\Models\SerialNumber;
 use Illuminate\Support\Facades\DB;
 
-class DeliveryOrderService
+class MaterialRequirementService
 {
-    public function getNextDeliveryNumber(): string
+    public function getNextRequirementNumber(): string
     {
-        $latest = DeliveryOrder::query()->latest('id')->first();
+        $latest = MaterialRequirement::query()->latest('id')->first();
         if (!$latest) {
-            return 'DO-0001';
+            return 'MR-0001';
         }
-        $rawNum = str_replace('DO-', '', $latest->delivery_number);
+        $rawNum = str_replace('MR-', '', $latest->requirement_number);
         $nextSeq = intval($rawNum) + 1;
-        return 'DO-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        return 'MR-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
     }
 
-    public function create(array $data, array $items): DeliveryOrder
+    public function create(array $data, array $items): MaterialRequirement
     {
         return DB::transaction(function () use ($data, $items) {
             $salesOrderId = $data['sales_order_id'];
             $salesOrder = SalesOrder::findOrFail($salesOrderId);
 
-            if (empty($data['delivery_number'])) {
-                $data['delivery_number'] = $this->getNextDeliveryNumber();
+            if (empty($data['requirement_number'])) {
+                $data['requirement_number'] = $this->getNextRequirementNumber();
             }
 
-            $delivery = DeliveryOrder::create([
+            $delivery = MaterialRequirement::create([
                 'tenant_id' => $salesOrder->tenant_id,
                 'sales_order_id' => $salesOrderId,
-                'delivery_number' => $data['delivery_number'],
-                'delivery_date' => $data['delivery_date'] ?? date('Y-m-d'),
+                'requirement_number' => $data['requirement_number'],
+                'requirement_date' => $data['requirement_date'] ?? date('Y-m-d'),
                 'status' => 'Draft',
                 'carrier' => $data['carrier'] ?? null,
                 'tracking_number' => $data['tracking_number'] ?? null,
@@ -51,8 +51,8 @@ class DeliveryOrderService
                 $soItem = SalesOrderItem::findOrFail($itemId);
 
                 // Calculate remaining unshipped qty
-                $shippedQty = DeliveryOrderItem::query()
-                    ->whereHas('deliveryOrder', function($q) {
+                $shippedQty = MaterialRequirementItem::query()
+                    ->whereHas('materialRequirement', function($q) {
                         $q->where('status', 'Shipped');
                     })
                     ->where('sales_order_item_id', $soItem->id)
@@ -71,8 +71,8 @@ class DeliveryOrderService
                     }
                 }
 
-                DeliveryOrderItem::create([
-                    'delivery_order_id' => $delivery->id,
+                MaterialRequirementItem::create([
+                    'material_requirement_id' => $delivery->id,
                     'sales_order_item_id' => $soItem->id,
                     'product_id' => $soItem->product_id,
                     'warehouse_id' => $warehouseId,
@@ -85,11 +85,11 @@ class DeliveryOrderService
         });
     }
 
-    public function ship(DeliveryOrder $delivery, array $allocations = []): void
+    public function ship(MaterialRequirement $delivery, array $allocations = []): void
     {
         DB::transaction(function () use ($delivery, $allocations) {
             if ($delivery->status !== 'Draft') {
-                throw new \Exception("Only Draft Delivery Orders can be shipped.");
+                throw new \Exception("Only Draft Material Requirements can be shipped.");
             }
 
             $delivery->update(['status' => 'Shipped']);
@@ -131,7 +131,7 @@ class DeliveryOrderService
                     $productId,
                     $warehouseId,
                     $qty,
-                    'DeliveryOrder',
+                    'DeliveryOrder', // Keep the stock outflow transaction type/tag context if needed, or change to MaterialRequirement
                     $delivery->id,
                     $serialsList
                 );
@@ -143,7 +143,7 @@ class DeliveryOrderService
                         ->where('product_id', $productId)
                         ->whereIn('serial_number', $serialsList)
                         ->update([
-                            'delivery_order_item_id' => $doItem->id,
+                            'material_requirement_item_id' => $doItem->id,
                             'status' => 'Sold',
                             'stock_transaction_id_out' => $transaction->id
                         ]);
@@ -160,11 +160,11 @@ class DeliveryOrderService
         });
     }
 
-    public function cancel(DeliveryOrder $delivery): void
+    public function cancel(MaterialRequirement $delivery): void
     {
         DB::transaction(function () use ($delivery) {
             if ($delivery->status !== 'Draft') {
-                throw new \Exception("Only Draft Delivery Orders can be cancelled.");
+                throw new \Exception("Only Draft Material Requirements can be cancelled.");
             }
 
             $delivery->update(['status' => 'Cancelled']);
@@ -179,8 +179,8 @@ class DeliveryOrderService
         foreach ($order->items as $soItem) {
             if (!$soItem->product_id || $soItem->product->type === 'Service') continue;
 
-            $shippedQty = DeliveryOrderItem::query()
-                ->whereHas('deliveryOrder', function($q) {
+            $shippedQty = MaterialRequirementItem::query()
+                ->whereHas('materialRequirement', function($q) {
                     $q->where('status', 'Shipped');
                 })
                 ->where('sales_order_item_id', $soItem->id)

@@ -9,17 +9,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class DeliveryOrder extends BaseModel
+class MaterialRequirement extends BaseModel
 {
     use BelongsToTenant, HasFactory, SoftDeletes;
 
-    protected $table = 'delivery_orders';
+    protected $table = 'material_requirements';
 
     protected $fillable = [
         'tenant_id',
         'sales_order_id',
-        'delivery_number',
-        'delivery_date',
+        'requirement_number',
+        'requirement_date',
         'status',
         'carrier',
         'tracking_number',
@@ -27,7 +27,7 @@ class DeliveryOrder extends BaseModel
     ];
 
     protected $casts = [
-        'delivery_date' => 'date',
+        'requirement_date' => 'date',
     ];
 
     public function salesOrder(): BelongsTo
@@ -37,6 +37,6 @@ class DeliveryOrder extends BaseModel
 
     public function items(): HasMany
     {
-        return $this->hasMany(DeliveryOrderItem::class);
+        return $this->hasMany(MaterialRequirementItem::class, 'material_requirement_id');
     }
 }

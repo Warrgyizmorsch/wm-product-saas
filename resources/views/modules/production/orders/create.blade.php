@@ -76,6 +76,64 @@
                     }
                 });
             });
+
+            function loadBOMPreview() {
+                var productId = $('#product_select').val();
+                var bomId = $('#bom_select').val();
+                var qty = $('input[name="quantity_ordered"]').val() || 1.0;
+
+                if (!productId) {
+                    $('#bom-preview-container').addClass('d-none');
+                    return;
+                }
+
+                $.ajax({
+                    url: "{{ route('production.plans.bom-explosion') }}",
+                    method: 'GET',
+                    data: { product_id: productId, bom_id: bomId, quantity: qty },
+                    success: function(response) {
+                        if (response.success && response.items.length > 0) {
+                            var html = '';
+                            response.items.forEach(function(item) {
+                                var indent = '';
+                                var nameHtml = '';
+                                var dotCount = (item.prefix.match(/\./g) || []).length;
+                                if (dotCount > 0) {
+                                    indent = '↳ ';
+                                    nameHtml = '<div style="margin-left: ' + (dotCount * 15) + 'px;"><span class="text-muted fw-bold">' + indent + '</span><span class="text-dark fw-normal">' + item.component_name + '</span><div class="text-muted fs-11" style="padding-left: 15px;">SKU: ' + item.component_sku + '</div></div>';
+                                } else {
+                                    nameHtml = '<div class="fw-bold text-dark">' + item.component_name + '</div><div class="text-muted fs-11">SKU: ' + item.component_sku + '</div>';
+                                }
+
+                                html += '<tr style="' + (dotCount > 0 ? 'background-color: #fcfcfc;' : '') + '">';
+                                html += '<td class="fw-semibold">' + item.prefix + '</td>';
+                                html += '<td>' + nameHtml + '</td>';
+                                html += '<td>' + item.type + '</td>';
+                                html += '<td class="text-center fw-semibold">' + parseFloat(item.quantity_required).toFixed(4) + '</td>';
+                                html += '<td class="text-center text-muted">' + parseFloat(item.available_quantity).toFixed(4) + '</td>';
+                                html += '<td class="text-center fw-bold ' + (item.for_production_qty > 0 ? 'text-danger' : 'text-success') + '">' + parseFloat(item.for_production_qty).toFixed(4) + '</td>';
+                                html += '<td class="text-center">' + item.uom + '</td>';
+                                html += '<td class="text-center font-monospace">$' + parseFloat(item.rate).toFixed(2) + '</td>';
+                                html += '<td class="text-center font-monospace fw-bold">$' + parseFloat(item.amount).toFixed(2) + '</td>';
+                                html += '<td class="text-muted fs-12">' + (item.notes || '—') + '</td>';
+                                html += '</tr>';
+                            });
+                            $('#bom-preview-table-body').html(html);
+                            $('#bom-preview-warehouse').text(response.warehouse_name);
+                            $('#bom-preview-container').removeClass('d-none');
+                        } else {
+                            $('#bom-preview-container').addClass('d-none');
+                        }
+                    },
+                    error: function() {
+                        $('#bom-preview-container').addClass('d-none');
+                    }
+                });
+            }
+
+            // Bind preview loading events
+            $('#product_select, #bom_select').on('change', loadBOMPreview);
+            $('input[name="quantity_ordered"]').on('input change', loadBOMPreview);
         });
     </script>
 @endpush
@@ -112,8 +170,8 @@
                                 <option value="">Select Draft Sales Request...</option>
                                 @foreach($productionOrderRequests as $request)
                                     @php
-                                        $deliveryItem = $request->deliveryOrderItem;
-                                        $delivery = $deliveryItem?->deliveryOrder;
+                                        $deliveryItem = $request->materialRequirementItem;
+                                        $delivery = $deliveryItem?->materialRequirement;
                                         $sales = $delivery?->salesOrder ?? $deliveryItem?->salesOrderItem?->salesOrder;
                                         $product = $request->product;
                                     @endphp
@@ -125,7 +183,7 @@
                                         @selected(old('production_order_request_id') == $request->id)>
                                         {{ $sales?->sales_order_number ?? 'Sales Order #' . ($sales?->id ?? 'N/A') }}
                                         @if($delivery)
-                                            / {{ $delivery->delivery_number }}
+                                            / {{ $delivery->requirement_number }}
                                         @endif
                                         @if($product)
                                             — {{ $product->name }} ({{ $product->sku }})
@@ -194,6 +252,37 @@
                         <x-ui.odoo-form-ui type="input" label="End Date" name="end_date" inputType="date" :value="old('end_date', date('Y-m-d', strtotime('+3 days')))" :required="true" />
 
                         <x-ui.odoo-form-ui type="textarea" label="Remarks" name="description" placeholder="Enter special manufacturing instructions, operator notes, or customer references..." rows="4">{{ old('description') }}</x-ui.odoo-form-ui>
+                    </div>
+                </div>
+
+                {{-- BOM Preview Section --}}
+                <div class="card border mt-4 d-none" id="bom-preview-container">
+                    <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="feather-box me-2 text-primary"></i>BOM Components &amp; Availability Preview
+                        </h6>
+                        <span class="fs-12 text-muted">Stock Warehouse: <strong id="bom-preview-warehouse">—</strong></span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped table-hover align-middle mb-0 fs-13">
+                            <thead class="bg-soft-light text-uppercase fs-11 fw-semibold text-muted">
+                                <tr>
+                                    <th style="width: 5%">Sr.No</th>
+                                    <th style="width: 25%">Component Name</th>
+                                    <th style="width: 12%">Type</th>
+                                    <th class="text-center" style="width: 10%">Qty Required</th>
+                                    <th class="text-center" style="width: 10%">Available Qty</th>
+                                    <th class="text-center" style="width: 12%">For Production Qty</th>
+                                    <th class="text-center" style="width: 7%">UOM</th>
+                                    <th class="text-center" style="width: 8%">Rate/Unit</th>
+                                    <th class="text-center" style="width: 11%">Total Amount</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bom-preview-table-body" class="text-dark">
+                                {{-- Dynamically populated via AJAX --}}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
