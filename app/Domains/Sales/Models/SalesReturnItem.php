@@ -14,7 +14,7 @@ class SalesReturnItem extends Model
 
     protected $fillable = [
         'sales_return_id',
-        'delivery_order_item_id',
+        'material_requirement_item_id',
         'invoice_item_id',
         'product_id',
         'warehouse_id',

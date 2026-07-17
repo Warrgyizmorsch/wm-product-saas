@@ -18,7 +18,7 @@
 
     <form action="{{ route('sales.dispatches.store') }}" method="POST" id="dispatchForm">
         @csrf
-        <input type="hidden" name="delivery_order_id" id="deliveryOrderId" value="{{ old('delivery_order_id') }}">
+        <input type="hidden" name="material_requirement_id" id="deliveryOrderId" value="{{ old('material_requirement_id') }}">
 
         <x-ui.odoo-form-ui type="sheet" class="erp-single-panel bg-white p-4">
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
@@ -31,12 +31,12 @@
 
             <div class="d-flex align-items-center justify-content-between gap-3 mb-4 p-3 bg-light rounded border">
                 <div>
-                    <span class="d-block fs-12 text-muted">Delivery Order</span>
-                    <strong id="selectedDeliveryOrder" class="text-dark">No delivery order selected</strong>
+                    <span class="d-block fs-12 text-muted">Material Requirement</span>
+                    <strong id="selectedDeliveryOrder" class="text-dark">No material requirement selected</strong>
                     <span id="selectedCustomer" class="d-block fs-12 text-muted"></span>
                 </div>
                 <x-ui.button type="button" variant="outline-primary" size="sm" icon="feather-truck" data-bs-toggle="modal" data-bs-target="#deliveryOrderPicker">
-                    Select Delivery Order
+                    Select Material Requirement
                 </x-ui.button>
             </div>
 
@@ -56,7 +56,7 @@
             <div class="border-top pt-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="fw-bold text-dark mb-0 fs-14">Items to Dispatch</h6>
-                    <span id="itemsHint" class="fs-12 text-muted">Select a delivery order to load its items.</span>
+                    <span id="itemsHint" class="fs-12 text-muted">Select a material requirement to load its items.</span>
                 </div>
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table" id="dispatchItemsTable">
@@ -91,13 +91,13 @@
         </x-ui.odoo-form-ui>
     </form>
 
-    <x-ui.modal id="deliveryOrderPicker" title="Select Delivery Order" size="lg" :centered="true" :scrollable="true">
+    <x-ui.modal id="deliveryOrderPicker" title="Select Material Requirement" size="lg" :centered="true" :scrollable="true">
         <div class="mb-3">
-            <x-ui.odoo-form-ui type="input" id="deliveryOrderSearch" placeholder="Search by delivery order, sales order, or customer..." />
+            <x-ui.odoo-form-ui type="input" id="deliveryOrderSearch" placeholder="Search by material requirement, sales order, or customer..." />
         </div>
         <div id="deliveryOrderList" class="d-grid gap-2">
             <div class="text-center py-4 text-muted">
-                <div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading delivery orders...
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading material requirements...
             </div>
         </div>
         <x-slot:footer>
@@ -118,9 +118,9 @@
         const searchInput = document.getElementById('deliveryOrderSearch');
         let deliveryOrders = [];
 
-        // ── Auto-select if delivery_order_id is passed in URL ──────────────────
+        // ── Auto-select if material_requirement_id is passed in URL ──────────────────
         const urlParams = new URLSearchParams(window.location.search);
-        const preselectedId = parseInt(urlParams.get('delivery_order_id')) || null;
+        const preselectedId = parseInt(urlParams.get('material_requirement_id')) || null;
 
         pickerElement.addEventListener('show.bs.modal', () => {
             if (deliveryOrders.length) {
@@ -128,14 +128,14 @@
                 return;
             }
 
-            fetch('{{ route('sales.dispatches.pending-do') }}', { headers: { Accept: 'application/json' } })
+            fetch('{{ route('sales.dispatches.pending-mr') }}', { headers: { Accept: 'application/json' } })
                 .then(response => response.ok ? response.json() : Promise.reject())
                 .then(data => {
                     deliveryOrders = data;
                     renderDeliveryOrders();
                 })
                 .catch(() => {
-                    deliveryOrderList.innerHTML = '<div class="alert alert-danger mb-0">Delivery orders could not be loaded. Please try again.</div>';
+                    deliveryOrderList.innerHTML = '<div class="alert alert-danger mb-0">Material requirements could not be loaded. Please try again.</div>';
                 });
         });
 
@@ -144,17 +144,17 @@
         function renderDeliveryOrders() {
             const search = searchInput.value.trim().toLowerCase();
             const filtered = deliveryOrders.filter(order =>
-                [order.delivery_number, order.sales_order, order.customer].filter(Boolean).some(value => value.toLowerCase().includes(search))
+                [order.requirement_number, order.sales_order, order.customer].filter(Boolean).some(value => value.toLowerCase().includes(search))
             );
 
             if (!filtered.length) {
-                deliveryOrderList.innerHTML = '<div class="text-center py-4 text-muted">No pending delivery orders found.</div>';
+                deliveryOrderList.innerHTML = '<div class="text-center py-4 text-muted">No pending material requirements found.</div>';
                 return;
             }
 
             deliveryOrderList.innerHTML = filtered.map(order => `
                 <button type="button" class="btn btn-light border text-start p-3 delivery-order-option" data-id="${order.id}" data-bs-dismiss="modal">
-                    <strong class="d-block text-primary">${escapeHtml(order.delivery_number)}</strong>
+                    <strong class="d-block text-primary">${escapeHtml(order.requirement_number)}</strong>
                     <span class="fs-12 text-muted">${escapeHtml(order.sales_order || '')} &mdash; ${escapeHtml(order.customer || 'No customer')}</span>
                     <span class="badge bg-soft-secondary text-secondary float-end">${order.items.length} item(s)</span>
                 </button>
@@ -181,7 +181,7 @@
 
         function selectDeliveryOrder(order) {
             deliveryOrderId.value = order.id;
-            document.getElementById('selectedDeliveryOrder').textContent = order.delivery_number;
+            document.getElementById('selectedDeliveryOrder').textContent = order.requirement_number;
             document.getElementById('selectedCustomer').textContent = `${order.sales_order || ''}${order.customer ? ` — ${order.customer}` : ''}`;
             renderDispatchItems(order.items);
         }
@@ -217,7 +217,7 @@
                     rowsHtml += `
                         <tr>
                             <td>
-                                <input type="hidden" name="items[${index}][delivery_order_item_id]" value="${item.id}">
+                                <input type="hidden" name="items[${index}][material_requirement_item_id]" value="${item.id}">
                                 <input type="hidden" name="items[${index}][product_id]" value="${item.product_id}">
                                 <strong>${escapeHtml(item.product_name || 'Unknown product')}</strong>
                                 ${item.product_sku ? `<small class="d-block text-muted font-monospace fs-11">SKU: ${escapeHtml(item.product_sku)}</small>` : ''}
@@ -259,13 +259,13 @@
         document.getElementById('dispatchForm').addEventListener('submit', event => {
             if (!deliveryOrderId.value || !itemsBody.querySelector('input[name$="[quantity_dispatched]"]')) {
                 event.preventDefault();
-                alert('Select a delivery order with at least one dispatch item before saving.');
+                alert('Select a material requirement with at least one dispatch item before saving.');
             }
         });
 
         // ── Auto-load on page ready if preselectedId present ──────────────────
         if (preselectedId) {
-            fetch('{{ route('sales.dispatches.pending-do') }}', { headers: { Accept: 'application/json' } })
+            fetch('{{ route('sales.dispatches.pending-mr') }}', { headers: { Accept: 'application/json' } })
                 .then(response => response.ok ? response.json() : Promise.reject())
                 .then(data => {
                     deliveryOrders = data;

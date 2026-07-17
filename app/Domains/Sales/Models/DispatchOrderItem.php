@@ -15,7 +15,7 @@ class DispatchOrderItem extends Model
 
     protected $fillable = [
         'dispatch_order_id',
-        'delivery_order_item_id',
+        'material_requirement_item_id',
         'product_id',
         'warehouse_id',
         'quantity_ordered',
@@ -32,9 +32,9 @@ class DispatchOrderItem extends Model
         return $this->belongsTo(DispatchOrder::class, 'dispatch_order_id');
     }
 
-    public function deliveryOrderItem(): BelongsTo
+    public function materialRequirementItem(): BelongsTo
     {
-        return $this->belongsTo(DeliveryOrderItem::class, 'delivery_order_item_id');
+        return $this->belongsTo(MaterialRequirementItem::class, 'material_requirement_item_id');
     }
 
     public function product(): BelongsTo

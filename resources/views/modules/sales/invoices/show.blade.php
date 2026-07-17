@@ -43,8 +43,8 @@
                 <div>
                     <h4 class="fw-bold text-dark mb-1">{{ $invoice->invoice_number }}</h4>
                     <span class="text-muted">Originating Order: <strong>{{ $invoice->salesOrder->sales_order_number }}</strong></span>
-                    @if ($invoice->deliveryOrder)
-                        <span class="text-muted d-block mt-1">Originating Shipment: <a href="{{ route('sales.deliveries.show', $invoice->delivery_order_id) }}" class="badge bg-soft-success text-success fw-bold">{{ $invoice->deliveryOrder->delivery_number }}</a></span>
+                    @if ($invoice->materialRequirement)
+                        <span class="text-muted d-block mt-1">Originating Requirement: <a href="{{ route('sales.material-requirements.show', $invoice->material_requirement_id) }}" class="badge bg-soft-success text-success fw-bold">{{ $invoice->materialRequirement->requirement_number }}</a></span>
                     @endif
                 </div>
                 <div class="text-end">

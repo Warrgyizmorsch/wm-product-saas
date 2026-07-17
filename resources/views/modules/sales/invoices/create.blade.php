@@ -28,14 +28,14 @@
         <form action="{{ route('sales.invoices.store') }}" method="POST" id="invoiceForm">
             @csrf
             <input type="hidden" name="sales_order_id" value="{{ $salesOrder->id }}">
-            <input type="hidden" name="delivery_order_id" value="{{ $deliveryOrder?->id }}">
+            <input type="hidden" name="material_requirement_id" value="{{ $materialRequirement?->id }}">
 
             <x-ui.odoo-form-ui type="sheet">
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
                     <div>
                         <h5 class="fw-bold text-dark mb-0">Generate Customer Invoice</h5>
-                        @if ($deliveryOrder)
-                            <span class="fs-12 text-muted">Billing for Shipment: <span class="badge bg-soft-success text-success fw-bold px-2 py-0.5">{{ $deliveryOrder->delivery_number }}</span> (SO: {{ $salesOrder->sales_order_number }})</span>
+                        @if ($materialRequirement)
+                            <span class="fs-12 text-muted">Billing for Requirement: <span class="badge bg-soft-success text-success fw-bold px-2 py-0.5">{{ $materialRequirement->requirement_number }}</span> (SO: {{ $salesOrder->sales_order_number }})</span>
                         @else
                             <span class="fs-12 text-muted">Billing for Sales Order: <strong>{{ $salesOrder->sales_order_number }}</strong></span>
                         @endif
@@ -105,7 +105,7 @@
                                                 <small class="text-muted d-block mt-0.5">SKU: {{ $item['sku'] }}</small>
                                             @endif
                                             <input type="hidden" name="items[{{ $index }}][sales_order_item_id]" value="{{ $item['sales_order_item_id'] }}">
-                                            <input type="hidden" name="items[{{ $index }}][delivery_order_item_id]" value="{{ $item['delivery_order_item_id'] }}">
+                                            <input type="hidden" name="items[{{ $index }}][material_requirement_item_id]" value="{{ $item['material_requirement_item_id'] }}">
                                             <input type="hidden" name="items[{{ $index }}][product_id]" value="{{ $item['product_id'] }}">
                                         </td>
                                         <td>

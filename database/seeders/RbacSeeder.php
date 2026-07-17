@@ -98,10 +98,10 @@ class RbacSeeder extends Seeder
             'sales.orders.delete' => $permissions['sales.orders.delete'],
             'sales.orders.confirm' => $permissions['sales.orders.confirm'],
             'sales.orders.cancel' => $permissions['sales.orders.cancel'],
-            'sales.deliveries.view' => $permissions['sales.deliveries.view'],
-            'sales.deliveries.create' => $permissions['sales.deliveries.create'],
-            'sales.deliveries.ship' => $permissions['sales.deliveries.ship'],
-            'sales.deliveries.cancel' => $permissions['sales.deliveries.cancel'],
+            'sales.material_requirements.view' => $permissions['sales.material_requirements.view'],
+            'sales.material_requirements.create' => $permissions['sales.material_requirements.create'],
+            'sales.material_requirements.ship' => $permissions['sales.material_requirements.ship'],
+            'sales.material_requirements.cancel' => $permissions['sales.material_requirements.cancel'],
             'sales.dispatches.view' => $permissions['sales.dispatches.view'],
             'sales.dispatches.create' => $permissions['sales.dispatches.create'],
             'sales.invoices.view' => $permissions['sales.invoices.view'],
@@ -119,8 +119,8 @@ class RbacSeeder extends Seeder
         // order-to-cash fulfillment work, not personally owned.
         $this->grant($roles['sales_executive'], [
             'sales.orders.create' => $permissions['sales.orders.create'],
-            'sales.deliveries.view' => $permissions['sales.deliveries.view'],
-            'sales.deliveries.create' => $permissions['sales.deliveries.create'],
+            'sales.material_requirements.view' => $permissions['sales.material_requirements.view'],
+            'sales.material_requirements.create' => $permissions['sales.material_requirements.create'],
             'sales.dispatches.view' => $permissions['sales.dispatches.view'],
             'sales.dispatches.create' => $permissions['sales.dispatches.create'],
             'sales.invoices.view' => $permissions['sales.invoices.view'],
@@ -230,10 +230,10 @@ class RbacSeeder extends Seeder
             ['name' => 'sales.orders.delete', 'module' => 'sales', 'entity' => 'orders', 'action' => 'delete'],
             ['name' => 'sales.orders.confirm', 'module' => 'sales', 'entity' => 'orders', 'action' => 'confirm'],
             ['name' => 'sales.orders.cancel', 'module' => 'sales', 'entity' => 'orders', 'action' => 'cancel'],
-            ['name' => 'sales.deliveries.view', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'view'],
-            ['name' => 'sales.deliveries.create', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'create'],
-            ['name' => 'sales.deliveries.ship', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'ship'],
-            ['name' => 'sales.deliveries.cancel', 'module' => 'sales', 'entity' => 'deliveries', 'action' => 'cancel'],
+            ['name' => 'sales.material_requirements.view', 'module' => 'sales', 'entity' => 'material_requirements', 'action' => 'view'],
+            ['name' => 'sales.material_requirements.create', 'module' => 'sales', 'entity' => 'material_requirements', 'action' => 'create'],
+            ['name' => 'sales.material_requirements.ship', 'module' => 'sales', 'entity' => 'material_requirements', 'action' => 'ship'],
+            ['name' => 'sales.material_requirements.cancel', 'module' => 'sales', 'entity' => 'material_requirements', 'action' => 'cancel'],
             ['name' => 'sales.dispatches.view', 'module' => 'sales', 'entity' => 'dispatches', 'action' => 'view'],
             ['name' => 'sales.dispatches.create', 'module' => 'sales', 'entity' => 'dispatches', 'action' => 'create'],
             ['name' => 'sales.invoices.view', 'module' => 'sales', 'entity' => 'invoices', 'action' => 'view'],
@@ -339,7 +339,8 @@ class RbacSeeder extends Seeder
 
     private function assignDemoAdmin(Role $role): void
     {
-        $tenant = Tenant::query()->where('slug', 'demo')->first();
+        $tenantSlug = config('tenancy.local_fallback_slug') ?: 'warrgyizmorsch';
+        $tenant = Tenant::query()->where('slug', $tenantSlug)->first();
         $user = User::query()
             ->where('email', 'admin@example.com')
             ->when($tenant !== null, fn ($query) => $query->where('tenant_id', $tenant->id))

@@ -4,7 +4,7 @@ namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
-use App\Domains\Sales\Models\DeliveryOrderItem;
+use App\Domains\Sales\Models\MaterialRequirementItem;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -16,7 +16,7 @@ class ProductionOrderRequest extends BaseModel
 
     protected $fillable = [
         'tenant_id',
-        'delivery_order_item_id',
+        'material_requirement_item_id',
         'product_id',
         'quantity_requested',
         'status',
@@ -30,9 +30,9 @@ class ProductionOrderRequest extends BaseModel
         'quantity_requested' => 'float',
     ];
 
-    public function deliveryOrderItem(): BelongsTo
+    public function materialRequirementItem(): BelongsTo
     {
-        return $this->belongsTo(DeliveryOrderItem::class, 'delivery_order_item_id');
+        return $this->belongsTo(MaterialRequirementItem::class, 'material_requirement_item_id');
     }
 
     public function product(): BelongsTo

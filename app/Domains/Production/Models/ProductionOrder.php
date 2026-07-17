@@ -4,7 +4,7 @@ namespace App\Domains\Production\Models;
 
 use App\Core\Database\BaseModel;
 use App\Domains\Inventory\Models\Product;
-use App\Domains\Sales\Models\DeliveryOrderItem;
+use App\Domains\Sales\Models\MaterialRequirementItem;
 use App\Models\Concerns\Loggable;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -30,7 +30,7 @@ class ProductionOrder extends BaseModel
                         $query->where('production_order_id', $order->id)
                             ->orWhere(function ($query) use ($order) {
                                 if ($order->sales_order_item_id) {
-                                    $query->whereHas('deliveryOrderItem', function ($q) use ($order) {
+                                    $query->whereHas('materialRequirementItem', function ($q) use ($order) {
                                         $q->where('sales_order_item_id', $order->sales_order_item_id);
                                     });
                                 }
@@ -40,13 +40,13 @@ class ProductionOrder extends BaseModel
 
                 foreach ($requests as $req) {
                     $req->update(['status' => 'completed']);
-                    if ($req->deliveryOrderItem) {
-                        $req->deliveryOrderItem->update(['status' => 'Ready']);
+                    if ($req->materialRequirementItem) {
+                        $req->materialRequirementItem->update(['status' => 'Ready']);
                     }
                 }
 
-                // Fallback for direct delivery order items update
-                $items = DeliveryOrderItem::whereHas('deliveryOrder', function ($query) use ($order) {
+                // Fallback for direct material requirement items update
+                $items = MaterialRequirementItem::whereHas('materialRequirement', function ($query) use ($order) {
                     $query->where('tenant_id', $order->tenant_id);
                 })
                     ->where(function ($query) use ($order) {

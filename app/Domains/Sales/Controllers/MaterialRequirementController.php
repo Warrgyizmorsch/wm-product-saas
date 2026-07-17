@@ -7,38 +7,38 @@ use App\Domains\Inventory\Models\SerialNumber;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
 use App\Domains\Production\Models\ProductionOrderRequest;
-use App\Domains\Sales\Models\DeliveryOrder;
-use App\Domains\Sales\Models\DeliveryOrderItem;
+use App\Domains\Sales\Models\MaterialRequirement;
+use App\Domains\Sales\Models\MaterialRequirementItem;
 use App\Domains\Sales\Models\DispatchOrder;
 use App\Domains\Sales\Models\DispatchOrderItem;
 use App\Domains\Sales\Models\SalesOrder;
-use App\Domains\Sales\Services\DeliveryOrderService;
+use App\Domains\Sales\Services\MaterialRequirementService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
-class DeliveryOrderController extends Controller
+class MaterialRequirementController extends Controller
 {
     public function __construct(
-        private readonly DeliveryOrderService $deliveryService,
+        private readonly MaterialRequirementService $deliveryService,
     ) {}
 
     public function index(): View
     {
-        $this->authorize('viewAny', DeliveryOrder::class);
+        $this->authorize('viewAny', MaterialRequirement::class);
 
-        $deliveries = DeliveryOrder::with('salesOrder.customer')->latest()->get();
+        $deliveries = MaterialRequirement::with('salesOrder.customer')->latest()->get();
 
-        return view('modules.sales.deliveries.index', [
+        return view('modules.sales.material-requirements.index', [
             'deliveries' => $deliveries,
         ]);
     }
 
     public function create(Request $request): View
     {
-        $this->authorize('create', DeliveryOrder::class);
+        $this->authorize('create', MaterialRequirement::class);
 
         $salesOrderId = $request->input('sales_order_id');
         $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->findOrFail($salesOrderId);
@@ -49,14 +49,14 @@ class DeliveryOrderController extends Controller
         }));
 
         if (! in_array($salesOrder->status, ['Confirmed', 'Partially Shipped'])) {
-            abort(400, 'Deliveries can only be created for Confirmed or Partially Shipped Sales Orders.');
+            abort(400, 'Material Requirements can only be created for Confirmed or Partially Shipped Sales Orders.');
         }
 
         // Calculate already shipped quantities for each sales order line
         $shippedQuantities = [];
         foreach ($salesOrder->items as $item) {
-            $shippedQuantities[$item->id] = DeliveryOrderItem::query()
-                ->whereHas('deliveryOrder', function ($q) {
+            $shippedQuantities[$item->id] = MaterialRequirementItem::query()
+                ->whereHas('materialRequirement', function ($q) {
                     $q->where('status', 'Shipped');
                 })
                 ->where('sales_order_item_id', $item->id)
@@ -76,23 +76,23 @@ class DeliveryOrderController extends Controller
             $stockMap[$stock->product_id][$stock->warehouse_id] = (float) $stock->available_qty;
         }
 
-        return view('modules.sales.deliveries.create', [
+        return view('modules.sales.material-requirements.create', [
             'salesOrder' => $salesOrder,
             'shippedQuantities' => $shippedQuantities,
             'warehouses' => $warehouses,
             'stockMap' => $stockMap,
-            'nextDeliveryNumber' => $this->deliveryService->getNextDeliveryNumber(),
+            'nextDeliveryNumber' => $this->deliveryService->getNextRequirementNumber(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $this->authorize('create', DeliveryOrder::class);
+        $this->authorize('create', MaterialRequirement::class);
 
         $validated = $request->validate([
             'sales_order_id' => ['required', 'exists:sales_orders,id'],
-            'delivery_number' => ['required', 'string', 'max:255'],
-            'delivery_date' => ['required', 'date'],
+            'requirement_number' => ['required', 'string', 'max:255'],
+            'requirement_date' => ['required', 'date'],
             'carrier' => ['nullable', 'string', 'max:255'],
             'tracking_number' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
@@ -103,11 +103,17 @@ class DeliveryOrderController extends Controller
         ]);
 
         try {
-            $delivery = $this->deliveryService->create($validated, $request->input('items', []));
+            // Re-map keys for Service compatibility
+            $mappedData = $validated;
+            $mappedData['sales_order_id'] = $validated['sales_order_id'];
+            $mappedData['requirement_number'] = $validated['requirement_number'];
+            $mappedData['requirement_date'] = $validated['requirement_date'];
+            
+            $delivery = $this->deliveryService->create($mappedData, $request->input('items', []));
 
             return redirect()
-                ->route('sales.deliveries.show', $delivery->id)
-                ->with('success', 'Delivery Order successfully created!');
+                ->route('sales.material-requirements.show', $delivery->id)
+                ->with('success', 'Material Requirement successfully created!');
         } catch (\Exception $e) {
             return back()->withErrors([$e->getMessage()])->withInput();
         }
@@ -115,7 +121,7 @@ class DeliveryOrderController extends Controller
 
     public function show(int $id): View
     {
-        $delivery = DeliveryOrder::with('salesOrder.customer', 'items.product', 'items.warehouse', 'items.salesOrderItem')->findOrFail($id);
+        $delivery = MaterialRequirement::with('salesOrder.customer', 'items.product', 'items.warehouse', 'items.salesOrderItem')->findOrFail($id);
 
         $this->authorize('view', $delivery);
 
@@ -132,7 +138,7 @@ class DeliveryOrderController extends Controller
 
         $itemAllocations = [];
 
-        return view('modules.sales.deliveries.show', [
+        return view('modules.sales.material-requirements.show', [
             'delivery' => $delivery,
             'warehouses' => $warehouses,
             'defaultWarehouseId' => $defaultWarehouseId,
@@ -142,7 +148,7 @@ class DeliveryOrderController extends Controller
 
     public function updateWarehouse(Request $request, int $itemId)
     {
-        $item = DeliveryOrderItem::findOrFail($itemId);
+        $item = MaterialRequirementItem::findOrFail($itemId);
         $warehouseId = (int) $request->input('warehouse_id');
 
         $item->update([
@@ -159,7 +165,7 @@ class DeliveryOrderController extends Controller
 
     public function reserveQty(Request $request, int $itemId)
     {
-        $item = DeliveryOrderItem::with('deliveryOrder')->findOrFail($itemId);
+        $item = MaterialRequirementItem::with('materialRequirement')->findOrFail($itemId);
         $qtyToReserve = (float) $request->input('quantity_reserve');
 
         if ($qtyToReserve <= 0) {
@@ -168,7 +174,7 @@ class DeliveryOrderController extends Controller
 
         $warehouseId = $item->warehouse_id;
         $productId = $item->product_id;
-        $tenantId = $item->deliveryOrder->tenant_id;
+        $tenantId = $item->materialRequirement->tenant_id;
 
         $availableStock = StockService::getAvailableStock($productId, $warehouseId);
 
@@ -182,8 +188,8 @@ class DeliveryOrderController extends Controller
             $productId,
             $warehouseId,
             $qtyToReserve,
-            'DeliveryOrder',
-            $item->delivery_order_id,
+            'DeliveryOrder', // context name inside StockService
+            $item->material_requirement_id,
             $item->id
         );
 
@@ -195,21 +201,21 @@ class DeliveryOrderController extends Controller
             $item->update(['status' => 'Partially Reserved']);
         }
 
-        $this->updateOverallDeliveryStatus($item->deliveryOrder);
+        $this->updateOverallDeliveryStatus($item->materialRequirement);
 
         return back()->with('success', "Successfully reserved {$qtyToReserve} unit(s).");
     }
 
     public function mockIndent(Request $request, int $itemId)
     {
-        $item = DeliveryOrderItem::with('deliveryOrder')->findOrFail($itemId);
+        $item = MaterialRequirementItem::with('materialRequirement')->findOrFail($itemId);
         $qtyToRequest = (float) $request->input('quantity_request');
 
         $item->update([
             'status' => 'Waiting Purchase',
         ]);
 
-        $this->updateOverallDeliveryStatus($item->deliveryOrder);
+        $this->updateOverallDeliveryStatus($item->materialRequirement);
 
         return back()->with('success', "Purchase request (Simulated) generated for {$qtyToRequest} unit(s). Line status set to Waiting Purchase.");
     }
@@ -217,8 +223,8 @@ class DeliveryOrderController extends Controller
     public function mockMo(Request $request, int $itemId)
     {
         $tenantId = require_tenant_id();
-        $item = DeliveryOrderItem::with('deliveryOrder')
-            ->whereHas('deliveryOrder', fn ($query) => $query->where('tenant_id', $tenantId))
+        $item = MaterialRequirementItem::with('materialRequirement')
+            ->whereHas('materialRequirement', fn ($query) => $query->where('tenant_id', $tenantId))
             ->findOrFail($itemId);
 
         $orderedQty = (float) ($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
@@ -234,32 +240,32 @@ class DeliveryOrderController extends Controller
         try {
             DB::transaction(function () use ($item, $qtyToMfg, $request, $tenantId) {
                 $existingRequest = ProductionOrderRequest::where('tenant_id', $tenantId)
-                    ->where('delivery_order_item_id', $item->id)
+                    ->where('material_requirement_item_id', $item->id)
                     ->whereNotIn('status', ['rejected', 'completed', 'cancelled'])
                     ->lockForUpdate()
                     ->first();
 
                 if ($existingRequest) {
-                    throw new \InvalidArgumentException('A production request already exists for this delivery line.');
+                    throw new \InvalidArgumentException('A production request already exists for this material requirement line.');
                 }
 
                 // Create a Production Order Request in draft status
                 ProductionOrderRequest::create([
                     'tenant_id' => $tenantId,
-                    'delivery_order_item_id' => $item->id,
+                    'material_requirement_item_id' => $item->id,
                     'product_id' => $item->product_id,
                     'quantity_requested' => $qtyToMfg,
                     'status' => 'draft',
-                    'notes' => $request->input('notes') ?? "Requested from DO {$item->deliveryOrder->delivery_number}",
+                    'notes' => $request->input('notes') ?? "Requested from MR {$item->materialRequirement->requirement_number}",
                     'created_by' => auth()->id(),
                 ]);
 
-                // Update delivery order item status
+                // Update material requirement item status
                 $item->update([
                     'status' => 'Waiting Production',
                 ]);
 
-                $this->updateOverallDeliveryStatus($item->deliveryOrder);
+                $this->updateOverallDeliveryStatus($item->materialRequirement);
             });
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['quantity_mfg' => $e->getMessage()]);
@@ -270,7 +276,7 @@ class DeliveryOrderController extends Controller
 
     public function startPicking(int $id)
     {
-        $delivery = DeliveryOrder::findOrFail($id);
+        $delivery = MaterialRequirement::findOrFail($id);
 
         DB::transaction(function () use ($delivery) {
             $delivery->update(['status' => 'Picked']);
@@ -284,7 +290,7 @@ class DeliveryOrderController extends Controller
 
     public function pack(int $id)
     {
-        $delivery = DeliveryOrder::findOrFail($id);
+        $delivery = MaterialRequirement::findOrFail($id);
 
         DB::transaction(function () use ($delivery) {
             $delivery->update(['status' => 'Packed']);
@@ -298,7 +304,7 @@ class DeliveryOrderController extends Controller
 
     public function dispatch(int $id, Request $request)
     {
-        $delivery = DeliveryOrder::with('items.product', 'salesOrder')->findOrFail($id);
+        $delivery = MaterialRequirement::with('items.product', 'salesOrder')->findOrFail($id);
 
         $request->validate([
             'carrier' => 'nullable|string|max:255',
@@ -357,7 +363,7 @@ class DeliveryOrderController extends Controller
 
     public function deliver(int $id)
     {
-        $delivery = DeliveryOrder::with('items', 'salesOrder')->findOrFail($id);
+        $delivery = MaterialRequirement::with('items', 'salesOrder')->findOrFail($id);
 
         DB::transaction(function () use ($delivery) {
             $delivery->update(['status' => 'Delivered']);
@@ -372,7 +378,7 @@ class DeliveryOrderController extends Controller
 
     public function ship(int $id, Request $request): RedirectResponse
     {
-        $delivery = DeliveryOrder::findOrFail($id);
+        $delivery = MaterialRequirement::findOrFail($id);
 
         $this->authorize('ship', $delivery);
 
@@ -410,8 +416,8 @@ class DeliveryOrderController extends Controller
             $this->deliveryService->ship($delivery, $allocations);
 
             return redirect()
-                ->route('sales.deliveries.show', $delivery->id)
-                ->with('success', 'Delivery shipped successfully! Inventory updated.');
+                ->route('sales.material-requirements.show', $delivery->id)
+                ->with('success', 'Material Requirement shipped successfully! Inventory updated.');
         } catch (\Exception $e) {
             return back()->withErrors([$e->getMessage()]);
         }
@@ -419,26 +425,25 @@ class DeliveryOrderController extends Controller
 
     public function cancel(int $id): RedirectResponse
     {
-        $delivery = DeliveryOrder::findOrFail($id);
+        $delivery = MaterialRequirement::findOrFail($id);
 
         $this->authorize('cancel', $delivery);
 
         try {
             $this->deliveryService->cancel($delivery);
 
-            return back()->with('success', 'Delivery Order cancelled successfully.');
+            return back()->with('success', 'Material Requirement cancelled successfully.');
         } catch (\Exception $e) {
             return back()->withErrors([$e->getMessage()]);
         }
     }
 
     /**
-     * Create a Dispatch Order from a Delivery Order.
-     * Uses reserved qty if available, otherwise falls back to quantity_ordered.
+     * Create a Dispatch Order from a Material Requirement.
      */
     public function storeDispatchOrder(int $deliveryId, Request $request): RedirectResponse
     {
-        $delivery = DeliveryOrder::with('items.product', 'items.warehouse', 'salesOrder')->findOrFail($deliveryId);
+        $delivery = MaterialRequirement::with('items.product', 'items.warehouse', 'salesOrder')->findOrFail($deliveryId);
 
         $request->validate([
             'carrier' => 'nullable|string|max:255',
@@ -463,7 +468,7 @@ class DeliveryOrderController extends Controller
 
             $dispatchOrder = DispatchOrder::create([
                 'tenant_id' => $delivery->tenant_id,
-                'delivery_order_id' => $delivery->id,
+                'material_requirement_id' => $delivery->id,
                 'sales_order_id' => $delivery->sales_order_id,
                 'dispatch_number' => $dispatchNumber,
                 'dispatch_date' => now()->toDateString(),
@@ -489,7 +494,7 @@ class DeliveryOrderController extends Controller
 
                 DispatchOrderItem::create([
                     'dispatch_order_id' => $dispatchOrder->id,
-                    'delivery_order_item_id' => $doItem->id,
+                    'material_requirement_item_id' => $doItem->id,
                     'product_id' => $doItem->product_id,
                     'warehouse_id' => $doItem->warehouse_id,
                     'quantity_ordered' => $orderedQty,
@@ -505,7 +510,7 @@ class DeliveryOrderController extends Controller
             ->with('success', "Dispatch Order {$dispatchOrder->dispatch_number} created successfully!");
     }
 
-    private function updateOverallDeliveryStatus(DeliveryOrder $delivery): void
+    private function updateOverallDeliveryStatus(MaterialRequirement $delivery): void
     {
         $items = $delivery->items()->get();
         if ($items->isEmpty()) {

@@ -11,7 +11,7 @@ class SalesReturn extends BaseModel
     protected $fillable = [
         'tenant_id',
         'sales_order_id',
-        'delivery_order_id',
+        'material_requirement_id',
         'invoice_id',
         'return_number',
         'return_date',
@@ -25,9 +25,9 @@ class SalesReturn extends BaseModel
         return $this->belongsTo(SalesOrder::class);
     }
 
-    public function deliveryOrder(): BelongsTo
+    public function materialRequirement(): BelongsTo
     {
-        return $this->belongsTo(DeliveryOrder::class);
+        return $this->belongsTo(MaterialRequirement::class, 'material_requirement_id');
     }
 
     public function invoice(): BelongsTo

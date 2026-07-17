@@ -17,7 +17,7 @@
                     <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                         <tr>
                             <th class="ps-4">Dispatch #</th>
-                            <th>Delivery Order</th>
+                            <th>Material Requirement</th>
                             <th>Sales Order</th>
                             <th>Customer</th>
                             <th>Date</th>
@@ -39,8 +39,8 @@
                                     <a href="{{ route('sales.dispatches.show', $dispatch->id) }}" class="text-primary">{{ $dispatch->dispatch_number }}</a>
                                 </td>
                                 <td>
-                                    <a href="{{ route('sales.deliveries.show', $dispatch->delivery_order_id) }}" class="text-dark fw-semibold">
-                                        {{ $dispatch->deliveryOrder->delivery_number }}
+                                    <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="text-dark fw-semibold">
+                                        {{ $dispatch->materialRequirement->requirement_number }}
                                     </a>
                                 </td>
                                 <td>

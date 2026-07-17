@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Delivery Order ' . $delivery->delivery_number . ' | SaaS ERP')
-@section('page-title', 'Delivery Order ' . $delivery->delivery_number)
-@section('breadcrumb', 'Sales / Deliveries / ' . $delivery->delivery_number)
+@section('title', 'Material Requirement ' . $delivery->requirement_number . ' | SaaS ERP')
+@section('page-title', 'Material Requirement ' . $delivery->requirement_number)
+@section('breadcrumb', 'Sales / Material Requirements / ' . $delivery->requirement_number)
 
 @section('content')
 
@@ -47,15 +47,13 @@
 
             {{-- Left: DO number + links --}}
             <div>
-                <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">Fulfillment Shipment</span>
-                <h4 class="fw-bold text-dark mb-1">{{ $delivery->delivery_number }}</h4>
+                <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">Material Requirement</span>
+                <h4 class="fw-bold text-dark mb-1">{{ $delivery->requirement_number }}</h4>
                 <span class="fs-13 text-muted">
                     SO:&nbsp;<a href="{{ route('sales.orders.show', $delivery->sales_order_id) }}" class="fw-semibold text-primary">{{ $delivery->salesOrder->sales_order_number }}</a>
                     &nbsp;·&nbsp;Customer:&nbsp;<strong class="text-dark">{{ $delivery->salesOrder->customer?->name }}</strong>
                 </span>
             </div>
-
-
 
             {{-- Right: DO status badge + action buttons --}}
             <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -68,25 +66,25 @@
                 </a>
 
                 @if (in_array($delivery->status, ['Processing', 'Partially Ready', 'Ready']))
-                    <form action="{{ route('sales.deliveries.picking', $delivery->id) }}" method="POST" class="d-inline">
+                    <form action="{{ route('sales.material-requirements.picking', $delivery->id) }}" method="POST" class="d-inline">
                         @csrf
                         <button type="submit" class="btn btn-primary btn-sm">
                             <i class="feather-truck me-1"></i>Start Picking
                         </button>
                     </form>
                 @elseif ($delivery->status === 'Picked')
-                    <form action="{{ route('sales.deliveries.pack', $delivery->id) }}" method="POST" class="d-inline">
+                    <form action="{{ route('sales.material-requirements.pack', $delivery->id) }}" method="POST" class="d-inline">
                         @csrf
                         <button type="submit" class="btn btn-info text-white btn-sm">
                             <i class="feather-box me-1"></i>Pack Items
                         </button>
                     </form>
                 @elseif ($delivery->status === 'Packed')
-                    <a href="{{ route('sales.dispatches.create', ['delivery_order_id' => $delivery->id]) }}" class="btn btn-success btn-sm">
-                        <i class="feather-send me-1"></i>Dispatch DO
+                    <a href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id]) }}" class="btn btn-success btn-sm">
+                        <i class="feather-send me-1"></i>Dispatch MR
                     </a>
                 @elseif ($delivery->status === 'Dispatched')
-                    <form action="{{ route('sales.deliveries.deliver', $delivery->id) }}" method="POST" class="d-inline">
+                    <form action="{{ route('sales.material-requirements.deliver', $delivery->id) }}" method="POST" class="d-inline">
                         @csrf
                         <button type="submit" class="btn btn-success btn-sm">
                             <i class="feather-check-circle me-1"></i>Mark Delivered
@@ -104,7 +102,7 @@
                 <div class="px-4 py-3">
 
                     <h6 class="fw-bold text-dark mb-3 fs-13 text-uppercase text-muted letter-spacing-1">
-                        <i class="feather-list me-1 text-primary"></i> Delivery Order Lines
+                         <i class="feather-list me-1 text-primary"></i> Material Requirement Lines
                     </h6>
 
                     <div class="table-responsive" style="overflow: visible !important;">
@@ -281,7 +279,7 @@
                 id="reserveModal-{{ $item->id }}"
                 title="Reserve Stock — {{ $item->product?->name }}"
                 submitText="Confirm Reservation"
-                formAction="{{ route('sales.deliveries.reserve-qty', $item->id) }}"
+                formAction="{{ route('sales.material-requirements.reserve-qty', $item->id) }}"
                 :centered="true"
             >
                 <div class="fs-13 text-dark">
@@ -434,7 +432,7 @@
                 id="generateMoModal-{{ $item->id }}"
                 title="Generate Manufacturing Order — {{ $item->product?->name }}"
                 submitText="Raise MO Request"
-                formAction="{{ route('sales.deliveries.mock-mo', $item->id) }}"
+                formAction="{{ route('sales.material-requirements.mock-mo', $item->id) }}"
                 :centered="true"
             >
                 <div class="fs-13 text-dark">
@@ -492,7 +490,7 @@
         <x-ui.modal
             id="dispatchModal"
             title="Transporter & Shipment Details"
-            formAction="{{ route('sales.deliveries.dispatch', $delivery->id) }}"
+            formAction="{{ route('sales.material-requirements.dispatch', $delivery->id) }}"
             submitText="Confirm Dispatch"
             :centered="true"
         >
@@ -529,7 +527,7 @@
          */
         function changeWarehouse(itemId, select) {
             const warehouseId = select.value;
-            const url = `/sales/deliveries/items/${itemId}/warehouse`;
+            const url = `/sales/material-requirements/items/${itemId}/warehouse`;
 
             $.ajax({
                 url:    url,
@@ -562,7 +560,7 @@
             updateReserveAvailableFromQty(itemId, avail);
 
             $.ajax({
-                url:    `/sales/deliveries/items/${itemId}/warehouse`,
+                url:    `/sales/material-requirements/items/${itemId}/warehouse`,
                 method: 'POST',
                 data:   { _token: '{{ csrf_token() }}', warehouse_id: select.value },
                 success: function (response) {

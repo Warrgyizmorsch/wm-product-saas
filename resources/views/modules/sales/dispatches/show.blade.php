@@ -28,7 +28,7 @@
                     <span class="fs-12 text-muted text-uppercase fw-bold d-block mb-1">Dispatch Shipment</span>
                     <h3 class="fw-bold text-dark mb-1">{{ $dispatch->dispatch_number }}</h3>
                     <span class="fs-13 text-muted">
-                        Delivery Order: <a href="{{ route('sales.deliveries.show', $dispatch->delivery_order_id) }}" class="fw-bold text-primary">{{ $dispatch->deliveryOrder->delivery_number }}</a>
+                        Material Requirement: <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-bold text-primary">{{ $dispatch->materialRequirement->requirement_number }}</a>
                         | Sales Order: <a href="{{ route('sales.orders.show', $dispatch->sales_order_id) }}" class="fw-bold text-info">{{ $dispatch->salesOrder->sales_order_number }}</a>
                         | Customer: <strong class="text-dark">{{ $dispatch->salesOrder->customer?->name }}</strong>
                     </span>
@@ -46,8 +46,8 @@
                 </div>
 
                 <div class="d-flex gap-2">
-                    <a href="{{ route('sales.deliveries.show', $dispatch->delivery_order_id) }}" class="btn btn-light border">
-                        <i class="feather-arrow-left me-2"></i>Back to DO
+                    <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="btn btn-light border">
+                        <i class="feather-arrow-left me-2"></i>Back to MR
                     </a>
                     <a href="{{ route('sales.dispatches.index') }}" class="btn btn-light border">
                         <i class="feather-list me-2"></i>All Dispatches
@@ -157,9 +157,9 @@
                         <strong>{{ $dispatch->dispatch_date->format('d M Y') }}</strong>
                     </div>
                     <div class="mb-2 d-flex justify-content-between">
-                        <span class="text-muted">Delivery Order</span>
-                        <a href="{{ route('sales.deliveries.show', $dispatch->delivery_order_id) }}" class="fw-bold text-primary">
-                            {{ $dispatch->deliveryOrder->delivery_number }}
+                        <span class="text-muted">Material Requirement</span>
+                        <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-bold text-primary">
+                            {{ $dispatch->materialRequirement->requirement_number }}
                         </a>
                     </div>
                     <div class="mb-2 d-flex justify-content-between">

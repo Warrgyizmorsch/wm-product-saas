@@ -82,8 +82,8 @@ class ProductionOrderController extends Controller
             ->whereNull('production_order_id')
             ->with([
                 'product',
-                'deliveryOrderItem.deliveryOrder.salesOrder.customer',
-                'deliveryOrderItem.salesOrderItem.salesOrder',
+                'materialRequirementItem.materialRequirement.salesOrder.customer',
+                'materialRequirementItem.salesOrderItem.salesOrder',
             ])
             ->orderByDesc('id')
             ->get();

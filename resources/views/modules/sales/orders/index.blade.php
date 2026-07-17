@@ -152,8 +152,8 @@
                                             </button>
                                         </form>
                                     @elseif ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                                        <a href="{{ route('sales.deliveries.create', ['sales_order_id' => $order->id]) }}" class="btn btn-sm btn-soft-primary py-1 px-2 fs-11 fw-bold border-0" data-bs-toggle="tooltip" title="Create Delivery Order">
-                                            <i class="feather-truck me-1"></i>Ship
+                                        <a href="{{ route('sales.material-requirements.create', ['sales_order_id' => $order->id]) }}" class="btn btn-sm btn-soft-primary py-1 px-2 fs-11 fw-bold border-0" data-bs-toggle="tooltip" title="Create Material Requirement">
+                                            <i class="feather-clipboard me-1"></i>Fulfill
                                         </a>
                                     @endif
 
