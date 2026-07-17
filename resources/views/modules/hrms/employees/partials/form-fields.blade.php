@@ -66,7 +66,7 @@
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_work_shift') }}" name="shift_id" id="{{ $prefix }}_shift_id" select2-selector="default" :errorText="$errors->first('shift_id')">
+                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_work_shift') }}" name="shift_id" id="{{ $prefix }}_shift_id" select2-selector="default" :errorText="$errors->first('shift_id')" data-selected-value="{{ $fieldValue('shift_id') }}">
                     <option value="">{{ __('hrms.employees.frm_select_shift') }}</option>
                     @foreach($shifts as $shift)
                         <option value="{{ $shift->id }}" @selected((string) $fieldValue('shift_id') === (string) $shift->id)>

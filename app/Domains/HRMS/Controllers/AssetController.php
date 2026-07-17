@@ -100,7 +100,7 @@ class AssetController extends Controller
         
         // 5. Requests Search & Filter
         $requestsQuery = AssetRequest::query()
-            ->with(['company', 'employee', 'category', 'allocatedAsset']);
+            ->with(['company', 'employee', 'category', 'allocatedAsset', 'requestedAsset']);
 
         if ($request->filled('request_search')) {
             $search = $request->input('request_search');
@@ -427,18 +427,58 @@ class AssetController extends Controller
      */
     public function storeRequest(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $request->validate([
             'employee_id' => 'required|exists:employees,id',
-            'asset_category_id' => 'required|exists:asset_categories,id',
             'reason' => 'required|string|max:1000',
+            'requested_asset_ids' => 'required|array|min:1',
+            'requested_asset_ids.*' => 'exists:assets,id',
         ]);
 
-        $employee = Employee::findOrFail($validated['employee_id']);
-        $validated['company_id'] = $employee->company_id;
-        $validated['request_date'] = date('Y-m-d');
-        $validated['status'] = 'pending';
+        $categoryIds = [];
+        if ($request->has('asset_category_ids')) {
+            $categoryIds = (array) $request->input('asset_category_ids');
+        } elseif ($request->has('asset_category_id')) {
+            $categoryIds = [$request->input('asset_category_id')];
+        }
 
-        AssetRequest::create($validated);
+        if (empty($categoryIds)) {
+            return redirect()->back()->withErrors(['asset_category_ids' => 'The asset category field is required.']);
+        }
+
+        $employee = Employee::findOrFail($request->input('employee_id'));
+        $companyId = $employee->company_id;
+        $requestDate = date('Y-m-d');
+        $reason = $request->input('reason');
+
+        $requestedAssetIds = (array) $request->input('requested_asset_ids', []);
+
+        if (count($requestedAssetIds) > 0) {
+            foreach ($requestedAssetIds as $assetId) {
+                $asset = Asset::find($assetId);
+                if ($asset) {
+                    AssetRequest::create([
+                        'company_id' => $companyId,
+                        'employee_id' => $employee->id,
+                        'asset_category_id' => $asset->asset_category_id,
+                        'requested_asset_id' => $asset->id,
+                        'reason' => $reason,
+                        'request_date' => $requestDate,
+                        'status' => 'pending',
+                    ]);
+                }
+            }
+        } else {
+            foreach ($categoryIds as $categoryId) {
+                AssetRequest::create([
+                    'company_id' => $companyId,
+                    'employee_id' => $employee->id,
+                    'asset_category_id' => $categoryId,
+                    'reason' => $reason,
+                    'request_date' => $requestDate,
+                    'status' => 'pending',
+                ]);
+            }
+        }
  
         return redirect()->back()->with('success', __('hrms.assets.success_req_submitted'));
     }
@@ -460,6 +500,149 @@ class AssetController extends Controller
         ]);
  
         return redirect()->back()->with('success', __('hrms.assets.success_req_rejected'));
+    }
+
+    /**
+     * Directly allocate a pending asset request without expected return date.
+     */
+    public function allocateDirect(AssetRequest $assetRequest): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        if ($assetRequest->status !== 'pending') {
+            return redirect()->back()->with('error', __('hrms.assets.error_req_not_pending'));
+        }
+
+        $asset = null;
+        if ($assetRequest->requested_asset_id) {
+            $asset = Asset::find($assetRequest->requested_asset_id);
+            if (!$asset || $asset->status !== 'available') {
+                return redirect()->back()->with('error', __('hrms.assets.error_spec_asset_not_avail'));
+            }
+        } else {
+            // Find first available asset of the requested category & company
+            $asset = Asset::query()
+                ->where('asset_category_id', $assetRequest->asset_category_id)
+                ->where('company_id', $assetRequest->company_id)
+                ->where('status', 'available')
+                ->first();
+
+            if (!$asset) {
+                return redirect()->back()->with('error', __('hrms.assets.error_no_avail_asset_cat'));
+            }
+        }
+
+        // Allocate the asset directly
+        $asset->update([
+            'status' => 'allocated',
+            'assigned_employee_id' => $assetRequest->employee_id,
+            'allocated_at' => date('Y-m-d'),
+            'expected_return_date' => null,
+        ]);
+
+        $asset->allocations()->create([
+            'employee_id' => $assetRequest->employee_id,
+            'allocated_at' => date('Y-m-d'),
+            'allocation_condition' => $asset->condition,
+            'notes' => $asset->notes,
+        ]);
+
+        $assetRequest->update([
+            'status' => 'allocated',
+            'allocated_asset_id' => $asset->id,
+            'admin_notes' => __('hrms.assets.admin_notes_allocated_dir', [
+                'code' => $asset->asset_code,
+                'name' => $asset->name,
+                'date' => date('d M, Y')
+            ]),
+        ]);
+
+        return redirect()->back()->with('success', __('hrms.assets.success_req_allocated_dir'));
+    }
+
+    /**
+     * Bulk allocate selected asset requests.
+     */
+    public function bulkAllocate(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'allocations' => 'required|array',
+            'allocations.*' => 'nullable|exists:assets,id',
+            'allocated_at' => 'required|date',
+            'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
+        ]);
+
+        $allocatedAt = $request->input('allocated_at');
+        $expectedReturnDate = $request->input('expected_return_date');
+        $allocatedCount = 0;
+
+        foreach ($request->input('allocations') as $requestId => $assetId) {
+            if (empty($assetId)) {
+                continue;
+            }
+
+            $assetRequest = AssetRequest::find($requestId);
+            $asset = Asset::find($assetId);
+
+            if ($assetRequest && $asset && $asset->status === 'available') {
+                $asset->update([
+                    'status' => 'allocated',
+                    'assigned_employee_id' => $assetRequest->employee_id,
+                    'allocated_at' => $allocatedAt,
+                    'expected_return_date' => $expectedReturnDate,
+                ]);
+
+                $asset->allocations()->create([
+                    'employee_id' => $assetRequest->employee_id,
+                    'allocated_at' => $allocatedAt,
+                    'allocation_condition' => $asset->condition,
+                    'notes' => $asset->notes,
+                ]);
+
+                $assetRequest->update([
+                    'status' => 'allocated',
+                    'allocated_asset_id' => $asset->id,
+                    'admin_notes' => 'Allocated asset ' . $asset->asset_code . ' (' . $asset->name . ') on ' . date('d M, Y') . ' via bulk allocation.',
+                ]);
+
+                $allocatedCount++;
+            }
+        }
+
+        if ($allocatedCount > 0) {
+            return redirect()->back()->with('success', "Successfully allocated {$allocatedCount} asset(s).");
+        }
+
+        return redirect()->back()->with('error', "No assets were allocated. Make sure selected assets are available.");
+    }
+
+    /**
+     * Bulk reject selected asset requests.
+     */
+    public function bulkReject(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'request_ids' => 'required|array',
+            'request_ids.*' => 'exists:asset_requests,id',
+            'admin_notes' => 'required|string|max:1000',
+        ]);
+
+        $adminNotes = $request->input('admin_notes');
+        $requestIds = $request->input('request_ids');
+
+        AssetRequest::query()
+            ->whereIn('id', $requestIds)
+            ->where('status', 'pending')
+            ->update([
+                'status' => 'rejected',
+                'admin_notes' => $adminNotes,
+            ]);
+
+        return redirect()->back()->with('success', 'Selected asset requests rejected successfully.');
     }
 
     /**
@@ -619,7 +802,26 @@ class AssetController extends Controller
             $headers = array_map(function($h) {
                 $h = strtolower(trim(preg_replace('/[\x{FEFF}\x{FFFE}]/u', '', $h)));
                 $h = str_replace([' ', '-'], '_', $h);
-                return preg_replace('/[^a-z0-9_]/', '', $h);
+                $h = preg_replace('/[^a-z0-9_]/', '', $h);
+
+                // Normalize common header aliases to make the import robust
+                if (str_starts_with($h, 'category') || $h === 'cat') {
+                    return 'category_name';
+                }
+                if (str_starts_with($h, 'model')) {
+                    return 'model_number';
+                }
+                if (str_starts_with($h, 'serial')) {
+                    return 'serial_number';
+                }
+                if ($h === 'purchase_d' || $h === 'purchase_dt' || str_starts_with($h, 'purchase_date')) {
+                    return 'purchase_date';
+                }
+                if ($h === 'purchase_c' || $h === 'purchase_amt' || $h === 'purchase_val' || $h === 'purchase_price' || str_starts_with($h, 'purchase_cost')) {
+                    return 'purchase_cost';
+                }
+
+                return $h;
             }, $headers);
 
             $required = ['asset_code', 'name', 'category_name'];

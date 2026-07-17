@@ -170,8 +170,8 @@
                                                                 {!! $typeBadge !!}
                                                             </div>
                                                             <div class="border-top pt-2 mt-auto">
-                                                                <div class="d-flex align-items-center">
-                                                                    <span class="fw-bold text-primary" style="font-size: 14px;">
+                                                                <div class="d-flex align-items-center overflow-hidden">
+                                                                    <span class="fw-bold text-primary flex-shrink-0" style="font-size: 14px;">
                                                                         @if($item->calculation_type === 'fixed')
                                                                             ₹{{ number_format($item->value, 2) }}
                                                                         @elseif($item->calculation_type === 'percentage_of_ctc' || $item->calculation_type === 'percentage_of_basic')
@@ -180,7 +180,7 @@
                                                                             <span class="text-secondary">-</span>
                                                                         @endif
                                                                     </span>
-                                                                    <span class="text-muted ms-1" style="font-size: 12px; max-width: 65%;">{{ $calcTypeLabel }}</span>
+                                                                    <span class="text-muted ms-1 text-truncate flex-grow-1" style="font-size: 12px;" title="{{ $calcTypeLabel }}">{{ $calcTypeLabel }}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -293,6 +293,7 @@
                                                         name="components[{{ $comp->id }}][calculation_type]"
                                                         class="add-calc-type-select"
                                                         data-comp-id="{{ $comp->id }}"
+                                                        id="add-calc-type-{{ $comp->id }}"
                                                         onchange="handleCalcTypeChange('add', {{ $comp->id }})">
                                                     <option value="not_included">{{ __('hrms.salary.not_included') }}</option>
                                                     <option value="fixed">{{ __('hrms.salary.fixed_amount') }}</option>

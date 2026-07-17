@@ -47,6 +47,154 @@
                 invalid.focus({ preventScroll: true });
             });
         });
+
+        // Dynamic filtering of Department Head by branch/business unit/company
+        const companySelect = document.getElementById('company_id');
+        const buSelect = document.getElementById('business_unit_id');
+        const branchSelect = document.getElementById('branch_id');
+        const headSelect = document.getElementById('head_employee_id');
+
+        if (companySelect && buSelect && branchSelect && headSelect) {
+            const $company = $(companySelect);
+            const $bu = $(buSelect);
+            const $branch = $(branchSelect);
+            const $head = $(headSelect);
+
+            function filterDepartmentHead() {
+                const companyId = $company.val();
+                const buId = $bu.val();
+                const branchId = $branch.val();
+
+                let originalOptions = $head.data('original-options');
+                if (!originalOptions) {
+                    originalOptions = $head.find('option').clone();
+                    $head.data('original-options', originalOptions);
+                }
+
+                const currentSelected = $head.val();
+                $head.empty();
+
+                originalOptions.each(function () {
+                    const opt = $(this);
+                    const optVal = opt.val();
+                    const optionBranchId = opt.attr('data-branch-id');
+                    const optionBuId = opt.attr('data-business-unit-id');
+                    const optionCompId = opt.attr('data-company-id');
+
+                    if (!optVal) {
+                        $head.append(opt.clone());
+                        return;
+                    }
+
+                    if (branchId) {
+                        if (String(optionBranchId) === String(branchId)) {
+                            $head.append(opt.clone());
+                        }
+                    } else if (buId) {
+                        if (String(optionBuId) === String(buId)) {
+                            $head.append(opt.clone());
+                        }
+                    } else if (companyId) {
+                        if (String(optionCompId) === String(companyId)) {
+                            $head.append(opt.clone());
+                        }
+                    } else {
+                        // All unselected -> show all
+                        $head.append(opt.clone());
+                    }
+                });
+
+                if ($head.find(`option[value="${currentSelected}"]`).length) {
+                    $head.val(currentSelected);
+                } else {
+                    $head.val('');
+                }
+
+                if ($head.hasClass('select2-hidden-accessible')) {
+                    $head.trigger('change.select2');
+                }
+            }
+
+            // Hierarchical filters for BU and branch selects
+            function filterOrgDropdowns() {
+                const companyId = $company.val();
+                const buId = $bu.val();
+
+                // Filter business units by company
+                let originalBUs = $bu.data('original-options');
+                if (!originalBUs) {
+                    originalBUs = $bu.find('option').clone();
+                    $bu.data('original-options', originalBUs);
+                }
+                const currentBU = $bu.val();
+                $bu.empty();
+                originalBUs.each(function () {
+                    const opt = $(this);
+                    if (!opt.val() || !companyId || String(opt.attr('data-company-id')) === String(companyId)) {
+                        $bu.append(opt.clone());
+                    }
+                });
+                if ($bu.find(`option[value="${currentBU}"]`).length) {
+                    $bu.val(currentBU);
+                } else {
+                    $bu.val('');
+                }
+                if ($bu.hasClass('select2-hidden-accessible')) {
+                    $bu.trigger('change.select2');
+                }
+
+                // Filter branches by business unit or company
+                let originalBranches = $branch.data('original-options');
+                if (!originalBranches) {
+                    originalBranches = $branch.find('option').clone();
+                    $branch.data('original-options', originalBranches);
+                }
+                const currentBranch = $branch.val();
+                $branch.empty();
+                originalBranches.each(function () {
+                    const opt = $(this);
+                    if (!opt.val()) {
+                        $branch.append(opt.clone());
+                        return;
+                    }
+                    if (buId) {
+                        if (String(opt.attr('data-business-unit-id')) === String(buId)) {
+                            $branch.append(opt.clone());
+                        }
+                    } else if (companyId) {
+                        if (String(opt.attr('data-company-id')) === String(companyId)) {
+                            $branch.append(opt.clone());
+                        }
+                    } else {
+                        $branch.append(opt.clone());
+                    }
+                });
+                if ($branch.find(`option[value="${currentBranch}"]`).length) {
+                    $branch.val(currentBranch);
+                } else {
+                    $branch.val('');
+                }
+                if ($branch.hasClass('select2-hidden-accessible')) {
+                    $branch.trigger('change.select2');
+                }
+            }
+
+            $company.on('change', function () {
+                filterOrgDropdowns();
+                filterDepartmentHead();
+            });
+            $bu.on('change', function () {
+                filterOrgDropdowns();
+                filterDepartmentHead();
+            });
+            $branch.on('change', filterDepartmentHead);
+
+            // Trigger initially
+            setTimeout(function () {
+                filterOrgDropdowns();
+                filterDepartmentHead();
+            }, 100);
+        }
     });
 })();
 </script>
@@ -77,10 +225,28 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_branch') }}" name="branch_id" id="branch_id" :required="true">
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_company') }}" name="company_id" id="company_id" :required="true">
+                                        <option value="">{{ __('hrms.org.parent_company') }}</option>
+                                        @foreach($companies as $company)
+                                            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_business_unit') }}" name="business_unit_id" id="business_unit_id">
+                                        <option value="">{{ __('hrms.org.select_business_unit') }}</option>
+                                        @foreach($businessUnits as $buUnit)
+                                            <option value="{{ $buUnit->id }}" data-company-id="{{ $buUnit->company_id }}">{{ $buUnit->name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_branch') }}" name="branch_id" id="branch_id">
                                         <option value="">{{ __('hrms.org.select_branch') }}</option>
                                         @foreach($branches as $branch)
-                                            <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                            <option value="{{ $branch->id }}" data-company-id="{{ $branch->company_id }}" data-business-unit-id="{{ $branch->business_unit_id }}">{{ $branch->name }}</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
@@ -89,7 +255,7 @@
                                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.department_head') }}" name="head_employee_id" id="head_employee_id">
                                         <option value="">{{ __('hrms.org.department_head') }}</option>
                                         @foreach($employees as $employee)
-                                            <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                            <option value="{{ $employee->id }}" data-company-id="{{ $employee->company_id }}" data-business-unit-id="{{ $employee->business_unit_id }}" data-branch-id="{{ $employee->branch_id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>

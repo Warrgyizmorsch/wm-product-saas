@@ -114,5 +114,8 @@ Route::prefix('hrms')
         Route::post('/assets/{asset}/allocate', [AssetController::class, 'allocate'])->name('assets.allocate');
         Route::post('/assets/{asset}/return', [AssetController::class, 'returnAsset'])->name('assets.return');
         Route::post('/assets/requests/store', [AssetController::class, 'storeRequest'])->name('assets.requests.store');
-        Route::post('/assets/requests/{request}/reject', [AssetController::class, 'rejectRequest'])->name('assets.requests.reject');
+        Route::post('/assets/requests/{assetRequest}/reject', [AssetController::class, 'rejectRequest'])->name('assets.requests.reject');
+        Route::post('/assets/requests/{assetRequest}/allocate-direct', [AssetController::class, 'allocateDirect'])->name('assets.requests.allocate-direct');
+        Route::post('/assets/requests/bulk-allocate', [AssetController::class, 'bulkAllocate'])->name('assets.requests.bulk-allocate');
+        Route::post('/assets/requests/bulk-reject', [AssetController::class, 'bulkReject'])->name('assets.requests.bulk-reject');
     });

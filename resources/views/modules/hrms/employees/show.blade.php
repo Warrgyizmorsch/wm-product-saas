@@ -2116,7 +2116,7 @@
                                     <thead class="table-light text-uppercase fs-10" style="letter-spacing: 0.5px;">
                                         <tr>
                                             <th class="text-start" style="padding-left: 20px;">{{ __('hrms.employees.tbl_requested_category') }}</th>
-                                            <th>{{ __('hrms.employees.tbl_expiry_date') }}</th>
+                                            <th>{{ __('hrms.employees.tbl_request_date') }}</th>
                                             <th class="text-start">{{ __('hrms.employees.tbl_reason') }}</th>
                                             <th>{{ __('hrms.employees.tbl_status') }}</th>
                                             <th class="text-start" style="padding-right: 20px;">{{ __('hrms.employees.tbl_admin_notes') }}</th>
@@ -2138,7 +2138,10 @@
                                                 data-search="{{ \Illuminate\Support\Str::lower($requestSearchText) }}"
                                                 data-date="{{ $req->request_date ? $req->request_date->timestamp : '' }}">
                                                 <td class="text-start" style="padding-left: 20px;">
-                                                    <span class="badge bg-soft-primary text-primary">{{ $req->category->name }}</span>
+                                                    <span class="badge bg-soft-primary text-primary mb-1">{{ $req->category->name }}</span>
+                                                    @if($req->requestedAsset)
+                                                        <div class="fs-11 text-muted">Req Asset: <strong class="text-dark">{{ $req->requestedAsset->name }} ({{ $req->requestedAsset->asset_code }})</strong></div>
+                                                    @endif
                                                 </td>
                                                 <td><span class="text-secondary fs-12">{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}</span></td>
                                                 <td class="text-start text-muted fs-12" style="max-width: 250px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ $req->reason }}">{{ $req->reason }}</td>
@@ -2500,7 +2503,7 @@
     </div>
 
     <!-- REQUEST ASSET MODAL FOR PROFILE TAB -->
-    <div class="modal fade" id="requestAssetModal" tabindex="-1" aria-labelledby="requestAssetModalLabel" aria-hidden="true">
+    <div class="modal fade" id="requestAssetModal" aria-labelledby="requestAssetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -2509,21 +2512,24 @@
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="{{ route('hrms.assets.requests.store') }}" method="POST">
+                <form action="{{ route('hrms.assets.requests.store') }}" method="POST" novalidate>
                     @csrf
                     <input type="hidden" name="employee_id" value="{{ $employee->id }}">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="info-label mb-1">{{ __('hrms.employees.mdl_emp_requesting') }}</label>
-                                <input type="text" class="form-control bg-light" value="{{ $employee->display_name }} ({{ $employee->employee_id }})" readonly>
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_emp_requesting') }}" name="employee_name_display" value="{{ $employee->display_name }} ({{ $employee->employee_id }})" :readonly="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.lbl_asset_category') }}" name="asset_category_id" :required="true" select2-selector="default">
-                                    <option value="">{{ __('hrms.common.all_companies') }} - {{ __('hrms.employees.tbl_category') }}</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.lbl_asset_category') }}" name="asset_category_ids[]" id="req_asset_category_ids" :required="true" :multiple="true" select2-selector="default">
                                     @foreach($categories->where('company_id', $employee->company_id) as $category)
                                         <option value="{{ $category->id }}">{{ $category->name }}</option>
                                     @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.lbl_select_specific_assets') }}" name="requested_asset_ids[]" id="req_requested_asset_ids" :required="true" :multiple="true" select2-selector="default">
+                                    <!-- Options populated via JS -->
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
@@ -2552,8 +2558,42 @@
                 $('#addHistoryModal').appendTo('body');
                 $('#returnAssetModal').appendTo('body');
                 $('#requestAssetModal').appendTo('body');
+                // Dynamic filtering of assets inside Request Asset Modal based on selected categories
+                const availableAssets = {!! json_encode($availableAssets->map(function($a) {
+                    return [
+                        'id' => $a->id,
+                        'name' => $a->name . ' (' . $a->asset_code . ')',
+                        'category_id' => $a->asset_category_id
+                    ];
+                })) !!};
 
-                // Handle return modal details binding
+                const $catSelect = $('#req_asset_category_ids');
+                const $assetSelect = $('#req_requested_asset_ids');
+
+                if ($catSelect.length && $assetSelect.length) {
+                    function updateAvailableAssets() {
+                        const selectedCats = $catSelect.val() || [];
+                        const currentSelectedAssets = $assetSelect.val() || [];
+                        
+                        $assetSelect.empty();
+                        
+                        availableAssets.forEach(function(asset) {
+                            if (selectedCats.includes(String(asset.category_id))) {
+                                const opt = new Option(asset.name, asset.id);
+                                if (currentSelectedAssets.includes(String(asset.id))) {
+                                    opt.selected = true;
+                                }
+                                $assetSelect.append(opt);
+                            }
+                        });
+                        
+                        if ($assetSelect.hasClass('select2-hidden-accessible')) {
+                            $assetSelect.trigger('change.select2');
+                        }
+                    }
+                    
+                    $catSelect.on('change', updateAvailableAssets);
+                }                // Handle return modal details binding
                 $('#returnAssetModal').on('show.bs.modal', function(event) {
                     var button = $(event.relatedTarget);
                     var assetId = button.data('asset-id');
@@ -2983,3 +3023,11 @@
         </script>
     @endpush
 @endsection
+
+@push('styles')
+    <style>
+        #requestAssetModal .odoo-form-label {
+            width: 180px !important;
+        }
+    </style>
+@endpush

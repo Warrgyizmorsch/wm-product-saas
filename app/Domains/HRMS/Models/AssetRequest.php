@@ -11,6 +11,7 @@ class AssetRequest extends BaseModel
         'company_id',
         'employee_id',
         'asset_category_id',
+        'requested_asset_id',
         'reason',
         'request_date',
         'status',
@@ -40,5 +41,10 @@ class AssetRequest extends BaseModel
     public function allocatedAsset(): BelongsTo
     {
         return $this->belongsTo(Asset::class, 'allocated_asset_id');
+    }
+
+    public function requestedAsset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class, 'requested_asset_id');
     }
 }

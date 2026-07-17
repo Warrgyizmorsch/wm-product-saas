@@ -471,7 +471,13 @@ class EmployeeController extends Controller
         }
 
         // Load employee penalties, adhoc components, documents, and employment histories
-        $employee->load(['documents.requestedBy', 'employmentHistories']);
+        $employee->load(['documents.requestedBy', 'employmentHistories', 'assetRequests.requestedAsset']);
+
+        $availableAssets = \App\Domains\HRMS\Models\Asset::query()
+            ->where('company_id', $employee->company_id)
+            ->where('status', 'available')
+            ->orderBy('name')
+            ->get();
 
         $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::query()
             ->where('employee_id', $employee->id)
@@ -499,7 +505,8 @@ class EmployeeController extends Controller
             'computedComponents',
             'adhocComponents',
             'penalties',
-            'availableAdhocComponents'
+            'availableAdhocComponents',
+            'availableAssets'
         ));
     }
 

@@ -47,6 +47,71 @@
                 invalid.focus({ preventScroll: true });
             });
         });
+
+        // Dynamic filtering of Branch Manager by Business Unit (or Company if no BU is selected)
+        const buSelect = document.getElementById('business_unit_id');
+        const companySelect = document.getElementById('company_id');
+        const managerSelect = document.getElementById('manager_employee_id');
+
+        if (buSelect && companySelect && managerSelect) {
+            const $bu = $(buSelect);
+            const $company = $(companySelect);
+            const $manager = $(managerSelect);
+
+            function filterBranchManagers() {
+                const buId = $bu.val();
+                const companyId = $company.val();
+                
+                let originalOptions = $manager.data('original-options');
+                if (!originalOptions) {
+                    originalOptions = $manager.find('option').clone();
+                    $manager.data('original-options', originalOptions);
+                }
+
+                const currentSelected = $manager.val();
+                $manager.empty();
+
+                originalOptions.each(function () {
+                    const opt = $(this);
+                    const optVal = opt.val();
+                    const optionBuId = opt.attr('data-business-unit-id');
+                    const optionCompId = opt.attr('data-company-id');
+
+                    if (!optVal) {
+                        $manager.append(opt.clone());
+                        return;
+                    }
+
+                    if (!buId && !companyId) {
+                        $manager.append(opt.clone());
+                    } else if (buId) {
+                        if (String(optionBuId) === String(buId)) {
+                            $manager.append(opt.clone());
+                        }
+                    } else if (companyId) {
+                        if (String(optionCompId) === String(companyId)) {
+                            $manager.append(opt.clone());
+                        }
+                    }
+                });
+
+                if ($manager.find(`option[value="${currentSelected}"]`).length) {
+                    $manager.val(currentSelected);
+                } else {
+                    $manager.val('');
+                }
+
+                if ($manager.hasClass('select2-hidden-accessible')) {
+                    $manager.trigger('change.select2');
+                }
+            }
+
+            $bu.on('change', filterBranchManagers);
+            $company.on('change', filterBranchManagers);
+
+            // Trigger initially
+            setTimeout(filterBranchManagers, 100);
+        }
     });
 })();
 </script>
@@ -77,7 +142,16 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_business_unit') }}" name="business_unit_id" id="business_unit_id" :required="true">
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_company') }}" name="company_id" id="company_id" :required="true">
+                                        <option value="">{{ __('hrms.org.parent_company') }}</option>
+                                        @foreach($companies as $company)
+                                            <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                        @endforeach
+                                    </x-ui.odoo-form-ui>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_business_unit') }}" name="business_unit_id" id="business_unit_id">
                                         <option value="">{{ __('hrms.org.select_business_unit') }}</option>
                                         @foreach($businessUnits as $buUnit)
                                             <option value="{{ $buUnit->id }}">{{ $buUnit->name }}</option>
@@ -89,7 +163,7 @@
                                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.branch_manager') }}" name="manager_employee_id" id="manager_employee_id">
                                         <option value="">{{ __('hrms.org.select_manager') }}</option>
                                         @foreach($employees as $employee)
-                                            <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                            <option value="{{ $employee->id }}" data-company-id="{{ $employee->company_id }}" data-business-unit-id="{{ $employee->business_unit_id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
                                         @endforeach
                                     </x-ui.odoo-form-ui>
                                 </div>
