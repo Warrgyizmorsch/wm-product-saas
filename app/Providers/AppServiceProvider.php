@@ -130,6 +130,43 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // ── Cross-module morph map (Journal.reference_type/reference_id) ───────
+        // Journal::reference() is a real morphTo(); these short, stable keys are
+        // what gets stored in reference_type, never the FQCN. Using morphMap()
+        // (additive) rather than enforceMorphMap() deliberately — the latter
+        // requires every morphTo() relation app-wide to resolve through the map,
+        // which breaks unrelated existing polymorphic relations (e.g. Projects'
+        // ActivityLog, HRMS's Document) that still store raw FQCNs.
+        \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
+            'invoice' => \App\Domains\Sales\Models\Invoice::class,
+            'customer_payment' => \App\Domains\Sales\Models\CustomerPayment::class,
+            'delivery_order' => \App\Domains\Sales\Models\DeliveryOrder::class,
+        ]);
+
+        // ── Domain Event Listeners ───────────────────────────────────────────
+        // Registered explicitly (not via discoverEventsWithin()/EventServiceProvider
+        // subclassing, which silently stops auto-discovering listeners outside
+        // app/Listeners) so every cross-module wire is auditable from this one file.
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Production\Events\BomApproved::class,
+            \App\Domains\Production\Listeners\CalculateBomCost::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Sales\Events\InvoicePosted::class,
+            \App\Domains\Accounting\Listeners\PostInvoiceJournal::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Sales\Events\CustomerPaymentReceived::class,
+            \App\Domains\Accounting\Listeners\PostCustomerPaymentJournal::class
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Inventory\Events\StockOutflowRecorded::class,
+            \App\Domains\Accounting\Listeners\PostCogsJournal::class
+        );
+
         // ── Production Policies ───────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionKpiTarget::class,

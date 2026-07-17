@@ -7,6 +7,7 @@ use App\Domains\Sales\Models\DeliveryOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\InvoiceItem;
 use App\Domains\Sales\Models\PaymentAllocation;
+use App\Domains\Sales\Events\InvoicePosted;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -214,6 +215,8 @@ class InvoiceController extends Controller
                     $invoice->update(['status' => 'Partially Paid']);
                 }
             }
+
+            event(new InvoicePosted($invoice));
 
             return $invoice;
         });

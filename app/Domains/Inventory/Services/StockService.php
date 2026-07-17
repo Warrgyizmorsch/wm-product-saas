@@ -8,6 +8,7 @@ use App\Domains\Inventory\Models\StockTransaction;
 use App\Domains\Inventory\Models\SerialNumber;
 use App\Domains\Inventory\Models\Batch;
 use App\Domains\Inventory\Models\StockReservation;
+use App\Domains\Inventory\Events\StockOutflowRecorded;
 use Illuminate\Support\Facades\DB;
 
 class StockService
@@ -610,6 +611,8 @@ class StockService
             // Attach details of allocations and serials consumed to transaction
             $transaction->consumed_allocations = $allocations;
             $transaction->consumed_serial_ids = $serialIds;
+
+            event(new StockOutflowRecorded($transaction));
 
             return $transaction;
         });

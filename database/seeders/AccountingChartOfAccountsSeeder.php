@@ -69,6 +69,7 @@ class AccountingChartOfAccountsSeeder extends Seeder
             ['code' => '2020', 'name' => 'Taxes Payable', 'type' => ChartOfAccount::TYPE_LIABILITY, 'subtype' => 'current_liability', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '2000'],
             ['code' => '2030', 'name' => 'Salaries Payable', 'type' => ChartOfAccount::TYPE_LIABILITY, 'subtype' => 'current_liability', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '2000'],
             ['code' => '2100', 'name' => 'Loans Payable', 'type' => ChartOfAccount::TYPE_LIABILITY, 'subtype' => 'long_term_liability', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '2000'],
+            ['code' => '2200', 'name' => 'Customer Advances', 'type' => ChartOfAccount::TYPE_LIABILITY, 'subtype' => 'current_liability', 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '2000'],
 
             // Equity
             ['code' => '3010', 'name' => "Owner's Capital", 'type' => ChartOfAccount::TYPE_EQUITY, 'normal_balance' => ChartOfAccount::BALANCE_CREDIT, 'parent' => '3000'],
