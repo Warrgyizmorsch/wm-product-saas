@@ -3,6 +3,7 @@
 namespace App\Domains\Projects\Repositories;
 
 use App\Domains\Projects\Models\Milestone;
+use App\Domains\Projects\Models\Task;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -12,6 +13,13 @@ class MilestoneRepository implements MilestoneRepositoryInterface
     {
         return Milestone::query()
             ->with('owner')
+            ->withCount([
+                'taskLists',
+                'tasks',
+                'tasks as completed_tasks_count' => function ($query) {
+                    $query->where('status', Task::STATUS_COMPLETED);
+                },
+            ])
             ->where('project_id', $projectId)
             ->latest('id')
             ->get();

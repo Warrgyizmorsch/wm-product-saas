@@ -144,9 +144,24 @@ class ProductionOrderController extends Controller
             'receipts.user', 'receipts.warehouse',
             'scraps.operation', 'scraps.product', 'scraps.user',
             'reworks.operation', 'reworks.user',
+            'wips.currentRoutingOperation', 'wips.currentWorkCenter', 'wips.transactions.fromOperation', 'wips.transactions.toOperation',
         ])->findOrFail($id);
 
         Gate::authorize('view', $order);
+
+        if (in_array($order->status, ['released', 'in_progress']) && $order->wips->isEmpty()) {
+            try {
+                app(\App\Domains\Production\Services\ProductionWipService::class)->initializeWip($order->id);
+                $order->load([
+                    'wips.currentRoutingOperation',
+                    'wips.currentWorkCenter',
+                    'wips.transactions.fromOperation',
+                    'wips.transactions.toOperation'
+                ]);
+            } catch (\Exception $e) {
+                // Fail-safe to avoid blocking page load
+            }
+        }
 
         // Get variance analysis calculations
         $costs = $this->costService->getCostAnalysis($order);

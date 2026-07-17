@@ -142,6 +142,12 @@ class MesExecutionService
                 $orderOp->save();
             }
 
+            // Sync with WIP tracking
+            $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $schedOp->production_order_id)->first();
+            if ($wip) {
+                app(ProductionWipService::class)->startWipOperation($wip->id, $schedOp->id, $operatorId);
+            }
+
             // Transition ProductionSchedule to in_progress if needed
             $schedule = $schedOp->schedule;
             if ($schedule && in_array($schedule->status, [ProductionSchedule::STATUS_SCHEDULED, ProductionSchedule::STATUS_RELEASED])) {
@@ -444,6 +450,22 @@ class MesExecutionService
                 $orderOp->quantity_rejected += $rejected;
                 $orderOp->quantity_scrapped += $scrapped;
                 $orderOp->save();
+
+                // Sync WIP tracking on operation completion
+                $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $schedOp->production_order_id)->first();
+                if ($wip) {
+                    app(ProductionWipService::class)->completeWipOperation(
+                        $wip->id,
+                        $orderOp->id,
+                        $produced,
+                        $rejected,
+                        $scrapped,
+                        $setupMinutes,
+                        $runMinutes,
+                        $data['remarks'] ?? null,
+                        $operatorId
+                    );
+                }
             }
 
             // Advance next schedule operations to ready (including parallel operations sharing the same next sequence)
@@ -455,6 +477,22 @@ class MesExecutionService
                 $nextSchedOps = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                     ->where('sequence', $nextSequence)
                     ->get();
+
+                // Perform WIP Transfer if next sequence exists and a WIP tracking record is active
+                if (isset($wip) && $wip && isset($produced) && $produced > 0) {
+                    $firstNextSchedOp = $nextSchedOps->first();
+                    $nextOrderOp = $firstNextSchedOp ? ProductionOrderOperation::find($firstNextSchedOp->production_order_operation_id) : null;
+                    if ($nextOrderOp && $orderOp->routing_operation_id && $nextOrderOp->routing_operation_id) {
+                        app(ProductionWipService::class)->transferWip(
+                            $wip->id,
+                            $orderOp->routing_operation_id,
+                            $nextOrderOp->routing_operation_id,
+                            $produced,
+                            'Transferred automatically upon operation completion.',
+                            $operatorId
+                        );
+                    }
+                }
 
                 foreach ($nextSchedOps as $nsOp) {
                     if ($nsOp->isWaiting()) {

@@ -5,6 +5,7 @@ use App\Domains\Production\Controllers\AnalyticsController;
 use App\Domains\Production\Controllers\AndonController;
 use App\Domains\Production\Controllers\BatchProductionController;
 use App\Domains\Production\Controllers\CalendarController;
+use App\Domains\Production\Controllers\CapacityController;
 use App\Domains\Production\Controllers\CapaController;
 use App\Domains\Production\Controllers\DeviationController;
 use App\Domains\Production\Controllers\DowntimeController;
@@ -36,6 +37,7 @@ use App\Domains\Production\Controllers\ScannerController;
 use App\Domains\Production\Controllers\ScrapController;
 use App\Domains\Production\Controllers\SerialNumberController;
 use App\Domains\Production\Controllers\ShiftController;
+use App\Domains\Production\Controllers\WipController;
 use App\Domains\Production\Controllers\WorkCenterController;
 use App\Domains\Production\Controllers\WorkCenterDashboardController;
 use App\Domains\Production\Controllers\ProductionImportExportController;
@@ -122,6 +124,12 @@ Route::prefix('production')
         Route::post('material-requests/items/{id}/reserve', [MaterialRequestController::class, 'reserve'])->name('material-requests.reserve');
         Route::post('material-requests/items/{id}/issue', [MaterialRequestController::class, 'issue'])->name('material-requests.issue');
         Route::post('material-requests/items/{id}/create-pr', [MaterialRequestController::class, 'createPurchaseRequisition'])->name('material-requests.create-pr');
+        // ── Work-in-Progress (WIP) Management ───────────────────────────────
+        Route::post('wip/{wip}/transfer', [WipController::class, 'transfer'])->name('wip.transfer');
+        Route::post('wip/{wip}/adjust', [WipController::class, 'adjust'])->name('wip.adjust');
+        Route::post('wip/{wip}/convert', [WipController::class, 'convertToFg'])->name('wip.convert');
+        Route::get('wip', [WipController::class, 'index'])->name('wip.index');
+        Route::get('wip/{wip}', [WipController::class, 'show'])->name('wip.show');
 
         // ── Production Scheduling ─────────────────────────────────────────────
         // Static named routes must be registered before the resource to avoid conflicts
@@ -130,6 +138,11 @@ Route::prefix('production')
         Route::post('schedules/{schedule}/release', [ProductionScheduleController::class, 'release'])->name('schedules.release');
         Route::post('schedules/{schedule}/cancel', [ProductionScheduleController::class, 'cancel'])->name('schedules.cancel');
         Route::resource('schedules', ProductionScheduleController::class)->except(['edit', 'update']);
+
+        // ── Capacity Planning ──────────────────────────────────────────────────
+        Route::get('capacity', [CapacityController::class, 'index'])->name('capacity.index');
+        Route::post('capacity/{id}/reschedule', [CapacityController::class, 'reschedule'])->name('capacity.reschedule');
+        Route::get('capacity/{id}/suggest', [CapacityController::class, 'suggest'])->name('capacity.suggest');
 
         // ── Shifts & Calendars ────────────────────────────────────────────────
         Route::resource('shifts', ShiftController::class)->except(['show']);
@@ -154,7 +167,7 @@ Route::prefix('production')
         // ── Advanced MES Refinements ───────────────────────────────────────────
         // Touch Operator Dashboard and My Operations
         Route::get('mes/operator', [MesController::class, 'operatorDashboard'])->name('mes.operator.dashboard');
-        Route::get('mes/operator/my-operations', [MesController::class, 'myOperations'])->name('mes.operator.my-operations');
+        Route::get('mes/operator/my-operations', [MesController::class, 'myOperations'])->name('mes.operator.my-operat
         Route::get('mes/operator/operations/{op}', [MesController::class, 'operationExecution'])->name('mes.operator.execution');
 
         // Operator Assignments
@@ -204,6 +217,7 @@ Route::prefix('production')
         Route::get('intelligence/analytics', [AnalyticsController::class, 'historical'])->name('intelligence.analytics');
         Route::get('intelligence/reports', [ReportsController::class, 'index'])->name('intelligence.reports.index');
         Route::get('intelligence/reports/{type}', [ReportsController::class, 'show'])->name('intelligence.reports.show');
+        Route::get('intelligence/reports/{type}/export', [ReportsController::class, 'export'])->name('intelligence.reports.export');
         Route::get('intelligence/alerts', [AlertController::class, 'index'])->name('intelligence.alerts.index');
         Route::post('intelligence/alerts/{id}', [AlertController::class, 'update'])->name('intelligence.alerts.update');
         Route::resource('kpi-targets', KpiTargetController::class)->only(['index', 'store']);

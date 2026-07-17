@@ -37,6 +37,7 @@ return [
     'erp_module_readiness' => 'Готовност на ERP модулите',
     'executive_dashboard' => 'Управленско табло',
     'filter' => 'Филтър',
+    'search' => 'Search',
     'finance_people' => 'Финанси и хора',
     'front_office' => 'Фронт офис',
     'home' => 'Начало',

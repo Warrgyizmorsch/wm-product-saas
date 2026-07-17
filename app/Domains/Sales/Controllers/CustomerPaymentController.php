@@ -7,6 +7,7 @@ use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\CustomerPayment;
 use App\Domains\Sales\Models\PaymentAllocation;
+use App\Domains\Sales\Events\CustomerPaymentReceived;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -110,6 +111,8 @@ class CustomerPaymentController extends Controller
                     $invoice->update(['status' => 'Partially Paid']);
                 }
             }
+
+            event(new CustomerPaymentReceived($payment));
 
             return $payment;
         });

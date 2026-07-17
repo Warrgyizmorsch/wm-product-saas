@@ -107,6 +107,13 @@
             'name' => ucwords(str_replace('_', ' ', $penalty->rule_type)),
         ];
     })->values();
+    $shiftsJson = $shifts->map(function ($shift) {
+        return [
+            'id' => $shift->id,
+            'company_id' => $shift->company_id,
+            'name' => $shift->name,
+        ];
+    })->values();
 @endphp
 
 @section('content')
@@ -676,6 +683,7 @@
             const salaryStructures = @json($salaryStructuresJson);
             const leavePlans = @json($leavePlansJson);
             const attendancePenalties = @json($attendancePenaltiesJson);
+            const shifts = @json($shiftsJson);
             const addEmployeeModal = document.getElementById('addEmployeeModal');
             const editEmployeeModal = document.getElementById('editEmployeeModal');
             const importEmployeeModal = document.getElementById('importEmployeeModal');
@@ -764,6 +772,7 @@
                 const designationSelect = document.getElementById(prefix + '_designation_id');
                 const payGroupSelect = document.getElementById(prefix + '_pay_group_id');
                 const leavePlanSelect = document.getElementById(prefix + '_leave_plan_id');
+                const shiftSelect = document.getElementById(prefix + '_shift_id');
 
                 if (!companySelect || !businessUnitSelect || !branchSelect || !departmentSelect || !designationSelect) {
                     return;
@@ -776,6 +785,7 @@
                 const designationId = preferredValue(selectedValues.designationId, designationSelect.value, designationSelect.dataset.selectedValue);
                 const payGroupId = preferredValue(selectedValues.payGroupId, payGroupSelect ? payGroupSelect.value : '', payGroupSelect ? payGroupSelect.dataset.selectedValue : '');
                 const leavePlanId = preferredValue(selectedValues.leavePlanId, leavePlanSelect ? leavePlanSelect.value : '', leavePlanSelect ? leavePlanSelect.dataset.selectedValue : '');
+                const shiftId = preferredValue(selectedValues.shiftId, shiftSelect ? shiftSelect.value : '', shiftSelect ? shiftSelect.dataset.selectedValue : '');
 
                 const availableBusinessUnits = businessUnits.filter(item => !companyId || String(item.company_id) === String(companyId));
                 buildOptions(businessUnitSelect, availableBusinessUnits, businessUnitId, 'Select Business Unit');
@@ -844,6 +854,12 @@
                     leavePlanSelect.dataset.selectedValue = leavePlanSelect.value;
                 }
 
+                if (shiftSelect) {
+                    const availableShifts = shifts.filter(item => !item.company_id || (companyId && String(item.company_id) === String(companyId)));
+                    buildOptions(shiftSelect, availableShifts, shiftId, 'Select Work Shift');
+                    shiftSelect.dataset.selectedValue = shiftSelect.value;
+                }
+
                 $(businessUnitSelect).trigger('change.select2');
                 $(branchSelect).trigger('change.select2');
                 $(departmentSelect).trigger('change.select2');
@@ -853,6 +869,9 @@
                 }
                 if (leavePlanSelect) {
                     $(leavePlanSelect).trigger('change.select2');
+                }
+                if (shiftSelect) {
+                    $(shiftSelect).trigger('change.select2');
                 }
             }
 
@@ -1016,6 +1035,7 @@
                     designationId: employee.designation_id || '',
                     payGroupId: employee.pay_group_id || '',
                     leavePlanId: employee.leave_plan_id || '',
+                    shiftId: employee.shift_id || '',
                 });
 
                 setPreview('edit', employee.photo, employee.full_name);
@@ -1027,20 +1047,22 @@
             attachHierarchyListeners('create');
             attachHierarchyListeners('edit');
             syncHierarchy('create', {
-                businessUnitId: document.getElementById('create_business_unit_id')?.value || '',
-                branchId: document.getElementById('create_branch_id')?.value || '',
-                departmentId: document.getElementById('create_department_id')?.value || '',
-                designationId: document.getElementById('create_designation_id')?.value || '',
-                payGroupId: document.getElementById('create_pay_group_id')?.value || '',
-                leavePlanId: document.getElementById('create_leave_plan_id')?.value || '',
+                    businessUnitId: document.getElementById('create_business_unit_id')?.value || '',
+                    branchId: document.getElementById('create_branch_id')?.value || '',
+                    departmentId: document.getElementById('create_department_id')?.value || '',
+                    designationId: document.getElementById('create_designation_id')?.value || '',
+                    payGroupId: document.getElementById('create_pay_group_id')?.value || '',
+                    leavePlanId: document.getElementById('create_leave_plan_id')?.value || '',
+                    shiftId: document.getElementById('create_shift_id')?.value || '',
             });
             syncHierarchy('edit', {
-                businessUnitId: document.getElementById('edit_business_unit_id')?.value || '',
-                branchId: document.getElementById('edit_branch_id')?.value || '',
-                departmentId: document.getElementById('edit_department_id')?.value || '',
-                designationId: document.getElementById('edit_designation_id')?.value || '',
-                payGroupId: document.getElementById('edit_pay_group_id')?.value || '',
-                leavePlanId: document.getElementById('edit_leave_plan_id')?.value || '',
+                    businessUnitId: document.getElementById('edit_business_unit_id')?.value || '',
+                    branchId: document.getElementById('edit_branch_id')?.value || '',
+                    departmentId: document.getElementById('edit_department_id')?.value || '',
+                    designationId: document.getElementById('edit_designation_id')?.value || '',
+                    payGroupId: document.getElementById('edit_pay_group_id')?.value || '',
+                    leavePlanId: document.getElementById('edit_leave_plan_id')?.value || '',
+                    shiftId: document.getElementById('edit_shift_id')?.value || '',
             });
 
             $(document).on('click', '.employee-edit-trigger', function () {

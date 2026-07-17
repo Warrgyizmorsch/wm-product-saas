@@ -83,7 +83,7 @@
                         <div class="row g-3">
                             @if($op->status !== 'running' && $op->status !== 'completed')
                                 <div class="col-12">
-                                    <form method="POST" action="{{ route('production.mes.start', $op->id) }}">
+                                    <form method="POST" action="{{ route('production.mes.start', optional($scheduleOp)->id ?? $op->id) }}">
                                         @csrf
                                         <button type="submit" class="btn btn-touch-large btn-success w-100">
                                             <i class="feather-play me-2 fs-20"></i> START OPERATION
@@ -107,7 +107,7 @@
 
                             @if($op->status === 'paused')
                                 <div class="col-12">
-                                    <form method="POST" action="{{ route('production.mes.resume', $op->id) }}">
+                                    <form method="POST" action="{{ route('production.mes.resume', optional($scheduleOp)->id ?? $op->id) }}">
                                         @csrf
                                         <button type="submit" class="btn btn-touch-large btn-success w-100">
                                             <i class="feather-play me-2 fs-20"></i> RESUME WORK
@@ -141,7 +141,21 @@
                                 <div class="avatar-text avatar-sm bg-soft-primary text-primary rounded-circle me-2">
                                     <i class="feather-user"></i>
                                 </div>
-                                <span class="fw-bold text-dark">{{ $assignment ? $assignment->user->name : 'No active assignments' }}</span>
+                                <span class="fw-bold text-dark me-3">
+                                    {{ $assignment ? $assignment->user->name : 'No active assignments' }}
+                                    @if($assignment)
+                                        @if($assignment->status === 'assigned')
+                                            <span class="badge bg-soft-warning text-warning fs-10 ms-1">Pending Acceptance</span>
+                                        @elseif($assignment->status === 'accepted')
+                                            <span class="badge bg-soft-success text-success fs-10 ms-1">Accepted</span>
+                                        @endif
+                                    @endif
+                                </span>
+                                @can('manage', \App\Domains\Production\Models\ProductionOperatorAssignment::class)
+                                    <button type="button" class="btn btn-xs btn-outline-primary ms-auto" data-bs-toggle="modal" data-bs-target="#assignOperatorModal">
+                                        <i class="feather-user-plus me-1"></i> {{ $assignment ? 'Reassign' : 'Assign' }}
+                                    </button>
+                                @endcan
                             </div>
                         </div>
                         <div class="mb-3 pt-3 border-top">
@@ -200,7 +214,7 @@
     <div class="modal fade" id="pauseModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <form method="POST" action="{{ route('production.mes.pause', $op->id) }}">
+                <form method="POST" action="{{ route('production.mes.pause', optional($scheduleOp)->id ?? $op->id) }}">
                     @csrf
                     <div class="modal-header">
                         <h5 class="modal-title fw-bold">Pause Operation</h5>
@@ -225,7 +239,7 @@
     <div class="modal fade" id="completeModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
-                <form method="POST" action="{{ route('production.mes.complete', $op->id) }}" id="completeForm">
+                <form method="POST" action="{{ route('production.mes.complete', optional($scheduleOp)->id ?? $op->id) }}" id="completeForm">
                     @csrf
                     <div class="modal-header">
                         <h5 class="modal-title fw-bold">Log Progress & Complete</h5>
@@ -291,6 +305,37 @@
             </div>
         </div>
     </div>
+
+    {{-- Assign/Reassign Operator Modal --}}
+    <x-ui.modal 
+        id="assignOperatorModal" 
+        title="{{ $assignment ? 'Reassign Operator' : 'Assign Operator' }}"
+        centered="true"
+        formAction="{{ $assignment ? route('production.mes.assignments.reassign', $assignment->id) : route('production.mes.assignments.assign') }}"
+        submitText="{{ $assignment ? 'Reassign' : 'Assign' }}"
+        closeText="Cancel"
+    >
+        @if(!$assignment)
+            <input type="hidden" name="production_order_operation_id" value="{{ $op->id }}">
+        @endif
+
+        <div class="mb-3 text-start text-dark">
+            <label class="form-label uppercase font-semibold fs-11 text-muted">Select Operator</label>
+            <select name="user_id" class="form-select form-control" required>
+                <option value="">-- Choose Operator --</option>
+                @foreach($operators as $operator)
+                    <option value="{{ $operator->id }}" {{ $assignment && $assignment->user_id == $operator->id ? 'selected' : '' }}>
+                        {{ $operator->name }} ({{ ucfirst($operator->role) }})
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="mb-3 text-start text-dark">
+            <label class="form-label uppercase font-semibold fs-11 text-muted">Remarks / Instructions</label>
+            <textarea name="remarks" class="form-control" rows="3" placeholder="Specify instructions or skill requirements..."></textarea>
+        </div>
+    </x-ui.modal>
 
     @push('scripts')
         <script>

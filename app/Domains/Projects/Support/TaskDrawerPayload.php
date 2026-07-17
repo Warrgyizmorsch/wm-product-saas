@@ -15,7 +15,9 @@ class TaskDrawerPayload
 {
     public static function subtasks(Project $project, Task $task): array
     {
-        return $task->subTasks()->with('assignee')->get()->map(fn ($subTask) => [
+        $task->loadMissing('subTasks.assignee');
+
+        return $task->subTasks->map(fn ($subTask) => [
             'id' => $subTask->id,
             'title' => $subTask->title,
             'isCompleted' => $subTask->is_completed,
@@ -29,7 +31,9 @@ class TaskDrawerPayload
 
     public static function dependencies(Project $project, Task $task): array
     {
-        return $task->dependencies()->with('dependsOn')->get()->map(fn ($dependency) => [
+        $task->loadMissing('dependencies.dependsOn');
+
+        return $task->dependencies->map(fn ($dependency) => [
             'id' => $dependency->id,
             'label' => $dependency->dependsOn?->task_code . ' — ' . $dependency->dependsOn?->title,
             'deleteUrl' => route('projects.tasks.dependencies.destroy', [$project, $task, $dependency]),

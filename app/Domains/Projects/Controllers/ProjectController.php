@@ -86,6 +86,12 @@ class ProjectController extends Controller
 
         $members = $this->members->list($project);
         $milestones = $this->milestones->list($project);
+        $milestones->each(function (Milestone $milestone) {
+            $health = $this->milestones->resolveHealth($milestone);
+            $milestone->health_state = $health['state'];
+            $milestone->health_reason = $health['reason'];
+        });
+        $milestoneKpis = $this->milestones->buildKpiSummary($milestones);
         $taskLists = $this->taskLists->list($project);
         $allTasks = $this->tasks->list($project);
         $tasksByList = $allTasks->groupBy('task_list_id');
@@ -108,6 +114,7 @@ class ProjectController extends Controller
             'customers'           => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
             'users'               => $canUpdateProject ? User::query()->orderBy('name')->get() : collect(),
             'milestones'          => $milestones,
+            'milestoneKpis'       => $milestoneKpis,
             'canManageMilestones' => $canManageMilestones,
             'taskLists'           => $taskLists,
             'canManageTaskLists'  => $canManageTaskLists,

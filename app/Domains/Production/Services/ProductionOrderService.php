@@ -327,6 +327,9 @@ class ProductionOrderService
         $order->released_at = now();
         $order->save();
 
+        // Initialize Work-in-Progress (WIP) tracking
+        app(ProductionWipService::class)->initializeWip($order->id, null, $userId);
+
         app(ProductionEventService::class)->writeEvent($order->tenant_id, [
             'production_order_id' => $order->id,
             'event_type' => 'Order Released',

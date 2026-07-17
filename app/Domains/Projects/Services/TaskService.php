@@ -7,6 +7,7 @@ use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Repositories\TaskRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -28,6 +29,18 @@ class TaskService
         private readonly TaskRepositoryInterface $tasks,
         private readonly ActivityLogService $activity,
     ) {
+    }
+
+    /**
+     * Legal next statuses from the given status, per the same TRANSITIONS
+     * map enforced in updateStatus() — exposed so the Task Workspace's
+     * status control only ever offers choices that won't be rejected.
+     *
+     * @return array<int, string>
+     */
+    public function legalTransitions(string $status): array
+    {
+        return self::TRANSITIONS[$status] ?? [];
     }
 
     public function list(Project $project, array $filters = []): Collection
@@ -98,6 +111,73 @@ class TaskService
 
             return $task;
         });
+    }
+
+    /**
+     * Update a single field on a task (inline-edit). Kept independent of
+     * update()'s task-list/position re-derivation, since none of the fields
+     * using this path (title, description, priority, assignee, reviewer,
+     * due_date) touch that logic.
+     */
+    public function updateField(Task $task, string $field, mixed $value): mixed
+    {
+        return DB::transaction(function () use ($task, $field, $value) {
+            $task = $this->tasks->update($task->id, [$field => $value]);
+
+            $this->activity->record(
+                $task->project,
+                'task.updated',
+                "Task '{$task->title}' updated",
+                null,
+                $task,
+            );
+
+            return $task->{$field};
+        });
+    }
+
+    /**
+     * The single most relevant next step for whoever owns this task, checked
+     * in priority order so the Task Workspace ever surfaces at most one
+     * state. Expects `dependencies.dependsOn` to already be eager-loaded.
+     *
+     * @return array{state: string, reason: ?string}|null
+     */
+    public function deriveNextAction(Task $task): ?array
+    {
+        if (in_array($task->status, [Task::STATUS_COMPLETED, Task::STATUS_CANCELLED], true)) {
+            return null;
+        }
+
+        $openDependency = $task->dependencies->first(
+            fn ($dependency) => $dependency->dependsOn && $dependency->dependsOn->status !== Task::STATUS_COMPLETED,
+        );
+
+        if ($openDependency !== null) {
+            return ['state' => 'blocked', 'reason' => $openDependency->dependsOn?->task_code];
+        }
+
+        $today = Carbon::today();
+
+        if ($task->due_date !== null && $today->gt($task->due_date)) {
+            $daysOverdue = (int) $task->due_date->diffInDays($today);
+
+            return ['state' => 'overdue', 'reason' => (string) $daysOverdue];
+        }
+
+        if ($task->due_date !== null && $today->isSameDay($task->due_date)) {
+            return ['state' => 'due_today', 'reason' => null];
+        }
+
+        if ($task->status === Task::STATUS_REVIEW) {
+            return ['state' => 'awaiting_review', 'reason' => $task->reviewer?->name];
+        }
+
+        if ($task->status === Task::STATUS_ON_HOLD) {
+            return ['state' => 'on_hold', 'reason' => null];
+        }
+
+        return null;
     }
 
     public function updateStatus(Task $task, string $newStatus): Task

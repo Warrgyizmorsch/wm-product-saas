@@ -47,6 +47,53 @@
                 invalid.focus({ preventScroll: true });
             });
         });
+
+        // Dynamic filtering of Unit Head by selected Parent Company
+        const companySelect = document.getElementById('company_id');
+        const headSelect = document.getElementById('head_employee_id');
+        if (companySelect && headSelect) {
+            const $company = $(companySelect);
+            const $head = $(headSelect);
+
+            $company.on('change', function () {
+                const compId = $company.val();
+                let originalOptions = $head.data('original-options');
+                if (!originalOptions) {
+                    originalOptions = $head.find('option').clone();
+                    $head.data('original-options', originalOptions);
+                }
+
+                const currentSelected = $head.val();
+                $head.empty();
+
+                originalOptions.each(function () {
+                    const opt = $(this);
+                    const optVal = opt.val();
+                    const optionCompId = opt.attr('data-company-id');
+
+                    if (!optVal || !compId || String(optionCompId) === String(compId)) {
+                        $head.append(opt.clone());
+                    }
+                });
+
+                if ($head.find(`option[value="${currentSelected}"]`).length) {
+                    $head.val(currentSelected);
+                } else {
+                    $head.val('');
+                }
+
+                if ($head.hasClass('select2-hidden-accessible')) {
+                    $head.trigger('change.select2');
+                }
+            });
+
+            // Trigger initially
+            setTimeout(() => {
+                if ($company.val()) {
+                    $company.trigger('change');
+                }
+            }, 100);
+        }
     });
 })();
 </script>
@@ -86,13 +133,13 @@
                                 </div>
 
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.unit_head') }}" name="head_employee_id" id="head_employee_id">
-                                        <option value="">{{ __('hrms.org.unit_head') }}</option>
-                                        @foreach($employees as $employee)
-                                            <option value="{{ $employee->id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
-                                        @endforeach
-                                    </x-ui.odoo-form-ui>
-                                </div>
+                                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.unit_head') }}" name="head_employee_id" id="head_employee_id">
+                                         <option value="">{{ __('hrms.org.unit_head') }}</option>
+                                         @foreach($employees as $employee)
+                                             <option value="{{ $employee->id }}" data-company-id="{{ $employee->company_id }}">{{ $employee->first_name }} {{ $employee->last_name }}</option>
+                                         @endforeach
+                                     </x-ui.odoo-form-ui>
+                                 </div>
 
                                 <div class="col-md-6">
                                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="status" :required="true">

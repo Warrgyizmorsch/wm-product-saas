@@ -217,6 +217,16 @@ class ProductionOrder extends BaseModel
         return $this->hasMany(ProductionSerialNumber::class, 'production_order_id');
     }
 
+    public function wips(): HasMany
+    {
+        return $this->hasMany(ProductionWip::class, 'production_order_id');
+    }
+
+    public function wipTransactions(): HasMany
+    {
+        return $this->hasMany(ProductionWipTransaction::class, 'production_order_id');
+    }
+
     // ── Status Helpers ──
 
     public function isDraft(): bool

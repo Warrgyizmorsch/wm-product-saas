@@ -465,9 +465,10 @@ class OrgController extends Controller {
     public function createBranch() {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
+        $companies = Company::orderBy('company_name')->get();
         $businessUnits = BusinessUnit::all();
         $employees = Employee::all();
-        return view('modules.hrms.org-structure.create-branch', compact('businessUnits', 'employees'));
+        return view('modules.hrms.org-structure.create-branch', compact('companies', 'businessUnits', 'employees'));
     }
 
     public function storeBranch(Request $request) {
@@ -569,9 +570,11 @@ class OrgController extends Controller {
     public function createDepartment() {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
+        $companies = Company::orderBy('company_name')->get();
+        $businessUnits = BusinessUnit::all();
         $branches = Branch::all();
         $employees = Employee::all();
-        return view('modules.hrms.org-structure.create-department', compact('branches', 'employees'));
+        return view('modules.hrms.org-structure.create-department', compact('companies', 'businessUnits', 'branches', 'employees'));
     }
 
     public function storeDepartment(Request $request) {

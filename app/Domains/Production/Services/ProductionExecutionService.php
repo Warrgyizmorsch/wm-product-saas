@@ -101,6 +101,37 @@ class ProductionExecutionService
             }
             $op->save();
 
+            // Sync with WIP tracking
+            $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $op->production_order_id)->first();
+            if ($wip) {
+                if (empty($wip->started_at)) {
+                    $wip->update(['started_at' => now()]);
+                }
+
+                app(ProductionWipService::class)->completeWipOperation(
+                    $wip->id,
+                    $op->id,
+                    $produced,
+                    $rejected,
+                    $scrapped,
+                    $setupMinutes,
+                    $runMinutes,
+                    $remarks,
+                    $userId
+                );
+
+                if ($completeOperation && isset($nextOp) && $nextOp && $produced > 0 && $op->routing_operation_id && $nextOp->routing_operation_id) {
+                    app(ProductionWipService::class)->transferWip(
+                        $wip->id,
+                        $op->routing_operation_id,
+                        $nextOp->routing_operation_id,
+                        $produced,
+                        'Transferred automatically upon manual operation completion.',
+                        $userId
+                    );
+                }
+            }
+
             // 4. Update parent order to in_progress on first execution log
             if ($order->isReleased()) {
                 $order->status            = ProductionOrder::STATUS_IN_PROGRESS;
@@ -430,6 +461,33 @@ class ProductionExecutionService
                         'status'           => 'completed',
                     ]);
                 }
+            }
+
+            // Sync with WIP tracking
+            $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $order->id)->first();
+            if ($wip && $wip->available_quantity > 0) {
+                // Clear WIP balances
+                $wip->update([
+                    'quantity' => 0.0000,
+                    'available_quantity' => 0.0000,
+                    'status' => 'completed',
+                ]);
+
+                // Create WIP Transaction of type converted_to_fg
+                \App\Domains\Production\Models\ProductionWipTransaction::create([
+                    'tenant_id' => $wip->tenant_id,
+                    'wip_id' => $wip->id,
+                    'production_order_id' => $wip->production_order_id,
+                    'production_batch_id' => $wip->production_batch_id,
+                    'transaction_type' => 'converted_to_finished_goods',
+                    'quantity' => $quantity,
+                    'cost_before' => $wip->total_value,
+                    'cost_added' => 0.00,
+                    'cost_after' => 0.00,
+                    'remarks' => $remarks ?? "Completed WIP quantity of {$quantity} received into finished inventory directly.",
+                    'transaction_at' => now(),
+                    'created_by' => $userId,
+                ]);
             }
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
