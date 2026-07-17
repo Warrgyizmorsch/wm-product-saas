@@ -57,11 +57,13 @@
             ['label' => 'Production Planning', 'icon' => 'feather-calendar', 'url' => '#', 'children' => [
                 ['label' => 'Production Planning', 'route' => 'production.plans.index'],
                 ['label' => 'Scheduling', 'route' => 'production.schedules.index'],
+                ['label' => 'Capacity Planning', 'route' => 'production.capacity.index'],
                 ['label' => 'Shifts', 'route' => 'production.shifts.index'],
                 ['label' => 'Calendars', 'route' => 'production.calendars.index'],
             ]],
             ['label' => 'Production Execution', 'icon' => 'feather-play-circle', 'url' => '#', 'children' => [
                 ['label' => 'Production Orders', 'route' => 'production.orders.index'],
+                ['label' => 'Work-in-Progress (WIP)', 'route' => 'production.wip.index'],
             ]],
             ['label' => 'Shop Floor (MES)', 'icon' => 'feather-activity', 'url' => '#', 'children' => [
                 ['label' => 'Shop Floor Dashboard', 'route' => 'production.mes.dashboard'],

@@ -160,6 +160,11 @@ class ProductionMaterialService
             $res->quantity_reserved  = max(0.0000, $res->quantity_reserved - $quantity);
             $res->save();
 
+            // Add material cost to Work-in-Progress (WIP)
+            $res->loadMissing('product');
+            $unitCost = (float) ($res->product?->unit_cost ?? $res->product?->cost_price ?? 0.0);
+            app(ProductionWipService::class)->addMaterialCost($res->production_order_id, $quantity * $unitCost);
+
             app(ProductionEventService::class)->writeEvent($res->tenant_id, [
                 'production_order_id' => $res->production_order_id,
                 'event_type'          => 'Material Issued',
@@ -229,6 +234,11 @@ class ProductionMaterialService
 
             $res->quantity_issued -= $quantity;
             $res->save();
+
+            // Deduct material cost from Work-in-Progress (WIP)
+            $res->loadMissing('product');
+            $unitCost = (float) ($res->product?->unit_cost ?? $res->product?->cost_price ?? 0.0);
+            app(ProductionWipService::class)->deductMaterialCost($res->production_order_id, $quantity * $unitCost);
 
             return $issue;
         });

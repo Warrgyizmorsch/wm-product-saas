@@ -29,8 +29,9 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="d-flex gap-2 mt-4">
-                                <button type="submit" class="btn btn-sm btn-primary flex-fill">View Report</button>
-                                <button type="submit" name="print" value="1" class="btn btn-sm btn-outline-dark"><i class="feather-printer"></i></button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'machine') }}'; this.form.target='_blank';" class="btn btn-sm btn-primary flex-fill">View Report</button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'machine') }}'; this.form.target='_blank';" name="print" value="1" class="btn btn-sm btn-outline-dark" title="Print"><i class="feather-printer"></i></button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.export', 'machine') }}'; this.form.target='_self';" class="btn btn-sm btn-outline-primary" title="Export CSV"><i class="feather-download"></i></button>
                             </div>
                         </form>
                     </div>
@@ -57,8 +58,9 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="d-flex gap-2 mt-4">
-                                <button type="submit" class="btn btn-sm btn-success flex-fill">View Report</button>
-                                <button type="submit" name="print" value="1" class="btn btn-sm btn-outline-dark"><i class="feather-printer"></i></button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'work-center') }}'; this.form.target='_blank';" class="btn btn-sm btn-success flex-fill">View Report</button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'work-center') }}'; this.form.target='_blank';" name="print" value="1" class="btn btn-sm btn-outline-dark" title="Print"><i class="feather-printer"></i></button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.export', 'work-center') }}'; this.form.target='_self';" class="btn btn-sm btn-outline-success" title="Export CSV"><i class="feather-download"></i></button>
                             </div>
                         </form>
                     </div>
@@ -85,8 +87,9 @@
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="d-flex gap-2 mt-4">
-                                <button type="submit" class="btn btn-sm btn-danger flex-fill">View Report</button>
-                                <button type="submit" name="print" value="1" class="btn btn-sm btn-outline-dark"><i class="feather-printer"></i></button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'downtime') }}'; this.form.target='_blank';" class="btn btn-sm btn-danger flex-fill">View Report</button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.show', 'downtime') }}'; this.form.target='_blank';" name="print" value="1" class="btn btn-sm btn-outline-dark" title="Print"><i class="feather-printer"></i></button>
+                                <button type="submit" onclick="this.form.action='{{ route('production.intelligence.reports.export', 'downtime') }}'; this.form.target='_self';" class="btn btn-sm btn-outline-danger" title="Export CSV"><i class="feather-download"></i></button>
                             </div>
                         </form>
                     </div>
