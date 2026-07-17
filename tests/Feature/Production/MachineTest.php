@@ -131,4 +131,120 @@ class MachineTest extends TestCase
             'code' => 'MCH-PRESS-1',
         ]);
     }
+
+    public function test_bulk_activate_machines(): void
+    {
+        $m1 = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Machine 1',
+            'code' => 'MCH-1',
+            'status' => 'inactive',
+        ]);
+        $m2 = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Machine 2',
+            'code' => 'MCH-2',
+            'status' => 'inactive',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.machines.bulk-action'), [
+                'action' => 'activate',
+                'ids' => [$m1->id, $m2->id],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertEquals('active', $m1->refresh()->status);
+        $this->assertEquals('active', $m2->refresh()->status);
+    }
+
+    public function test_bulk_deactivate_machines(): void
+    {
+        $m1 = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Machine 1',
+            'code' => 'MCH-1',
+            'status' => 'active',
+        ]);
+        $m2 = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Machine 2',
+            'code' => 'MCH-2',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.machines.bulk-action'), [
+                'action' => 'deactivate',
+                'ids' => [$m1->id, $m2->id],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertEquals('inactive', $m1->refresh()->status);
+        $this->assertEquals('inactive', $m2->refresh()->status);
+    }
+
+    public function test_bulk_maintenance_machines(): void
+    {
+        $m1 = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Machine 1',
+            'code' => 'MCH-1',
+            'status' => 'active',
+        ]);
+        $m2 = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Machine 2',
+            'code' => 'MCH-2',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.machines.bulk-action'), [
+                'action' => 'maintenance',
+                'ids' => [$m1->id, $m2->id],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertEquals('maintenance', $m1->refresh()->status);
+        $this->assertEquals('maintenance', $m2->refresh()->status);
+    }
+
+    public function test_bulk_delete_machines(): void
+    {
+        $m1 = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Machine 1',
+            'code' => 'MCH-1',
+            'status' => 'active',
+        ]);
+        $m2 = Machine::create([
+            'tenant_id' => $this->tenantA->id,
+            'work_center_id' => $this->workCenterA->id,
+            'name' => 'Machine 2',
+            'code' => 'MCH-2',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.machines.bulk-action'), [
+                'action' => 'delete',
+                'ids' => [$m1->id, $m2->id],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertSoftDeleted('production_machines', ['id' => $m1->id]);
+        $this->assertSoftDeleted('production_machines', ['id' => $m2->id]);
+    }
 }

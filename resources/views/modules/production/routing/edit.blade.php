@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Edit Routing | SaaS ERP')
-@section('page-title', 'Edit Process Routing')
-@section('breadcrumb', 'Edit Routing')
+@section('title', __('production.edit_routing') . ' | SaaS ERP')
+@section('page-title', __('production.edit_routing'))
+@section('breadcrumb', __('production.edit_routing'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -20,7 +20,7 @@
     <div class="erp-single-panel">
         <!-- Validation Errors -->
         @if ($errors->any())
-            <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
+            <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') }}: {{ $errors->first() }}" />
         @endif
 
         @if (session('error'))
@@ -34,72 +34,72 @@
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Header with Close Button -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-                    <h4 class="fw-bold text-dark mb-0">Edit Process Routing ({{ $routing->routing_number }})</h4>
-                    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-sm btn-light border">Cancel</a>
+                    <h4 class="fw-bold text-dark mb-0">{{ __('production.edit_routing') }} ({{ $routing->routing_number }})</h4>
+                    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
                 </div>
 
                 <!-- Routing General Header -->
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
-                        <x-ui.odoo-form-ui type="input" label="Routing Number" name="routing_number" :value="$routing->routing_number" :readonly="true" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.routing_number')" name="routing_number" :value="$routing->routing_number" :readonly="true" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="input" label="Routing Name" name="name" placeholder="e.g. Standard Cabinet Assembly Process" :value="old('name', $routing->name)" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.routing_name')" name="name" placeholder="{{ __('production.routing_name_placeholder') }}" :value="old('name', $routing->name)" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="select" label="Target Product" name="product_id" :required="true">
-                            <option value="">Select Product</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.item_to_produce')" name="product_id" :required="true">
+                            <option value="">{{ __('production.select_product') }}</option>
                             @foreach($products as $p)
                                 <option value="{{ $p->id }}" @selected(old('product_id', $routing->product_id) == $p->id)>{{ $p->name }} ({{ $p->sku }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
                         
-                        <x-ui.odoo-form-ui type="input" label="Version ID" name="version" placeholder="e.g. 1.0.0" :value="old('version', $routing->version)" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.version')" name="version" placeholder="e.g. 1.0.0" :value="old('version', $routing->version)" :required="true" />
                     </div>
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Start Date" name="effective_from" inputType="date" :value="old('effective_from', $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '')" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.start_date')" name="effective_from" inputType="date" :value="old('effective_from', $routing->effective_from ? $routing->effective_from->format('Y-m-d') : '')" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="input" label="Expiry Date" name="effective_to" inputType="date" :value="old('effective_to', $routing->effective_to ? $routing->effective_to->format('Y-m-d') : '')" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.expiry_date')" name="effective_to" inputType="date" :value="old('effective_to', $routing->effective_to ? $routing->effective_to->format('Y-m-d') : '')" />
                         
-                        <x-ui.odoo-form-ui type="select" label="Routing Class" name="is_default" :required="true">
-                            <option value="1" @selected(old('is_default', $routing->is_default ? '1' : '0') == '1')>Primary / Standard Routing</option>
-                            <option value="0" @selected(old('is_default', $routing->is_default ? '1' : '0') == '0')>Alternative / Backup Routing</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.routing_type')" name="is_default" :required="true">
+                            <option value="1" @selected(old('is_default', $routing->is_default ? '1' : '0') == '1')>{{ __('production.primary') }}</option>
+                            <option value="0" @selected(old('is_default', $routing->is_default ? '1' : '0') == '0')>{{ __('production.alternative') }}</option>
                         </x-ui.odoo-form-ui>
 
                         <div class="odoo-form-group">
-                            <label class="odoo-form-label">Sequence Control</label>
+                            <label class="odoo-form-label">{{ __('production.sequence_control') }}</label>
                             <div class="flex-grow-1">
                                 <div class="form-check form-switch pt-1">
                                     <input class="form-check-input" type="checkbox" id="auto_sequence" x-model="autoSequence">
-                                    <label class="form-check-label fw-semibold text-dark fs-12 ms-2" for="auto_sequence">Auto-Manage Sequence Numbers</label>
+                                    <label class="form-check-label fw-semibold text-dark fs-12 ms-2" for="auto_sequence">{{ __('production.auto_manage_sequence') }}</label>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <div class="col-12 border-top pt-3">
-                        <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Enter high-level description, manufacturing objectives..." rows="3">{{ old('description', $routing->description) }}</x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" :label="__('production.description')" name="description" placeholder="{{ __('production.description_placeholder') }}" rows="3">{{ old('description', $routing->description) }}</x-ui.odoo-form-ui>
                     </div>
                 </div>
 
                 <!-- Operations Dynamic Grid -->
                 <div class="border-top pt-4 mb-4">
-                    <h5 class="fw-bold text-dark mb-3 fs-14">Routing Operations Sequence Grid</h5>
+                    <h5 class="fw-bold text-dark mb-3 fs-14">{{ __('production.routing_operations_sequence') }}</h5>
                     
                     <div class="table-responsive mb-3">
                         <x-ui.odoo-form-ui type="table">
                             <thead>
                                 <tr>
-                                    <th style="width: 8%" class="text-center">Seq</th>
-                                    <th style="width: 25%">Operation Name &amp; Yield</th>
-                                    <th style="width: 14%">Type</th>
-                                    <th style="width: 18%">Work Center</th>
-                                    <th style="width: 18%">Machine</th>
-                                    <th style="width: 8%" class="text-end">Setup (m)</th>
-                                    <th style="width: 8%" class="text-end">Run (m)</th>
-                                    <th style="width: 5%" class="text-center">QC?</th>
-                                    <th style="width: 8%" class="text-end">Actions</th>
+                                    <th style="width: 8%" class="text-center">{{ __('production.seq') }}</th>
+                                    <th style="width: 25%">{{ __('production.operation_name_yield') }}</th>
+                                    <th style="width: 14%">{{ __('production.type') }}</th>
+                                    <th style="width: 18%">{{ __('production.work_center') }}</th>
+                                    <th style="width: 18%">{{ __('production.machine') }}</th>
+                                    <th style="width: 8%" class="text-end">{{ __('production.setup') }} (m)</th>
+                                    <th style="width: 8%" class="text-end">{{ __('production.run') }} (m)</th>
+                                    <th style="width: 5%" class="text-center">{{ __('production.qc_gate') }}</th>
+                                    <th style="width: 8%" class="text-end">{{ __('production.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -112,15 +112,15 @@
                                         
                                         <!-- Operation Name & Details -->
                                         <td class="align-middle">
-                                            <input type="text" x-bind:name="'operations['+index+'][name]'" class="odoo-table-input" placeholder="e.g. Drilling pilot holes" x-model="operation.name" required />
+                                            <input type="text" x-bind:name="'operations['+index+'][name]'" class="odoo-table-input" placeholder="{{ __('production.operation_placeholder') }}" x-model="operation.name" required />
                                             
                                             <div class="d-flex flex-wrap gap-3 mt-1.5 align-items-center">
                                                 <div class="form-check">
                                                     <input type="checkbox" class="form-check-input" x-model="operation.is_external" x-bind:name="'operations['+index+'][is_external]'" x-bind:id="'ext_' + operation.uid" value="1">
-                                                    <label class="form-check-label fs-11 text-muted ms-1" x-bind:for="'ext_' + operation.uid">External/Outsourced</label>
+                                                    <label class="form-check-label fs-11 text-muted ms-1" x-bind:for="'ext_' + operation.uid">{{ __('production.outsourced') }}</label>
                                                 </div>
                                                 <div class="d-flex align-items-center gap-1.5">
-                                                    <span class="fs-10 text-muted">Yield %:</span>
+                                                    <span class="fs-10 text-muted">{{ __('production.yield') }} %:</span>
                                                     <input type="number" step="any" x-bind:name="'operations['+index+'][expected_yield_percentage]'" class="odoo-table-input text-center" style="width: 60px; padding: 2px !important;" x-model="operation.expected_yield_percentage" min="0.01" max="100.00" required />
                                                 </div>
                                             </div>
@@ -130,7 +130,7 @@
                                         <td class="align-middle">
                                             <select x-bind:name="'operations['+index+'][operation_type]'" class="odoo-table-select" x-model="operation.operation_type" required>
                                                 @foreach ($operationTypes as $val => $label)
-                                                    <option value="{{ $val }}">{{ $label }}</option>
+                                                    <option value="{{ $val }}">{{ __('production.op_type_' . $val) }}</option>
                                                 @endforeach
                                             </select>
                                         </td>
@@ -138,7 +138,7 @@
                                         <!-- Work Center -->
                                         <td class="align-middle">
                                             <select x-bind:name="'operations['+index+'][work_center_id]'" class="odoo-table-select" x-model="operation.work_center_id" x-on:change="workCenterChanged(index)" required>
-                                                <option value="">Select Center...</option>
+                                                <option value="">{{ __('production.select_work_center') }}</option>
                                                 @foreach ($workCenters as $wc)
                                                     <option value="{{ $wc->id }}">{{ $wc->name }} ({{ $wc->code }})</option>
                                                 @endforeach
@@ -148,7 +148,7 @@
                                         <!-- Machine -->
                                         <td class="align-middle">
                                             <select x-bind:name="'operations['+index+'][machine_id]'" class="odoo-table-select" x-model="operation.machine_id" x-bind:disabled="!operation.work_center_id">
-                                                <option value="">No Specific Machine</option>
+                                                <option value="">{{ __('production.no_specific_machine') }}</option>
                                                 <template x-for="m in operation.availableMachines" :key="m.id">
                                                     <option :value="m.id" x-text="m.label" :selected="m.id == operation.machine_id"></option>
                                                 </template>
@@ -173,10 +173,10 @@
                                         <!-- Actions -->
                                         <td class="text-end align-middle">
                                             <div class="d-inline-flex gap-1">
-                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-arrow-up" x-on:click="moveUp(index)" x-bind:disabled="index === 0" title="Move Up" />
-                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-arrow-down" x-on:click="moveDown(index)" x-bind:disabled="index === operations.length - 1" title="Move Down" />
-                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-copy" class="text-primary" x-on:click="duplicateOperation(index)" title="Duplicate Operation" />
-                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-trash-2" class="text-danger" x-on:click="removeOperation(index)" title="Remove Operation" />
+                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-arrow-up" x-on:click="moveUp(index)" x-bind:disabled="index === 0" title="{{ __('production.move_up') }}" />
+                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-arrow-down" x-on:click="moveDown(index)" x-bind:disabled="index === operations.length - 1" title="{{ __('production.move_down') }}" />
+                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-copy" class="text-primary" x-on:click="duplicateOperation(index)" title="{{ __('production.duplicate_operation') }}" />
+                                                <x-ui.icon-btn variant="light" size="sm" icon="feather-trash-2" class="text-danger" x-on:click="removeOperation(index)" title="{{ __('production.remove_operation') }}" />
                                             </div>
                                         </td>
                                     </tr>
@@ -187,19 +187,19 @@
 
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <button type="button" class="btn btn-light-brand" x-on:click="addOperation()">
-                            <i class="feather-plus me-2"></i>Add Operation Stage
+                            <i class="feather-plus me-2"></i>{{ __('production.add_operation_stage') }}
                         </button>
                         
                         <div class="text-muted fs-12 fw-medium">
-                            Total Operations: <span class="fw-bold text-dark" x-text="operations.length"></span>
+                            {{ __('production.total_operations') }} <span class="fw-bold text-dark" x-text="operations.length"></span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">Update Routing</button>
-                    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-secondary px-4">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4">{{ __('production.update_routing') }}</button>
+                    <a href="{{ route('production.routing.show', $routing->id) }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>
@@ -270,7 +270,7 @@
                         this.operations.splice(index, 1);
                         this.recalculateSequences();
                     } else {
-                        alert('A process routing requires at least one operation stage.');
+                        alert(@js(__('production.requires_at_least_one_operation')));
                     }
                 },
 

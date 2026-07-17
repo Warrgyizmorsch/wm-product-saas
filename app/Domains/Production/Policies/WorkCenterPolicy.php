@@ -29,6 +29,10 @@ class WorkCenterPolicy
 
     public function delete(User $user, WorkCenter $workCenter): bool
     {
-        return $user->hasProductionPermission('production.work_center.manage', $workCenter->tenant_id);
+        if (!$user->hasProductionPermission('production.work_center.manage', $workCenter->tenant_id)) {
+            return false;
+        }
+
+        return !$workCenter->operations()->exists();
     }
 }

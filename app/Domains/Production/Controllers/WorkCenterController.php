@@ -139,4 +139,84 @@ class WorkCenterController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
+
+    public function bulkAction(Request $request): RedirectResponse
+    {
+        $action = $request->input('action');
+        $ids = $request->input('ids');
+
+        if (empty($ids) || !is_array($ids)) {
+            return redirect()
+                ->back()
+                ->with('error', __('production.no_work_centers_selected'));
+        }
+
+        $tenantId = require_tenant_id();
+        $workCenters = WorkCenter::whereIn('id', $ids)
+            ->where('tenant_id', $tenantId)
+            ->get();
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        switch ($action) {
+            case 'delete':
+                foreach ($workCenters as $wc) {
+                    if (auth()->user()->can('delete', $wc)) {
+                        try {
+                            $this->service->delete($wc->id);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "deleted";
+                break;
+
+            case 'activate':
+                foreach ($workCenters as $wc) {
+                    if (auth()->user()->can('update', $wc)) {
+                        try {
+                            $wc->update(['status' => 'active']);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "activated";
+                break;
+
+            case 'deactivate':
+                foreach ($workCenters as $wc) {
+                    if (auth()->user()->can('update', $wc)) {
+                        try {
+                            $wc->update(['status' => 'inactive']);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "deactivated";
+                break;
+
+            default:
+                return redirect()->back()->with('error', 'Invalid action');
+        }
+
+        $message = "Successfully {$messagePrefix} {$successCount} " . \Illuminate\Support\Str::plural('work center', $successCount) . ".";
+        if ($failedCount > 0) {
+            $message .= " Failed to process {$failedCount} " . \Illuminate\Support\Str::plural('work center', $failedCount) . " due to constraints or permissions.";
+        }
+
+        return redirect()->back()->with($failedCount > 0 ? 'warning' : 'success', $message);
+    }
 }

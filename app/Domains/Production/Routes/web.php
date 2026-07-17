@@ -75,11 +75,13 @@ Route::prefix('production')
         Route::resource('boms', ProductionBomController::class);
 
         // ── Work Centers ──────────────────────────────────────────────────────
+        Route::post('work-centers/bulk-action', [WorkCenterController::class, 'bulkAction'])->name('work-centers.bulk-action');
         Route::resource('work-centers', WorkCenterController::class);
 
         // ── Machines (AJAX endpoint must be before resource to avoid routing conflict) ──
         Route::get('machines/by-work-center/{workCenter}', [MachineController::class, 'byWorkCenter'])
             ->name('machines.by-work-center');
+        Route::post('machines/bulk-action', [MachineController::class, 'bulkAction'])->name('machines.bulk-action');
         Route::resource('machines', MachineController::class)->except(['show']);
 
         // ── Routing ───────────────────────────────────────────────────────────
@@ -89,6 +91,7 @@ Route::prefix('production')
         Route::post('routing/{routing}/cancel', [RoutingController::class, 'cancel'])->name('routing.cancel');
         Route::post('routing/{routing}/duplicate', [RoutingController::class, 'duplicateVersion'])->name('routing.duplicate');
         Route::get('routing/{routing}/operations', [RoutingController::class, 'getOperationsForAjax'])->name('routing.operations');
+        Route::post('routing/bulk-action', [RoutingController::class, 'bulkAction'])->name('routing.bulk-action');
         Route::resource('routing', RoutingController::class);
 
         // ── Production Planning ───────────────────────────────────────────────

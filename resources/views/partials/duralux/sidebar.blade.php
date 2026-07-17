@@ -49,18 +49,18 @@
             ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', 'Requests', 'Purchase Orders', 'Bills']],
         ],
         __('ui.production') => [
-            ['label' => 'Production Engineering', 'icon' => 'feather-cpu', 'url' => '#', 'children' => [
-                ['label' => 'BOM', 'route' => 'production.boms.index'],
-                ['label' => 'Routing', 'route' => 'production.routing.index'],
-                ['label' => 'Work Centers', 'route' => 'production.work-centers.index'],
-                ['label' => 'Machines', 'route' => 'production.machines.index'],
+            ['label' => __('production.production_engineering'), 'icon' => 'feather-cpu', 'url' => '#', 'children' => [
+                ['label' => __('production.bom'), 'route' => 'production.boms.index'],
+                ['label' => __('production.routing'), 'route' => 'production.routing.index'],
+                ['label' => __('production.work_centers'), 'route' => 'production.work-centers.index'],
+                ['label' => __('production.machines'), 'route' => 'production.machines.index'],
             ]],
-            ['label' => 'Production Planning', 'icon' => 'feather-calendar', 'url' => '#', 'children' => [
-                ['label' => 'Production Planning', 'route' => 'production.plans.index'],
-                ['label' => 'Scheduling', 'route' => 'production.schedules.index'],
-                ['label' => 'Capacity Planning', 'route' => 'production.capacity.index'],
-                ['label' => 'Shifts', 'route' => 'production.shifts.index'],
-                ['label' => 'Calendars', 'route' => 'production.calendars.index'],
+            ['label' => __('production.production_planning'), 'icon' => 'feather-calendar', 'url' => '#', 'children' => [
+                ['label' => __('production.production_planning'), 'route' => 'production.plans.index'],
+                ['label' => __('production.scheduling_sidebar'), 'route' => 'production.schedules.index'],
+                ['label' => __('production.capacity_planning_sidebar'), 'route' => 'production.capacity.index'],
+                ['label' => __('production.shifts_sidebar'), 'route' => 'production.shifts.index'],
+                ['label' => __('production.calendars_sidebar'), 'route' => 'production.calendars.index'],
             ]],
             ['label' => 'Production Execution', 'icon' => 'feather-play-circle', 'url' => '#', 'children' => [
                 ['label' => 'Production Orders', 'route' => 'production.orders.index'],

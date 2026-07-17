@@ -215,4 +215,86 @@ class WorkCenterTest extends TestCase
             'tenant_id' => $this->tenantA->id,
         ]);
     }
+
+    public function test_bulk_activate_work_centers(): void
+    {
+        $wc1 = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'WC 1',
+            'code' => 'WC-1',
+            'status' => 'inactive',
+        ]);
+        $wc2 = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'WC 2',
+            'code' => 'WC-2',
+            'status' => 'inactive',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.work-centers.bulk-action'), [
+                'action' => 'activate',
+                'ids' => [$wc1->id, $wc2->id],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertEquals('active', $wc1->refresh()->status);
+        $this->assertEquals('active', $wc2->refresh()->status);
+    }
+
+    public function test_bulk_deactivate_work_centers(): void
+    {
+        $wc1 = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'WC 1',
+            'code' => 'WC-1',
+            'status' => 'active',
+        ]);
+        $wc2 = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'WC 2',
+            'code' => 'WC-2',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.work-centers.bulk-action'), [
+                'action' => 'deactivate',
+                'ids' => [$wc1->id, $wc2->id],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertEquals('inactive', $wc1->refresh()->status);
+        $this->assertEquals('inactive', $wc2->refresh()->status);
+    }
+
+    public function test_bulk_delete_work_centers(): void
+    {
+        $wc1 = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'WC 1',
+            'code' => 'WC-1',
+            'status' => 'active',
+        ]);
+        $wc2 = WorkCenter::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'WC 2',
+            'code' => 'WC-2',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.work-centers.bulk-action'), [
+                'action' => 'delete',
+                'ids' => [$wc1->id, $wc2->id],
+            ]);
+
+        $response->assertRedirect();
+        $this->assertSoftDeleted('production_work_centers', ['id' => $wc1->id]);
+        $this->assertSoftDeleted('production_work_centers', ['id' => $wc2->id]);
+    }
 }
+

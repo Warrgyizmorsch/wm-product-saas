@@ -73,7 +73,7 @@ class WorkCenter extends BaseModel
             'production_work_center_shifts',
             'work_center_id',
             'shift_id'
-        );
+        )->distinct();
     }
 
     public function activeMachines(): HasMany

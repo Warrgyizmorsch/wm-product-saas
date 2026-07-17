@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Edit Production Plan | SaaS ERP')
-@section('page-title', 'Edit Production Plan')
-@section('breadcrumb', 'Edit Production Plan')
+@section('title', __('production.edit_production_plan') . ' | SaaS ERP')
+@section('page-title', __('production.edit_production_plan'))
+@section('breadcrumb', __('production.edit_production_plan'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -18,7 +18,7 @@
     <div class="erp-single-panel">
         <!-- Validation Errors -->
         @if ($errors->any())
-            <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
+            <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') }}: {{ $errors->first() }}" />
         @endif
 
         @if (session('error'))
@@ -33,23 +33,23 @@
                 <!-- Header with Close Button -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
                     <div>
-                        <h4 class="fw-bold text-dark mb-0">Edit Production Plan - {{ $plan->plan_number }}</h4>
-                        <small class="text-muted">Status: <span class="text-uppercase fw-semibold text-primary">{{ $plan->status }}</span></small>
+                        <h4 class="fw-bold text-dark mb-0">{{ __('production.edit_production_plan_with_number', ['number' => $plan->plan_number]) }}</h4>
+                        <small class="text-muted">{{ __('production.status') }}: <span class="text-uppercase fw-semibold text-primary">{{ __('production.' . $plan->status) ?? $plan->status }}</span></small>
                     </div>
-                    <a href="{{ route('production.plans.show', $plan->id) }}" class="btn btn-sm btn-light border">Cancel</a>
+                    <a href="{{ route('production.plans.show', $plan->id) }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
                 </div>
 
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
-                        <x-ui.odoo-form-ui type="input" label="Plan Name" name="name" :value="old('name', $plan->name)" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.plan_name')" name="name" :value="old('name', $plan->name)" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" :required="true">
+                        <x-ui.odoo-form-ui type="select" :label="__('production.item_to_produce')" name="product_id" :required="true">
                             <option value="{{ $plan->product_id }}">{{ $plan->product->name }} ({{ $plan->product->sku }})</option>
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="select" label="Bill of Materials" name="bom_id">
-                            <option value="">None / Auto-select (Latest Approved)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.bill_of_materials')" name="bom_id">
+                            <option value="">{{ __('production.none_auto_select_bom') }}</option>
                             @foreach($boms as $bom)
                                 <option value="{{ $bom->id }}" @selected(old('bom_id', $plan->bom_id) == $bom->id)>
                                     {{ $bom->bom_number }} - {{ $bom->bom_name }} (v{{ $bom->version }})
@@ -57,8 +57,8 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="select" label="Routing" name="routing_id">
-                            <option value="">None / Auto-select (Default Active)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.routing')" name="routing_id">
+                            <option value="">{{ __('production.none_auto_select_routing') }}</option>
                             @foreach($routings as $rt)
                                 <option value="{{ $rt->id }}" @selected(old('routing_id', $plan->routing_id) == $rt->id)>
                                     {{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})
@@ -69,20 +69,20 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Target Quantity" name="quantity" inputType="number" :value="old('quantity', $plan->quantity)" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.target_quantity')" name="quantity" inputType="number" :value="old('quantity', $plan->quantity)" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="input" label="Planned Start Date" name="start_date" inputType="date" :value="old('start_date', $plan->start_date->format('Y-m-d'))" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.planned_start_date')" name="start_date" inputType="date" :value="old('start_date', $plan->start_date->format('Y-m-d'))" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="input" label="Planned End Date" name="end_date" inputType="date" :value="old('end_date', $plan->end_date->format('Y-m-d'))" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.planned_end_date')" name="end_date" inputType="date" :value="old('end_date', $plan->end_date->format('Y-m-d'))" :required="true" />
 
-                        <x-ui.odoo-form-ui type="textarea" label="Description" name="description" rows="4">{{ old('description', $plan->description) }}</x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" :label="__('production.description')" name="description" rows="4">{{ old('description', $plan->description) }}</x-ui.odoo-form-ui>
                     </div>
                 </div>
 
                 <!-- Footer Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">Update Plan</button>
-                    <a href="{{ route('production.plans.show', $plan->id) }}" class="btn btn-secondary px-4">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4">{{ __('production.update_plan') }}</button>
+                    <a href="{{ route('production.plans.show', $plan->id) }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

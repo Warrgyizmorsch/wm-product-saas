@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Production Schedules | SaaS ERP')
-@section('page-title', 'Production Scheduling')
-@section('breadcrumb', 'Schedules')
+@section('title', __('production.production_scheduling') . ' | SaaS ERP')
+@section('page-title', __('production.production_scheduling'))
+@section('breadcrumb', __('production.schedules'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -26,13 +26,13 @@
 
 @section('page-actions')
     <a href="{{ route('production.schedules.calendar') }}" class="btn btn-light me-2">
-        <i class="feather-calendar me-2"></i>Calendar View
+        <i class="feather-calendar me-2"></i>{{ __('production.calendar_view') }}
     </a>
     <a href="{{ route('production.schedules.work-center-view') }}" class="btn btn-light me-2">
-        <i class="feather-grid me-2"></i>Work Center View
+        <i class="feather-grid me-2"></i>{{ __('production.work_center_view') }}
     </a>
     <a href="{{ route('production.schedules.create') }}" class="btn btn-primary">
-        <i class="feather-plus me-2"></i>Create Schedule
+        <i class="feather-plus me-2"></i>{{ __('production.create_schedule') }}
     </a>
 @endsection
 
@@ -66,7 +66,7 @@
                             </div>
                             <div>
                                 <div class="fs-18 fw-bold text-dark">{{ $totalSchedules }}</div>
-                                <div class="fs-11 text-muted text-uppercase">Total</div>
+                                <div class="fs-11 text-muted text-uppercase">{{ __('production.total') }}</div>
                             </div>
                         </div>
                     </div>
@@ -81,7 +81,7 @@
                             </div>
                             <div>
                                 <div class="fs-18 fw-bold text-dark">{{ $draftCount }}</div>
-                                <div class="fs-11 text-muted text-uppercase">Draft</div>
+                                <div class="fs-11 text-muted text-uppercase">{{ __('production.draft_schedules') }}</div>
                             </div>
                         </div>
                     </div>
@@ -96,7 +96,7 @@
                             </div>
                             <div>
                                 <div class="fs-18 fw-bold text-dark">{{ $scheduledCount }}</div>
-                                <div class="fs-11 text-muted text-uppercase">Scheduled</div>
+                                <div class="fs-11 text-muted text-uppercase">{{ __('production.scheduled_schedules') }}</div>
                             </div>
                         </div>
                     </div>
@@ -111,7 +111,7 @@
                             </div>
                             <div>
                                 <div class="fs-18 fw-bold text-dark">{{ $releasedCount }}</div>
-                                <div class="fs-11 text-muted text-uppercase">Released</div>
+                                <div class="fs-11 text-muted text-uppercase">{{ __('production.released_schedules') }}</div>
                             </div>
                         </div>
                     </div>
@@ -126,7 +126,7 @@
                             </div>
                             <div>
                                 <div class="fs-18 fw-bold text-dark">{{ $inProgressCount }}</div>
-                                <div class="fs-11 text-muted text-uppercase">In Progress</div>
+                                <div class="fs-11 text-muted text-uppercase">{{ __('production.in_progress_schedules') }}</div>
                             </div>
                         </div>
                     </div>
@@ -141,7 +141,7 @@
                             </div>
                             <div>
                                 <div class="fs-18 fw-bold text-dark">{{ $completedCount }}</div>
-                                <div class="fs-11 text-muted text-uppercase">Completed</div>
+                                <div class="fs-11 text-muted text-uppercase">{{ __('production.completed_schedules') }}</div>
                             </div>
                         </div>
                     </div>
@@ -151,43 +151,43 @@
 
         {{-- Toolbar --}}
         <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">Schedule List</h5>
+            <h5 class="fw-bold text-dark mb-0">{{ __('production.schedule_list') }}</h5>
             <div class="d-flex gap-2 ms-auto">
                 <form method="GET" action="{{ route('production.schedules.index') }}" class="d-inline">
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('production.filter_options') }}</h6>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Schedule #, Order #, Product..." value="{{ request('search') }}" />
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" placeholder="{{ __('production.schedule_number') }}, {{ __('production.production_order') }}, {{ __('production.product') }}..." value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                <option value="draft"     {{ request('status') === 'draft'     ? 'selected' : '' }}>Draft</option>
-                                <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>Scheduled</option>
-                                <option value="released"    {{ request('status') === 'released'    ? 'selected' : '' }}>Released</option>
-                                <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>In Progress</option>
-                                <option value="completed"   {{ request('status') === 'completed'   ? 'selected' : '' }}>Completed</option>
-                                <option value="cancelled"   {{ request('status') === 'cancelled'   ? 'selected' : '' }}>Cancelled</option>
+                                <option value="">{{ __('production.all_statuses') }}</option>
+                                <option value="draft"     {{ request('status') === 'draft'     ? 'selected' : '' }}>{{ __('production.draft_schedules') }}</option>
+                                <option value="scheduled" {{ request('status') === 'scheduled' ? 'selected' : '' }}>{{ __('production.scheduled_schedules') }}</option>
+                                <option value="released"    {{ request('status') === 'released'    ? 'selected' : '' }}>{{ __('production.released_schedules') }}</option>
+                                <option value="in_progress" {{ request('status') === 'in_progress' ? 'selected' : '' }}>{{ __('production.in_progress_schedules') }}</option>
+                                <option value="completed"   {{ request('status') === 'completed'   ? 'selected' : '' }}>{{ __('production.completed_schedules') }}</option>
+                                <option value="cancelled"   {{ request('status') === 'cancelled'   ? 'selected' : '' }}>{{ __('production.cancelled_schedules') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Scheduling Type</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.scheduling_type') }}</label>
                             <x-ui.odoo-form-ui type="select" name="scheduling_type">
-                                <option value="">All Types</option>
-                                <option value="forward"  {{ request('scheduling_type') === 'forward'  ? 'selected' : '' }}>Forward</option>
-                                <option value="backward" {{ request('scheduling_type') === 'backward' ? 'selected' : '' }}>Backward</option>
-                                <option value="manual"   {{ request('scheduling_type') === 'manual'   ? 'selected' : '' }}>Manual</option>
+                                <option value="">{{ __('production.all_types') }}</option>
+                                <option value="forward"  {{ request('scheduling_type') === 'forward'  ? 'selected' : '' }}>{{ __('production.forward') }}</option>
+                                <option value="backward" {{ request('scheduling_type') === 'backward' ? 'selected' : '' }}>{{ __('production.backward') }}</option>
+                                <option value="manual"   {{ request('scheduling_type') === 'manual'   ? 'selected' : '' }}>{{ __('production.manual') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('production.schedules.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('production.schedules.index') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -199,14 +199,14 @@
             <x-ui.odoo-form-ui type="table">
                 <thead>
                     <tr>
-                        <th style="width: 15%">Schedule #</th>
-                        <th style="width: 15%">Production Order</th>
-                        <th style="width: 20%">Product</th>
-                        <th style="width: 10%">Type</th>
-                        <th style="width: 12%">Status</th>
-                        <th style="width: 10%">Planned Start</th>
-                        <th style="width: 10%">Planned Finish</th>
-                        <th style="width: 8%" class="text-end">Actions</th>
+                        <th style="width: 15%">{{ __('production.schedule_number') }}</th>
+                        <th style="width: 15%">{{ __('production.production_order') }}</th>
+                        <th style="width: 20%">{{ __('production.product') }}</th>
+                        <th style="width: 10%">{{ __('production.type') }}</th>
+                        <th style="width: 12%">{{ __('production.status') }}</th>
+                        <th style="width: 10%">{{ __('production.planned_start') }}</th>
+                        <th style="width: 10%">{{ __('production.planned_finish') }}</th>
+                        <th style="width: 8%" class="text-end">{{ __('production.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -233,21 +233,23 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge bg-soft-info text-info text-capitalize">{{ $schedule->scheduling_type }}</span>
+                                <span class="badge bg-soft-info text-info text-capitalize">
+                                    {{ __('production.' . $schedule->scheduling_type) ?? $schedule->scheduling_type }}
+                                </span>
                             </td>
                             <td>
                                 @if($schedule->status === 'released')
-                                    <span class="erp-badge-active">Released</span>
+                                    <span class="erp-badge-active">{{ __('production.released_schedules') }}</span>
                                 @elseif($schedule->status === 'in_progress')
-                                    <span class="badge bg-soft-warning text-warning">In Progress</span>
+                                    <span class="badge bg-soft-warning text-warning">{{ __('production.in_progress_schedules') }}</span>
                                 @elseif($schedule->status === 'scheduled')
-                                    <span class="badge bg-soft-info text-info">Scheduled</span>
+                                    <span class="badge bg-soft-info text-info">{{ __('production.scheduled_schedules') }}</span>
                                 @elseif($schedule->status === 'draft')
-                                    <span class="erp-badge-draft">Draft</span>
+                                    <span class="erp-badge-draft">{{ __('production.draft_schedules') }}</span>
                                 @elseif($schedule->status === 'completed')
-                                    <span class="badge bg-soft-success text-success">Completed</span>
+                                    <span class="badge bg-soft-success text-success">{{ __('production.completed_schedules') }}</span>
                                 @elseif($schedule->status === 'cancelled')
-                                    <span class="badge bg-soft-danger text-danger">Cancelled</span>
+                                    <span class="badge bg-soft-danger text-danger">{{ __('production.cancelled_schedules') }}</span>
                                 @else
                                     <span class="erp-badge-draft text-uppercase">{{ $schedule->status }}</span>
                                 @endif
@@ -265,7 +267,7 @@
                                             <form method="POST" action="{{ route('production.schedules.release', $schedule->id) }}">
                                                 @csrf
                                                 <button type="submit" class="dropdown-item text-success">
-                                                    <i class="feather-play-circle me-2 text-success fs-12"></i>Release to Shop Floor
+                                                    <i class="feather-play-circle me-2 text-success fs-12"></i>{{ __('production.release_to_shop_floor') }}
                                                 </button>
                                             </form>
                                         </li>
@@ -274,16 +276,16 @@
                                     @if(!$schedule->isFrozen())
                                         <li>
                                             <button type="button" class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#cancelModal{{ $schedule->id }}">
-                                                <i class="feather-slash me-2 text-danger fs-12"></i>Cancel Schedule
+                                                <i class="feather-slash me-2 text-danger fs-12"></i>{{ __('production.cancel_schedule') }}
                                             </button>
                                         </li>
                                         <li><hr class="dropdown-divider"></li>
                                         <li>
-                                            <form method="POST" action="{{ route('production.schedules.destroy', $schedule->id) }}" onsubmit="return confirm('Delete this schedule permanently?');">
+                                            <form method="POST" action="{{ route('production.schedules.destroy', $schedule->id) }}" onsubmit="return confirm('{{ __('production.confirm_delete_plan') }}');">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="dropdown-item text-danger">
-                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete
+                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('production.delete') }}
                                                 </button>
                                             </form>
                                         </li>
@@ -291,14 +293,14 @@
                                 </x-ui.action-dropdown>
 
                                 {{-- Cancel Modal --}}
-                                <x-ui.modal id="cancelModal{{ $schedule->id }}" title="Cancel Schedule" class="text-start">
+                                <x-ui.modal id="cancelModal{{ $schedule->id }}" :title="__('production.cancel_schedule')" class="text-start">
                                     <form method="POST" action="{{ route('production.schedules.cancel', $schedule->id) }}" id="cancelForm{{ $schedule->id }}">
                                         @csrf
-                                        <p class="fs-13 text-muted">Cancelling this schedule will stop all planned operations. This cannot be undone.</p>
+                                        <p class="fs-13 text-muted">{{ __('production.cancel_schedule_warning') }}</p>
                                     </form>
                                     <x-slot name="footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Back</button>
-                                        <button type="submit" class="btn btn-danger" onclick="document.getElementById('cancelForm{{ $schedule->id }}').submit();">Cancel Schedule</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.back') ?? 'Back' }}</button>
+                                        <button type="submit" class="btn btn-danger" onclick="document.getElementById('cancelForm{{ $schedule->id }}').submit();">{{ __('production.cancel_schedule') }}</button>
                                     </x-slot>
                                 </x-ui.modal>
                             </td>
@@ -306,7 +308,7 @@
                     @empty
                         <tr>
                             <td colspan="8" class="text-center py-4 text-muted">
-                                <i class="feather-calendar me-2 fs-16"></i>No schedules found. Click "Create Schedule" to generate one from a released Production Order.
+                                <i class="feather-calendar me-2 fs-16"></i>{{ __('production.no_schedules_found') }}
                             </td>
                         </tr>
                     @endforelse

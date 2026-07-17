@@ -237,4 +237,92 @@ class RoutingTest extends TestCase
         $this->assertCount(1, $newRouting->operations);
         $this->assertEquals('Operation 1', $newRouting->operations[0]->name);
     }
+
+    public function test_bulk_action_routing_processing(): void
+    {
+        // 1. Setup multiple routing drafts for different products so both can be active
+        $finishedProductB = Product::create([
+            'tenant_id' => $this->tenantA->id,
+            'name' => 'Premium Cabinet Model Y',
+            'sku' => 'FG-CABINET-Y',
+            'type' => 'finished_good',
+            'status' => 'active',
+        ]);
+
+        $routing1 = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RTG-BULK-001',
+            'name' => 'Bulk Routing 1',
+            'product_id' => $this->finishedProductA->id,
+            'version' => '1.0.0',
+            'status' => Routing::STATUS_DRAFT,
+            'effective_from' => '2026-06-30',
+        ]);
+        $routing1->operations()->create([
+            'tenant_id' => $this->tenantA->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-010',
+            'name' => 'Operation 1',
+            'work_center_id' => $this->workCenterA->id,
+        ]);
+
+        $routing2 = Routing::create([
+            'tenant_id' => $this->tenantA->id,
+            'routing_number' => 'RTG-BULK-002',
+            'name' => 'Bulk Routing 2',
+            'product_id' => $finishedProductB->id,
+            'version' => '1.0.0',
+            'status' => Routing::STATUS_DRAFT,
+            'effective_from' => '2026-06-30',
+        ]);
+        $routing2->operations()->create([
+            'tenant_id' => $this->tenantA->id,
+            'sequence' => 10,
+            'operation_number' => 'OP-010',
+            'name' => 'Operation 2',
+            'work_center_id' => $this->workCenterA->id,
+        ]);
+
+        // 2. Perform bulk submit for approval
+        $response = $this->actingAs($this->engineerA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.routing.bulk-action'), [
+                'action' => 'submit_approval',
+                'ids' => [$routing1->id, $routing2->id]
+            ]);
+
+        $response->assertRedirect();
+        $routing1->refresh();
+        $routing2->refresh();
+        $this->assertTrue($routing1->isPendingApproval());
+        $this->assertTrue($routing2->isPendingApproval());
+
+        // 3. Perform bulk approve
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.routing.bulk-action'), [
+                'action' => 'approve',
+                'ids' => [$routing1->id, $routing2->id]
+            ]);
+
+        $response->assertRedirect();
+        $routing1->refresh();
+        $routing2->refresh();
+        $this->assertTrue($routing1->isActive());
+        $this->assertTrue($routing2->isActive());
+
+        // 4. Perform bulk cancel
+        $response = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->post(route('production.routing.bulk-action'), [
+                'action' => 'cancel',
+                'ids' => [$routing1->id, $routing2->id]
+            ]);
+
+        $response->assertRedirect();
+        $routing1->refresh();
+        $routing2->refresh();
+        $this->assertTrue($routing1->isCancelled());
+        $this->assertTrue($routing2->isCancelled());
+    }
 }
