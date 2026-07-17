@@ -167,7 +167,7 @@ Route::prefix('production')
         // ── Advanced MES Refinements ───────────────────────────────────────────
         // Touch Operator Dashboard and My Operations
         Route::get('mes/operator', [MesController::class, 'operatorDashboard'])->name('mes.operator.dashboard');
-        Route::get('mes/operator/my-operations', [MesController::class, 'myOperations'])->name('mes.operator.my-operat
+        Route::get('mes/operator/my-operations', [MesController::class, 'myOperations'])->name('mes.operator.my-operations');
         Route::get('mes/operator/operations/{op}', [MesController::class, 'operationExecution'])->name('mes.operator.execution');
 
         // Operator Assignments
