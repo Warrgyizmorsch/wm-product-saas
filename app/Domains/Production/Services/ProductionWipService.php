@@ -250,8 +250,12 @@ class ProductionWipService
     /**
      * Transfer WIP quantity to another operation step in sequence.
      */
-    public function transferWip(int $wipId, int $fromOpId, int $toOpId, float $quantity, ?string $remarks = null, ?int $userId = null): void
+    public function transferWip(int $wipId, ?int $fromOpId, ?int $toOpId, float $quantity, ?string $remarks = null, ?int $userId = null): void
     {
+        if ($fromOpId === null || $toOpId === null) {
+            return;
+        }
+
         DB::transaction(function () use ($wipId, $fromOpId, $toOpId, $quantity, $remarks, $userId) {
             $wip = ProductionWip::lockForUpdate()->findOrFail($wipId);
 

@@ -120,7 +120,7 @@ class ProductionExecutionService
                     $userId
                 );
 
-                if ($completeOperation && isset($nextOp) && $nextOp && $produced > 0) {
+                if ($completeOperation && isset($nextOp) && $nextOp && $produced > 0 && $op->routing_operation_id && $nextOp->routing_operation_id) {
                     app(ProductionWipService::class)->transferWip(
                         $wip->id,
                         $op->routing_operation_id,

@@ -482,7 +482,7 @@ class MesExecutionService
                 if (isset($wip) && $wip && isset($produced) && $produced > 0) {
                     $firstNextSchedOp = $nextSchedOps->first();
                     $nextOrderOp = $firstNextSchedOp ? ProductionOrderOperation::find($firstNextSchedOp->production_order_operation_id) : null;
-                    if ($nextOrderOp) {
+                    if ($nextOrderOp && $orderOp->routing_operation_id && $nextOrderOp->routing_operation_id) {
                         app(ProductionWipService::class)->transferWip(
                             $wip->id,
                             $orderOp->routing_operation_id,
