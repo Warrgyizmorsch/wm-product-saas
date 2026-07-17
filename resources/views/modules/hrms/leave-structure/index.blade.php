@@ -397,13 +397,12 @@
                                                             </td>
                                                             <td>
                                                                 <span class="fw-bold text-dark">{{ floatval($type->quota) }} {{ __('hrms.leave.days') }}</span>
-                                                            </td>
                                                             <td class="text-end">
                                                                 <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.leave.delete_type_confirm') }}');">
                                                                     @csrf
                                                                     @method('DELETE')
                                                                     <div class="hstack gap-2 justify-content-end">
-                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-rules="{{ json_encode($type->rules) }}" title="{{ __('hrms.leave.configure_rules') }}" data-bs-toggle="tooltip">
+                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-type-quota="{{ floatval($type->quota) }}" data-rules="{{ json_encode($type->rules) }}" title="{{ __('hrms.leave.configure_rules') }}" data-bs-toggle="tooltip">
                                                                             <i class="feather feather-settings"></i>
                                                                         </a>
                                                                         <x-ui.action-dropdown>
@@ -764,51 +763,51 @@
                                     
                                     <!-- Allocation & Accrual Rate -->
                                     <div class="card border mb-3 bg-light-subtle rounded-3 shadow-none">
-                                        <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapseRate" aria-expanded="true">
-                                            <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-trending-up me-2 text-muted"></i>{{ __('hrms.leave.allocation_accrual_rate') }}</h6>
-                                        </div>
-                                        <div id="collapseRate" class="collapse show">
-                                            <div class="card-body bg-white border-top p-3 fs-13 d-flex flex-column gap-3">
-                                                <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
-                                                    <input type="radio" name="accrual_rate" value="periodic" class="form-check-input mt-1">
-                                                    <div>
-                                                        <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_periodically') }}</span>
-                                                        <span class="text-muted fs-11">{{ __('hrms.leave.accrued_periodically_desc') }}</span>
-                                                     </div>
-                                                 </label>
+                                         <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between">
+                                             <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-trending-up me-2 text-muted"></i>{{ __('hrms.leave.allocation_accrual_rate') }}</h6>
+                                         </div>
+                                         <div>
+                                             <div class="card-body bg-white border-top p-3 fs-13 d-flex flex-column gap-3">
                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
-                                                     <input type="radio" name="accrual_rate" value="attendance" class="form-check-input mt-1">
+                                                     <input type="radio" name="accrual_rate" value="periodic" class="form-check-input mt-1">
                                                      <div>
-                                                         <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_attendance') }}</span>
-                                                         <span class="text-muted fs-11">{{ __('hrms.leave.accrued_attendance_desc') }}</span>
-                                                     </div>
-                                                 </label>
-                                                 <div class="ps-4 mt-1 mb-2 d-none" id="accrual_attendance_div">
-                                                     <div class="d-flex align-items-center gap-2 fs-13">
-                                                         <span>{{ __('hrms.leave.earn') }}</span>
-                                                         <input type="number" id="accrual_attendance_earn" class="odoo-table-input text-center" style="width: 70px;" value="1">
-                                                         <span>{{ __('hrms.leave.days_of_leave_for_every') }}</span>
-                                                         <input type="number" id="accrual_attendance_period" class="odoo-table-input text-center" style="width: 70px;" value="20">
-                                                         <span>{{ __('hrms.leave.days_worked') }}</span>
-                                                     </div>
-                                                 </div>
-                                                 <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
-                                                     <input type="radio" name="accrual_rate" value="immediate" class="form-check-input mt-1" checked>
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.immediate_quota') }}</span>
-                                                         <span class="text-muted fs-11">{{ __('hrms.leave.immediate_quota_desc') }}</span>
-                                                     </div>
-                                                 </label>
-                                             </div>
+                                                         <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_periodically') }}</span>
+                                                         <span class="text-muted fs-11">{{ __('hrms.leave.accrued_periodically_desc') }}</span>
+                                                      </div>
+                                                  </label>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="accrual_rate" value="attendance" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_attendance') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.accrued_attendance_desc') }}</span>
+                                                      </div>
+                                                  </label>
+                                                  <div class="ps-4 mt-1 mb-2 d-none" id="accrual_attendance_div">
+                                                      <div class="d-flex align-items-center gap-2 fs-13">
+                                                          <span>{{ __('hrms.leave.earn') }}</span>
+                                                          <input type="number" id="accrual_attendance_earn" class="odoo-table-input text-center" style="width: 70px;" value="1">
+                                                          <span>{{ __('hrms.leave.days_of_leave_for_every') }}</span>
+                                                          <input type="number" id="accrual_attendance_period" class="odoo-table-input text-center" style="width: 70px;" value="20">
+                                                          <span>{{ __('hrms.leave.days_worked') }}</span>
+                                                      </div>
+                                                  </div>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="accrual_rate" value="immediate" class="form-check-input mt-1" checked>
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.immediate_quota') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.immediate_quota_desc') }}</span>
+                                                      </div>
+                                                  </label>
+                                              </div>
                                          </div>
                                      </div>
                                      
                                      <!-- Accrual Restrictions -->
                                      <div class="card border bg-light-subtle rounded-3 shadow-none">
-                                         <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between cursor-pointer" data-bs-toggle="collapse" data-bs-target="#collapseRestrictions" aria-expanded="true">
+                                         <div class="card-header bg-white py-3 px-3 d-flex align-items-center justify-content-between">
                                              <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-alert-circle me-2 text-muted"></i>{{ __('hrms.leave.accrual_restrictions') }}</h6>
                                          </div>
-                                         <div id="collapseRestrictions" class="collapse show">
+                                         <div>
                                              <div class="card-body bg-white border-top p-3 fs-13">
                                                  <div class="form-check form-switch mb-1">
                                                      <input class="form-check-input" type="checkbox" id="accrual_limit_carry">
@@ -1228,6 +1227,7 @@
             $(document).on('click', '.configure-rules-btn', function() {
                 let typeId = $(this).attr('data-type-id');
                 let typeName = $(this).attr('data-type-name');
+                let typeQuota = parseFloat($(this).attr('data-type-quota') || '12');
 
                 $('#rules-leave-type-id').val(typeId);
                 $('#rules-leave-type-name').text(typeName);
@@ -1237,7 +1237,7 @@
                     accrual: {
                         calculate_in: 'days',
                         quota_type: 'fixed',
-                        quota_value: 12,
+                        quota_value: typeQuota,
                         rate: 'immediate',
                         attendance_earn: 1,
                         attendance_period: 20,
@@ -1287,7 +1287,7 @@
                 // Load state into UI
                 $(`input[name="accrual_calculate_in"][value="${rules.accrual?.calculate_in || 'days'}"]`).prop('checked', true);
                 $(`input[name="accrual_quota_type"][value="${rules.accrual?.quota_type || 'fixed'}"]`).prop('checked', true);
-                $('#accrual_quota_value').val(rules.accrual?.quota_value !== undefined ? rules.accrual.quota_value : 12);
+                $('#accrual_quota_value').val(rules.accrual?.quota_value !== undefined ? rules.accrual.quota_value : typeQuota);
                 $(`input[name="accrual_rate"][value="${rules.accrual?.rate || 'immediate'}"]`).prop('checked', true);
                 
                 // Attendance details loading

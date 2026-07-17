@@ -599,7 +599,7 @@
                                         <input type="text" name="request_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.assets.search_requests_placeholder') }}" value="{{ request('request_search') }}" style="box-shadow: none; height: 32px;">
                                     </div>
 
-                                    <div class="d-flex gap-2">
+                                    <div class="d-flex gap-2 align-items-center">
                                         <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                                             <a class="dropdown-item py-2 {{ request('request_sort', 'newest') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'newest', this); event.preventDefault();">{{ __('hrms.assets.sort_newest') }}</a>
                                             <a class="dropdown-item py-2 {{ request('request_sort') == 'oldest' ? 'active' : '' }}" href="#" onclick="changeSort('request', 'oldest', this); event.preventDefault();">{{ __('hrms.assets.sort_oldest') }}</a>
@@ -660,11 +660,24 @@
                             </div>
                         </div>
                         <div class="card-body p-0">
+                            <!-- Bulk Actions Toolbar (Shifted below search/filter above the table) -->
+                            <div id="bulkActionsToolbar" class="d-none border-bottom px-4 py-2 bg-light">
+                                <div class="d-flex justify-content-end align-items-center gap-2">
+                                    <span class="fs-12 text-muted fw-bold me-1"><span id="selectedRequestsCount">0</span> {{ __('hrms.assets.selected') }}</span>
+                                    <button type="button" class="btn btn-sm btn-primary text-uppercase fw-bold px-3 py-1.5" id="btnBulkAllocate" style="font-size: 11px; border-radius: 6px; letter-spacing: 0.5px;">
+                                        <i class="feather-user-check me-1"></i> {{ __('hrms.assets.bulk_allocate') }}
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger text-uppercase fw-bold px-3 py-1.5" id="btnBulkReject" style="font-size: 11px; border-radius: 6px; letter-spacing: 0.5px;">
+                                        <i class="feather-x me-1"></i> {{ __('hrms.assets.bulk_reject') }}
+                                    </button>
+                                </div>
+                            </div>
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0 text-center">
                                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                                         <tr>
-                                            <th class="text-start" style="padding-left: 20px;">{{ __('hrms.employees.title') }}</th>
+                                            <th style="width: 40px; padding-left: 20px;"><input type="checkbox" id="selectAllRequests" class="form-check-input"></th>
+                                            <th class="text-start">{{ __('hrms.employees.title') }}</th>
                                             <th>{{ __('hrms.assets.org_entity') }}</th>
                                             <th>{{ __('hrms.assets.req_asset') }}</th>
                                             <th>{{ __('hrms.assets.req_reason') }}</th>
@@ -676,13 +689,21 @@
                                     <tbody>
                                         @forelse($requests as $req)
                                             <tr>
-                                                <td class="text-start" style="padding-left: 20px;">
+                                                <td style="padding-left: 20px;">
+                                                    @if($req->status === 'pending')
+                                                        <input type="checkbox" class="form-check-input request-select-checkbox" value="{{ $req->id }}" data-category-id="{{ $req->asset_category_id }}" data-category-name="{{ $req->category->name }}" data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})" data-company-id="{{ $req->company_id }}" data-requested-asset-id="{{ $req->requested_asset_id }}">
+                                                    @endif
+                                                </td>
+                                                <td class="text-start">
                                                     <div class="fw-bold text-dark fs-13">{{ $req->employee->display_name }}</div>
                                                     <small class="text-muted fs-11">{{ $req->employee->employee_id }}</small>
                                                 </td>
                                                 <td>{{ $req->company->company_name }}</td>
                                                 <td>
-                                                    <span class="badge bg-light text-secondary border px-2 py-1">{{ $req->category->name }}</span>
+                                                    <span class="badge bg-light text-secondary border px-2 py-1 mb-1">{{ $req->category->name }}</span>
+                                                    @if($req->requestedAsset)
+                                                        <div class="fs-11 text-muted">Req Asset: <strong class="text-dark">{{ $req->requestedAsset->name }} ({{ $req->requestedAsset->asset_code }})</strong></div>
+                                                    @endif
                                                 </td>
                                                 <td class="text-start text-muted fs-12" style="max-width: 250px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ $req->reason }}">
                                                     {{ $req->reason }}
@@ -702,20 +723,15 @@
                                                 <td class="text-end" style="padding-right: 20px;">
                                                     @if($req->status === 'pending')
                                                         <div class="d-flex justify-content-end align-items-center gap-2">
-                                                            <!-- Allocate Trigger -->
-                                                            <button type="button" class="action-dropdown-btn text-uppercase fw-bold px-3 allocate-from-request-btn" 
+                                                            <button type="button" class="action-dropdown-btn text-uppercase fw-bold px-3 allocate-direct-btn" 
                                                                 style="width: auto !important; font-size: 11px; letter-spacing: 0.5px; height: 32px;"
-                                                                data-bs-toggle="modal"
-                                                                data-bs-target="#allocateAssetModal"
                                                                 data-request-id="{{ $req->id }}"
-                                                                data-employee-id="{{ $req->employee_id }}"
                                                                 data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
-                                                                data-category-id="{{ $req->asset_category_id }}"
-                                                                data-company-id="{{ $req->company_id }}">
+                                                                data-asset-name="{{ $req->requestedAsset ? $req->requestedAsset->name . ' (' . $req->requestedAsset->asset_code . ')' : $req->category->name }}"
+                                                                data-confirm-template="{{ __('hrms.assets.confirm_direct_allocate', ['asset' => ':asset', 'employee' => ':employee']) }}">
                                                                 {{ __('hrms.assets.allocate') }}
                                                             </button>
 
-                                                            <!-- Reject Trigger -->
                                                             <button type="button" class="btn btn-sm btn-outline-danger text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center reject-request-btn"
                                                                 style="font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;"
                                                                 data-request-id="{{ $req->id }}">
@@ -731,7 +747,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="7" class="text-center py-5 text-muted fs-12">
+                                                <td colspan="8" class="text-center py-5 text-muted fs-12">
                                                     <i class="feather-user-check fs-32 d-block mb-3 text-secondary"></i>
                                                     <div class="fw-bold mb-1">{{ __('hrms.assets.empty_requests_title') }}</div>
                                                     <div>{{ __('hrms.assets.empty_requests_desc') }}</div>
@@ -907,7 +923,7 @@
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="{{ route('hrms.assets.import') }}" method="POST" enctype="multipart/file-data">
+                <form action="{{ route('hrms.assets.import') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-body text-start">
                         <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
@@ -953,7 +969,7 @@
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="{{ route('hrms.assets.categories.import') }}" method="POST" enctype="multipart/file-data">
+                <form action="{{ route('hrms.assets.categories.import') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-body text-start">
                         <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
@@ -1233,6 +1249,71 @@
             </div>
         </div>
     </div>
+    <div class="modal fade" id="bulkAllocateModal" tabindex="-1" aria-labelledby="bulkAllocateModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="bulkAllocateModalLabel">
+                        <i class="feather-user-check me-2 text-primary"></i>{{ __('hrms.assets.bulk_allocate_assets') }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="bulkAllocateForm" action="{{ route('hrms.assets.requests.bulk-allocate') }}" method="POST">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="table-responsive mb-3">
+                            <table class="table table-bordered align-middle text-center mb-0" id="bulk_allocate_table">
+                                <thead class="table-light fs-11 text-uppercase">
+                                    <tr>
+                                        <th class="text-start">{{ __('hrms.assets.employee') }}</th>
+                                        <th>{{ __('hrms.assets.category_req_asset') }}</th>
+                                        <th class="text-start">{{ __('hrms.assets.asset_to_allocate') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dynamic rows populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <input type="hidden" name="allocated_at" value="{{ date('Y-m-d') }}">
+                    </div>
+                    <div class="modal-footer bg-light py-2 gap-2">
+                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.confirm_bulk_allocation') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bulkRejectModal" tabindex="-1" aria-labelledby="bulkRejectModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="bulkRejectModalLabel">
+                        <i class="feather-x me-2 text-danger"></i>{{ __('hrms.assets.bulk_reject_requests') }}
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="bulkRejectForm" action="{{ route('hrms.assets.requests.bulk-reject') }}" method="POST">
+                    @csrf
+                    <div id="bulk_reject_ids_container"></div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.bulk_rejection_reason') }}" name="admin_notes" placeholder="{{ __('hrms.assets.bulk_rejection_placeholder') }}" :required="true" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2 gap-2">
+                        <button type="submit" class="btn btn-danger px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.assets.reject_all_selected') }}</button>
+                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.cancel') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -1254,6 +1335,12 @@
                 'company_id' => $a->company_id
             ];
         })) !!};
+
+        const langAssets = {
+            requestedAssetNotAvail: "{{ __('hrms.assets.requested_asset_not_avail') }}",
+            autoMatched: "{{ __('hrms.assets.auto_matched') }}",
+            noAvailAssetsInCat: "{{ __('hrms.assets.no_avail_assets_in_cat', ['category' => ':category']) }}"
+        };
 
         $(document).ready(function() {
             // Append modals to body root to prevent Bootstrap backdrop overlay issues inside settings flex container
@@ -1411,6 +1498,36 @@
                 rejectModal.show();
             });
 
+            // Handle direct allocation button click (never opens modal)
+            $(document).on('click', '.allocate-direct-btn', function(e) {
+                e.preventDefault();
+                var btn = $(this);
+                var requestId = btn.data('request-id');
+                var empName = btn.data('employee-name');
+                var assetName = btn.data('asset-name');
+                var confirmTemplate = btn.data('confirm-template');
+
+                var confirmMsg = confirmTemplate
+                    .replace(':asset', assetName)
+                    .replace(':employee', empName);
+
+                if (confirm(confirmMsg)) {
+                    var form = $('<form>', {
+                        'action': '/hrms/assets/requests/' + requestId + '/allocate-direct',
+                        'method': 'POST'
+                    });
+
+                    form.append($('<input>', {
+                        'type': 'hidden',
+                        'name': '_token',
+                        'value': $('meta[name="csrf-token"]').attr('content')
+                    }));
+
+                    $('body').append(form);
+                    form.submit();
+                }
+            });
+
             // Form submit intercept for Request allocation flow (asset is picked dropdown)
             $('#request_asset_select').on('change', function() {
                 var assetId = $(this).val();
@@ -1469,6 +1586,8 @@
                         return String(asset.category_id) === String(categoryId) && String(asset.company_id) === String(companyId);
                     });
 
+                    var requestedAssetId = button.data('requested-asset-id');
+
                     filteredAssets.forEach(function(asset) {
                         assetSelect.append(new Option(asset.name, asset.id));
                     });
@@ -1481,7 +1600,12 @@
                         width: '100%',
                         dropdownParent: modal
                     });
-                    assetSelect.val('').trigger('change');
+                    
+                    if (requestedAssetId && filteredAssets.some(asset => String(asset.id) === String(requestedAssetId))) {
+                        assetSelect.val(requestedAssetId).trigger('change');
+                    } else {
+                        assetSelect.val('').trigger('change');
+                    }
                     form.attr('action', ''); // Reset action until asset is selected
                 } else {
                     // FLOW 2: REGISTRY DIRECT ALLOCATION
@@ -1748,6 +1872,112 @@
                 localStorage.setItem('activeAssetTab', e.target.id);
                 updateHeaderActions();
             });
+            // Checkbox multi-select logic
+            const $selectAll = $('#selectAllRequests');
+            const $bulkToolbar = $('#bulkActionsToolbar');
+            const $selectedCount = $('#selectedRequestsCount');
+
+            function updateBulkToolbar() {
+                const checkedCheckboxes = $('.request-select-checkbox:checked');
+                const count = checkedCheckboxes.length;
+                if (count > 0) {
+                    $bulkToolbar.removeClass('d-none');
+                    $selectedCount.text(count);
+                } else {
+                    $bulkToolbar.addClass('d-none');
+                }
+            }
+
+            $selectAll.on('change', function() {
+                const isChecked = $(this).prop('checked');
+                $('.request-select-checkbox').prop('checked', isChecked);
+                updateBulkToolbar();
+            });
+
+            $(document).on('change', '.request-select-checkbox', function() {
+                const total = $('.request-select-checkbox').length;
+                const checked = $('.request-select-checkbox:checked').length;
+                $selectAll.prop('checked', total === checked);
+                updateBulkToolbar();
+            });
+
+            // Bulk Reject click handler
+            $('#btnBulkReject').on('click', function() {
+                const checkedCheckboxes = $('.request-select-checkbox:checked');
+                const container = $('#bulk_reject_ids_container');
+                container.empty();
+
+                checkedCheckboxes.each(function() {
+                    const reqId = $(this).val();
+                    container.append(`<input type="hidden" name="request_ids[]" value="${reqId}">`);
+                });
+
+                var bulkRejectModal = new bootstrap.Modal(document.getElementById('bulkRejectModal'));
+                bulkRejectModal.show();
+            });
+
+            // Bulk Allocate click handler (shows requested specific asset and submits hidden input)
+            $('#btnBulkAllocate').on('click', function() {
+                const checkedCheckboxes = $('.request-select-checkbox:checked');
+                const tableBody = $('#bulk_allocate_table tbody');
+                tableBody.empty();
+
+                checkedCheckboxes.each(function() {
+                    const $chk = $(this);
+                    const reqId = $chk.val();
+                    const empName = $chk.data('employee-name');
+                    const catId = $chk.data('category-id');
+                    const catName = $chk.data('category-name');
+                    const compId = $chk.data('company-id');
+                    const reqAssetId = $chk.data('requested-asset-id');
+
+                    let displayAssetHtml = '';
+                    let hiddenInputHtml = '';
+
+                    if (reqAssetId) {
+                        const assetObj = allAvailableAssets.find(function(asset) {
+                            return String(asset.id) === String(reqAssetId);
+                        });
+
+                        if (assetObj) {
+                            displayAssetHtml = `<strong class="text-dark">${assetObj.name}</strong>`;
+                            hiddenInputHtml = `<input type="hidden" name="allocations[${reqId}]" value="${assetObj.id}">`;
+                        } else {
+                            displayAssetHtml = `<span class="text-danger fw-bold"><i class="feather-alert-triangle"></i> ${langAssets.requestedAssetNotAvail}</span>`;
+                        }
+                    } else {
+                        const autoAsset = allAvailableAssets.find(function(asset) {
+                            return String(asset.category_id) === String(catId) && String(asset.company_id) === String(compId);
+                        });
+
+                        if (autoAsset) {
+                            displayAssetHtml = `<strong class="text-secondary">${autoAsset.name}</strong> <span class="badge bg-soft-secondary text-secondary ms-1 fs-10">${langAssets.autoMatched}</span>`;
+                            hiddenInputHtml = `<input type="hidden" name="allocations[${reqId}]" value="${autoAsset.id}">`;
+                        } else {
+                            displayAssetHtml = `<span class="text-danger fw-bold"><i class="feather-alert-triangle"></i> ${langAssets.noAvailAssetsInCat.replace(':category', catName)}</span>`;
+                        }
+                    }
+
+                    const rowHtml = `
+                        <tr>
+                            <td class="text-start"><strong>${empName}</strong></td>
+                            <td><span class="badge bg-light text-secondary border px-2 py-1">${catName}</span></td>
+                            <td class="text-start">
+                                ${displayAssetHtml}
+                                ${hiddenInputHtml}
+                            </td>
+                        </tr>
+                    `;
+                    tableBody.append(rowHtml);
+                });
+
+                const modalEl = document.getElementById('bulkAllocateModal');
+                const bulkAllocModal = new bootstrap.Modal(modalEl);
+                bulkAllocModal.show();
+            });
+
+            $('#bulkAllocateModal').appendTo('body');
+            $('#bulkRejectModal').appendTo('body');
         });
 
         // Global function for sorting

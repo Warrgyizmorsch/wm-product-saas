@@ -556,6 +556,25 @@
             // Generic modal Select2 initializer inside HRMS boundaries
             $(document).on('shown.bs.modal', '.modal', function () {
                 var modal = $(this);
+
+                // Trigger company filter for business unit modals
+                const buCompSelects = modal.find('#add_bu_company_id, #edit_bu_company_id');
+                buCompSelects.each(function () {
+                    $(this).trigger('change');
+                });
+
+                // Trigger company/bu filters for branch modals
+                const branchSelects = modal.find('#add_branch_company_id, #add_branch_business_unit_id, #edit_branch_company_id, #edit_branch_bu_id');
+                branchSelects.each(function () {
+                    $(this).trigger('change');
+                });
+
+                // Trigger company/bu/branch filters for department modals
+                const deptSelects = modal.find('#add_dept_company_id, #add_dept_business_unit_id, #add_dept_branch_id, #edit_dept_company_id, #edit_dept_bu_id, #edit_dept_branch_id');
+                deptSelects.each(function () {
+                    $(this).trigger('change');
+                });
+
                 modal.find('select').each(function() {
                     var $select = $(this);
                     if ($select.hasClass("select2-hidden-accessible")) {
@@ -587,6 +606,243 @@
                     $select.select2(options);
                 });
             });
+
+            // Dynamic filtering of Unit Head by selected Company in Add Business Unit modal
+            const addCompanySelect = $('#add_bu_company_id');
+            const addHeadSelect = $('#add_bu_head_employee_id');
+            if (addCompanySelect.length && addHeadSelect.length) {
+                addCompanySelect.on('change', function () {
+                    const compId = addCompanySelect.val();
+                    let originalOptions = addHeadSelect.data('original-options');
+                    if (!originalOptions) {
+                        originalOptions = addHeadSelect.find('option').clone();
+                        addHeadSelect.data('original-options', originalOptions);
+                    }
+
+                    const currentSelected = addHeadSelect.val();
+                    addHeadSelect.empty();
+
+                    originalOptions.each(function () {
+                        const opt = $(this);
+                        const optVal = opt.val();
+                        const optionCompId = opt.attr('data-company-id');
+
+                        if (!optVal || !compId || String(optionCompId) === String(compId)) {
+                            addHeadSelect.append(opt.clone());
+                        }
+                    });
+
+                    if (addHeadSelect.find(`option[value="${currentSelected}"]`).length) {
+                        addHeadSelect.val(currentSelected);
+                    } else {
+                        addHeadSelect.val('');
+                    }
+
+                    if (addHeadSelect.hasClass('select2-hidden-accessible')) {
+                        addHeadSelect.trigger('change.select2');
+                    }
+                });
+            }
+
+            // Dynamic filtering of Branch Manager by business unit/company in modals
+            function bindBranchManagerFilter(modalSelector, companySelectSelector, buSelectSelector, managerSelectSelector) {
+                $(document).on('change', modalSelector + ' ' + companySelectSelector + ', ' + modalSelector + ' ' + buSelectSelector, function () {
+                    const modal = $(modalSelector);
+                    const companySelect = modal.find(companySelectSelector);
+                    const buSelect = modal.find(buSelectSelector);
+                    const managerSelect = modal.find(managerSelectSelector);
+
+                    if (!managerSelect.length) return;
+
+                    const compId = companySelect.val();
+                    const buId = buSelect.val();
+
+                    let originalOptions = managerSelect.data('original-options');
+                    if (!originalOptions) {
+                        originalOptions = managerSelect.find('option').clone();
+                        managerSelect.data('original-options', originalOptions);
+                    }
+
+                    const currentSelected = managerSelect.val();
+                    managerSelect.empty();
+
+                    originalOptions.each(function () {
+                        const opt = $(this);
+                        const optVal = opt.val();
+                        const optionBuId = opt.attr('data-business-unit-id');
+                        const optionCompId = opt.attr('data-company-id');
+
+                        if (!optVal) {
+                            managerSelect.append(opt.clone());
+                            return;
+                        }
+
+                        if (!buId && !compId) {
+                            managerSelect.append(opt.clone());
+                        } else if (buId) {
+                            if (String(optionBuId) === String(buId)) {
+                                managerSelect.append(opt.clone());
+                            }
+                        } else if (compId) {
+                            if (String(optionCompId) === String(compId)) {
+                                managerSelect.append(opt.clone());
+                            }
+                        }
+                    });
+
+                    if (managerSelect.find(`option[value="${currentSelected}"]`).length) {
+                        managerSelect.val(currentSelected);
+                    } else {
+                        managerSelect.val('');
+                    }
+
+                    if (managerSelect.hasClass('select2-hidden-accessible')) {
+                        managerSelect.trigger('change.select2');
+                    }
+                });
+            }
+
+            bindBranchManagerFilter('#addBranchModal', '#add_branch_company_id', '#add_branch_business_unit_id', '#add_branch_manager_id');
+            bindBranchManagerFilter('#editBranchModal', '#edit_branch_company_id', '#edit_branch_bu_id', '#edit_branch_manager_id');
+
+            // Dynamic filtering of Department Head by branch/business unit/company in modals
+            function bindDeptHeadFilter(modalSelector, companySelectSelector, buSelectSelector, branchSelectSelector, headSelectSelector) {
+                $(document).on('change', modalSelector + ' ' + companySelectSelector + ', ' + modalSelector + ' ' + buSelectSelector + ', ' + modalSelector + ' ' + branchSelectSelector, function () {
+                    const modal = $(modalSelector);
+                    const companySelect = modal.find(companySelectSelector);
+                    const buSelect = modal.find(buSelectSelector);
+                    const branchSelect = modal.find(branchSelectSelector);
+                    const headSelect = modal.find(headSelectSelector);
+
+                    if (!headSelect.length) return;
+
+                    const companyId = companySelect.val();
+                    const buId = buSelect.val();
+                    const branchId = branchSelect.val();
+
+                    let originalOptions = headSelect.data('original-options');
+                    if (!originalOptions) {
+                        originalOptions = headSelect.find('option').clone();
+                        headSelect.data('original-options', originalOptions);
+                    }
+
+                    const currentSelected = headSelect.val();
+                    headSelect.empty();
+
+                    originalOptions.each(function () {
+                        const opt = $(this);
+                        const optVal = opt.val();
+                        const optionBranchId = opt.attr('data-branch-id');
+                        const optionBuId = opt.attr('data-business-unit-id');
+                        const optionCompId = opt.attr('data-company-id');
+
+                        if (!optVal) {
+                            headSelect.append(opt.clone());
+                            return;
+                        }
+
+                        if (branchId) {
+                            if (String(optionBranchId) === String(branchId)) {
+                                headSelect.append(opt.clone());
+                            }
+                        } else if (buId) {
+                            if (String(optionBuId) === String(buId)) {
+                                headSelect.append(opt.clone());
+                            }
+                        } else if (companyId) {
+                            if (String(optionCompId) === String(companyId)) {
+                                headSelect.append(opt.clone());
+                            }
+                        } else {
+                            headSelect.append(opt.clone());
+                        }
+                    });
+
+                    if (headSelect.find(`option[value="${currentSelected}"]`).length) {
+                        headSelect.val(currentSelected);
+                    } else {
+                        headSelect.val('');
+                    }
+
+                    if (headSelect.hasClass('select2-hidden-accessible')) {
+                        headSelect.trigger('change.select2');
+                    }
+                });
+
+                // Hierarchical filters for BU and branch selects
+                $(document).on('change', modalSelector + ' ' + companySelectSelector + ', ' + modalSelector + ' ' + buSelectSelector, function () {
+                    const modal = $(modalSelector);
+                    const companySelect = modal.find(companySelectSelector);
+                    const buSelect = modal.find(buSelectSelector);
+                    const branchSelect = modal.find(branchSelectSelector);
+
+                    const companyId = companySelect.val();
+                    const buId = buSelect.val();
+
+                    if (buSelect.length) {
+                        let originalBUs = buSelect.data('original-options');
+                        if (!originalBUs) {
+                            originalBUs = buSelect.find('option').clone();
+                            buSelect.data('original-options', originalBUs);
+                        }
+                        const currentBU = buSelect.val();
+                        buSelect.empty();
+                        originalBUs.each(function () {
+                            const opt = $(this);
+                            if (!opt.val() || !companyId || String(opt.attr('data-company-id')) === String(companyId)) {
+                                buSelect.append(opt.clone());
+                            }
+                        });
+                        if (buSelect.find(`option[value="${currentBU}"]`).length) {
+                            buSelect.val(currentBU);
+                        } else {
+                            buSelect.val('');
+                        }
+                        if (buSelect.hasClass('select2-hidden-accessible')) {
+                            buSelect.trigger('change.select2');
+                        }
+                    }
+
+                    if (branchSelect.length) {
+                        let originalBranches = branchSelect.data('original-options');
+                        if (!originalBranches) {
+                            originalBranches = branchSelect.find('option').clone();
+                            branchSelect.data('original-options', originalBranches);
+                        }
+                        const currentBranch = branchSelect.val();
+                        branchSelect.empty();
+                        originalBranches.each(function () {
+                            const opt = $(this);
+                            if (!opt.val()) {
+                                branchSelect.append(opt.clone());
+                                return;
+                            }
+                            if (buId) {
+                                if (String(opt.attr('data-business-unit-id')) === String(buId)) {
+                                    branchSelect.append(opt.clone());
+                                }
+                            } else if (companyId) {
+                                if (String(opt.attr('data-company-id')) === String(companyId)) {
+                                    branchSelect.append(opt.clone());
+                                }
+                            } else {
+                                branchSelect.append(opt.clone());
+                            }
+                        });
+                        if (branchSelect.find(`option[value="${currentBranch}"]`).length) {
+                            branchSelect.val(currentBranch);
+                        } else {
+                            branchSelect.val('');
+                        }
+                        if (branchSelect.hasClass('select2-hidden-accessible')) {
+                            branchSelect.trigger('change.select2');
+                        }
+                    }
+                });
+            }
+
+            bindDeptHeadFilter('#addDeptModal', '#add_dept_company_id', '#add_dept_business_unit_id', '#add_dept_branch_id', '#add_dept_head_id');
+            bindDeptHeadFilter('#editDeptModal', '#edit_dept_company_id', '#edit_dept_bu_id', '#edit_dept_branch_id', '#edit_dept_head_id');
         });
     </script>
 @endsection

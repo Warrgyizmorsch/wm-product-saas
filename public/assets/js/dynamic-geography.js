@@ -86,6 +86,9 @@
         timezoneSelects.forEach(select => {
             let initialTz = select.dataset.initialValue || select.value || '';
             
+            // Clear manual interaction flag on init
+            delete select.dataset.userInteracted;
+            
             let timezones = [];
             try {
                 timezones = Intl.supportedValuesOf('timeZone');
@@ -159,6 +162,12 @@
             });
 
             window.initSelect2(select);
+
+            // Bind change handler to track user interaction
+            $(select).off('change.geo_user');
+            $(select).on('change.geo_user', function() {
+                select.dataset.userInteracted = 'true';
+            });
         });
     };
 
@@ -193,7 +202,8 @@
 
         window.initSelect2(countrySelect);
 
-        async function updateStates() {
+        async function updateStates(isInit) {
+            const isInitialLoad = (isInit === true);
             if (!stateSelect) return;
             const selectedCountry = countrySelect.value;
             if (!selectedCountry) {
@@ -207,29 +217,35 @@
             }
 
             // Auto-detect and select corresponding timezone for known countries
-            const tzSelect = container.querySelector('.geo-timezone');
-            if (tzSelect) {
-                const countryLower = selectedCountry.toLowerCase();
-                let matchedTz = '';
-                if (countryLower === 'india') {
-                    matchedTz = 'Asia/Kolkata';
-                } else if (countryLower === 'united states') {
-                    matchedTz = 'America/New_York';
-                } else if (countryLower === 'united kingdom') {
-                    matchedTz = 'Europe/London';
-                } else if (countryLower === 'united arab emirates') {
-                    matchedTz = 'Asia/Dubai';
-                } else if (countryLower === 'bangladesh') {
-                    matchedTz = 'Asia/Dhaka';
-                } else if (countryLower === 'pakistan') {
-                    matchedTz = 'Asia/Karachi';
-                } else if (countryLower === 'singapore') {
-                    matchedTz = 'Asia/Singapore';
-                }
+            if (!isInitialLoad) {
+                const tzSelect = container.querySelector('.geo-timezone');
+                if (tzSelect && tzSelect.dataset.userInteracted !== 'true') {
+                    const countryLower = selectedCountry.toLowerCase();
+                    let matchedTz = '';
+                    if (countryLower === 'india') {
+                        matchedTz = 'Asia/Kolkata';
+                    } else if (countryLower === 'united states') {
+                        matchedTz = 'America/New_York';
+                    } else if (countryLower === 'united kingdom') {
+                        matchedTz = 'Europe/London';
+                    } else if (countryLower === 'united arab emirates') {
+                        matchedTz = 'Asia/Dubai';
+                    } else if (countryLower === 'bangladesh') {
+                        matchedTz = 'Asia/Dhaka';
+                    } else if (countryLower === 'pakistan') {
+                        matchedTz = 'Asia/Karachi';
+                    } else if (countryLower === 'singapore') {
+                        matchedTz = 'Asia/Singapore';
+                    }
 
-                if (matchedTz) {
-                    tzSelect.value = matchedTz;
-                    window.initSelect2(tzSelect);
+                    if (matchedTz) {
+                        $(tzSelect).off('change.geo_user');
+                        tzSelect.value = matchedTz;
+                        window.initSelect2(tzSelect);
+                        $(tzSelect).on('change.geo_user', function() {
+                            tzSelect.dataset.userInteracted = 'true';
+                        });
+                    }
                 }
             }
 
@@ -292,7 +308,7 @@
 
         // If there is a preselected country, trigger states loading
         if (countrySelect.value) {
-            await updateStates();
+            await updateStates(true);
         }
     };
 

@@ -164,6 +164,43 @@
 <script>
     (function() {
         function init() {
+            // Bind company change listener for edit business unit modal once
+            const editCompanySelect = $('#edit_bu_company_id');
+            const editHeadSelect = $('#edit_bu_head_employee_id');
+            if (editCompanySelect.length && editHeadSelect.length) {
+                editCompanySelect.on('change', function () {
+                    const compId = editCompanySelect.val();
+                    let originalOptions = editHeadSelect.data('original-options');
+                    if (!originalOptions) {
+                        originalOptions = editHeadSelect.find('option').clone();
+                        editHeadSelect.data('original-options', originalOptions);
+                    }
+
+                    const currentSelected = editHeadSelect.val();
+                    editHeadSelect.empty();
+
+                    originalOptions.each(function () {
+                        const opt = $(this);
+                        const optVal = opt.val();
+                        const optionCompId = opt.attr('data-company-id');
+
+                        if (!optVal || !compId || String(optionCompId) === String(compId)) {
+                            editHeadSelect.append(opt.clone());
+                        }
+                    });
+
+                    if (editHeadSelect.find(`option[value="${currentSelected}"]`).length) {
+                        editHeadSelect.val(currentSelected);
+                    } else {
+                        editHeadSelect.val('');
+                    }
+
+                    if (editHeadSelect.hasClass('select2-hidden-accessible')) {
+                        editHeadSelect.trigger('change.select2');
+                    }
+                });
+            }
+
             function getInitials(name, fallback) {
                 const words = String(name || fallback || '').trim().split(/\s+/).filter(Boolean);
 
@@ -222,10 +259,18 @@
                     if (codeEl) codeEl.value = unit.code || '';
                     
                     let companyEl = document.getElementById('edit_bu_company_id');
-                    if (companyEl) companyEl.value = unit.company_id || '';
+                    if (companyEl) {
+                        companyEl.value = unit.company_id || '';
+                        $(companyEl).trigger('change');
+                    }
                     
                     let headEl = document.getElementById('edit_bu_head_employee_id');
-                    if (headEl) headEl.value = unit.head_employee_id || '';
+                    if (headEl) {
+                        $(headEl).val(unit.head_employee_id || '');
+                        if ($(headEl).hasClass('select2-hidden-accessible')) {
+                            $(headEl).trigger('change.select2');
+                        }
+                    }
                     
                     let descEl = document.getElementById('edit_bu_description');
                     if (descEl) descEl.value = unit.description || '';
