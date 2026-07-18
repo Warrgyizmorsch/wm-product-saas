@@ -5,6 +5,7 @@ namespace App\Domains\Sales\Services;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Repositories\SalesOrderRepository;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Collection;
 
 class SalesOrderService
 {
@@ -13,7 +14,7 @@ class SalesOrderService
     ) {
     }
 
-    public function latest(): \Illuminate\Database\Eloquent\Collection
+    public function latest(): Collection
     {
         return $this->salesOrders->latest();
     }
@@ -25,16 +26,22 @@ class SalesOrderService
 
     public function getNextSalesOrderNumber(): string
     {
-        $latest = SalesOrder::query()->latest('id')->first();
+        $year = now()->format('Y');
+        $prefix = "{$year}-";
 
-        if (!$latest) {
-            return 'SO-0001';
+        $latest = SalesOrder::query()
+            ->where('sales_order_number', 'like', "{$prefix}%")
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $nextNum = 1;
+        if ($latest) {
+            $rawNum = $latest->getRawOriginal('sales_order_number');
+            $lastNumStr = str_replace($prefix, '', $rawNum);
+            $nextNum = intval($lastNumStr) + 1;
         }
 
-        $rawNum = $latest->getRawOriginal('sales_order_number');
-        $nextSeq = intval($rawNum) + 1;
-        
-        return 'SO-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        return 'SO-' . $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
     }
 
     public function create(array $data, array $items): SalesOrder

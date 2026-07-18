@@ -46,7 +46,7 @@
                 ['label' => 'Dispatch Orders', 'route' => 'sales.dispatches.index'],
             ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],
-            ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', 'Requests', 'Purchase Orders', 'Bills']],
+            ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', ['label' => __('ui.purchase_requests'), 'route' => 'purchase.requisitions.index'], ['label' => 'RFQs', 'route' => 'purchase.rfqs.index'], 'Purchase Orders', 'Bills']],
         ],
         __('ui.production') => [
             ['label' => 'Production Engineering', 'icon' => 'feather-cpu', 'url' => '#', 'children' => [

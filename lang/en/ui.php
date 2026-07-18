@@ -85,6 +85,7 @@ return [
     'production' => 'Production',
     'projects' => 'Projects',
     'purchase' => 'Purchase',
+    'purchase_requests' => 'Purchase Requests',
     'remember_me' => 'Remember me',
     'reports_bi' => 'Reports & BI',
     'roles_permissions' => 'Roles & Permissions',

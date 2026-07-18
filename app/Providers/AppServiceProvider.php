@@ -5,6 +5,14 @@ namespace App\Providers;
 use App\Core\Tenant\TenantContext;
 use App\Support\Tenancy;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use App\Domains\Sales\Models\Invoice;
+use App\Domains\Sales\Models\CustomerPayment;
+use App\Domains\Sales\Models\DeliveryOrder;
+use App\Domains\Production\Models\ProductionOrder;
+use App\Domains\Production\Models\ProductionRequisitionSlip;
+use App\Domains\Sales\Models\MaterialRequirement;
+use App\Domains\Sales\Models\SalesOrder;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -137,10 +145,14 @@ class AppServiceProvider extends ServiceProvider
         // requires every morphTo() relation app-wide to resolve through the map,
         // which breaks unrelated existing polymorphic relations (e.g. Projects'
         // ActivityLog, HRMS's Document) that still store raw FQCNs.
-        \Illuminate\Database\Eloquent\Relations\Relation::morphMap([
-            'invoice' => \App\Domains\Sales\Models\Invoice::class,
-            'customer_payment' => \App\Domains\Sales\Models\CustomerPayment::class,
-            'delivery_order' => \App\Domains\Sales\Models\DeliveryOrder::class,
+        Relation::morphMap([
+            'invoice' => Invoice::class,
+            'customer_payment' => CustomerPayment::class,
+            'delivery_order' => DeliveryOrder::class,
+            'mo' => ProductionOrder::class,
+            'material_request' => ProductionRequisitionSlip::class,
+            'material_requirement' => MaterialRequirement::class,
+            'so' => SalesOrder::class,
         ]);
 
         // ── Domain Event Listeners ───────────────────────────────────────────

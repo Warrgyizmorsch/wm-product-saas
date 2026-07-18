@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'CRM Leads | SaaS ERP')
-@section('page-title', 'CRM Leads')
-@section('breadcrumb', 'CRM Leads')
+@section('title', __('crm.crm_leads') . ' | SaaS ERP')
+@section('page-title', __('crm.crm_leads'))
+@section('breadcrumb', __('crm.crm_leads'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('crm.leads.create') }}" variant="primary" icon="feather-plus">
-        Add New Call / Lead
+        {{ __('crm.add_new_call_lead') }}
     </x-ui.button>
 @endsection
 
@@ -33,103 +33,103 @@
         @endif
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">Leads Listing</h5>
+            <h5 class="fw-bold text-dark mb-0">{{ __('crm.leads_listing') }}</h5>
             <div class="d-flex gap-2 ms-auto">
                 <!-- Custom Sort Component -->
-                <x-ui.sort-dropdown label="Sort">
+                <x-ui.sort-dropdown :label="__('crm.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Call Date (Latest first)</span>
+                        <span>{{ __('crm.sort_call_date_latest') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Call Date (Oldest first)</span>
+                        <span>{{ __('crm.sort_call_date_oldest') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company_name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'company_name' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Company Name (A-Z)</span>
+                        <span>{{ __('crm.sort_company_name_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'company_name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'company_name' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Company Name (Z-A)</span>
+                        <span>{{ __('crm.sort_company_name_za') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Est. Sale (High to Low)</span>
+                        <span>{{ __('crm.sort_expected_amount_desc') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Est. Sale (Low to High)</span>
+                        <span>{{ __('crm.sort_expected_amount_asc') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- Custom Filter Component -->
                 <form method="GET" action="{{ route('crm.leads.index') }}" class="d-inline">
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search company, contact..." value="{{ request('search') }}" />
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_leads')" value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Priority</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.priority') }}</label>
                             <x-ui.odoo-form-ui type="select" name="priority">
-                                <option value="">All Priorities</option>
-                                <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>Low</option>
-                                <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>Medium</option>
-                                <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>High</option>
-                                <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>Urgent</option>
+                                <option value="">{{ __('crm.all_priorities') }}</option>
+                                <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>{{ __('crm.priorities.Low') }}</option>
+                                <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>{{ __('crm.priorities.Medium') }}</option>
+                                <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>{{ __('crm.priorities.High') }}</option>
+                                <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>{{ __('crm.priorities.Urgent') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Segment</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.segment') }}</label>
                             <x-ui.odoo-form-ui type="select" name="segment">
-                                <option value="">All Segments</option>
-                                <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>SME</option>
-                                <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>Mid-Market</option>
-                                <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>Enterprise</option>
+                                <option value="">{{ __('crm.all_segments') }}</option>
+                                <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>{{ __('crm.segments.SME') }}</option>
+                                <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>{{ __('crm.segments.Mid-Market') }}</option>
+                                <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>{{ __('crm.segments.Enterprise') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                <option value="New" {{ request('status') === 'New' ? 'selected' : '' }}>New</option>
-                                <option value="Follow-up Scheduled" {{ request('status') === 'Follow-up Scheduled' ? 'selected' : '' }}>Follow-up Scheduled</option>
-                                <option value="Contacted" {{ request('status') === 'Contacted' ? 'selected' : '' }}>Contacted</option>
-                                <option value="Qualified" {{ request('status') === 'Qualified' ? 'selected' : '' }}>Qualified</option>
-                                <option value="Converted" {{ request('status') === 'Converted' ? 'selected' : '' }}>Converted</option>
-                                <option value="Lost" {{ request('status') === 'Lost' ? 'selected' : '' }}>Lost</option>
+                                <option value="">{{ __('crm.all_statuses') }}</option>
+                                <option value="New" {{ request('status') === 'New' ? 'selected' : '' }}>{{ __('crm.statuses.New') }}</option>
+                                <option value="Follow-up Scheduled" {{ request('status') === 'Follow-up Scheduled' ? 'selected' : '' }}>{{ __('crm.statuses.Follow-up Scheduled') }}</option>
+                                <option value="Contacted" {{ request('status') === 'Contacted' ? 'selected' : '' }}>{{ __('crm.statuses.Contacted') }}</option>
+                                <option value="Qualified" {{ request('status') === 'Qualified' ? 'selected' : '' }}>{{ __('crm.statuses.Qualified') }}</option>
+                                <option value="Converted" {{ request('status') === 'Converted' ? 'selected' : '' }}>{{ __('crm.statuses.Converted') }}</option>
+                                <option value="Lost" {{ request('status') === 'Lost' ? 'selected' : '' }}>{{ __('crm.statuses.Lost') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('crm.leads.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('crm.leads.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
 
                 <!-- Action Dropdown for Import/Export/Download Sample (Action button style) -->
                 <div class="dropdown d-inline-block">
-                    <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" title="Import / Export Options">
+                    <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" :title="__('crm.import_export_options')">
                         <i class="feather feather-paperclip"></i>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
                         <li>
                             <a href="{{ route('crm.leads.export') }}" class="dropdown-item">
-                                <i class="feather-download me-2 text-muted fs-12"></i>Export Excel
+                                <i class="feather-download me-2 text-muted fs-12"></i>{{ __('crm.export_excel') }}
                             </a>
                         </li>
                         <li>
                             <a href="{{ route('crm.leads.downloadSample') }}" class="dropdown-item">
-                                <i class="feather-file-text me-2 text-muted fs-12"></i>Download Sample
+                                <i class="feather-file-text me-2 text-muted fs-12"></i>{{ __('crm.download_sample') }}
                             </a>
                         </li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <a href="javascript:void(0);" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importLeadsModal">
-                                <i class="feather-upload me-2 text-muted fs-12"></i>Import
+                                <i class="feather-upload me-2 text-muted fs-12"></i>{{ __('crm.import') }}
                             </a>
                         </li>
                     </ul>
@@ -145,15 +145,15 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
-                        <th>Call Date & Time</th>
-                        <th>Lead / Company</th>
-                        <th>Phone / Email</th>
-                        <th class="text-end">Value / Est. Sale</th>
-                        <th>Source</th>
-                        <th>Priority</th>
-                        <th>Segment</th>
-                        <th>Status</th>
-                        <th class="text-end pe-4">Action</th>
+                        <th>{{ __('crm.call_date_time') }}</th>
+                        <th>{{ __('crm.lead_company') }}</th>
+                        <th>{{ __('crm.phone_email') }}</th>
+                        <th class="text-end">{{ __('crm.value_est_sale') }}</th>
+                        <th>{{ __('crm.source') }}</th>
+                        <th>{{ __('crm.priority') }}</th>
+                        <th>{{ __('crm.segment') }}</th>
+                        <th>{{ __('crm.status') }}</th>
+                        <th class="text-end pe-4">{{ __('crm.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -201,19 +201,19 @@
                             </td>
                             <td>
                                 @if ($lead->priority == 'High' || $lead->priority == 'Urgent')
-                                    <span class="badge bg-soft-danger text-danger">{{ $lead->priority }}</span>
+                                    <span class="badge bg-soft-danger text-danger">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
                                 @elseif ($lead->priority == 'Medium')
-                                    <span class="badge bg-soft-warning text-warning">{{ $lead->priority }}</span>
+                                    <span class="badge bg-soft-warning text-warning">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
                                 @else
-                                    <span class="badge bg-soft-success text-success">{{ $lead->priority }}</span>
+                                    <span class="badge bg-soft-success text-success">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
                                 @endif
                             </td>
                             <td>
-                                <span class="badge bg-soft-info text-info">{{ $lead->segment }}</span>
+                                <span class="badge bg-soft-info text-info">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span>
                             </td>
                             <td>
                                 @if ($lead->is_customer || $lead->status === 'Converted')
-                                    <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 fw-bold"><i class="feather-check-circle me-1"></i>Converted</span>
+                                    <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 fw-bold"><i class="feather-check-circle me-1"></i>{{ __('crm.converted') }}</span>
                                 @else
                                     <div class="d-flex flex-column gap-1">
                                         <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline">
@@ -230,7 +230,7 @@
                                                         elseif($statusOption === 'Lost') $bgClass = 'bg-danger';
                                                     @endphp
                                                     <option value="{{ $statusOption }}" data-bg="{{ $bgClass }}" {{ ($lead->status ?: 'New') === $statusOption ? 'selected' : '' }}>
-                                                        {{ $statusOption }}
+                                                        {{ __('crm.statuses.' . $statusOption) ?? $statusOption }}
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -239,7 +239,7 @@
                                             <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <button type="submit" class="btn btn-xs btn-primary mt-1 w-100 fw-bold py-1 px-1 fs-10">
-                                                    <i class="feather-file-plus me-1"></i>Convert to Quotation
+                                                    <i class="feather-file-plus me-1"></i>{{ __('crm.convert_to_quotation') }}
                                                 </button>
                                             </form>
                                         @endif
@@ -252,7 +252,7 @@
                                    {{-- Edit --}}
                                    <li>
                                        <a href="{{ route('crm.leads.show', ['lead' => $lead->id, 'edit_lead' => 1]) }}" class="dropdown-item">
-                                           <i class="feather-edit me-2 text-muted fs-12"></i>Edit Lead
+                                           <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('crm.edit_lead') }}
                                        </a>
                                    </li>
                            
@@ -261,12 +261,12 @@
                                    <li>
                                        <form action="{{ route('crm.leads.destroy', $lead->id) }}"
                                              method="POST"
-                                             onsubmit="return confirm('Are you sure you want to delete this lead?');">
+                                             onsubmit="return confirm('{{ __('crm.confirm_delete_lead') }}');">
                                            @csrf
                                            @method('DELETE')
                            
                                            <button type="submit" class="dropdown-item text-danger">
-                                               <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Lead
+                                               <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('crm.delete_lead') }}
                                            </button>
                                        </form>
                                    </li>
@@ -278,7 +278,7 @@
                         <tr>
                             <td colspan="10" class="text-center py-5 text-muted">
                                 <i class="feather-users fs-1 d-block mb-3 text-light"></i>
-                                No leads registered yet. Click "Add New Call / Lead" to create one.
+                                {{ __('crm.no_leads') }}
                             </td>
                         </tr>
                     @endforelse
@@ -296,15 +296,15 @@
     </div>
 
     {{-- Import Leads Modal --}}
-    <x-ui.modal id="importLeadsModal" title="Import Leads via Excel/CSV" submitText="Import File" :centered="true">
+    <x-ui.modal id="importLeadsModal" :title="__('crm.import_leads_modal_title')" :submitText="__('crm.import_file')" :centered="true">
         <form method="POST" action="{{ route('crm.leads.import') }}" enctype="multipart/form-data" id="importLeadsForm">
             @csrf
-            <p class="fs-13 text-muted mb-3">Upload an Excel (.xlsx, .xls) or CSV (.csv) file containing lead records. Make sure the headers match the column names in the sample template file.</p>
-            <x-ui.odoo-form-ui type="file" name="file" label="Excel/CSV File" required placeholder="Choose file..." />
+            <p class="fs-13 text-muted mb-3">{{ __('crm.import_leads_help_text') }}</p>
+            <x-ui.odoo-form-ui type="file" name="file" :label="__('crm.excel_csv_file')" required :placeholder="__('crm.choose_file')" />
         </form>
         <x-slot name="footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" form="importLeadsForm" class="btn btn-primary">Import File</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('crm.cancel') }}</button>
+            <button type="submit" form="importLeadsForm" class="btn btn-primary">{{ __('crm.import_file') }}</button>
         </x-slot>
     </x-ui.modal>
 @endsection
@@ -367,8 +367,9 @@
 
                 // If no rows are visible and we have actual data rows, show a "No results found" row
                 if (visibleRows === 0 && totalRows > 0) {
+                    var noResultsText = '{{ __('crm.no_matching_leads', ['query' => '_QUERY_']) }}'.replace('_QUERY_', value);
                     $('#leadsTable tbody').append(
-                        '<tr class="no-search-results"><td colspan="9" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>No matching leads found for "' + value + '"</td></tr>'
+                        '<tr class="no-search-results"><td colspan="9" class="text-center py-4 text-muted"><i class="feather-search fs-3 d-block mb-2 text-light"></i>' + noResultsText + '</td></tr>'
                     );
                 }
             });

@@ -80,6 +80,7 @@ return [
     'production' => 'उत्पादन',
     'projects' => 'प्रोजेक्ट्स',
     'purchase' => 'खरीद',
+    'purchase_requests' => 'खरीद अनुरोध',
     'remember_me' => 'मुझे याद रखें',
     'reports_bi' => 'रिपोर्ट और BI',
     'roles_permissions' => 'भूमिकाएं और अनुमतियां',

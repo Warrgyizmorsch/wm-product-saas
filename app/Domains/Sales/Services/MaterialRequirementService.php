@@ -14,13 +14,21 @@ class MaterialRequirementService
 {
     public function getNextRequirementNumber(): string
     {
-        $latest = MaterialRequirement::query()->latest('id')->first();
-        if (!$latest) {
-            return 'MR-0001';
+        $year = now()->format('Y');
+        $prefix = "MR-{$year}-";
+
+        $latest = MaterialRequirement::query()
+            ->where('requirement_number', 'like', "{$prefix}%")
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $nextNum = 1;
+        if ($latest) {
+            $lastNumStr = str_replace($prefix, '', $latest->requirement_number);
+            $nextNum = intval($lastNumStr) + 1;
         }
-        $rawNum = str_replace('MR-', '', $latest->requirement_number);
-        $nextSeq = intval($rawNum) + 1;
-        return 'MR-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+
+        return $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
     }
 
     public function create(array $data, array $items): MaterialRequirement

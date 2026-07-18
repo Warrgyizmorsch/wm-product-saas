@@ -64,7 +64,16 @@ class MaterialRequestController extends Controller
 
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
 
-        return view('modules.production.material-requests.show', compact('slip', 'items', 'warehouses'));
+        $existingPrProductIds = PurchaseRequisitionItem::where('tenant_id', $tenantId)
+            ->whereHas('requisition', function ($q) use ($slip) {
+                $q->where('source_type', 'material_request')
+                  ->where('source_id', $slip->id)
+                  ->where('status', '!=', 'Cancelled');
+            })
+            ->pluck('product_id')
+            ->toArray();
+
+        return view('modules.production.material-requests.show', compact('slip', 'items', 'warehouses', 'existingPrProductIds'));
     }
 
     public function reserve(Request $request, int $itemId)
@@ -222,8 +231,10 @@ class MaterialRequestController extends Controller
     public function createPurchaseRequisition(Request $request, int $itemId)
     {
         $tenantId = require_tenant_id();
+        $warehouseId = $request->input('warehouse_id');
+        $notes = $request->input('notes');
 
-        return DB::transaction(function () use ($itemId, $tenantId) {
+        return DB::transaction(function () use ($itemId, $warehouseId, $notes, $tenantId) {
             $item = ProductionRequisitionSlipItem::findOrFail($itemId);
             $shortageQty = max(0.0, $item->quantity_planned - $item->quantity_issued);
 
@@ -249,7 +260,9 @@ class MaterialRequestController extends Controller
                 'requisition_number' => $requisitionNumber,
                 'requisition_date' => now()->toDateString(),
                 'status' => 'Draft',
-                'notes' => 'Shortage purchase requisition generated from Material Request Slip #' . $item->slip->requisition_number,
+                'source_type' => 'material_request',
+                'source_id' => $item->slip->id,
+                'notes' => $notes ?: 'Shortage purchase requisition generated from Material Request Slip #' . $item->slip->requisition_number,
                 'requested_by' => auth()->id() ?: 1,
             ]);
 
@@ -257,7 +270,7 @@ class MaterialRequestController extends Controller
                 'purchase_requisition_id' => $pr->id,
                 'product_id' => $item->product_id,
                 'quantity' => $shortageQty,
-                'warehouse_id' => $item->warehouse_id,
+                'warehouse_id' => $warehouseId ?: $item->warehouse_id,
                 'estimated_cost' => $item->product->unit_cost ?? 0.00,
             ]);
 

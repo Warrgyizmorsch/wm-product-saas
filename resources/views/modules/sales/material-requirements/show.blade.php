@@ -216,12 +216,18 @@
                                                         @endif
 
                                                         @if ($method === 'buy')
-                                                            <button
-                                                                type="button"
-                                                                class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-semibold w-100"
-                                                                data-bs-toggle="modal"
-                                                                data-bs-target="#indentModal-{{ $item->id }}"
-                                                            ><i class="feather-file-text me-1"></i>Indent</button>
+                                                            @if ($item->status === 'Waiting Purchase')
+                                                                <span class="badge bg-warning-soft text-warning px-2 py-1 fs-12 w-100 text-center">
+                                                                    <i class="feather-clock me-1"></i>PR Raised
+                                                                </span>
+                                                            @else
+                                                                <button
+                                                                    type="button"
+                                                                    class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-semibold w-100"
+                                                                    data-bs-toggle="modal"
+                                                                    data-bs-target="#indentModal-{{ $item->id }}"
+                                                                ><i class="feather-file-text me-1"></i>Indent</button>
+                                                            @endif
                                                         @elseif ($method === 'manufacture')
                                                             @if ($item->status === 'Pending')
                                                                 <button
@@ -367,6 +373,7 @@
                 id="indentModal-{{ $item->id }}"
                 title="Create Purchase Indent — {{ $item->product?->name }}"
                 submitText="Submit Indent Request"
+                formAction="{{ route('sales.material-requirements.mock-indent', $item->id) }}"
                 :centered="true"
                 :showFooter="true"
             >
@@ -409,15 +416,27 @@
                     <div class="odoo-form-group">
                         <label class="odoo-form-label">Qty to Indent <span class="text-danger">*</span></label>
                         <div class="flex-grow-1">
-                            <input type="number" class="odoo-form-control" name="quantity_indent_preview" min="1" value="{{ (int)($shortageQty ?: $pendingQty) }}">
+                            <input type="number" class="odoo-form-control" name="quantity_request" min="1" value="{{ (int)($shortageQty ?: $pendingQty) }}">
                             <div class="text-muted fs-11 mt-1">Pre-filled with shortage. You can adjust.</div>
+                        </div>
+                    </div>
+
+                    <div class="odoo-form-group">
+                        <label class="odoo-form-label">Destination Warehouse <span class="text-danger">*</span></label>
+                        <div class="flex-grow-1">
+                            <select class="odoo-form-control" name="warehouse_id" required>
+                                @foreach($warehouses as $w)
+                                    <option value="{{ $w->id }}" @selected($w->id == $item->warehouse_id)>{{ $w->name }}</option>
+                                @endforeach
+                            </select>
+                            <div class="text-muted fs-11 mt-1">Select the target warehouse for procurement.</div>
                         </div>
                     </div>
 
                     <div class="odoo-form-group mb-0">
                         <label class="odoo-form-label">Notes</label>
                         <div class="flex-grow-1">
-                            <textarea class="odoo-form-control" rows="2" placeholder="Reason, urgency, etc…"></textarea>
+                            <textarea class="odoo-form-control" name="notes" rows="2" placeholder="Reason, urgency, etc…"></textarea>
                         </div>
                     </div>
                 </div>

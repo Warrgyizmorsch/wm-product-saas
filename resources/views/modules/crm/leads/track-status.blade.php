@@ -1,15 +1,15 @@
 @extends('layouts.duralux')
 
-@section('title', 'CRM Leads Track Status | SaaS ERP')
-@section('page-title', 'CRM Leads Track Status')
-@section('breadcrumb', 'Track Status')
+@section('title', __('crm.track_status_title') . ' | SaaS ERP')
+@section('page-title', __('crm.track_status_title'))
+@section('breadcrumb', __('crm.track_status'))
 
 @section('page-actions')
     <span class="badge bg-soft-success text-success p-2 me-2">
-        <i class="feather-info me-1"></i> Static Array Mode
+        <i class="feather-info me-1"></i> {{ __('crm.static_array_mode') }}
     </span>
     <x-ui.button href="{{ route('crm.leads.index') }}" variant="light" icon="feather-arrow-left">
-        Back to Leads
+        {{ __('crm.back_to_leads') }}
     </x-ui.button>
 @endsection
 
@@ -20,78 +20,78 @@
      */
     $checklistTasks = [
         [
-            'title' => 'CRUD',
-            'desc' => 'Implement Create, Read, Update, and Delete operations.',
+            'title' => __('crm.checklist.crud.title'),
+            'desc' => __('crm.checklist.crud.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Toasters',
-            'desc' => 'Add toast notifications for success, warning, and error alerts.',
+            'title' => __('crm.checklist.toasters.title'),
+            'desc' => __('crm.checklist.toasters.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Validations',
-            'desc' => 'Set up frontend and backend request validations for forms.',
+            'title' => __('crm.checklist.validations.title'),
+            'desc' => __('crm.checklist.validations.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Filters (POST)',
-            'desc' => 'Implement advanced filtering capabilities using POST requests.',
+            'title' => __('crm.checklist.filters.title'),
+            'desc' => __('crm.checklist.filters.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Pagination/Lazy loading',
-            'desc' => 'Configure pagination or lazy loading for heavy data grids.',
+            'title' => __('crm.checklist.pagination.title'),
+            'desc' => __('crm.checklist.pagination.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Search Filter',
-            'desc' => 'Add live search filtering on listings and tables.',
+            'title' => __('crm.checklist.search_filter.title'),
+            'desc' => __('crm.checklist.search_filter.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Sorting (asc/dec)',
-            'desc' => 'Allow sorting columns in ascending and descending order.',
+            'title' => __('crm.checklist.sorting.title'),
+            'desc' => __('crm.checklist.sorting.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Import File',
-            'desc' => 'Enable importing records from CSV / Excel templates.',
+            'title' => __('crm.checklist.import.title'),
+            'desc' => __('crm.checklist.import.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Export File',
-            'desc' => 'Enable exporting records to CSV / Excel formats.',
+            'title' => __('crm.checklist.export.title'),
+            'desc' => __('crm.checklist.export.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Soft Delete',
-            'desc' => 'Support soft deleting records with restore capability.',
+            'title' => __('crm.checklist.soft_delete.title'),
+            'desc' => __('crm.checklist.soft_delete.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Using Common Elements',
-            'desc' => 'Utilize global blade layout components, icons, and styling helper classes.',
+            'title' => __('crm.checklist.common_elements.title'),
+            'desc' => __('crm.checklist.common_elements.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'If File Upload Then Preview Feature',
-            'desc' => 'Add dynamic image/document preview for uploads.',
+            'title' => __('crm.checklist.file_preview.title'),
+            'desc' => __('crm.checklist.file_preview.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Seeders',
-            'desc' => 'Create database model seeders with rich sample demo data.',
+            'title' => __('crm.checklist.seeders.title'),
+            'desc' => __('crm.checklist.seeders.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Support Multi Language/Currency',
-            'desc' => 'Support multiple languages (translations) and local currency formats.',
+            'title' => __('crm.checklist.multi_lang.title'),
+            'desc' => __('crm.checklist.multi_lang.desc'),
             'status' => 'Pending',
         ],
         [
-            'title' => 'Approvals',
-            'desc' => 'Implement verification/approval workflows (draft -> approve -> reject).',
+            'title' => __('crm.checklist.approvals.title'),
+            'desc' => __('crm.checklist.approvals.desc'),
             'status' => 'Pending',
         ],
     ];
@@ -144,7 +144,7 @@
     <!-- Task List Card with Tabs -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">Task Status Tracker</h5>
+            <h5 class="card-title mb-0">{{ __('crm.task_status_tracker') }}</h5>
         </div>
         <div class="card-body p-0">
             <!-- Tab Navigation -->
@@ -185,8 +185,8 @@
                             <table class="table mb-0 align-middle table-hover">
                                 <thead class="table-light fs-11 text-uppercase text-muted">
                                     <tr>
-                                        <th class="ps-4">Description</th>
-                                        <th class="text-end pe-4" style="width: 250px;">Actions</th>
+                                        <th class="ps-4">{{ __('crm.description') }}</th>
+                                        <th class="text-end pe-4" style="width: 250px;">{{ __('crm.actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="fs-13 text-dark">
@@ -212,19 +212,19 @@
                                             <td class="text-end pe-4">
                                                 <div class="form-group select-wd-lg mb-0 ms-auto" style="width: 230px;">
                                                     <select class="form-control status-select" data-select2-selector="icon">
-                                                        <option value="Pending" data-icon="feather-clock" {{ $task['status'] === 'Pending' ? 'selected' : '' }}>Pending</option>
-                                                        <option value="Developer Complete" data-icon="feather-code" {{ $task['status'] === 'Developer Complete' ? 'selected' : '' }}>Developer Complete</option>
-                                                        <option value="Internal Testing Complete" data-icon="feather-check" {{ $task['status'] === 'Internal Testing Complete' ? 'selected' : '' }}>Internal Testing Complete</option>
-                                                        <option value="External Testing Complete" data-icon="feather-shield" {{ $task['status'] === 'External Testing Complete' ? 'selected' : '' }}>External Testing Complete</option>
-                                                        <option value="Rework" data-icon="feather-rotate-ccw" {{ $task['status'] === 'Rework' ? 'selected' : '' }}>Rework</option>
-                                                        <option value="Complete" data-icon="feather-check-circle" {{ $task['status'] === 'Complete' ? 'selected' : '' }}>Complete</option>
+                                                        <option value="Pending" data-icon="feather-clock" {{ $task['status'] === 'Pending' ? 'selected' : '' }}>{{ __('crm.checklist_statuses.Pending') }}</option>
+                                                        <option value="Developer Complete" data-icon="feather-code" {{ $task['status'] === 'Developer Complete' ? 'selected' : '' }}>{{ __('crm.checklist_statuses.Developer Complete') }}</option>
+                                                        <option value="Internal Testing Complete" data-icon="feather-check" {{ $task['status'] === 'Internal Testing Complete' ? 'selected' : '' }}>{{ __('crm.checklist_statuses.Internal Testing Complete') }}</option>
+                                                        <option value="External Testing Complete" data-icon="feather-shield" {{ $task['status'] === 'External Testing Complete' ? 'selected' : '' }}>{{ __('crm.checklist_statuses.External Testing Complete') }}</option>
+                                                        <option value="Rework" data-icon="feather-rotate-ccw" {{ $task['status'] === 'Rework' ? 'selected' : '' }}>{{ __('crm.checklist_statuses.Rework') }}</option>
+                                                        <option value="Complete" data-icon="feather-check-circle" {{ $task['status'] === 'Complete' ? 'selected' : '' }}>{{ __('crm.checklist_statuses.Complete') }}</option>
                                                     </select>
                                                 </div>
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="2" class="text-center py-4 text-muted">No tasks defined for {{ $tabName }}.</td>
+                                            <td colspan="2" class="text-center py-4 text-muted">{{ __('crm.no_tasks_defined', ['tab' => $tabName]) }}</td>
                                         </tr>
                                     @endforelse
                                 </tbody>

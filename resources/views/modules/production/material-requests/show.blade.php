@@ -113,9 +113,15 @@
                                         @endif
 
                                         @if($remainingToIssue > 0 && $totalAvailableStock <= 0)
-                                            <button type="button" class="btn btn-sm btn-soft-danger px-2 py-1 fs-11 fw-semibold w-100 text-start" data-bs-toggle="modal" data-bs-target="#shortageModal-{{ $item->id }}">
-                                                <i class="feather-shopping-cart me-1"></i>Create Indent
-                                            </button>
+                                            @if(in_array($item->product_id, $existingPrProductIds))
+                                                <span class="badge bg-warning-soft text-warning px-2 py-1 fs-12 w-100 text-center">
+                                                    <i class="feather-clock me-1"></i>PR Raised
+                                                </span>
+                                            @else
+                                                <button type="button" class="btn btn-sm btn-soft-danger px-2 py-1 fs-11 fw-semibold w-100 text-start" data-bs-toggle="modal" data-bs-target="#shortageModal-{{ $item->id }}">
+                                                    <i class="feather-shopping-cart me-1"></i>Create Indent
+                                                </button>
+                                            @endif
                                         @endif
 
                                         @if($remainingToIssue <= 0)
@@ -247,7 +253,24 @@
                         </div>
                     </div>
 
-                    <p class="mb-0">This will generate a Draft Purchase Requisition for the shortage quantity of <strong>{{ $remainingToIssue }} {{ $item->uom->code }}</strong>.</p>
+                    <p class="mb-3">This will generate a Draft Purchase Requisition for the shortage quantity of <strong>{{ $remainingToIssue }} {{ $item->uom->code }}</strong>.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Destination Warehouse <span class="text-danger">*</span></label>
+                        <select class="form-select form-select-sm" name="warehouse_id" required>
+                            @foreach($warehouses as $wh)
+                                <option value="{{ $wh->id }}" @selected($wh->id == $item->warehouse_id)>
+                                    {{ $wh->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="text-muted fs-11 mt-1">Select the target warehouse for procurement.</div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fs-11 fw-bold mb-1 text-muted">Notes</label>
+                        <textarea class="form-control form-control-sm" name="notes" rows="2" placeholder="e.g. Urgent shortage for MO"></textarea>
+                    </div>
                 </div>
             </x-ui.modal>
         @endif

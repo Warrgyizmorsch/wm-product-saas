@@ -22,13 +22,15 @@ class PurchaseRequisition extends BaseModel
         'requisition_date',
         'status', // Draft, Approved, Cancelled
         'notes',
-        'sales_order_id',
+        'source_type',
+        'source_id',
+        'requisition_slip_number',
     ];
 
     protected $casts = [
         'requisition_date' => 'date',
         'requested_by' => 'integer',
-        'sales_order_id' => 'integer',
+        'source_id' => 'integer',
     ];
 
     public function items(): HasMany
@@ -41,8 +43,8 @@ class PurchaseRequisition extends BaseModel
         return $this->belongsTo(User::class, 'requested_by');
     }
 
-    public function salesOrder(): BelongsTo
+    public function sourceable(): \Illuminate\Database\Eloquent\Relations\MorphTo
     {
-        return $this->belongsTo(SalesOrder::class, 'sales_order_id');
+        return $this->morphTo(__FUNCTION__, 'source_type', 'source_id');
     }
 }

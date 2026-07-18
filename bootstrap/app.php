@@ -25,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.required' => TenantMiddleware::class,
         ]);
 
+        $middleware->validateCsrfTokens(except: [
+            'purchase/rfq-portal/*/submit',
+        ]);
+
             // ResolveTenant must run before auth resolves the user (TenantAwareUserProvider
             // needs the tenant context to decide whether the session user is accessible),
             // but Laravel's default priority list otherwise runs Authenticate first since
