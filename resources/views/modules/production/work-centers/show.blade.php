@@ -1,17 +1,17 @@
 @extends('layouts.duralux')
 
-@section('title', 'Work Center Details | SaaS ERP')
-@section('page-title', 'Work Center Details')
+@section('title', __('production.work_center_details') . ' | SaaS ERP')
+@section('page-title', __('production.work_center_details'))
 @section('breadcrumb', $workCenter->code)
 
 @section('page-actions')
     <div class="d-flex gap-2">
         <a href="{{ route('production.work-centers.index') }}" class="btn btn-secondary">
-            <i class="feather-arrow-left me-2"></i>Back to List
+            <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
         </a>
         @can('update', $workCenter)
             <a href="{{ route('production.work-centers.edit', $workCenter->id) }}" class="btn btn-primary">
-                <i class="feather-edit me-2"></i>Edit
+                <i class="feather-edit me-2"></i>{{ __('production.edit') }}
             </a>
         @endcan
     </div>
@@ -40,30 +40,30 @@
                     <span class="fs-13 fw-semibold text-muted text-uppercase">{{ $workCenter->code }}</span>
                     <div class="mt-3">
                         @if ($workCenter->isActive())
-                            <span class="badge bg-soft-success text-success px-3 py-1.5 rounded-pill">Active / Operating</span>
+                            <span class="badge bg-soft-success text-success px-3 py-1.5 rounded-pill">{{ __('production.active_operating') }}</span>
                         @else
-                            <span class="badge bg-soft-danger text-danger px-3 py-1.5 rounded-pill">Inactive / Suspended</span>
+                            <span class="badge bg-soft-danger text-danger px-3 py-1.5 rounded-pill">{{ __('production.inactive_suspended') }}</span>
                         @endif
                     </div>
                 </div>
 
                 <div class="d-flex flex-column gap-3 mt-4 px-3">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">Work Center Type:</span>
+                        <span class="text-muted fs-13">{{ __('production.work_center_type') }}:</span>
                         <span class="fw-bold text-dark text-uppercase fs-12">
                             {{ config('production.work_center_types')[$workCenter->work_center_type] ?? $workCenter->work_center_type ?? 'N/A' }}
                         </span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">Department:</span>
+                        <span class="text-muted fs-13">{{ __('production.department_name') }}:</span>
                         <span class="fw-semibold text-dark">{{ $workCenter->department_name ?? '—' }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">Physical Location:</span>
+                        <span class="text-muted fs-13">{{ __('production.physical_location') }}:</span>
                         <span class="fw-semibold text-dark">{{ $workCenter->location ?? '—' }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">Created Date:</span>
+                        <span class="text-muted fs-13">{{ __('production.created_date') }}:</span>
                         <span class="fw-semibold text-dark">{{ $workCenter->created_at->format('Y-m-d') }}</span>
                     </div>
                 </div>
@@ -71,25 +71,25 @@
 
             <!-- Capacity Panel -->
             <div class="col-md-4 border-end">
-                <h5 class="fw-bold text-dark mb-3">Capacity & Parameter Metrics</h5>
+                <h5 class="fw-bold text-dark mb-3">{{ __('production.wc_metrics') }}</h5>
                 <div class="d-flex flex-column gap-4 py-2 px-2">
                     <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Nominal Capacity per Hour</span>
+                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.nominal_capacity') }}</span>
                         <span class="fs-22 fw-bold text-dark">
-                            {{ $workCenter->capacity_per_hour !== null ? number_format($workCenter->capacity_per_hour, 2) . ' Units' : 'Unlimited' }}
+                            {{ $workCenter->capacity_per_hour !== null ? number_format($workCenter->capacity_per_hour, 2) . ' ' . __('production.units') : __('production.unlimited') }}
                         </span>
                     </div>
                     <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Operational Efficiency</span>
+                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.operational_efficiency') }}</span>
                         <span class="fs-22 fw-bold text-dark">{{ number_format($workCenter->efficiency_percentage, 0) }}%</span>
                         <div class="progress progress-xs mt-2" style="height: 6px;">
                             <div class="progress-bar bg-primary" role="progressbar" style="width: {{ $workCenter->efficiency_percentage }}%;" aria-valuenow="{{ $workCenter->efficiency_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </div>
                     <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Effective Capacity</span>
+                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.effective_capacity') }}</span>
                         <span class="fs-18 fw-bold text-success">
-                            {{ $workCenter->capacity_per_hour !== null ? number_format($workCenter->effectiveCapacityPerHour(), 2) . ' Units/Hr' : 'Unlimited' }}
+                            {{ $workCenter->capacity_per_hour !== null ? number_format($workCenter->effectiveCapacityPerHour(), 2) . ' ' . __('production.units_hr') : __('production.unlimited') }}
                         </span>
                     </div>
                 </div>
@@ -97,19 +97,19 @@
 
             <!-- Overhead Cost Panel -->
             <div class="col-md-4">
-                <h5 class="fw-bold text-dark mb-3">Operating Cost Structure</h5>
+                <h5 class="fw-bold text-dark mb-3">{{ __('production.wc_cost_structure') }}</h5>
                 <div class="d-flex flex-column gap-4 py-2 px-2">
                     <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Overhead Cost Rate</span>
-                        <span class="fs-24 fw-bold text-dark">${{ number_format($workCenter->cost_per_hour, 2) }} <span class="fs-13 fw-normal text-muted">/ Hour</span></span>
-                        <small class="text-muted d-block mt-1">Includes floor space, power, maintenance, and shared department overhead.</small>
+                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.overhead_cost_rate') }}</span>
+                        <span class="fs-24 fw-bold text-dark">${{ number_format($workCenter->cost_per_hour, 2) }} <span class="fs-13 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
+                        <small class="text-muted d-block mt-1">{{ __('production.overhead_cost_rate_help') }}</small>
                     </div>
                     
                     <div class="border-top pt-3 mt-2">
-                        <h6 class="fw-bold text-dark mb-2">Cost Calculations Guide</h6>
+                        <h6 class="fw-bold text-dark mb-2">{{ __('production.wc_cost_guide') }}</h6>
                         <ul class="fs-12 text-muted ps-3 mb-0">
-                            <li class="mb-1">Hourly Cost = ${{$workCenter->cost_per_hour}}</li>
-                            <li>Applied to Setup time & Processing time in routing calculations.</li>
+                            <li class="mb-1">{{ __('production.wc_cost_guide_text_1', ['cost' => $workCenter->cost_per_hour]) }}</li>
+                            <li>{{ __('production.wc_cost_guide_text_2') }}</li>
                         </ul>
                     </div>
                 </div>
@@ -119,7 +119,7 @@
         <!-- Description Section -->
         @if ($workCenter->description)
             <div class="mb-4 pb-4 border-bottom">
-                <h5 class="fw-bold text-dark mb-2">Purpose & Operational Notes</h5>
+                <h5 class="fw-bold text-dark mb-2">{{ __('production.purpose_notes') }}</h5>
                 <p class="mb-0 fs-13 text-muted" style="white-space: pre-line;">{{ $workCenter->description }}</p>
             </div>
         @endif
@@ -127,10 +127,10 @@
         <!-- Assigned Shifts Section -->
         <div class="mb-4 pb-4 border-bottom">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold text-dark mb-0">Assigned Production Shifts</h5>
+                <h5 class="fw-bold text-dark mb-0">{{ __('production.assigned_shifts') }}</h5>
                 @can('update', $workCenter)
                     <a href="{{ route('production.work-centers.edit', $workCenter->id) }}" class="btn btn-sm btn-soft-primary">
-                        <i class="feather-edit-2 me-1"></i>Manage Shift Assignments
+                        <i class="feather-edit-2 me-1"></i>{{ __('production.manage_shifts') }}
                     </a>
                 @endcan
             </div>
@@ -143,9 +143,9 @@
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="badge bg-soft-primary text-primary font-monospace fs-10 px-2">{{ $shift->code }}</span>
                                     @if($shift->active)
-                                        <span class="badge bg-soft-success text-success fs-9 rounded-pill px-2">Active</span>
+                                        <span class="badge bg-soft-success text-success fs-9 rounded-pill px-2">{{ __('production.active') }}</span>
                                     @else
-                                        <span class="badge bg-soft-secondary text-secondary fs-9 rounded-pill px-2">Inactive</span>
+                                        <span class="badge bg-soft-secondary text-secondary fs-9 rounded-pill px-2">{{ __('production.inactive') }}</span>
                                     @endif
                                 </div>
                                 <h6 class="fw-bold text-dark mb-1 fs-13">{{ $shift->name }}</h6>
@@ -156,7 +156,7 @@
                                     </div>
                                     <div class="d-flex align-items-center gap-2">
                                         <i class="feather-coffee text-muted fs-13"></i>
-                                        <span>Break: {{ $shift->break_minutes }} minutes</span>
+                                        <span>{{ __('production.break_time', ['minutes' => $shift->break_minutes]) }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -165,7 +165,7 @@
                 </div>
             @else
                 <div class="text-center py-4 bg-light rounded text-muted fs-13 border border-dashed">
-                    <i class="feather-info me-2 fs-16"></i>No production shifts explicitly assigned to this work center. Running on fallback Standard Shift (8 hours).
+                    <i class="feather-info me-2 fs-16"></i>{{ __('production.no_shifts_assigned') }}
                 </div>
             @endif
         </div>
@@ -173,10 +173,10 @@
         <!-- Assigned Machines List -->
         <div>
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold text-dark mb-0">Assigned Equipment & Machines</h5>
+                <h5 class="fw-bold text-dark mb-0">{{ __('production.assigned_equipment') }}</h5>
                 @can('create', App\Domains\Production\Models\Machine::class)
                     <a href="{{ route('production.machines.create', ['work_center_id' => $workCenter->id]) }}" class="btn btn-sm btn-soft-primary">
-                        <i class="feather-plus me-1"></i>Add Machine
+                        <i class="feather-plus me-1"></i>{{ __('production.add_machine') }}
                     </a>
                 @endcan
             </div>
@@ -185,14 +185,14 @@
                 <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
-                            <th style="width: 15%">Machine Code</th>
-                            <th style="width: 20%">Machine Name</th>
-                            <th style="width: 15%">Machine Type</th>
-                            <th style="width: 15%">Manufacturer</th>
-                            <th style="width: 12%">Model Number</th>
-                            <th style="width: 10%" class="text-end">Capacity/Hour</th>
-                            <th style="width: 8%">Status</th>
-                                <th style="width: 5%" class="text-end">Actions</th>
+                            <th style="width: 15%">{{ __('production.machine_code') }}</th>
+                            <th style="width: 20%">{{ __('production.machine_name') }}</th>
+                            <th style="width: 15%">{{ __('production.machine_type') }}</th>
+                            <th style="width: 15%">{{ __('production.manufacturer') }}</th>
+                            <th style="width: 12%">{{ __('production.model_number') }}</th>
+                            <th style="width: 10%" class="text-end">{{ __('production.capacity_hr') }}</th>
+                            <th style="width: 8%">{{ __('production.status') }}</th>
+                            <th style="width: 5%" class="text-end">{{ __('production.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -208,20 +208,20 @@
                                 </td>
                                 <td class="align-middle">
                                     @if ($machine->isActive())
-                                        <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">Active</span>
+                                        <span class="badge bg-soft-success text-success rounded-pill px-2 py-1">{{ __('production.active') }}</span>
                                     @elseif ($machine->isUnderMaintenance())
                                         <span class="badge bg-soft-warning text-warning rounded-pill px-2 py-1">Maint.</span>
                                     @elseif ($machine->isDecommissioned())
                                         <span class="badge bg-soft-dark text-dark rounded-pill px-2 py-1">Decom.</span>
                                     @else
-                                        <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">Inactive</span>
+                                        <span class="badge bg-soft-danger text-danger rounded-pill px-2 py-1">{{ __('production.inactive') }}</span>
                                     @endif
                                 </td>
                                 <td class="text-end align-middle">
                                     <x-ui.action-dropdown>
                                         <li>
                                             <a href="{{ route('production.machines.edit', $machine->id) }}" class="dropdown-item">
-                                                <i class="feather-edit me-2 text-muted fs-12"></i>Edit Machine
+                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('production.edit_machine') }}
                                             </a>
                                         </li>
                                     </x-ui.action-dropdown>
@@ -230,7 +230,7 @@
                         @empty
                             <tr>
                                 <td colspan="8" class="text-center py-4 text-muted">
-                                    <i class="feather-info me-2"></i>No machines registered in this work center.
+                                    <i class="feather-info me-2"></i>{{ __('production.no_machines_registered') }}
                                 </td>
                             </tr>
                         @endforelse

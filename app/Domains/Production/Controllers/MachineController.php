@@ -113,6 +113,102 @@ class MachineController extends Controller
         }
     }
 
+    public function bulkAction(Request $request): RedirectResponse
+    {
+        $action = $request->input('action');
+        $ids = $request->input('ids');
+
+        if (empty($ids) || !is_array($ids)) {
+            return redirect()
+                ->back()
+                ->with('error', __('production.no_machines_selected'));
+        }
+
+        $tenantId = require_tenant_id();
+        $machines = Machine::whereIn('id', $ids)
+            ->where('tenant_id', $tenantId)
+            ->get();
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        switch ($action) {
+            case 'delete':
+                foreach ($machines as $machine) {
+                    if (auth()->user()->can('delete', $machine)) {
+                        try {
+                            $this->service->delete($machine->id);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "deleted";
+                break;
+
+            case 'activate':
+                foreach ($machines as $machine) {
+                    if (auth()->user()->can('update', $machine)) {
+                        try {
+                            $machine->update(['status' => 'active']);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "activated";
+                break;
+
+            case 'deactivate':
+                foreach ($machines as $machine) {
+                    if (auth()->user()->can('update', $machine)) {
+                        try {
+                            $machine->update(['status' => 'inactive']);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "deactivated";
+                break;
+
+            case 'maintenance':
+                foreach ($machines as $machine) {
+                    if (auth()->user()->can('update', $machine)) {
+                        try {
+                            $machine->update(['status' => 'maintenance']);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "set to maintenance status for";
+                break;
+
+            default:
+                return redirect()->back()->with('error', 'Invalid action');
+        }
+
+        $message = "Successfully {$messagePrefix} {$successCount} " . \Illuminate\Support\Str::plural('machine', $successCount) . ".";
+        if ($failedCount > 0) {
+            $message .= " Failed to process {$failedCount} " . \Illuminate\Support\Str::plural('machine', $failedCount) . " due to constraints or permissions.";
+        }
+
+        return redirect()->back()->with($failedCount > 0 ? 'warning' : 'success', $message);
+    }
+
     /**
      * Q5: AJAX endpoint — returns machines filtered by work center.
      */

@@ -74,7 +74,7 @@
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.bom_number')" name="bom_number" placeholder="e.g. BOM-XYZ-001 or AUTO" :value="old('bom_number', 'AUTO')" :required="true" :error-text="$errors->first('bom_number')" alpineError="errors.bom_number" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.bom_number')" name="bom_number" placeholder="{{ __('production.bom_number_placeholder') }}" :value="old('bom_number', 'AUTO')" :required="true" :error-text="$errors->first('bom_number')" alpineError="errors.bom_number" />
                         <x-ui.odoo-form-ui type="select" :label="__('production.item_to_produce')" name="product_id" id="product_id" :required="true" data-master="product" :error-text="$errors->first('product_id')" alpineError="errors.product_id">
                             <option value="">{{ __('production.select_product') }}</option>
                             <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_product') }}</option>
@@ -83,7 +83,7 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" :label="__('production.bom_name')" name="bom_name" placeholder="e.g. Standard Red Door BOM" :value="old('bom_name')" :required="true" :error-text="$errors->first('bom_name')" alpineError="errors.bom_name" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.bom_name')" name="bom_name" placeholder="{{ __('production.bom_name_placeholder') }}" :value="old('bom_name')" :required="true" :error-text="$errors->first('bom_name')" alpineError="errors.bom_name" />
 
                         <x-ui.odoo-form-ui type="select" :label="__('production.bom_type')" name="bom_type" :required="true" :error-text="$errors->first('bom_type')" alpineError="errors.bom_type">
                             <option value="manufacturing" @selected(old('bom_type', 'manufacturing') === 'manufacturing')>{{ __('production.bom_type_manufacturing') }}</option>
@@ -112,7 +112,7 @@
                                 <option value="{{ $uom->id }}" @selected(old('base_uom_id') == $uom->id)>{{ $uom->name }} ({{ $uom->code }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>                        
-                        <x-ui.odoo-form-ui type="textarea" :label="__('production.revision_notes')" name="notes" placeholder="Max. 500 characters" rows="3" :error-text="$errors->first('notes')" alpineError="errors.notes">{{ old('notes') }}</x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" :label="__('production.revision_notes')" name="notes" placeholder="{{ __('production.notes_placeholder') }}" rows="3" :error-text="$errors->first('notes')" alpineError="errors.notes">{{ old('notes') }}</x-ui.odoo-form-ui>
                     </div>
                 </div>
 
@@ -127,7 +127,7 @@
                          :style="showAdvanced ? 'max-height: 1000px; padding: 1rem; opacity: 1; border-top: 1px solid #dee2e6;' : 'max-height: 0px; padding: 0 1rem; opacity: 0; border-top: none;'">
                         <div class="row g-3 fs-13 text-dark">
                             <div class="col-md-6">
-                                <x-ui.odoo-form-ui type="input" :label="__('production.version')" name="version" placeholder="e.g. 1.0.0" :value="old('version', '1.0.0')" :required="true" :error-text="$errors->first('version')" alpineError="errors.version" />
+                                <x-ui.odoo-form-ui type="input" :label="__('production.version')" name="version" placeholder="{{ __('production.version_placeholder') }}" :value="old('version', '1.0.0')" :required="true" :error-text="$errors->first('version')" alpineError="errors.version" />
                             </div>
                             <div class="col-md-6">
                                 <x-ui.odoo-form-ui type="select" :label="__('production.routing_reference')" name="routing_id" id="routing_id" x-model="selectedRoutingId" :error-text="$errors->first('routing_id')" alpineError="errors.routing_id">
@@ -144,7 +144,7 @@
                                 <x-ui.odoo-form-ui type="input" :label="__('production.expiry_date') ?? 'Expiry Date'" name="expiry_date" inputType="date" :value="old('expiry_date')" :error-text="$errors->first('expiry_date')" alpineError="errors.expiry_date" />
                             </div>
                             <div class="col-md-12">
-                                <x-ui.odoo-form-ui type="input" :label="__('production.revision_reason') ?? 'Revision Reason'" name="revision_reason" placeholder="e.g. Engineering specification update" :value="old('revision_reason')" :error-text="$errors->first('revision_reason')" alpineError="errors.revision_reason" />
+                                <x-ui.odoo-form-ui type="input" :label="__('production.revision_reason') ?? 'Revision Reason'" name="revision_reason" placeholder="{{ __('production.revision_reason_placeholder') }}" :value="old('revision_reason')" :error-text="$errors->first('revision_reason')" alpineError="errors.revision_reason" />
                             </div>
                         </div>
                     </div>

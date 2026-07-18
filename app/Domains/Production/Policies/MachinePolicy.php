@@ -29,6 +29,10 @@ class MachinePolicy
 
     public function delete(User $user, Machine $machine): bool
     {
-        return $user->hasProductionPermission('production.machine.manage', $machine->tenant_id);
+        if (!$user->hasProductionPermission('production.machine.manage', $machine->tenant_id)) {
+            return false;
+        }
+
+        return !$machine->operations()->exists();
     }
 }

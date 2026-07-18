@@ -258,4 +258,106 @@ class RoutingController extends Controller
 
         return response()->json($ops);
     }
+
+    public function bulkAction(Request $request): RedirectResponse
+    {
+        $action = $request->input('action');
+        $ids = $request->input('ids');
+
+        if (empty($ids) || !is_array($ids)) {
+            return redirect()
+                ->back()
+                ->with('error', __('production.no_routings_selected'));
+        }
+
+        $tenantId = require_tenant_id();
+        $routings = Routing::whereIn('id', $ids)
+            ->where('tenant_id', $tenantId)
+            ->get();
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        switch ($action) {
+            case 'delete':
+                foreach ($routings as $routing) {
+                    if (Gate::allows('delete', $routing)) {
+                        $this->routingRepository->delete($routing->id);
+                        $successCount++;
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "deleted";
+                break;
+
+            case 'submit_approval':
+                foreach ($routings as $routing) {
+                    if (Gate::allows('submit', $routing)) {
+                        try {
+                            $this->routingService->submitApproval($routing->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "submitted for approval";
+                break;
+
+            case 'approve':
+                foreach ($routings as $routing) {
+                    if (Gate::allows('approve', $routing)) {
+                        try {
+                            $this->routingService->approve($routing->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "approved";
+                break;
+
+            case 'cancel':
+                foreach ($routings as $routing) {
+                    if (Gate::allows('cancel', $routing)) {
+                        try {
+                            $this->routingService->cancel($routing->id, auth()->id() ?: 1, 'Bulk cancelled.');
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "cancelled";
+                break;
+
+            default:
+                return redirect()
+                    ->back()
+                    ->with('error', 'Invalid action.');
+        }
+
+        if ($failedCount > 0) {
+            if ($successCount > 0) {
+                return redirect()
+                    ->route('production.routing.index')
+                    ->with('success', "Successfully {$messagePrefix} {$successCount} routing(s). {$failedCount} routing(s) could not be processed due to status or permission rules.");
+            }
+            return redirect()
+                ->route('production.routing.index')
+                ->with('error', "No routings could be {$messagePrefix}. Check status restrictions and your permissions.");
+        }
+
+        return redirect()
+            ->route('production.routing.index')
+            ->with('success', "Successfully {$messagePrefix} {$successCount} routing(s).");
+    }
 }

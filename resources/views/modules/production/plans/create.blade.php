@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Create Production Plan | SaaS ERP')
-@section('page-title', 'Create Production Plan')
-@section('breadcrumb', 'Create Production Plan')
+@section('title', __('production.create_production_plan') . ' | SaaS ERP')
+@section('page-title', __('production.create_production_plan'))
+@section('breadcrumb', __('production.create_production_plan'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -20,7 +20,7 @@
                 var qty = selectedOption.data('qty');
                 var salesOrderId = selectedOption.data('sales-order-id');
                 var salesOrderItemId = selectedOption.data('sales-order-item-id');
-
+ 
                 if (productId !== undefined && productId !== '') {
                     $('#product_select').val(productId).trigger('change');
                 }
@@ -30,52 +30,52 @@
                 $('#sales_order_id').val(salesOrderId || '');
                 $('#sales_order_item_id').val(salesOrderItemId || '');
             });
-
+ 
             if ($('#production_order_request_select').val()) {
                 $('#production_order_request_select').trigger('change');
             }
-
+ 
             // Setup AJAX dynamic dropdown triggers
             $('#product_select').on('change', function() {
                 var productId = $(this).val();
                 if (!productId) {
-                    $('#bom_select').html('<option value="">None / Auto Select</option>').trigger('change');
-                    $('#routing_select').html('<option value="">None / Auto Select</option>').trigger('change');
+                    $('#bom_select').html('<option value="">' + @js(__('production.none_auto_select')) + '</option>').trigger('change');
+                    $('#routing_select').html('<option value="">' + @js(__('production.none_auto_select')) + '</option>').trigger('change');
                     return;
                 }
-
+ 
                 // Show loading
-                $('#bom_select').html('<option value="">Loading...</option>').trigger('change');
-                $('#routing_select').html('<option value="">Loading...</option>').trigger('change');
-
+                $('#bom_select').html('<option value="">' + @js(__('production.loading')) + '</option>').trigger('change');
+                $('#routing_select').html('<option value="">' + @js(__('production.loading')) + '</option>').trigger('change');
+ 
                 $.ajax({
                     url: "{{ route('production.plans.engineering-options') }}",
                     method: 'GET',
                     data: { product_id: productId },
                     success: function(response) {
-                        var bomHtml = '<option value="">None / Auto-select (Latest Approved)</option>';
+                        var bomHtml = '<option value="">' + @js(__('production.none_auto_select_bom')) + '</option>';
                         if (response.boms && response.boms.length > 0) {
                             response.boms.forEach(function(bom) {
                                 bomHtml += '<option value="' + bom.id + '">' + bom.bom_number + ' - ' + (bom.bom_name || '') + ' (v' + bom.version + ')</option>';
                             });
                         } else {
-                            bomHtml += '<option value="" disabled>No approved BOM found for this product</option>';
+                            bomHtml += '<option value="" disabled>' + @js(__('production.no_approved_bom_found')) + '</option>';
                         }
                         $('#bom_select').html(bomHtml).trigger('change');
-
-                        var routingHtml = '<option value="">None / Auto-select (Default Active)</option>';
+ 
+                        var routingHtml = '<option value="">' + @js(__('production.none_auto_select_routing')) + '</option>';
                         if (response.routings && response.routings.length > 0) {
                             response.routings.forEach(function(rt) {
                                 routingHtml += '<option value="' + rt.id + '">' + rt.routing_number + ' - ' + rt.name + ' (v' + rt.version + ')</option>';
                             });
                         } else {
-                            routingHtml += '<option value="" disabled>No active Routing found for this product</option>';
+                            routingHtml += '<option value="" disabled>' + @js(__('production.no_active_routing_found')) + '</option>';
                         }
                         $('#routing_select').html(routingHtml).trigger('change');
                     },
                     error: function() {
-                        $('#bom_select').html('<option value="">Error loading options</option>').trigger('change');
-                        $('#routing_select').html('<option value="">Error loading options</option>').trigger('change');
+                        $('#bom_select').html('<option value="">' + @js(__('production.error_loading_options')) + '</option>').trigger('change');
+                        $('#routing_select').html('<option value="">' + @js(__('production.error_loading_options')) + '</option>').trigger('change');
                     }
                 });
             });
@@ -87,7 +87,7 @@
     <div class="erp-single-panel">
         <!-- Validation Errors -->
         @if ($errors->any())
-            <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
+            <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') }}: {{ $errors->first() }}" />
         @endif
 
         @if (session('error'))
@@ -100,24 +100,24 @@
             <x-ui.odoo-form-ui type="sheet">
                 <!-- Header with Close Button -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-                    <h4 class="fw-bold text-dark mb-0">New Production Plan</h4>
-                    <a href="{{ route('production.plans.index') }}" class="btn btn-sm btn-light border">Cancel</a>
+                    <h4 class="fw-bold text-dark mb-0">{{ __('production.new_production_plan') }}</h4>
+                    <a href="{{ route('production.plans.index') }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
                 </div>
 
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
-                        <x-ui.odoo-form-ui type="input" label="Plan Name" name="name" placeholder="e.g. Q3 E-Bike Production Batch" :value="old('name')" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.plan_name')" name="name" placeholder="{{ __('production.plan_name_placeholder') }}" :value="old('name')" :required="true" />
 
-                        <x-ui.odoo-form-ui type="select" label="Sales Order Request" name="production_order_request_id" id="production_order_request_select">
-                            <option value="">Select Draft Sales Request...</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.sales_order_request')" name="production_order_request_id" id="production_order_request_select">
+                            <option value="">{{ __('production.select_draft_sales_request') }}</option>
                             @foreach($productionOrderRequests as $request)
                                 @php
                                     $deliveryItem = $request->materialRequirementItem;
                                     $delivery = $deliveryItem?->materialRequirement;
                                     $sales = $delivery?->salesOrder ?? $deliveryItem?->salesOrderItem?->salesOrder;
                                     $product = $request->product;
-                                @endphp
+                                 @endphp
                                 <option value="{{ $request->id }}"
                                     data-product-id="{{ $request->product_id }}"
                                     data-qty="{{ $request->quantity_requested }}"
@@ -138,15 +138,15 @@
                         <input type="hidden" name="sales_order_id" id="sales_order_id" value="{{ old('sales_order_id') }}">
                         <input type="hidden" name="sales_order_item_id" id="sales_order_item_id" value="{{ old('sales_order_item_id') }}">
                         
-                        <x-ui.odoo-form-ui type="select" label="Item to Produce" name="product_id" id="product_select" :required="true">
-                            <option value="">Select Product to Produce</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.item_to_produce')" name="product_id" id="product_select" :required="true">
+                            <option value="">{{ __('production.select_product_to_produce') }}</option>
                             @foreach ($products as $p)
                                 <option value="{{ $p->id }}" @selected(old('product_id') == $p->id)>{{ $p->name }} ({{ $p->sku }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="select" label="Bill of Materials" name="bom_id" id="bom_select">
-                            <option value="">None / Auto-select (Latest Approved)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.bill_of_materials')" name="bom_id" id="bom_select">
+                            <option value="">{{ __('production.none_auto_select_bom') }}</option>
                             @foreach($boms as $bom)
                                 <option value="{{ $bom->id }}" @selected(old('bom_id') == $bom->id)>
                                     {{ $bom->bom_number }} - {{ $bom->bom_name }} (v{{ $bom->version }})
@@ -154,8 +154,8 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="select" label="Routing" name="routing_id" id="routing_select">
-                            <option value="">None / Auto-select (Default Active)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.routing')" name="routing_id" id="routing_select">
+                            <option value="">{{ __('production.none_auto_select_routing') }}</option>
                             @foreach($routings as $rt)
                                 <option value="{{ $rt->id }}" @selected(old('routing_id') == $rt->id)>
                                     {{ $rt->routing_number }} - {{ $rt->name }} (v{{ $rt->version }})
@@ -166,20 +166,20 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Target Quantity" name="quantity" inputType="number" placeholder="e.g. 50.00" :value="old('quantity', '1.00')" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.target_quantity')" name="quantity" inputType="number" placeholder="e.g. 50.00" :value="old('quantity', '1.00')" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="input" label="Planned Start Date" name="start_date" inputType="date" :value="old('start_date', date('Y-m-d'))" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.planned_start_date')" name="start_date" inputType="date" :value="old('start_date', date('Y-m-d'))" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="input" label="Planned End Date" name="end_date" inputType="date" :value="old('end_date', date('Y-m-d', strtotime('+7 days')))" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.planned_end_date')" name="end_date" inputType="date" :value="old('end_date', date('Y-m-d', strtotime('+7 days')))" :required="true" />
 
-                        <x-ui.odoo-form-ui type="textarea" label="Description" name="description" placeholder="Specify production targets, scheduling notes, or customer references..." rows="4">{{ old('description') }}</x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" :label="__('production.description')" name="description" placeholder="{{ __('production.plan_description_placeholder') }}" rows="4">{{ old('description') }}</x-ui.odoo-form-ui>
                     </div>
                 </div>
 
                 <!-- Footer Action Buttons -->
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
-                    <button type="submit" class="btn btn-primary px-4">Create Plan</button>
-                    <a href="{{ route('production.plans.index') }}" class="btn btn-secondary px-4">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4">{{ __('production.create_plan') }}</button>
+                    <a href="{{ route('production.plans.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

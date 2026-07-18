@@ -1,20 +1,20 @@
 @extends('layouts.duralux')
 
-@section('title', 'Production Plan ' . $plan->plan_number . ' | SaaS ERP')
+@section('title', __('production.production_plan_details', ['number' => $plan->plan_number]) . ' | SaaS ERP')
 
 @section('page-actions')
     <a href="{{ route('production.plans.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-arrow-left me-2"></i>Back to List
+        <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
     </a>
 
     @if($plan->isDraft())
         <a href="{{ route('production.plans.edit', $plan->id) }}" class="btn btn-primary me-2">
-            <i class="feather-edit me-2"></i>Edit Plan
+            <i class="feather-edit me-2"></i>{{ __('production.edit_plan') }}
         </a>
         <form method="POST" action="{{ route('production.plans.submit', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-info">
-                <i class="feather-send me-2"></i>Submit for Approval
+                <i class="feather-send me-2"></i>{{ __('production.submit_for_approval') }}
             </button>
         </form>
     @endif
@@ -23,13 +23,13 @@
         <form method="POST" action="{{ route('production.plans.approve', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-success">
-                <i class="feather-check-circle me-2"></i>Approve Plan
+                <i class="feather-check-circle me-2"></i>{{ __('production.approve_plan') }}
             </button>
         </form>
         <form method="POST" action="{{ route('production.plans.reject', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-danger">
-                <i class="feather-x-circle me-2"></i>Reject
+                <i class="feather-x-circle me-2"></i>{{ __('production.reject') }}
             </button>
         </form>
     @endif
@@ -38,7 +38,7 @@
         <form method="POST" action="{{ route('production.plans.run-mrp', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-warning text-dark">
-                <i class="feather-cpu me-2"></i>{{ $plan->isMrpGenerated() ? 'Refresh MRP Snapshot' : 'Run MRP Engine' }}
+                <i class="feather-cpu me-2"></i>{{ $plan->isMrpGenerated() ? __('production.refresh_mrp_snapshot') : __('production.run_mrp_engine') }}
             </button>
         </form>
     @endcan
@@ -47,13 +47,13 @@
         <form method="POST" action="{{ route('production.plans.create-order', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-success">
-                <i class="feather-file-text me-2"></i>Generate Production Order
+                <i class="feather-file-text me-2"></i>{{ __('production.generate_production_order') }}
             </button>
         </form>
         <form method="POST" action="{{ route('production.plans.release', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-primary">
-                <i class="feather-play-circle me-2"></i>Release to Shop Floor
+                <i class="feather-play-circle me-2"></i>{{ __('production.release_to_shop_floor') }}
             </button>
         </form>
     @endif
@@ -62,7 +62,7 @@
         <form method="POST" action="{{ route('production.plans.complete', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-success">
-                <i class="feather-check me-2"></i>Complete Plan
+                <i class="feather-check me-2"></i>{{ __('production.complete_plan') }}
             </button>
         </form>
     @endif
@@ -71,17 +71,17 @@
         <form method="POST" action="{{ route('production.plans.close', $plan->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-dark">
-                <i class="feather-archive me-2"></i>Close &amp; Archive
+                <i class="feather-archive me-2"></i>{{ __('production.close_archive') }}
             </button>
         </form>
     @endif
 
     @if(!$plan->isClosed() && !$plan->isCompleted() && !$plan->isCancelled())
         <form method="POST" action="{{ route('production.plans.cancel', $plan->id) }}" class="d-inline"
-              onsubmit="return confirm('Cancel this Production Plan?');">
+              onsubmit="return confirm('{{ __('production.confirm_cancel_plan') }}');">
             @csrf
             <button type="submit" class="btn btn-outline-danger">
-                <i class="feather-slash me-2"></i>Cancel Plan
+                <i class="feather-slash me-2"></i>{{ __('production.cancel_plan') }}
             </button>
         </form>
     @endif
@@ -104,7 +104,7 @@
         <div class="alert alert-danger border-danger bg-soft-danger mb-4 rounded shadow-sm" role="alert">
             <div class="d-flex align-items-center mb-2">
                 <i class="feather-alert-triangle me-2 fs-18 text-danger"></i>
-                <span class="fw-bold text-danger">Planning &amp; Resource Warnings ({{ count($warnings) }})</span>
+                <span class="fw-bold text-danger">{{ __('production.planning_resource_warnings') }} ({{ count($warnings) }})</span>
             </div>
             <ul class="mb-0 ps-3">
                 @foreach($warnings as $warn)
@@ -121,21 +121,21 @@
         <h4 class="fw-bold text-dark mb-0">{{ $plan->plan_number }} — {{ $plan->name }}</h4>
         <div>
             @if($plan->status === 'draft')
-                <span class="erp-badge-draft">Draft</span>
+                <span class="erp-badge-draft">{{ __('production.draft') }}</span>
             @elseif($plan->status === 'pending_approval')
-                <span class="erp-badge-pending">Pending Approval</span>
+                <span class="erp-badge-pending">{{ __('production.pending') }}</span>
             @elseif($plan->status === 'approved')
-                <span class="erp-badge-active">Approved</span>
+                <span class="erp-badge-active">{{ __('production.approved') }}</span>
             @elseif($plan->status === 'mrp_generated')
-                <span class="badge bg-soft-info text-info">MRP Generated</span>
+                <span class="badge bg-soft-info text-info">{{ __('production.mrp_generated') }}</span>
             @elseif($plan->status === 'released')
-                <span class="badge bg-soft-primary text-primary">Released</span>
+                <span class="badge bg-soft-primary text-primary">{{ __('production.released') }}</span>
             @elseif($plan->status === 'completed')
-                <span class="erp-badge-active">Completed</span>
+                <span class="erp-badge-active">{{ __('production.completed') }}</span>
             @elseif($plan->status === 'closed')
-                <span class="badge bg-soft-dark text-dark">Closed</span>
+                <span class="badge bg-soft-dark text-dark">{{ __('production.closed') }}</span>
             @else
-                <span class="badge bg-soft-danger text-danger">Cancelled</span>
+                <span class="badge bg-soft-danger text-danger">{{ __('production.cancelled') }}</span>
             @endif
         </div>
     </div>
@@ -144,55 +144,55 @@
     <div class="row g-4 mb-4">
         <div class="col-md-6 border-end">
             <div class="row erp-form-row mb-2">
-                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Item to Produce:</span></div>
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.item_to_produce') }}:</span></div>
                 <div class="col-md-8">
                     <span class="text-dark fw-bold fs-13">{{ $plan->product->name }}</span>
                     <small class="text-muted font-monospace d-block fs-10">{{ $plan->product->sku }}</small>
                 </div>
             </div>
             <div class="row erp-form-row mb-2">
-                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Target Quantity:</span></div>
-                <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ number_format($plan->quantity, 2) }} Units</span></div>
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.target_quantity') }}:</span></div>
+                <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ number_format($plan->quantity, 2) }}</span></div>
             </div>
             <div class="row erp-form-row mb-2">
-                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Planned Window:</span></div>
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.planned_window') }}:</span></div>
                 <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $plan->start_date->format('d M Y') }} → {{ $plan->end_date->format('d M Y') }}</span></div>
             </div>
             <div class="row erp-form-row mb-2">
-                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Created By:</span></div>
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.created_by') }}:</span></div>
                 <div class="col-md-8"><span class="text-dark fw-bold fs-13">{{ $plan->creator ? $plan->creator->name : 'System' }} on {{ $plan->created_at->format('d/m/Y H:i') }}</span></div>
             </div>
         </div>
         <div class="col-md-6">
             <div class="row erp-form-row mb-2">
-                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">BOM Reference:</span></div>
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.bom_reference') }}:</span></div>
                 <div class="col-md-8">
                     @if($plan->bom)
                         <a href="{{ route('production.boms.show', $plan->bom_id) }}" class="fw-bold text-primary fs-13">
                             {{ $plan->bom->bom_number }} (v{{ $plan->bom->version }})
                         </a>
-                        <small class="text-muted d-block fs-11">Frozen at plan creation</small>
+                        <small class="text-muted d-block fs-11">{{ __('production.frozen_at_plan_creation') }}</small>
                     @else
-                        <span class="text-muted fs-13">None Assigned</span>
+                        <span class="text-muted fs-13">{{ __('production.none_assigned') }}</span>
                     @endif
                 </div>
             </div>
             <div class="row erp-form-row mb-2">
-                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Routing Reference:</span></div>
+                <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.routing_reference') }}:</span></div>
                 <div class="col-md-8">
                     @if($plan->routing)
                         <a href="{{ route('production.routing.show', $plan->routing_id) }}" class="fw-bold text-primary fs-13">
                             {{ $plan->routing->routing_number }} (v{{ $plan->routing->version }})
                         </a>
-                        <small class="text-muted d-block fs-11">Frozen at plan creation</small>
+                        <small class="text-muted d-block fs-11">{{ __('production.frozen_at_plan_creation') }}</small>
                     @else
-                        <span class="text-muted fs-13">None Assigned</span>
+                        <span class="text-muted fs-13">{{ __('production.none_assigned') }}</span>
                     @endif
                 </div>
             </div>
             @if($plan->approved_by)
                 <div class="row erp-form-row mb-2">
-                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Approved By:</span></div>
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.approved_by') }}:</span></div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">{{ $plan->approver ? $plan->approver->name : 'N/A' }}</span>
                         <small class="text-muted d-block fs-11">{{ $plan->approved_at ? $plan->approved_at->format('d/m/Y H:i') : '' }}</small>
@@ -201,7 +201,7 @@
             @endif
             @if($plan->description)
                 <div class="row erp-form-row mb-2">
-                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Description:</span></div>
+                    <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.description') }}:</span></div>
                     <div class="col-md-8"><span class="text-dark fs-13">{{ $plan->description }}</span></div>
                 </div>
             @endif
@@ -210,10 +210,10 @@
 
     {{-- Tab Navigation (BOM-style) --}}
     <div class="erp-tabs-nav">
-        <a class="erp-tabs-link active" id="btn-tab-mrp"        onclick="switchTab('mrp')"><i class="feather-cpu me-2 fs-13"></i>Material Requirements (MRP)</a>
-        <a class="erp-tabs-link"        id="btn-tab-summary"    onclick="switchTab('summary')"><i class="feather-info me-2 fs-13"></i>MRP Summary</a>
-        <a class="erp-tabs-link"        id="btn-tab-operations" onclick="switchTab('operations')"><i class="feather-sliders me-2 fs-13"></i>Capacity Operations</a>
-        <a class="erp-tabs-link"        id="btn-tab-details"    onclick="switchTab('details')"><i class="feather-activity me-2 fs-13"></i>Details &amp; Logs</a>
+        <a class="erp-tabs-link active" id="btn-tab-mrp"        onclick="switchTab('mrp')"><i class="feather-cpu me-2 fs-13"></i>{{ __('production.material_requirements_mrp') }}</a>
+        <a class="erp-tabs-link"        id="btn-tab-summary"    onclick="switchTab('summary')"><i class="feather-info me-2 fs-13"></i>{{ __('production.mrp_summary') }}</a>
+        <a class="erp-tabs-link"        id="btn-tab-operations" onclick="switchTab('operations')"><i class="feather-sliders me-2 fs-13"></i>{{ __('production.capacity_operations') }}</a>
+        <a class="erp-tabs-link"        id="btn-tab-details"    onclick="switchTab('details')"><i class="feather-activity me-2 fs-13"></i>{{ __('production.details_logs') }}</a>
     </div>
 
     {{-- Tab Content --}}
@@ -224,31 +224,31 @@
             @if($plan->requirements->isEmpty())
                 <div class="text-center py-5 text-muted">
                     <i class="feather-cpu fs-32 mb-2 d-block text-muted"></i>
-                    <p class="mb-2 fw-semibold">No snapshot material requirements recorded.</p>
-                    <p class="fs-12 mb-3">Run the MRP Engine to explode the BOM and populate required components.</p>
+                    <p class="mb-2 fw-semibold">{{ __('production.no_snapshot_mrp') }}</p>
+                    <p class="fs-12 mb-3">{{ __('production.run_mrp_to_explode') }}</p>
                     @can('runMrp', $plan)
                         <form method="POST" action="{{ route('production.plans.run-mrp', $plan->id) }}">
                             @csrf
                             <button type="submit" class="btn btn-warning text-dark px-4 btn-sm">
-                                <i class="feather-play me-2"></i>Run MRP Engine Now
+                                <i class="feather-play me-2"></i>{{ __('production.run_mrp_now') }}
                             </button>
                         </form>
                     @endcan
                 </div>
             @else
-                <h5 class="fw-bold text-dark mb-3">Material Requirements Snapshot</h5>
+                <h5 class="fw-bold text-dark mb-3">{{ __('production.material_requirements_snapshot') }}</h5>
                 <div class="table-responsive">
                     <table class="erp-thin-table fs-12">
                         <thead>
                             <tr>
-                                <th style="width:4%">Lv</th>
-                                <th style="width:26%">Component Item</th>
-                                <th style="width:12%" class="text-end">Required Qty</th>
-                                <th style="width:12%" class="text-end">Available Qty</th>
-                                <th style="width:12%" class="text-end">Reserved Qty</th>
-                                <th style="width:12%" class="text-end text-danger">Shortage Qty</th>
-                                <th style="width:8%">UOM</th>
-                                <th>Source Item</th>
+                                <th style="width:4%">{{ __('production.lv') }}</th>
+                                <th style="width:26%">{{ __('production.component_item') }}</th>
+                                <th style="width:12%" class="text-end">{{ __('production.required_qty') }}</th>
+                                <th style="width:12%" class="text-end">{{ __('production.available_qty') }}</th>
+                                <th style="width:12%" class="text-end">{{ __('production.reserved_qty') }}</th>
+                                <th style="width:12%" class="text-end text-danger">{{ __('production.shortage_qty') }}</th>
+                                <th style="width:8%">{{ __('production.uom') ?? 'UOM' }}</th>
+                                <th>{{ __('production.source_item') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -294,32 +294,32 @@
             @if(!$summary)
                 <div class="text-center py-5 text-muted">
                     <i class="feather-info fs-32 mb-2 d-block"></i>
-                    <p class="mb-0">MRP summary will appear after you run the MRP Engine.</p>
+                    <p class="mb-0">{{ __('production.mrp_summary_appear') }}</p>
                 </div>
             @else
-                <h5 class="fw-bold text-dark mb-3">MRP Execution Summary</h5>
+                <h5 class="fw-bold text-dark mb-3">{{ __('production.mrp_execution_summary') }}</h5>
                 <div class="row g-3 mb-4">
                     <div class="col-md-3">
                         <div class="bg-light rounded p-3 text-center border">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Total Components</span>
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.total_components') }}</span>
                             <span class="fw-bold text-dark fs-18">{{ $summary['total_components'] }}</span>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="bg-light rounded p-3 text-center border">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Subassemblies</span>
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.subassemblies') }}</span>
                             <span class="fw-bold text-dark fs-18">{{ $summary['total_subassemblies'] }}</span>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="bg-light rounded p-3 text-center border">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Operations</span>
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.operations') }}</span>
                             <span class="fw-bold text-dark fs-18">{{ $summary['total_operations'] }}</span>
                         </div>
                     </div>
                     <div class="col-md-3">
                         <div class="bg-soft-danger rounded p-3 text-center border border-danger">
-                            <span class="text-danger fs-11 text-uppercase d-block mb-1">Warnings</span>
+                            <span class="text-danger fs-11 text-uppercase d-block mb-1">{{ __('production.warnings') }}</span>
                             <span class="fw-bold text-danger fs-18">{{ $summary['warnings_count'] }}</span>
                         </div>
                     </div>
@@ -327,19 +327,19 @@
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="bg-soft-success rounded p-3 text-center border border-success">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Est. Material Cost</span>
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.est_material_cost') }}</span>
                             <h4 class="fw-bold text-success mt-1 mb-0">${{ number_format($summary['estimated_material_cost'], 2) }}</h4>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-soft-primary rounded p-3 text-center border border-primary">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Manufacturing Overhead</span>
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.manufacturing_overhead') }}</span>
                             <h4 class="fw-bold text-primary mt-1 mb-0">${{ number_format($summary['estimated_manufacturing_cost'], 2) }}</h4>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-light rounded p-3 text-center border">
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Capacity Utilization</span>
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.capacity_utilization') }}</span>
                             <h4 class="fw-bold text-dark mt-1 mb-0">{{ $summary['capacity_utilization'] }}%</h4>
                         </div>
                     </div>
@@ -352,22 +352,22 @@
             @if($plan->operations->isEmpty())
                 <div class="text-center py-5 text-muted">
                     <i class="feather-sliders fs-32 mb-2 d-block"></i>
-                    <p class="mb-0">No Routing capacity operations snapshotted. Run the MRP Engine to compute capacity requirements.</p>
+                    <p class="mb-0">{{ __('production.no_routing_capacity_snapshotted') }}</p>
                 </div>
             @else
-                <h5 class="fw-bold text-dark mb-3">Capacity Operations Load</h5>
+                <h5 class="fw-bold text-dark mb-3">{{ __('production.capacity_operations') }}</h5>
                 <div class="table-responsive">
                     <table class="erp-thin-table fs-12">
                         <thead>
                             <tr>
-                                <th style="width:5%">Seq</th>
-                                <th style="width:12%">Operation#</th>
-                                <th style="width:20%">Name</th>
-                                <th style="width:22%">Work Center (Hierarchy)</th>
-                                <th style="width:15%">Assigned Machine</th>
-                                <th style="width:8%" class="text-end">Setup Min</th>
-                                <th style="width:8%" class="text-end">Run Min/unit</th>
-                                <th style="width:10%" class="text-end">Total Time</th>
+                                <th style="width:5%">{{ __('production.seq') }}</th>
+                                <th style="width:12%">{{ __('production.operation_number') }}</th>
+                                <th style="width:20%">{{ __('production.machine_name') }}</th>
+                                <th style="width:22%">{{ __('production.work_center_hierarchy') }}</th>
+                                <th style="width:15%">{{ __('production.assigned_machine') }}</th>
+                                <th style="width:8%" class="text-end">{{ __('production.setup_min') }}</th>
+                                <th style="width:8%" class="text-end">{{ __('production.run_min_unit') }}</th>
+                                <th style="width:10%" class="text-end">{{ __('production.total_time') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -384,7 +384,7 @@
                                              </small>
                                          @endif
                                      </td>
-                                    <td class="text-muted">{{ $op->machine ? $op->machine->name : 'Manual / None' }}</td>
+                                    <td class="text-muted">{{ $op->machine ? $op->machine->name : __('production.manual_none') }}</td>
                                     <td class="text-end">{{ number_format($op->setup_time_minutes, 1) }}</td>
                                     <td class="text-end">{{ number_format($op->processing_time_minutes, 1) }}</td>
                                     <td class="text-end fw-bold text-dark">{{ number_format($op->total_time_minutes, 1) }} min</td>
@@ -400,18 +400,18 @@
         <div class="tab-pane-custom d-none" id="tab-details">
             <div class="row g-4 fs-13">
                 <div class="col-md-6">
-                    <h5 class="fw-bold text-dark mb-3">Description / Planning Notes</h5>
-                    <p class="text-muted">{{ $plan->description ?: 'No detailed planning notes provided.' }}</p>
+                    <h5 class="fw-bold text-dark mb-3">{{ __('production.description_notes') }}</h5>
+                    <p class="text-muted">{{ $plan->description ?: __('production.no_description_notes') }}</p>
                 </div>
                 <div class="col-md-6 border-start ps-4">
-                    <h5 class="fw-bold text-dark mb-3">Audit Metadata</h5>
+                    <h5 class="fw-bold text-dark mb-3">{{ __('production.audit_metadata') }}</h5>
                     <ul class="list-unstyled mb-0">
                         <li class="mb-3 d-flex align-items-start">
                             <div class="avatar-text avatar-sm bg-soft-primary text-primary me-3 mt-1 rounded-circle">
                                 <i class="feather-user fs-14"></i>
                             </div>
                             <div>
-                                <div class="fw-bold text-dark">Plan Created</div>
+                                <div class="fw-bold text-dark">{{ __('production.plan_created') }}</div>
                                 <div class="text-muted fs-11">By: {{ $plan->creator ? $plan->creator->name : 'System' }} on {{ $plan->created_at->format('d/m/Y H:i') }}</div>
                             </div>
                         </li>
@@ -421,7 +421,7 @@
                                     <i class="feather-check-circle fs-14"></i>
                                 </div>
                                 <div>
-                                    <div class="fw-bold text-dark">Plan Approved</div>
+                                    <div class="fw-bold text-dark">{{ __('production.plan_approved') }}</div>
                                     <div class="text-muted fs-11">By: {{ $plan->approver ? $plan->approver->name : 'N/A' }} on {{ $plan->approved_at ? $plan->approved_at->format('d/m/Y H:i') : '' }}</div>
                                 </div>
                             </li>

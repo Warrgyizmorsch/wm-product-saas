@@ -142,6 +142,7 @@ class FurnitureManufacturingDemoSeeder extends Seeder
         DB::table('production_boms')->truncate();
         DB::table('production_machines')->truncate();
         DB::table('production_work_centers')->truncate();
+        DB::table('production_work_center_shifts')->truncate();
 
         // Inventory tables (no orphan FKs)
         DB::table('product_warehouse_stocks')->truncate();

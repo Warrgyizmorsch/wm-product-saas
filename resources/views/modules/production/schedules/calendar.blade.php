@@ -1,15 +1,15 @@
 @extends('layouts.duralux')
 
-@section('title', 'Schedule Calendar | SaaS ERP')
-@section('page-title', 'Scheduling Calendar')
-@section('breadcrumb', 'Calendar')
+@section('title', __('production.scheduling_calendar') . ' | SaaS ERP')
+@section('page-title', __('production.scheduling_calendar'))
+@section('breadcrumb', __('production.calendar_view'))
 
 @section('page-actions')
     <a href="{{ route('production.schedules.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-list me-2"></i>List View
+        <i class="feather-list me-2"></i>{{ __('production.plans_list') ?? 'List View' }}
     </a>
     <a href="{{ route('production.schedules.work-center-view') }}" class="btn btn-light me-2">
-        <i class="feather-grid me-2"></i>Work Center View
+        <i class="feather-grid me-2"></i>{{ __('production.work_center_view') }}
     </a>
 @endsection
 
@@ -52,25 +52,25 @@
                 <a href="{{ request()->fullUrlWithQuery(['start' => $nextStart->toDateString()]) }}" class="btn btn-sm btn-light">
                     <i class="feather-chevron-right"></i>
                 </a>
-                <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-sm btn-outline-primary ms-2">Today</a>
+                <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-sm btn-outline-primary ms-2">{{ __('production.today') }}</a>
             </div>
 
             <div class="d-flex align-items-center gap-3">
                 {{-- Layout Selection (Gantt vs Table) --}}
                 <div class="btn-group" role="group">
                     <a href="{{ request()->fullUrlWithQuery(['layout' => 'gantt']) }}" class="btn btn-sm {{ $layout === 'gantt' ? 'btn-primary' : 'btn-outline-secondary' }}">
-                        <i class="feather-bar-chart-2 me-1"></i> Gantt View
+                        <i class="feather-bar-chart-2 me-1"></i> {{ __('production.gantt_view') }}
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['layout' => 'list']) }}" class="btn btn-sm {{ $layout === 'list' ? 'btn-primary' : 'btn-outline-secondary' }}">
-                        <i class="feather-list me-1"></i> Table View
+                        <i class="feather-list me-1"></i> {{ __('production.table_view') }}
                     </a>
                 </div>
 
                 {{-- Time Horizon selection --}}
                 <div class="btn-group" role="group">
-                    <a href="{{ request()->fullUrlWithQuery(['view' => 'day']) }}" class="btn btn-sm {{ $view === 'day' ? 'btn-primary' : 'btn-outline-secondary' }}">Day</a>
-                    <a href="{{ request()->fullUrlWithQuery(['view' => 'week']) }}" class="btn btn-sm {{ $view === 'week' ? 'btn-primary' : 'btn-outline-secondary' }}">Week</a>
-                    <a href="{{ request()->fullUrlWithQuery(['view' => 'month']) }}" class="btn btn-sm {{ $view === 'month' ? 'btn-primary' : 'btn-outline-secondary' }}">Month</a>
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'day']) }}" class="btn btn-sm {{ $view === 'day' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('production.day') }}</a>
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'week']) }}" class="btn btn-sm {{ $view === 'week' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('production.week') }}</a>
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'month']) }}" class="btn btn-sm {{ $view === 'month' ? 'btn-primary' : 'btn-outline-secondary' }}">{{ __('production.month') }}</a>
                 </div>
             </div>
         </div>
@@ -125,7 +125,7 @@
                         <!-- Header Row -->
                         <div class="gantt-header-row d-flex border-bottom bg-light">
                             <div class="gantt-label-col border-end p-3 d-flex align-items-center" style="width: 250px; flex-shrink: 0; background-color: #f8f9fa; z-index: 10;">
-                                <span class="fw-bold text-uppercase text-muted fs-11">Work Center</span>
+                                <span class="fw-bold text-uppercase text-muted fs-11">{{ __('production.work_centers') }}</span>
                             </div>
                             <div class="gantt-timeline-col flex-grow-1 d-flex">
                                 @foreach($columns as $col)
@@ -147,7 +147,7 @@
                             <div class="gantt-row d-flex align-items-stretch border-bottom bg-white" style="min-height: 64px;">
                                 <div class="gantt-label-col border-end d-flex flex-column justify-content-center px-3 py-2" style="width: 250px; flex-shrink: 0; background-color: #fafafa; z-index: 10;">
                                     <span class="fw-bold text-dark fs-13">{{ $wc->name }}</span>
-                                    <span class="text-muted font-monospace" style="font-size: 10px;">Code: {{ $wc->code }}</span>
+                                    <span class="text-muted font-monospace" style="font-size: 10px;">{{ __('production.code') ?? 'Code' }}: {{ $wc->code }}</span>
                                 </div>
                                 <div class="gantt-timeline-col position-relative flex-grow-1 py-3" style="min-height: 64px;">
                                     <!-- Grid lines background -->
@@ -202,31 +202,31 @@
                                     @endforeach
 
                                     @if($wcOps->isEmpty())
-                                        <div class="text-muted fs-11 text-center py-2 position-relative" style="z-index: 2; opacity: 0.4;">
-                                            No operations scheduled
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
+                                         <div class="text-muted fs-11 text-center py-2 position-relative" style="z-index: 2; opacity: 0.4;">
+                                             {{ __('production.no_operations_scheduled') }}
+                                         </div>
+                                     @endif
+                                 </div>
+                             </div>
+                         @endforeach
+                     </div>
+                 </div>
 
-                {{-- Status Legend --}}
-                <div class="d-flex flex-wrap gap-3 align-items-center justify-content-center mt-4 pt-3 border-top fs-12">
-                    <span class="fw-bold text-muted">Legend:</span>
-                    <span class="d-flex align-items-center gap-1"><span class="badge bg-success">&nbsp;&nbsp;</span> Completed</span>
-                    <span class="d-flex align-items-center gap-1"><span class="badge bg-warning text-dark">&nbsp;&nbsp;</span> Running</span>
-                    <span class="d-flex align-items-center gap-1"><span class="badge bg-info">&nbsp;&nbsp;</span> Ready</span>
-                    <span class="d-flex align-items-center gap-1"><span class="badge bg-primary">&nbsp;&nbsp;</span> Scheduled</span>
-                    <span class="d-flex align-items-center gap-1"><span class="badge bg-soft-danger text-danger border border-danger">&nbsp;&nbsp;</span> Paused</span>
-                </div>
+                 {{-- Status Legend --}}
+                 <div class="d-flex flex-wrap gap-3 align-items-center justify-content-center mt-4 pt-3 border-top fs-12">
+                     <span class="fw-bold text-muted">{{ __('production.legend') ?? 'Legend' }}:</span>
+                     <span class="d-flex align-items-center gap-1"><span class="badge bg-success">&nbsp;&nbsp;</span> {{ __('production.completed') }}</span>
+                     <span class="d-flex align-items-center gap-1"><span class="badge bg-warning text-dark">&nbsp;&nbsp;</span> {{ __('production.running') }}</span>
+                     <span class="d-flex align-items-center gap-1"><span class="badge bg-info">&nbsp;&nbsp;</span> {{ __('production.ready') }}</span>
+                     <span class="d-flex align-items-center gap-1"><span class="badge bg-primary">&nbsp;&nbsp;</span> {{ __('production.scheduled_schedules') }}</span>
+                     <span class="d-flex align-items-center gap-1"><span class="badge bg-soft-danger text-danger border border-danger">&nbsp;&nbsp;</span> {{ __('production.paused') ?? 'Paused' }}</span>
+                 </div>
             @else
                 <div class="text-center py-5 text-muted">
                     <i class="feather-calendar fs-36 mb-3 d-block"></i>
-                    <p class="fs-14">No operations scheduled for this period.</p>
+                    <p class="fs-14">{{ __('production.no_operations_scheduled_period') }}</p>
                     <a href="{{ route('production.schedules.create') }}" class="btn btn-primary btn-sm">
-                        <i class="feather-plus me-2"></i>Create Schedule
+                        <i class="feather-plus me-2"></i>{{ __('production.create_schedule') }}
                     </a>
                 </div>
             @endif
@@ -237,14 +237,14 @@
                     <x-ui.odoo-form-ui type="table">
                         <thead>
                             <tr>
-                                <th style="width: 12%">Planned Start</th>
-                                <th style="width: 12%">Planned Finish</th>
-                                <th style="width: 15%">Schedule #</th>
-                                <th style="width: 20%">Order / Product</th>
-                                <th style="width: 18%">Operation</th>
-                                <th style="width: 12%">Work Center</th>
-                                <th style="width: 10%">Machine</th>
-                                <th style="width: 10%">Status</th>
+                                <th style="width: 12%">{{ __('production.planned_start') }}</th>
+                                <th style="width: 12%">{{ __('production.planned_finish') }}</th>
+                                <th style="width: 15%">{{ __('production.schedule_number') }}</th>
+                                <th style="width: 20%">{{ __('production.production_order') }} / {{ __('production.product') }}</th>
+                                <th style="width: 18%">{{ __('production.operations') }}</th>
+                                <th style="width: 12%">{{ __('production.work_centers') }}</th>
+                                <th style="width: 10%">{{ __('production.assigned_machine') ?? 'Machine' }}</th>
+                                <th style="width: 10%">{{ __('production.status') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -271,13 +271,13 @@
                                     <td class="fs-12 text-muted">{{ $op->machine->name ?? '—' }}</td>
                                     <td>
                                         @if($op->status === 'running')
-                                            <span class="badge bg-soft-warning text-warning">Running</span>
+                                            <span class="badge bg-soft-warning text-warning">{{ __('production.running') }}</span>
                                         @elseif($op->status === 'ready')
-                                            <span class="badge bg-soft-info text-info">Ready</span>
+                                            <span class="badge bg-soft-info text-info">{{ __('production.ready') }}</span>
                                         @elseif($op->status === 'completed')
-                                            <span class="badge bg-soft-success text-success">Done</span>
+                                            <span class="badge bg-soft-success text-success">{{ __('production.completed') }}</span>
                                         @elseif($op->status === 'paused')
-                                            <span class="badge bg-soft-warning text-warning">Paused</span>
+                                            <span class="badge bg-soft-warning text-warning">{{ __('production.paused') ?? 'Paused' }}</span>
                                         @else
                                             <span class="erp-badge-draft">{{ ucfirst($op->status) }}</span>
                                         @endif
@@ -290,9 +290,9 @@
             @else
                 <div class="text-center py-5 text-muted">
                     <i class="feather-calendar fs-36 mb-3 d-block"></i>
-                    <p class="fs-14">No operations scheduled for this period.</p>
+                    <p class="fs-14">{{ __('production.no_operations_scheduled_period') }}</p>
                     <a href="{{ route('production.schedules.create') }}" class="btn btn-primary btn-sm">
-                        <i class="feather-plus me-2"></i>Create Schedule
+                        <i class="feather-plus me-2"></i>{{ __('production.create_schedule') }}
                     </a>
                 </div>
             @endif
@@ -310,4 +310,3 @@
         });
     </script>
 @endpush
-

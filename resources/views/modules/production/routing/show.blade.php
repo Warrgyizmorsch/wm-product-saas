@@ -1,26 +1,26 @@
 @extends('layouts.duralux')
 
-@section('title', 'Routing Details | SaaS ERP')
-@section('page-title', 'Routing Details')
+@section('title', __('production.routing_details') . ' | SaaS ERP')
+@section('page-title', __('production.routing_details'))
 @section('breadcrumb', $routing->routing_number)
 
 @section('page-actions')
     <div class="d-flex gap-2">
         <a href="{{ route('production.routing.index') }}" class="btn btn-secondary">
-            <i class="feather-arrow-left me-2"></i>Back to List
+            <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
         </a>
         
         @if ($routing->isDraft())
             @can('update', $routing)
                 <a href="{{ route('production.routing.edit', $routing->id) }}" class="btn btn-primary">
-                    <i class="feather-edit me-2"></i>Edit Draft
+                    <i class="feather-edit me-2"></i>{{ __('production.edit_draft') }}
                 </a>
             @endcan
         @endif
 
         @can('duplicate', $routing)
             <button type="button" class="btn btn-light-brand" data-bs-toggle="modal" data-bs-target="#duplicateVersionModal">
-                <i class="feather-copy me-2"></i>Create New Version
+                <i class="feather-copy me-2"></i>{{ __('production.duplicate_routing_version') }}
             </button>
         @endcan
     </div>
@@ -43,24 +43,24 @@
                     <i class="feather-info"></i>
                 </div>
                 <div>
-                    <h6 class="fw-bold mb-1 text-dark">Process Routing Lifecycle Status</h6>
+                    <h6 class="fw-bold mb-1 text-dark">{{ __('production.routing_lifecycle_status') }}</h6>
                     <p class="fs-12 mb-0 text-muted">
-                        Current Status: 
+                        {{ __('production.status') }}: 
                         @if ($routing->isDraft())
-                            <span class="badge bg-soft-secondary text-secondary font-monospace fw-bold text-uppercase">Draft</span>
-                            — Open for editing. Fill out operation sequences before submitting for approval.
+                            <span class="badge bg-soft-secondary text-secondary font-monospace fw-bold text-uppercase">{{ __('production.draft') }}</span>
+                            — {{ __('production.draft_desc') }}
                         @elseif ($routing->isPendingApproval())
-                            <span class="badge bg-soft-warning text-warning font-monospace fw-bold text-uppercase">Pending Approval</span>
-                            — Locked for review by Production Engineering & Managers.
+                            <span class="badge bg-soft-warning text-warning font-monospace fw-bold text-uppercase">{{ __('production.pending_approval') }}</span>
+                            — {{ __('production.pending_desc') }}
                         @elseif ($routing->isActive())
-                            <span class="badge bg-soft-success text-success font-monospace fw-bold text-uppercase">Active / Released</span>
-                            — Currently used in shop-floor production orders and costing templates.
+                            <span class="badge bg-soft-success text-success font-monospace fw-bold text-uppercase">{{ __('production.active') }}</span>
+                            — {{ __('production.active_desc') }}
                         @elseif ($routing->isHistorical())
-                            <span class="badge bg-soft-info text-info font-monospace fw-bold text-uppercase">Historical / Archived</span>
-                            — Replaced by a newer version. Kept for retrospective audit trail.
+                            <span class="badge bg-soft-info text-info font-monospace fw-bold text-uppercase">{{ __('production.historical') }}</span>
+                            — {{ __('production.historical_desc') }}
                         @else
-                            <span class="badge bg-soft-danger text-danger font-monospace fw-bold text-uppercase">Cancelled</span>
-                            — Process terminated. Cannot be used for scheduling or orders.
+                            <span class="badge bg-soft-danger text-danger font-monospace fw-bold text-uppercase">{{ __('production.cancelled') }}</span>
+                            — {{ __('production.cancelled_desc') }}
                         @endif
                     </p>
                 </div>
@@ -73,7 +73,7 @@
                         <form action="{{ route('production.routing.submit', $routing->id) }}" method="POST">
                             @csrf
                             <button type="submit" class="btn btn-warning btn-sm px-3">
-                                <i class="feather-send me-1"></i>Submit for Approval
+                                <i class="feather-send me-1"></i>{{ __('production.submit_approval') }}
                             </button>
                         </form>
                     @endcan
@@ -83,15 +83,15 @@
                     @can('approve', $routing)
                         <form action="{{ route('production.routing.approve', $routing->id) }}" method="POST" class="d-inline">
                             @csrf
-                            <button type="submit" class="btn btn-success btn-sm px-3" onclick="return confirm('Approving this routing will automatically archive the previous active version. Proceed?');">
-                                <i class="feather-check-circle me-1"></i>Approve & Activate
+                            <button type="submit" class="btn btn-success btn-sm px-3" onclick="return confirm(@js(__('production.confirm_approve_routing')));">
+                                <i class="feather-check-circle me-1"></i>{{ __('production.approve_activate') }}
                             </button>
                         </form>
                     @endcan
 
                     @can('reject', $routing)
                         <button type="button" class="btn btn-danger btn-sm px-3" data-bs-toggle="modal" data-bs-target="#rejectModal">
-                            <i class="feather-x-circle me-1"></i>Reject
+                            <i class="feather-x-circle me-1"></i>{{ __('production.reject') }}
                         </button>
                     @endcan
                 @endif
@@ -99,7 +99,7 @@
                 @if (!$routing->isCancelled() && !$routing->isHistorical())
                     @can('cancel', $routing)
                         <button type="button" class="btn btn-outline-danger btn-sm px-3" data-bs-toggle="modal" data-bs-target="#cancelModal">
-                            <i class="feather-slash me-1"></i>Cancel Routing
+                            <i class="feather-slash me-1"></i>{{ __('production.cancel_routing') }}
                         </button>
                     @endcan
                 @endif
@@ -118,35 +118,35 @@
                     <span class="fs-13 fw-semibold text-muted text-uppercase">{{ $routing->routing_number }}</span>
                     <div class="mt-2">
                         @if ($routing->is_default)
-                            <span class="badge bg-soft-success text-success px-3 py-1 rounded-pill">Primary Route</span>
+                            <span class="badge bg-soft-success text-success px-3 py-1 rounded-pill">{{ __('production.primary') }}</span>
                         @else
-                            <span class="badge bg-soft-warning text-warning px-3 py-1 rounded-pill">Alternative Route</span>
+                            <span class="badge bg-soft-warning text-warning px-3 py-1 rounded-pill">{{ __('production.alternative') }}</span>
                         @endif
                     </div>
                 </div>
 
                 <div class="d-flex flex-column gap-3 mt-4 px-3">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">Manufactured Item:</span>
+                        <span class="text-muted fs-13">{{ __('production.item_to_produce') }}:</span>
                         <span class="fw-bold text-dark text-end">
                             @if ($routing->product)
                                 {{ $routing->product->name }}
                                 <small class="text-muted d-block fs-11">{{ $routing->product->sku }}</small>
                             @else
-                                <span class="text-danger">Not specified</span>
+                                <span class="text-danger">{{ __('production.not_specified') }}</span>
                             @endif
                         </span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">Version Profile:</span>
+                        <span class="text-muted fs-13">{{ __('production.version') }}:</span>
                         <span class="fw-semibold text-dark">{{ $routing->version }} (Rev {{ $routing->revision }})</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted fs-13">Effective Range:</span>
+                        <span class="text-muted fs-13">{{ __('production.validity') }}:</span>
                         <span class="fw-semibold text-dark text-end fs-12">
-                            {{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : 'Immediate' }}
-                            to
-                            {{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : 'Indefinite' }}
+                            {{ $routing->effective_from ? $routing->effective_from->format('Y-m-d') : __('production.immediate') }}
+                            {{ __('production.to') ?? 'to' }}
+                            {{ $routing->effective_to ? $routing->effective_to->format('Y-m-d') : __('production.indefinite') }}
                         </span>
                     </div>
                 </div>
@@ -154,43 +154,43 @@
 
             <!-- Time Metrics -->
             <div class="col-md-4 border-end">
-                <h5 class="fw-bold text-dark mb-3">Time & Process Statistics</h5>
+                <h5 class="fw-bold text-dark mb-3">{{ __('production.time_process_stats') }}</h5>
                 <div class="d-flex flex-column gap-4 py-2 px-2">
                     <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Total Sequence Operations</span>
-                        <span class="fs-22 fw-bold text-dark">{{ $routing->operations->count() }} Stage(s)</span>
+                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.total_sequence_operations') }}</span>
+                        <span class="fs-22 fw-bold text-dark">{{ $routing->operations->count() }} {{ __('production.stages') }}</span>
                     </div>
                     <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Setup Duration Estimate</span>
-                        <span class="fs-22 fw-bold text-dark">{{ number_format($routing->operations->sum('setup_time_minutes'), 1) }} <span class="fs-13 fw-normal text-muted">Minutes</span></span>
+                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.setup_duration_estimate') }}</span>
+                        <span class="fs-22 fw-bold text-dark">{{ number_format($routing->operations->sum('setup_time_minutes'), 1) }} <span class="fs-13 fw-normal text-muted">{{ __('production.minutes') }}</span></span>
                     </div>
                     <div>
-                        <span class="text-muted fs-11 text-uppercase d-block mb-1">Total Cycle Running Time</span>
-                        <span class="fs-18 fw-bold text-success">{{ number_format($routing->totalCycleTimeMinutes(), 1) }} <span class="fs-13 fw-normal text-muted">Minutes</span></span>
-                        <small class="text-muted d-block mt-1">Includes setup, processing, and queuing/wait times.</small>
+                        <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.total_cycle_running_time') }}</span>
+                        <span class="fs-18 fw-bold text-success">{{ number_format($routing->totalCycleTimeMinutes(), 1) }} <span class="fs-13 fw-normal text-muted">{{ __('production.minutes') }}</span></span>
+                        <small class="text-muted d-block mt-1">{{ __('production.cycle_time_desc') }}</small>
                     </div>
                 </div>
             </div>
 
             <!-- Cost Estimates -->
             <div class="col-md-4">
-                <h5 class="fw-bold text-dark mb-3">Process Cost Predictions (Qty: 1.0)</h5>
+                <h5 class="fw-bold text-dark mb-3">{{ __('production.process_cost_predictions') }} (Qty: 1.0)</h5>
                 @if ($costSummary)
                     <div class="d-flex flex-column gap-4 py-2 px-2">
                         <div>
-                            <span class="text-muted fs-11 text-uppercase d-block mb-1">Routing Cost Per Unit</span>
+                            <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.routing_cost_per_unit') }}</span>
                             <span class="fs-24 fw-bold text-primary">${{ number_format($costSummary['total_cost'], 4) }}</span>
-                            <small class="text-muted d-block mt-1">Adjusted labor and machine rates based on yield percentages.</small>
+                            <small class="text-muted d-block mt-1">{{ __('production.cost_yield_desc') }}</small>
                         </div>
                         
                         <div class="border-top pt-3 mt-2">
-                            <h6 class="fw-bold text-dark mb-2">Cost Contribution Details</h6>
+                            <h6 class="fw-bold text-dark mb-2">{{ __('production.cost_contribution_details') }}</h6>
                             <div class="d-flex justify-content-between align-items-center mb-1 fs-12">
-                                <span class="text-muted">Labor Expense:</span>
+                                <span class="text-muted">{{ __('production.labor_cost') }}:</span>
                                 <span class="fw-semibold text-dark">${{ number_format(collect($costSummary['operations'])->sum('labor_cost'), 4) }}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center fs-12">
-                                <span class="text-muted">Machine Overhead:</span>
+                                <span class="text-muted">{{ __('production.machine_cost') }}:</span>
                                 <span class="fw-semibold text-dark">${{ number_format(collect($costSummary['operations'])->sum('machine_cost'), 4) }}</span>
                             </div>
                         </div>
@@ -198,7 +198,7 @@
                 @else
                     <div class="text-center py-5">
                         <i class="feather-dollar-sign text-muted fs-28 mb-2 d-block"></i>
-                        <span class="text-muted fs-12">No cost estimates available.</span>
+                        <span class="text-muted fs-12">{{ __('production.no_pricing_components') }}</span>
                     </div>
                 @endif
             </div>
@@ -207,27 +207,27 @@
         <!-- Description Info -->
         @if ($routing->description)
             <div class="mb-4 pb-4 border-bottom">
-                <h5 class="fw-bold text-dark mb-2">Routing Purpose & Specifications</h5>
+                <h5 class="fw-bold text-dark mb-2">{{ __('production.routing_purpose_specs') }}</h5>
                 <p class="mb-0 fs-13 text-muted" style="white-space: pre-line;">{{ $routing->description }}</p>
             </div>
         @endif
 
         <!-- Operations Sequence Details -->
         <div class="mb-4 pb-4 border-bottom">
-            <h5 class="fw-bold text-dark mb-3">Sequence Operations Timeline Details</h5>
+            <h5 class="fw-bold text-dark mb-3">{{ __('production.sequence_operations_timeline') }}</h5>
             <div class="table-responsive">
                 <table class="erp-thin-table">
                     <thead>
                         <tr>
-                            <th style="width: 5%" class="text-center">Seq</th>
-                            <th style="width: 25%">Operation Detail</th>
-                            <th style="width: 12%">Operation Type</th>
-                            <th style="width: 18%">Work Center Location</th>
-                            <th style="width: 15%">Machine Asset</th>
-                            <th class="text-end" style="width: 8%">Setup Time</th>
-                            <th class="text-end" style="width: 8%">Process Time</th>
-                            <th class="text-end" style="width: 8%">Yield Rate</th>
-                            <th class="text-center" style="width: 5%">QC Gate</th>
+                            <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
+                            <th style="width: 25%">{{ __('production.operation_details') }}</th>
+                            <th style="width: 12%">{{ __('production.type') }}</th>
+                            <th style="width: 18%">{{ __('production.work_center') }}</th>
+                            <th style="width: 15%">{{ __('production.machine') }}</th>
+                            <th class="text-end" style="width: 8%">{{ __('production.setup') }}</th>
+                            <th class="text-end" style="width: 8%">{{ __('production.run') }}</th>
+                            <th class="text-end" style="width: 8%">{{ __('production.yield') }}</th>
+                            <th class="text-center" style="width: 5%">{{ __('production.qc_gate') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -241,7 +241,7 @@
                                         <small class="text-muted d-block mt-1">{{ $op->description }}</small>
                                     @endif
                                     @if ($op->is_external)
-                                        <span class="badge bg-soft-danger text-danger mt-1 fs-9 text-uppercase">Outsourced</span>
+                                        <span class="badge bg-soft-danger text-danger mt-1 fs-9 text-uppercase">{{ __('production.outsourced') }}</span>
                                     @endif
                                 </td>
                                 <td class="align-middle">
@@ -256,7 +256,7 @@
                                         </a>
                                         <small class="text-muted d-block fs-10">{{ $op->workCenter->code }}</small>
                                     @else
-                                        <span class="text-danger">Missing</span>
+                                        <span class="text-danger">{{ __('production.missing') }}</span>
                                     @endif
                                 </td>
                                 <td class="align-middle">
@@ -264,7 +264,7 @@
                                         <span class="fw-semibold text-dark">{{ $op->machine->name }}</span>
                                         <small class="text-muted d-block fs-10">{{ $op->machine->code }}</small>
                                     @else
-                                        <span class="text-muted">Generic Capacity</span>
+                                        <span class="text-muted">{{ __('production.generic_capacity') }}</span>
                                     @endif
                                 </td>
                                 <td class="text-end align-middle font-monospace">{{ number_format($op->setup_time_minutes, 1) }} min</td>
@@ -281,7 +281,7 @@
                         @empty
                             <tr>
                                 <td colspan="9" class="text-center py-4 text-muted">
-                                    <i class="feather-info me-2"></i>No operation stages defined in this routing.
+                                    <i class="feather-info me-2"></i>{{ __('production.no_operations_defined') }}
                                 </td>
                             </tr>
                         @endforelse
@@ -292,15 +292,15 @@
 
         <!-- Approval Audit History -->
         <div>
-            <h5 class="fw-bold text-dark mb-3">Routing Document Lifecycle Approval History</h5>
+            <h5 class="fw-bold text-dark mb-3">{{ __('production.routing_approval_history') }}</h5>
             <div class="table-responsive">
                 <table class="erp-thin-table">
                     <thead>
                         <tr>
-                            <th style="width: 20%">DateTime Stamp</th>
-                            <th style="width: 25%">Reviewer User</th>
-                            <th style="width: 15%">Action / Transition</th>
-                            <th style="width: 40%">Review Comments / Reasons</th>
+                            <th style="width: 20%">{{ __('production.timestamp') }}</th>
+                            <th style="width: 25%">{{ __('production.user') }}</th>
+                            <th style="width: 15%">{{ __('production.transition') }}</th>
+                            <th style="width: 40%">{{ __('production.notes_reasons') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -310,13 +310,13 @@
                                 <td class="fw-semibold text-dark align-middle">{{ $approval->user->name ?? 'System Process' }}</td>
                                 <td class="align-middle">
                                     @if ($approval->action === 'Approved')
-                                        <span class="badge bg-soft-success text-success text-uppercase font-monospace fs-10">Approved</span>
+                                        <span class="badge bg-soft-success text-success text-uppercase font-monospace fs-10">{{ __('production.approved') }}</span>
                                     @elseif ($approval->action === 'Rejected')
-                                        <span class="badge bg-soft-danger text-danger text-uppercase font-monospace fs-10">Rejected</span>
+                                        <span class="badge bg-soft-danger text-danger text-uppercase font-monospace fs-10">{{ __('production.rejected') }}</span>
                                     @elseif ($approval->action === 'Submitted')
-                                        <span class="badge bg-soft-warning text-warning text-uppercase font-monospace fs-10">Submitted</span>
+                                        <span class="badge bg-soft-warning text-warning text-uppercase font-monospace fs-10">{{ __('production.submitted') }}</span>
                                     @elseif ($approval->action === 'Cancelled')
-                                        <span class="badge bg-soft-danger text-danger text-uppercase font-monospace fs-10">Cancelled</span>
+                                        <span class="badge bg-soft-danger text-danger text-uppercase font-monospace fs-10">{{ __('production.cancelled') }}</span>
                                     @else
                                         <span class="badge bg-soft-secondary text-secondary text-uppercase font-monospace fs-10">{{ $approval->action }}</span>
                                     @endif
@@ -326,7 +326,7 @@
                         @empty
                             <tr>
                                 <td colspan="4" class="text-center py-4 text-muted">
-                                    <i class="feather-info me-2"></i>No workflow entries recorded.
+                                    <i class="feather-info me-2"></i>{{ __('production.no_history_found') }}
                                 </td>
                             </tr>
                         @endforelse
@@ -344,15 +344,15 @@
                 <form action="{{ route('production.routing.reject', $routing->id) }}" method="POST">
                     @csrf
                     <div class="modal-header bg-danger text-white border-0 py-3">
-                        <h5 class="modal-title fw-bold" id="rejectModalLabel"><i class="feather-x-circle me-2"></i>Reject Engineering Routing</h5>
+                        <h5 class="modal-title fw-bold" id="rejectModalLabel"><i class="feather-x-circle me-2"></i>{{ __('production.reject_routing_version') }}</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
-                        <x-ui.odoo-form-ui type="textarea" label="Comments" name="comments" placeholder="Detail any design faults, time study corrections, or validation errors preventing approval..." :required="true" rows="4"></x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" :label="__('production.comments_notes')" name="comments" placeholder="{{ __('production.reject_comments_placeholder') }}" :required="true" rows="4"></x-ui.odoo-form-ui>
                     </div>
                     <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-danger">Confirm Rejection</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                        <button type="submit" class="btn btn-danger">{{ __('production.confirm_rejection') }}</button>
                     </div>
                 </form>
             </div>
@@ -366,15 +366,15 @@
                 <form action="{{ route('production.routing.cancel', $routing->id) }}" method="POST">
                     @csrf
                     <div class="modal-header bg-dark text-white border-0 py-3">
-                        <h5 class="modal-title fw-bold" id="cancelModalLabel"><i class="feather-slash me-2"></i>Cancel Process Routing</h5>
+                        <h5 class="modal-title fw-bold" id="cancelModalLabel"><i class="feather-slash me-2"></i>{{ __('production.cancel_routing_version') }}</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
-                        <x-ui.odoo-form-ui type="textarea" label="Reason" name="comments" placeholder="Detail the reason for termination or process decommissioning..." :required="true" rows="4"></x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" :label="__('production.notes_reasons')" name="comments" placeholder="{{ __('production.cancel_reason_placeholder') }}" :required="true" rows="4"></x-ui.odoo-form-ui>
                     </div>
                     <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-dark">Decommission Routing</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                        <button type="submit" class="btn btn-dark">{{ __('production.decommission_routing') }}</button>
                     </div>
                 </form>
             </div>
@@ -388,21 +388,21 @@
                 <form action="{{ route('production.routing.duplicate', $routing->id) }}" method="POST">
                     @csrf
                     <div class="modal-header bg-brand text-white border-0 py-3">
-                        <h5 class="modal-title fw-bold" id="duplicateVersionModalLabel"><i class="feather-git-branch me-2"></i>Release Next Version</h5>
+                        <h5 class="modal-title fw-bold" id="duplicateVersionModalLabel"><i class="feather-git-branch me-2"></i>{{ __('production.duplicate_routing_version') }}</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4 text-dark fs-13">
                         <div class="mb-3 d-flex align-items-center">
-                            <span class="odoo-form-label" style="width: 150px;">Original Version Profile:</span>
-                            <span class="fw-bold text-dark fs-14">{{ $routing->version }} (Revision {{ $routing->revision }})</span>
+                            <span class="odoo-form-label" style="width: 150px;">{{ __('production.original_version_profile') }}</span>
+                            <span class="fw-bold text-dark fs-14">{{ $routing->version }} ({{ __('production.revision') ?? 'Revision' }} {{ $routing->revision }})</span>
                         </div>
                         
-                        <x-ui.odoo-form-ui type="input" label="Next Version" name="new_version" placeholder="e.g. 1.0.1 or 2.0.0" :value="old('new_version')" :required="true" />
-                        <small class="text-muted d-block mt-2">Creates a new draft routing duplicating all original operations. The new revision number will be incremented automatically.</small>
+                        <x-ui.odoo-form-ui type="input" :label="__('production.new_version_name')" name="new_version" placeholder="e.g. 1.0.1 or 2.0.0" :value="old('new_version')" :required="true" />
+                        <small class="text-muted d-block mt-2">{{ __('production.duplicate_routing_modal_body') }}</small>
                     </div>
                     <div class="modal-footer border-0 pt-0">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-brand text-white">Create Revision Version</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                        <button type="submit" class="btn btn-brand text-white">{{ __('production.create_revision_version') }}</button>
                     </div>
                 </form>
             </div>

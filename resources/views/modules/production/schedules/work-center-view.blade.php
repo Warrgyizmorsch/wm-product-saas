@@ -1,18 +1,18 @@
 @extends('layouts.duralux')
 
-@section('title', 'Work Center Schedule View | SaaS ERP')
-@section('page-title', 'Work Center Schedule View')
-@section('breadcrumb', 'Work Center View')
+@section('title', __('production.work_center_view') . ' | SaaS ERP')
+@section('page-title', __('production.work_center_view'))
+@section('breadcrumb', __('production.work_center_view'))
 
 @section('page-actions')
     <a href="{{ route('production.schedules.index') }}" class="btn btn-secondary me-2">
-        <i class="feather-list me-2"></i>List View
+        <i class="feather-list me-2"></i>{{ __('production.plans_list') ?? 'List View' }}
     </a>
     <a href="{{ route('production.schedules.calendar') }}" class="btn btn-light me-2">
-        <i class="feather-calendar me-2"></i>Calendar View
+        <i class="feather-calendar me-2"></i>{{ __('production.calendar_view') }}
     </a>
     <a href="{{ route('production.mes.work-centers.index') }}" class="btn btn-light">
-        <i class="feather-monitor me-2"></i>MES Dashboard
+        <i class="feather-monitor me-2"></i>{{ __('production.mes_dashboard') ?? 'MES Dashboard' }}
     </a>
 @endsection
 
@@ -21,7 +21,7 @@
         @if($workCenters->count() === 0)
             <div class="text-center py-5 text-muted">
                 <i class="feather-grid fs-36 mb-3 d-block"></i>
-                <p class="fs-14">No active Work Centers configured.</p>
+                <p class="fs-14">{{ __('production.no_active_work_centers') }}</p>
             </div>
         @else
             @foreach($workCenters as $wc)
@@ -46,16 +46,16 @@
                         </div>
                         <div class="d-flex gap-2 align-items-center">
                             @if($runningCount > 0)
-                                <span class="badge bg-soft-warning text-warning">{{ $runningCount }} Running</span>
+                                <span class="badge bg-soft-warning text-warning">{{ $runningCount }} {{ __('production.running') }}</span>
                             @endif
                             @if($readyCount > 0)
-                                <span class="badge bg-soft-info text-info">{{ $readyCount }} Ready</span>
+                                <span class="badge bg-soft-info text-info">{{ $readyCount }} {{ __('production.ready') }}</span>
                             @endif
                             @if($waitingCount > 0)
-                                <span class="erp-badge-draft">{{ $waitingCount }} Waiting</span>
+                                <span class="erp-badge-draft">{{ $waitingCount }} {{ __('production.waiting') }}</span>
                             @endif
                             @if($wcOps->count() === 0)
-                                <span class="badge bg-soft-secondary text-secondary">No Jobs</span>
+                                <span class="badge bg-soft-secondary text-secondary">{{ __('production.no_jobs') }}</span>
                             @endif
                         </div>
                     </div>
@@ -65,14 +65,14 @@
                             <x-ui.odoo-form-ui type="table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 5%" class="text-center">Seq</th>
-                                        <th style="width: 15%">Order #</th>
-                                        <th style="width: 20%">Product</th>
-                                        <th style="width: 18%">Operation</th>
-                                        <th style="width: 10%">Machine</th>
-                                        <th style="width: 12%">Planned Start</th>
-                                        <th style="width: 12%">Planned Finish</th>
-                                        <th style="width: 10%">Status</th>
+                                        <th style="width: 5%" class="text-center">{{ __('production.seq') }}</th>
+                                        <th style="width: 15%">{{ __('production.production_order') }} #</th>
+                                        <th style="width: 20%">{{ __('production.product') }}</th>
+                                        <th style="width: 18%">{{ __('production.operations') }}</th>
+                                        <th style="width: 10%">{{ __('production.assigned_machine') ?? 'Machine' }}</th>
+                                        <th style="width: 12%">{{ __('production.planned_start') }}</th>
+                                        <th style="width: 12%">{{ __('production.planned_finish') }}</th>
+                                        <th style="width: 10%">{{ __('production.status') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -96,11 +96,11 @@
                                             <td class="fs-12 text-muted">{{ $op->planned_finish->format('d/m H:i') }}</td>
                                             <td>
                                                 @if($op->status === 'running')
-                                                    <span class="badge bg-soft-warning text-warning">Running</span>
+                                                    <span class="badge bg-soft-warning text-warning">{{ __('production.running') }}</span>
                                                 @elseif($op->status === 'ready')
-                                                    <span class="badge bg-soft-info text-info">Ready</span>
+                                                    <span class="badge bg-soft-info text-info">{{ __('production.ready') }}</span>
                                                 @elseif($op->status === 'waiting')
-                                                    <span class="erp-badge-draft">Waiting</span>
+                                                    <span class="erp-badge-draft">{{ __('production.waiting') }}</span>
                                                 @else
                                                     <span class="badge bg-soft-secondary text-secondary text-capitalize">{{ $op->status }}</span>
                                                 @endif
@@ -112,7 +112,7 @@
                         </div>
                     @else
                         <div class="text-center py-3 text-muted fs-13">
-                            <i class="feather-inbox me-2"></i>No active operations queued for this Work Center.
+                            <i class="feather-inbox me-2"></i>{{ __('production.no_active_ops_wc') }}
                         </div>
                     @endif
                 </div>

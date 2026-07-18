@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Create Schedule | SaaS ERP')
-@section('page-title', 'Create Production Schedule')
-@section('breadcrumb', 'Create Schedule')
+@section('title', __('production.create_schedule') . ' | SaaS ERP')
+@section('page-title', __('production.create_production_schedule'))
+@section('breadcrumb', __('production.create_schedule'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -18,7 +18,7 @@
     <div class="erp-single-panel bg-white">
 
         @if ($errors->any())
-            <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
+            <x-ui.toast :auto="true" type="error" title="{{ __('production.validation_failed') }}: {{ $errors->first() }}" />
         @endif
 
         @if (session('error'))
@@ -31,7 +31,7 @@
             <x-ui.odoo-form-ui type="sheet">
                 {{-- Sheet Header --}}
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-                    <h4 class="fw-bold text-dark mb-0">New Production Schedule</h4>
+                    <h4 class="fw-bold text-dark mb-0">{{ __('production.new_production_schedule') }}</h4>
                     <a href="{{ route('production.schedules.index') }}" class="text-muted hover-danger fs-18">
                         <i class="feather-x"></i>
                     </a>
@@ -42,13 +42,13 @@
                         {{-- Production Order --}}
                         <x-ui.odoo-form-ui
                             type="select"
-                            label="Production Order"
+                            :label="__('production.production_order')"
                             name="production_order_id"
                             :required="true"
                             :error-text="$errors->first('production_order_id')"
                             data-select2-selector="default"
                         >
-                            <option value="">Select Released Production Order...</option>
+                            <option value="">{{ __('production.select_released_production_order') }}</option>
                             @foreach($orders as $order)
                                 <option value="{{ $order->id }}" {{ old('production_order_id') == $order->id ? 'selected' : '' }}>
                                     {{ $order->order_number }} — {{ $order->product->name ?? 'N/A' }}
@@ -60,7 +60,7 @@
                         {{-- Schedule Start Date --}}
                         <x-ui.odoo-form-ui
                             type="input"
-                            label="Schedule Start Date"
+                            :label="__('production.schedule_start_date')"
                             name="start_date"
                             inputType="datetime-local"
                             :value="old('start_date', now()->format('Y-m-d\TH:i'))"
@@ -74,30 +74,30 @@
                         <div class="mb-3">
                             <x-ui.odoo-form-ui
                                 type="select"
-                                label="Scheduling Type"
+                                :label="__('production.scheduling_type')"
                                 name="scheduling_type"
                                 :required="true"
                                 :error-text="$errors->first('scheduling_type')"
                             >
                                 <option value="forward" {{ old('scheduling_type', 'forward') === 'forward' ? 'selected' : '' }}>
-                                    Forward Scheduling (Start → Finish)
+                                    {{ __('production.forward_scheduling') }}
                                 </option>
                                 <option value="backward" {{ old('scheduling_type') === 'backward' ? 'selected' : '' }}>
-                                    Backward Scheduling (Finish → Start)
+                                    {{ __('production.backward_scheduling') }}
                                 </option>
                                 <option value="manual" disabled title="Coming in future release">
-                                    Manual Scheduling — Coming Soon
+                                    {{ __('production.manual_scheduling') }}
                                 </option>
                             </x-ui.odoo-form-ui>
                             <small class="text-muted fs-11 mt-1 d-block">
-                                <i class="feather-info me-1"></i>Forward and Backward Scheduling are available.
+                                <i class="feather-info me-1"></i>{{ __('production.forward_and_backward_scheduling_available') ?? 'Forward and Backward Scheduling are available.' }}
                             </small>
                         </div>
 
                         {{-- Notes --}}
                         <x-ui.odoo-form-ui
                             type="textarea"
-                            label="Notes"
+                            :label="__('production.description') ?? 'Notes'"
                             name="notes"
                             placeholder="Optional scheduling notes or remarks..."
                             :value="old('notes')"
@@ -110,13 +110,9 @@
                 <div class="alert alert-info border-info bg-soft-info d-flex align-items-start p-3 rounded mb-4">
                     <i class="feather-info me-3 text-info mt-1"></i>
                     <div>
-                        <strong class="text-info">How Scheduling Works</strong>
+                        <strong class="text-info">{{ __('production.scheduling_info_heading') }}</strong>
                         <p class="mb-0 fs-12 text-info-800 mt-1">
-                            The scheduling engine will automatically:
-                            <br>• Calculate planned start and finish times for each operation based on routing sequence.
-                            <br>• Assign operations to their configured Work Centers and Machines.
-                            <br>• Validate machine availability and work center eligibility.
-                            <br>• Alert you to any capacity overloads or conflicts.
+                            {!! __('production.scheduling_info_body') !!}
                         </p>
                     </div>
                 </div>
@@ -124,9 +120,9 @@
                 {{-- Submit Buttons --}}
                 <div class="d-flex align-items-center gap-2 border-top pt-3">
                     <button type="submit" class="btn btn-primary">
-                        <i class="feather-calendar me-2"></i>Generate Schedule
+                        <i class="feather-calendar me-2"></i>{{ __('production.generate_schedule') }}
                     </button>
-                    <a href="{{ route('production.schedules.index') }}" class="btn btn-secondary">Cancel</a>
+                    <a href="{{ route('production.schedules.index') }}" class="btn btn-secondary">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>
