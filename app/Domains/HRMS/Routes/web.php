@@ -7,6 +7,7 @@ use App\Domains\HRMS\Controllers\LeaveStructureController;
 use App\Domains\HRMS\Controllers\PenalizationPolicyController;
 use App\Domains\HRMS\Controllers\RosterController;
 use App\Domains\HRMS\Controllers\AssetController;
+use App\Domains\HRMS\Controllers\LeaveRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('hrms')
@@ -118,4 +119,11 @@ Route::prefix('hrms')
         Route::post('/assets/requests/{assetRequest}/allocate-direct', [AssetController::class, 'allocateDirect'])->name('assets.requests.allocate-direct');
         Route::post('/assets/requests/bulk-allocate', [AssetController::class, 'bulkAllocate'])->name('assets.requests.bulk-allocate');
         Route::post('/assets/requests/bulk-reject', [AssetController::class, 'bulkReject'])->name('assets.requests.bulk-reject');
+
+        // Leave request management
+        Route::get('/leaves', [LeaveRequestController::class, 'index'])->name('leaves.index');
+        Route::post('/leaves/store', [LeaveRequestController::class, 'store'])->name('leaves.store');
+        Route::post('/leaves/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leaves.approve');
+        Route::post('/leaves/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leaves.reject');
+        Route::post('/leaves/{leaveRequest}/update-status', [LeaveRequestController::class, 'updateStatus'])->name('leaves.update-status');
     });

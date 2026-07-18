@@ -159,6 +159,40 @@
             border-bottom: 1px solid var(--bs-primary) !important;
             background-color: transparent !important;
         }
+        #leaveRulesModal .odoo-table-select {
+            border: none !important;
+            border-bottom: 1px solid #ced4da !important;
+            padding: 3px 6px !important;
+            display: inline-block !important;
+            height: auto !important;
+            font-weight: bold;
+            color: #212529;
+            background-color: transparent !important;
+            border-radius: 0 !important;
+        }
+        #leaveRulesModal .odoo-table-select:focus {
+            border-bottom: 1px solid var(--bs-primary) !important;
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        #leaveRulesModal .odoo-table-select option {
+            font-weight: normal !important;
+            background-color: #ffffff !important;
+            color: #212529 !important;
+        }
+        #leaveRulesModal .form-switch .form-check-input {
+            width: 36px !important;
+            height: 18px !important;
+            border-radius: 2em !important;
+            background-position: left center;
+        }
+        #leaveRulesModal .form-switch .form-check-input:checked {
+            background-position: right center;
+        }
+        #leaveRulesModal .select2-container {
+            max-width: 250px !important;
+            width: 100% !important;
+        }
     </style>
 
     <div class="settings-container">
@@ -768,13 +802,39 @@
                                          </div>
                                          <div>
                                              <div class="card-body bg-white border-top p-3 fs-13 d-flex flex-column gap-3">
-                                                 <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
-                                                     <input type="radio" name="accrual_rate" value="periodic" class="form-check-input mt-1">
-                                                     <div>
-                                                         <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_periodically') }}</span>
-                                                         <span class="text-muted fs-11">{{ __('hrms.leave.accrued_periodically_desc') }}</span>
+                                                  <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
+                                                      <input type="radio" name="accrual_rate" value="periodic" class="form-check-input mt-1">
+                                                      <div>
+                                                          <span class="fw-semibold text-dark d-block">{{ __('hrms.leave.accrued_periodically') }}</span>
+                                                          <span class="text-muted fs-11">{{ __('hrms.leave.accrued_periodically_desc') }}</span>
                                                       </div>
                                                   </label>
+                                                   <div class="ps-4 mt-1 mb-2 d-none" id="accrual_periodic_div">
+                                                       <div class="d-flex flex-column gap-3 fs-13 py-2.5 px-3 bg-light-subtle rounded border">
+                                                           <!-- Accrual Frequency -->
+                                                           <div class="row align-items-center">
+                                                               <div class="col-sm-4 text-muted">{{ __('hrms.leave.accrual_frequency') }}</div>
+                                                               <div class="col-sm-8">
+                                                                   <select id="accrual_frequency" class="odoo-select2 odoo-table-select" style="max-width: 250px;">
+                                                                       <option value="monthly">{{ __('hrms.leave.monthly') }}</option>
+                                                                       <option value="quarterly">{{ __('hrms.leave.quarterly') }}</option>
+                                                                       <option value="half_yearly">{{ __('hrms.leave.half_yearly') }}</option>
+                                                                       <option value="yearly">{{ __('hrms.leave.yearly') }}</option>
+                                                                   </select>
+                                                               </div>
+                                                           </div>
+                                                           <!-- Proportional adjustment -->
+                                                           <div class="row align-items-center">
+                                                               <div class="col-sm-4 text-muted">{{ __('hrms.leave.prorate_new_joiners') }}</div>
+                                                               <div class="col-sm-8">
+                                                                   <div class="form-check form-switch mb-0 d-flex align-items-center">
+                                                                       <input class="form-check-input" type="checkbox" role="switch" id="accrual_prorate" checked>
+                                                                       <label class="form-check-label text-muted fs-11 ms-2 cursor-pointer mb-0" for="accrual_prorate">{{ __('hrms.leave.prorate_new_joiners_desc') }}</label>
+                                                                   </div>
+                                                               </div>
+                                                           </div>
+                                                        </div>
+                                                   </div>
                                                   <label class="form-check-label d-flex align-items-start gap-3 cursor-pointer">
                                                       <input type="radio" name="accrual_rate" value="attendance" class="form-check-input mt-1">
                                                       <div>
@@ -924,7 +984,7 @@
                                               <div class="row align-items-center mb-3" id="first_approver_row">
                                                   <div class="col-sm-4 text-muted">{{ __('hrms.leave.first_approver') }}</div>
                                                   <div class="col-sm-8">
-                                                      <select id="approval_first_approver" class="odoo-table-select" style="max-width: 250px;">
+                                                      <select id="approval_first_approver" class="odoo-select2 odoo-table-select" style="max-width: 250px;">
                                                           <option value="reporting_manager">{{ __('hrms.leave.reporting_manager') }}</option>
                                                           <option value="department_head">{{ __('hrms.leave.department_head') }}</option>
                                                           <option value="hr_manager">{{ __('hrms.leave.hr_manager') }}</option>
@@ -934,7 +994,7 @@
                                               <div class="row align-items-center d-none" id="second_approver_row">
                                                   <div class="col-sm-4 text-muted">{{ __('hrms.leave.second_approver') }}</div>
                                                   <div class="col-sm-8">
-                                                      <select id="approval_second_approver" class="odoo-table-select" style="max-width: 250px;">
+                                                      <select id="approval_second_approver" class="odoo-select2 odoo-table-select" style="max-width: 250px;">
                                                           <option value="hr_manager" selected>{{ __('hrms.leave.hr_manager') }}</option>
                                                           <option value="department_head">{{ __('hrms.leave.department_head') }}</option>
                                                           <option value="ceo">{{ __('hrms.leave.ceo') }}</option>
@@ -1108,7 +1168,7 @@
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             // Initialize Select2 dropdowns on modal open
-            $('#addLeavePlanModal, #editLeavePlanModal, #addLeaveTypeModal, #editLeaveTypeModal').on('shown.bs.modal', function () {
+            $('#addLeavePlanModal, #editLeavePlanModal, #addLeaveTypeModal, #editLeaveTypeModal, #leaveRulesModal').on('shown.bs.modal', function () {
                 $(this).find('select').each(function() {
                     var $select = $(this);
                     if ($select.hasClass("select2-hidden-accessible")) {
@@ -1293,10 +1353,20 @@
                 // Attendance details loading
                 $('#accrual_attendance_earn').val(rules.accrual?.attendance_earn !== undefined ? rules.accrual.attendance_earn : 1);
                 $('#accrual_attendance_period').val(rules.accrual?.attendance_period !== undefined ? rules.accrual.attendance_period : 20);
+                
+                // Periodic details loading
+                $('#accrual_frequency').val(rules.accrual?.frequency || 'monthly');
+                $('#accrual_prorate').prop('checked', rules.accrual?.prorate !== false);
+
                 if (rules.accrual?.rate === 'attendance') {
                     $('#accrual_attendance_div').removeClass('d-none');
+                    $('#accrual_periodic_div').addClass('d-none');
+                } else if (rules.accrual?.rate === 'periodic') {
+                    $('#accrual_attendance_div').addClass('d-none');
+                    $('#accrual_periodic_div').removeClass('d-none');
                 } else {
                     $('#accrual_attendance_div').addClass('d-none');
+                    $('#accrual_periodic_div').addClass('d-none');
                 }
 
                 $('#accrual_limit_carry').prop('checked', !!rules.accrual?.limit_carry).trigger('change');
@@ -1328,10 +1398,16 @@
 
             // Toggle logic for conditional fields
             $(document).on('change', 'input[name="accrual_rate"]', function() {
-                if ($(this).val() === 'attendance') {
+                let rateVal = $(this).val();
+                if (rateVal === 'attendance') {
                     $('#accrual_attendance_div').removeClass('d-none');
+                    $('#accrual_periodic_div').addClass('d-none');
+                } else if (rateVal === 'periodic') {
+                    $('#accrual_attendance_div').addClass('d-none');
+                    $('#accrual_periodic_div').removeClass('d-none');
                 } else {
                     $('#accrual_attendance_div').addClass('d-none');
+                    $('#accrual_periodic_div').addClass('d-none');
                 }
             });
 
@@ -1411,7 +1487,10 @@
                         attendance_earn: parseFloat($('#accrual_attendance_earn').val()) || 1,
                         attendance_period: parseInt($('#accrual_attendance_period').val()) || 20,
                         limit_carry: $('#accrual_limit_carry').is(':checked'),
-                        max_accum: parseFloat($('#accrual_max_accum_val').val()) || 30
+                        max_accum: parseFloat($('#accrual_max_accum_val').val()) || 30,
+                        frequency: $('#accrual_frequency').val(),
+                        prorate: $('#accrual_prorate').is(':checked'),
+                        rounding: 'half_day'
                     },
                     application: {
                         apply_in_advance: $('#app_apply_in_advance').is(':checked'),

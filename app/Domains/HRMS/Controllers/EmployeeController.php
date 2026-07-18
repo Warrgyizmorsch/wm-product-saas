@@ -497,6 +497,22 @@ class EmployeeController extends Controller
             ->where('status', true)
             ->get();
 
+        // Self-healing: Recalculate and reconcile leave balances for this employee to match approved requests
+        try {
+            $balancesList = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)->get();
+            foreach ($balancesList as $bal) {
+                $approvedSum = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+                    ->where('leave_type_id', $bal->leave_type_id)
+                    ->where('status', 'approved')
+                    ->sum('duration');
+                if (floatval($bal->used) !== floatval($approvedSum)) {
+                    $bal->update(['used' => $approvedSum]);
+                }
+            }
+        } catch (\Exception $e) {
+            // Safe fallback
+        }
+
         return view('modules.hrms.employees.show', compact(
             'employee',
             'salaryStructure',
