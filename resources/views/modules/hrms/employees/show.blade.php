@@ -1401,45 +1401,79 @@
                                 @else
                                     <div class="table-responsive">
                                         <table class="table table-hover align-middle mb-0">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>{{ __('hrms.employees.tbl_code_type_name') }}</th>
-                                                    <th>{{ __('hrms.employees.tbl_category') }}</th>
-                                                    <th class="text-end">{{ __('hrms.employees.tbl_yearly_quota') }}</th>
-                                                    <th class="text-center">{{ __('hrms.employees.tbl_rules') }}</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($employee->leavePlan->types as $ltype)
-                                                    <tr>
-                                                        <td>
-                                                            <div class="d-flex align-items-center gap-2">
-                                                                <span class="d-inline-block rounded-circle" style="width: 12px; height: 12px; background-color: {{ $ltype->color ?: '#3b82f6' }};"></span>
-                                                                <div>
-                                                                    <div class="fw-bold text-dark">{{ $ltype->name }}</div>
-                                                                    <code>{{ $ltype->code }}</code>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <span class="badge bg-soft-info text-info text-uppercase fs-11">{{ $ltype->type }}</span>
-                                                        </td>
-                                                        <td class="text-end fw-bold">{{ floatval($ltype->quota) }} Days</td>
-                                                        <td class="text-center">
-                                                            <button
-                                                                type="button"
-                                                                class="leave-rules-icon-btn"
-                                                                data-bs-toggle="modal"
-                                                                data-bs-target="#leaveRulesModal{{ $ltype->id }}"
-                                                                title="View leave rules"
-                                                                aria-label="View rules for {{ $ltype->name }}"
-                                                            >
-                                                                <i class="feather-sliders"></i>
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
+                                             <thead class="table-light">
+                                                 <tr>
+                                                     <th>{{ __('hrms.employees.tbl_code_type_name') }}</th>
+                                                     <th>{{ __('hrms.employees.tbl_category') }}</th>
+                                                     <th>Accrual Frequency</th>
+                                                     <th class="text-end">Current Balance</th>
+                                                     <th class="text-center">{{ __('hrms.employees.tbl_rules') }}</th>
+                                                 </tr>
+                                             </thead>
+                                             <tbody>
+                                                 @foreach($employee->leavePlan->types as $ltype)
+                                                     @php
+                                                         $balance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)
+                                                             ->where('leave_type_id', $ltype->id)
+                                                             ->first();
+                                                         $balanceVal = $balance ? floatval($balance->remaining) : 0.0;
+                                                         $allocatedVal = $balance ? floatval($balance->allocated) : floatval($ltype->quota);
+                                                         $accrualRate = $ltype->rules['accrual']['rate'] ?? 'immediate';
+                                                         $quotaVal = floatval($ltype->quota);
+                                                         if ($accrualRate === 'periodic') {
+                                                             $accrualFrequency = $ltype->rules['accrual']['frequency'] ?? 'monthly';
+                                                             $accrualText = match ($accrualFrequency) {
+                                                                 'monthly' => 'Monthly (' . number_format($quotaVal / 12, 1) . ' Days)',
+                                                                 'quarterly' => 'Quarterly (' . number_format($quotaVal / 4, 1) . ' Days)',
+                                                                 'half_yearly' => 'Half Yearly (' . number_format($quotaVal / 2, 1) . ' Days)',
+                                                                 'yearly' => 'Yearly (' . number_format($quotaVal, 1) . ' Days)',
+                                                                 default => 'Periodic',
+                                                             };
+                                                         } elseif ($accrualRate === 'attendance') {
+                                                             $earn = $ltype->rules['accrual']['attendance_earn'] ?? 1;
+                                                             $period = $ltype->rules['accrual']['attendance_period'] ?? 20;
+                                                             $accrualText = "Based on Attendance ({$earn} Day / {$period} Days)";
+                                                         } elseif ($accrualRate === 'immediate') {
+                                                             $accrualText = 'Immediate (' . number_format($quotaVal, 1) . ' Days)';
+                                                         } else {
+                                                             $accrualText = ucfirst($accrualRate);
+                                                         }
+                                                     @endphp
+                                                     <tr>
+                                                         <td>
+                                                             <div class="d-flex align-items-center gap-2">
+                                                                 <span class="d-inline-block rounded-circle" style="width: 12px; height: 12px; background-color: {{ $ltype->color ?: '#3b82f6' }};"></span>
+                                                                 <div>
+                                                                     <div class="fw-bold text-dark">{{ $ltype->name }}</div>
+                                                                     <code>{{ $ltype->code }}</code>
+                                                                 </div>
+                                                             </div>
+                                                         </td>
+                                                         <td>
+                                                             <span class="badge bg-soft-info text-info text-uppercase fs-11">{{ $ltype->type }}</span>
+                                                         </td>
+                                                         <td>
+                                                             <span class="badge bg-soft-secondary text-secondary text-capitalize fs-11">{{ $accrualText }}</span>
+                                                         </td>
+                                                         <td class="text-end">
+                                                             <span class="fw-bold text-dark">{{ $balanceVal }}</span>
+                                                             <span class="text-muted fs-11">/ {{ $allocatedVal }} Days</span>
+                                                         </td>
+                                                         <td class="text-center">
+                                                             <button
+                                                                 type="button"
+                                                                 class="leave-rules-icon-btn"
+                                                                 data-bs-toggle="modal"
+                                                                 data-bs-target="#leaveRulesModal{{ $ltype->id }}"
+                                                                 title="View leave rules"
+                                                                 aria-label="View rules for {{ $ltype->name }}"
+                                                             >
+                                                                 <i class="feather-sliders"></i>
+                                                             </button>
+                                                         </td>
+                                                     </tr>
+                                                 @endforeach
+                                             </tbody>
                                         </table>
                                     </div>
                                 @endif
