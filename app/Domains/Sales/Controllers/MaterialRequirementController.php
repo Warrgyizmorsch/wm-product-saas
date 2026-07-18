@@ -13,6 +13,8 @@ use App\Domains\Sales\Models\DispatchOrder;
 use App\Domains\Sales\Models\DispatchOrderItem;
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Services\MaterialRequirementService;
+use App\Domains\Purchase\Models\PurchaseRequisition;
+use App\Domains\Purchase\Models\PurchaseRequisitionItem;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -208,16 +210,58 @@ class MaterialRequirementController extends Controller
 
     public function mockIndent(Request $request, int $itemId)
     {
+        $tenantId = require_tenant_id();
         $item = MaterialRequirementItem::with('materialRequirement')->findOrFail($itemId);
         $qtyToRequest = (float) $request->input('quantity_request');
+        $warehouseId = (int) $request->input('warehouse_id', $item->warehouse_id);
+        $notes = $request->input('notes');
 
-        $item->update([
-            'status' => 'Waiting Purchase',
-        ]);
+        if ($qtyToRequest <= 0) {
+            return back()->with('error', 'Quantity to request must be greater than 0.');
+        }
 
-        $this->updateOverallDeliveryStatus($item->materialRequirement);
+        DB::transaction(function () use ($item, $qtyToRequest, $warehouseId, $notes, $tenantId) {
+            // Generate sequence number YYYY-000001
+            $year = now()->format('Y');
+            $prefix = "PR-{$year}-";
+            $lastPr = PurchaseRequisition::where('tenant_id', $tenantId)
+                ->where('requisition_number', 'like', "{$prefix}%")
+                ->orderBy('id', 'desc')
+                ->first();
+            $nextNum = 1;
+            if ($lastPr) {
+                $lastNumStr = str_replace($prefix, '', $lastPr->requisition_number);
+                $nextNum = ((int) $lastNumStr) + 1;
+            }
+            $requisitionNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
 
-        return back()->with('success', "Purchase request (Simulated) generated for {$qtyToRequest} unit(s). Line status set to Waiting Purchase.");
+            $pr = PurchaseRequisition::create([
+                'tenant_id' => $tenantId,
+                'requisition_number' => $requisitionNumber,
+                'requisition_date' => now()->toDateString(),
+                'status' => 'Draft',
+                'source_type' => 'material_requirement',
+                'source_id' => $item->material_requirement_id,
+                'notes' => $notes ?: 'Generated from Material Requirement #' . $item->materialRequirement->requirement_number,
+                'requested_by' => auth()->id() ?: 1,
+            ]);
+
+            PurchaseRequisitionItem::create([
+                'purchase_requisition_id' => $pr->id,
+                'product_id' => $item->product_id,
+                'quantity' => $qtyToRequest,
+                'warehouse_id' => $warehouseId,
+                'estimated_cost' => $item->product->unit_cost ?? 0.00,
+            ]);
+
+            $item->update([
+                'status' => 'Waiting Purchase',
+            ]);
+
+            $this->updateOverallDeliveryStatus($item->materialRequirement);
+        });
+
+        return back()->with('success', "Purchase Requisition successfully generated for {$qtyToRequest} unit(s).");
     }
 
     public function mockMo(Request $request, int $itemId)
@@ -456,15 +500,20 @@ class MaterialRequirementController extends Controller
 
         $dispatchOrder = DB::transaction(function () use ($delivery, $request) {
             // Generate next dispatch number
-            $lastNumber = DispatchOrder::where('tenant_id', $delivery->tenant_id)
+            $year = now()->format('Y');
+            $prefix = "DSP-{$year}-";
+
+            $latest = DispatchOrder::where('tenant_id', $delivery->tenant_id)
+                ->where('dispatch_number', 'like', "{$prefix}%")
                 ->orderByDesc('id')
-                ->value('dispatch_number');
+                ->first();
 
             $nextNum = 1;
-            if ($lastNumber && preg_match('/(\d+)$/', $lastNumber, $matches)) {
-                $nextNum = (int) $matches[1] + 1;
+            if ($latest) {
+                $lastNumStr = str_replace($prefix, '', $latest->dispatch_number);
+                $nextNum = intval($lastNumStr) + 1;
             }
-            $dispatchNumber = 'DSP-'.str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $dispatchNumber = $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
 
             $dispatchOrder = DispatchOrder::create([
                 'tenant_id' => $delivery->tenant_id,

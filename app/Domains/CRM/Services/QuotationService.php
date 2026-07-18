@@ -6,6 +6,8 @@ use App\Domains\CRM\Models\Quotation;
 use App\Domains\CRM\Repositories\QuotationRepository;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Collection;
+use App\Domains\Inventory\Models\Product;
 
 class QuotationService
 {
@@ -14,7 +16,7 @@ class QuotationService
     ) {
     }
 
-    public function latest(): \Illuminate\Database\Eloquent\Collection
+    public function latest(): Collection
     {
         return $this->quotations->latest();
     }
@@ -26,16 +28,23 @@ class QuotationService
 
     public function getNextQuotationNumber(): string
     {
-        $latest = Quotation::query()->whereNull('parent_id')->latest('id')->first();
+        $year = now()->format('Y');
+        $prefix = "{$year}-";
 
-        if (!$latest) {
-            return 'QT-0001';
+        $latest = Quotation::query()
+            ->whereNull('parent_id')
+            ->where('quotation_number', 'like', "{$prefix}%")
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $nextNum = 1;
+        if ($latest) {
+            $rawNum = $latest->getRawOriginal('quotation_number');
+            $lastNumStr = str_replace($prefix, '', $rawNum);
+            $nextNum = intval($lastNumStr) + 1;
         }
-
-        $rawNum = $latest->getRawOriginal('quotation_number');
-        $nextSeq = intval($rawNum) + 1;
         
-        return 'QT-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
+        return 'QT-' . $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
     }
 
     public function create(array $data, array $items): Quotation
@@ -65,7 +74,7 @@ class QuotationService
 
                 $itemName = $item['item_name'] ?? 'Product/Service';
                 if ($productId) {
-                    $product = \App\Domains\Inventory\Models\Product::find($productId);
+                    $product = Product::find($productId);
                     if ($product) {
                         $itemName = $product->name;
                     }
@@ -140,7 +149,7 @@ class QuotationService
 
                 $itemName = $item['item_name'] ?? 'Product/Service';
                 if ($productId) {
-                    $product = \App\Domains\Inventory\Models\Product::find($productId);
+                    $product = Product::find($productId);
                     if ($product) {
                         $itemName = $product->name;
                     }

@@ -160,15 +160,20 @@ class DispatchOrderController extends Controller
 
         $dispatchOrder = DB::transaction(function () use ($request, $delivery) {
             // Auto-generate dispatch number
-            $lastNumber = DispatchOrder::where('tenant_id', $delivery->tenant_id)
+            $year = now()->format('Y');
+            $prefix = "DSP-{$year}-";
+
+            $latest = DispatchOrder::where('tenant_id', $delivery->tenant_id)
+                ->where('dispatch_number', 'like', "{$prefix}%")
                 ->orderByDesc('id')
-                ->value('dispatch_number');
+                ->first();
 
             $nextNum = 1;
-            if ($lastNumber && preg_match('/(\d+)$/', $lastNumber, $m)) {
-                $nextNum = (int)$m[1] + 1;
+            if ($latest) {
+                $lastNumStr = str_replace($prefix, '', $latest->dispatch_number);
+                $nextNum = intval($lastNumStr) + 1;
             }
-            $dispatchNumber = 'DSP-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+            $dispatchNumber = $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
 
             $dispatchOrder = DispatchOrder::create([
                 'tenant_id'               => $delivery->tenant_id,

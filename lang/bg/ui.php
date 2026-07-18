@@ -80,6 +80,7 @@ return [
     'production' => 'Производство',
     'projects' => 'Проекти',
     'purchase' => 'Покупки',
+    'purchase_requests' => 'Заявки за покупка',
     'remember_me' => 'Запомни ме',
     'reports_bi' => 'Отчети и BI',
     'roles_permissions' => 'Роли и права',
