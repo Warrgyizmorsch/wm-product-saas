@@ -109,6 +109,8 @@ class WipController extends Controller
 
         $request->validate([
             'quantity' => 'required|numeric|min:0',
+            'scrap_quantity' => 'nullable|numeric|min:0',
+            'rejected_quantity' => 'nullable|numeric|min:0',
             'reason' => 'required|string|max:255',
         ]);
 
@@ -117,7 +119,9 @@ class WipController extends Controller
                 $id,
                 (float) $request->input('quantity'),
                 $request->input('reason'),
-                auth()->id()
+                auth()->id(),
+                $request->filled('scrap_quantity') ? (float) $request->input('scrap_quantity') : null,
+                $request->filled('rejected_quantity') ? (float) $request->input('rejected_quantity') : null
             );
 
             return redirect()->back()->with('success', 'WIP quantity adjusted successfully.');

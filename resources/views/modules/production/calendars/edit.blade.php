@@ -57,7 +57,16 @@
                                     6 => 'Saturday',
                                     0 => 'Sunday'
                                 ];
-                                $oldWorkingDays = old('working_days', $calendar->working_days ?? []);
+                                $dayNamesMap = [
+                                    'sunday' => 0, 'monday' => 1, 'tuesday' => 2, 'wednesday' => 3,
+                                    'thursday' => 4, 'friday' => 5, 'saturday' => 6
+                                ];
+                                $oldWorkingDays = array_map(function($day) use ($dayNamesMap) {
+                                    if (is_numeric($day)) {
+                                        return (int)$day;
+                                    }
+                                    return $dayNamesMap[strtolower($day)] ?? $day;
+                                }, old('working_days', $calendar->working_days ?? []));
                             @endphp
                             @foreach($daysOfWeek as $value => $label)
                                 <div class="form-check mb-2">

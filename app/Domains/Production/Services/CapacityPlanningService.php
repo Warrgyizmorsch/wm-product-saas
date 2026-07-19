@@ -417,7 +417,19 @@ class CapacityPlanningService
     {
         $dayOfWeek = $date->dayOfWeek;
         $workingDays = $calendar->working_days ?? [1, 2, 3, 4, 5];
-        if (!in_array($dayOfWeek, $workingDays)) {
+        
+        $dayNamesMap = [
+            'sunday' => 0, 'monday' => 1, 'tuesday' => 2, 'wednesday' => 3,
+            'thursday' => 4, 'friday' => 5, 'saturday' => 6
+        ];
+        $workingDaysNormalized = array_map(function($day) use ($dayNamesMap) {
+            if (is_numeric($day)) {
+                return (int)$day;
+            }
+            return $dayNamesMap[strtolower($day)] ?? $day;
+        }, $workingDays);
+
+        if (!in_array($dayOfWeek, $workingDaysNormalized)) {
             return false;
         }
         if ($calendar->id) {

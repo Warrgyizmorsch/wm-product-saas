@@ -148,20 +148,17 @@ class ProductionWipService
      * Log progress and complete WIP operations.
      */
     public function completeWipOperation(
-        int     $wipId,
-        int     $orderOpId,
-        float   $goodQty,
-        float   $rejectedQty,
-        float   $scrapQty,
-        float   $setupMins,
-        float   $runMins,
+        int $wipId,
+        int $orderOpId,
+        float $goodQty,
+        float $rejectedQty,
+        float $scrapQty,
+        float $setupMins,
+        float $runMins,
         ?string $remarks = null,
-        ?int    $userId  = null
+        ?int $userId = null
     ): void {
-        DB::transaction(function () use (
-            $wipId, $orderOpId, $goodQty, $rejectedQty, $scrapQty,
-            $setupMins, $runMins, $remarks, $userId
-        ) {
+        DB::transaction(function () use ($wipId, $orderOpId, $goodQty, $rejectedQty, $scrapQty, $setupMins, $runMins, $remarks, $userId) {
             $wip = ProductionWip::lockForUpdate()->findOrFail($wipId);
             $orderOp = ProductionOrderOperation::with(['workCenter', 'routingOperation'])->findOrFail($orderOpId);
 
@@ -192,7 +189,7 @@ class ProductionWipService
             $wip->completed_quantity += $goodQty;
             $wip->rejected_quantity += $rejectedQty;
             $wip->scrap_quantity += $scrapQty;
-            
+
             // Adjust available balance
             $wip->available_quantity = max(0.0000, $wip->available_quantity - $scrapQty);
 
@@ -340,9 +337,9 @@ class ProductionWipService
     /**
      * Manually adjust WIP values or quantities.
      */
-    public function adjustWip(int $wipId, float $quantity, string $reason, ?int $userId = null): void
+    public function adjustWip(int $wipId, float $quantity, string $reason, ?int $userId = null, ?float $scrapQuantity = null, ?float $rejectedQuantity = null): void
     {
-        DB::transaction(function () use ($wipId, $quantity, $reason, $userId) {
+        DB::transaction(function () use ($wipId, $quantity, $reason, $userId, $scrapQuantity, $rejectedQuantity) {
             $wip = ProductionWip::lockForUpdate()->findOrFail($wipId);
 
             if ($wip->order->isClosed() || $wip->order->isCancelled()) {
@@ -357,7 +354,15 @@ class ProductionWipService
             $oldAvailable = $wip->available_quantity;
 
             $wip->quantity = $quantity;
-            $wip->available_quantity = max(0.0000, $quantity - $wip->scrap_quantity);
+
+            if ($scrapQuantity !== null) {
+                $wip->scrap_quantity = max(0.0000, $scrapQuantity);
+            }
+            if ($rejectedQuantity !== null) {
+                $wip->rejected_quantity = max(0.0000, $rejectedQuantity);
+            }
+
+            $wip->available_quantity = max(0.0000, $quantity - $wip->scrap_quantity - $wip->rejected_quantity);
             $wip->updated_by = $userId;
             $wip->save();
 
@@ -369,7 +374,7 @@ class ProductionWipService
                 'from_operation_id' => $wip->current_routing_operation_id,
                 'transaction_type' => 'adjusted',
                 'quantity' => $quantity,
-                'remarks' => "WIP adjusted from {$oldQty} to {$quantity}. Reason: {$reason}",
+                'remarks' => "WIP adjusted from {$oldQty} to {$quantity} (Scrap: {$wip->scrap_quantity}, Rejects: {$wip->rejected_quantity}). Reason: {$reason}",
                 'transaction_at' => now(),
                 'created_by' => $userId,
             ]);
@@ -489,8 +494,8 @@ class ProductionWipService
         DB::transaction(function () use ($wipId, $warehouseId, $remarks, $userId) {
             $wip = ProductionWip::lockForUpdate()->findOrFail($wipId);
 
-            if ($wip->status === 'completed' || $wip->available_quantity <= 0) {
-                throw new InvalidArgumentException("Cannot convert WIP: This tracking card has already been completed or has no remaining available quantity.");
+            if ($wip->available_quantity <= 0) {
+                throw new InvalidArgumentException("Cannot convert WIP: This tracking card has no remaining available quantity.");
             }
 
             $qtyToComplete = $wip->available_quantity;

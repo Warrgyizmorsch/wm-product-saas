@@ -253,7 +253,7 @@ class FurnitureManufacturingDemoSeeder extends Seeder
             }
         }
 
-        $calendar = ProductionCalendar::create(['tenant_id' => $tenant->id, 'name' => 'Furniture Plant 2026 Calendar', 'working_days' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], 'is_default' => true]);
+        $calendar = ProductionCalendar::create(['tenant_id' => $tenant->id, 'name' => 'Furniture Plant 2026 Calendar', 'working_days' => [1, 2, 3, 4, 5, 6], 'is_default' => true]);
         ProductionCalendarHoliday::create(['tenant_id' => $tenant->id, 'production_calendar_id' => $calendar->id, 'holiday_date' => Carbon::parse('2026-08-15'), 'name' => 'Independence Day', 'holiday_type' => 'public']);
 
         // ═══════════════════════════════════════════════════════════════════════

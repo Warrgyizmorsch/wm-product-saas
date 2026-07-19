@@ -59,7 +59,7 @@ class ProductionWip extends BaseModel
 
     public function order(): BelongsTo
     {
-        return $this->belongsTo(ProductionOrder::class, 'production_order_id');
+        return $this->belongsTo(ProductionOrder::class, 'production_order_id')->withTrashed();
     }
 
     public function batch(): BelongsTo

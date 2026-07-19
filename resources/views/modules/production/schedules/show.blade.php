@@ -8,6 +8,9 @@
     </a>
 
     @if($schedule->isScheduled())
+        <button type="button" class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#rescheduleStartModal">
+            <i class="feather-calendar me-2"></i>Change Schedule Start Date
+        </button>
         <form method="POST" action="{{ route('production.schedules.release', $schedule->id) }}" class="d-inline me-2">
             @csrf
             <button type="submit" class="btn btn-primary">
@@ -171,10 +174,29 @@
         @if(count($warnings) > 0)
             <div class="alert alert-warning border-warning bg-soft-warning p-3 rounded mb-4">
                 <div class="fw-bold text-warning mb-2"><i class="feather-alert-triangle me-2"></i>{{ __('production.capacity_overload_warnings') }} ({{ count($warnings) }})</div>
-                @foreach($warnings as $warning)
-                    <div class="fs-12 text-warning-800 mb-1">• {{ $warning }}</div>
-                @endforeach
+                <div style="max-height: 180px; overflow-y: auto; padding-right: 8px;" class="warning-scrollbar-custom">
+                    @foreach($warnings as $warning)
+                        <div class="fs-12 text-warning-800 mb-1">• {{ $warning }}</div>
+                    @endforeach
+                </div>
             </div>
+            
+            <style>
+                .warning-scrollbar-custom::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .warning-scrollbar-custom::-webkit-scrollbar-track {
+                    background: rgba(245, 158, 11, 0.05);
+                    border-radius: 4px;
+                }
+                .warning-scrollbar-custom::-webkit-scrollbar-thumb {
+                    background: rgba(245, 158, 11, 0.3);
+                    border-radius: 4px;
+                }
+                .warning-scrollbar-custom::-webkit-scrollbar-thumb:hover {
+                    background: rgba(245, 158, 11, 0.5);
+                }
+            </style>
         @endif
 
         {{-- Tabs --}}
@@ -290,6 +312,48 @@
             </div>
 
             <div class="tab-pane fade" id="tab-capacity" role="tabpanel">
+                <style>
+                    .transition-icon {
+                        transition: transform 0.2s ease-in-out;
+                        display: inline-block;
+                    }
+                    tr[aria-expanded="true"] .transition-icon {
+                        transform: rotate(90deg);
+                    }
+                    .hover-bg-light:hover {
+                        background-color: rgba(0, 0, 0, 0.03) !important;
+                    }
+                </style>
+                <div class="alert alert-info border-0 shadow-sm d-flex align-items-start mb-4 p-3 bg-light text-dark fs-13" style="border-left: 4px solid #0d6efd !important;">
+                    <i class="feather-info me-3 fs-20 text-primary mt-1"></i>
+                    <div>
+                        <h6 class="fw-bold text-primary mb-1">Understanding Work Center Capacity</h6>
+                        <p class="mb-0 text-muted fs-12">
+                            The table below shows the <strong>total accumulated capacity</strong> summed over the entire scheduled period. 
+                            If a work center is flagged with an overload warning above, it means scheduled work exceeded capacity on a <strong>specific day</strong> (e.g. on a weekend or shift overflow). 
+                            <span class="fw-bold text-dark">Click on any work center row below</span> to toggle a detailed day-by-day breakdown.
+                        </p>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-4 p-2 bg-light rounded border border-light shadow-none">
+                    <div class="text-muted fs-12 ms-2">
+                        @php
+                            $currentGroup = $capacityDetails[0]['group_type'] ?? 'day';
+                        @endphp
+                        Showing breakdown grouped by: <strong class="text-capitalize text-dark">{{ $currentGroup }}</strong>
+                    </div>
+                    <div class="btn-group btn-group-sm" style="gap:10px;" role="group" aria-label="Capacity grouping">
+                        <a href="{{ request()->fullUrlWithQuery(['group_by' => 'day']) }}" class="btn btn-outline-primary {{ $currentGroup === 'day' ? 'active' : '' }}">
+                            Day
+                        </a>
+                        <a href="{{ request()->fullUrlWithQuery(['group_by' => 'week']) }}" class="btn btn-outline-primary {{ $currentGroup === 'week' ? 'active' : '' }}">
+                            Week
+                        </a>
+                        <a href="{{ request()->fullUrlWithQuery(['group_by' => 'month']) }}" class="btn btn-outline-primary {{ $currentGroup === 'month' ? 'active' : '' }}">
+                            Month
+                        </a>
+                    </div>
+                </div>
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table">
                         <thead>
@@ -304,8 +368,9 @@
                         </thead>
                         <tbody>
                             @forelse($capacityDetails as $detail)
-                                <tr>
+                                <tr data-bs-toggle="collapse" data-bs-target="#collapse-wc-{{ $detail['work_center']->id }}" style="cursor: pointer;" class="hover-bg-light">
                                     <td class="fw-bold align-middle">
+                                        <i class="feather-chevron-right me-2 text-muted transition-icon" id="arrow-wc-{{ $detail['work_center']->id }}"></i>
                                         {{ $detail['work_center']->name }}
                                         <br><small class="text-muted">Calendar: {{ $detail['calendar_name'] }} ({{ $detail['working_days'] }})</small>
                                     </td>
@@ -334,6 +399,63 @@
                                         </div>
                                     </td>
                                 </tr>
+                                <tr class="collapse" id="collapse-wc-{{ $detail['work_center']->id }}">
+                                    <td colspan="6" class="p-3 bg-light">
+                                        <div class="card card-body border border-light shadow-sm p-4 bg-white rounded">
+                                            @php
+                                                $groupType = $detail['group_type'] ?? 'day';
+                                                $headerTitle = $groupType === 'week' ? 'Weekly' : ($groupType === 'month' ? 'Monthly' : 'Day-by-Day');
+                                                $col1Label = $groupType === 'week' ? 'Date Range' : ($groupType === 'month' ? 'Month' : 'Scheduled Date');
+                                                $col2Label = $groupType === 'week' ? 'Week Number' : ($groupType === 'month' ? 'Period' : 'Day of Week');
+                                            @endphp
+                                            <h6 class="fw-bold text-dark fs-13 mb-3">
+                                                <i class="feather-calendar me-2 text-primary"></i>{{ $headerTitle }} Capacity Breakdown for {{ $detail['work_center']->name }}
+                                            </h6>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-bordered fs-12 mb-0">
+                                                    <thead class="table-light text-dark fw-bold">
+                                                        <tr>
+                                                            <th>{{ $col1Label }}</th>
+                                                            <th>{{ $col2Label }}</th>
+                                                            <th class="text-end">Scheduled Minutes</th>
+                                                            <th class="text-end">Available Capacity</th>
+                                                            <th class="text-end">Utilization %</th>
+                                                            <th>Capacity Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($detail['daily_breakdown'] as $day)
+                                                            @php
+                                                                $isOverloaded = $day['scheduled_minutes'] > $day['capacity_minutes'];
+                                                                $isSundayOverload = $day['capacity_minutes'] == 0 && $day['scheduled_minutes'] > 0;
+                                                            @endphp
+                                                            <tr style="background-color: {{ $isOverloaded ? '#fff5f5' : '#ffffff' }};">
+                                                                <td class="font-monospace align-middle">{{ $day['date'] }}</td>
+                                                                <td class="align-middle fw-medium">{{ $day['day_name'] }}</td>
+                                                                <td class="text-end align-middle font-monospace">{{ number_format($day['scheduled_minutes'], 1) }} mins</td>
+                                                                <td class="text-end align-middle font-monospace">{{ number_format($day['capacity_minutes'], 1) }} mins</td>
+                                                                <td class="text-end align-middle font-monospace fw-bold {{ $isOverloaded ? 'text-danger' : 'text-success' }}">
+                                                                    {{ number_format($day['utilization'], 2) }}%
+                                                                </td>
+                                                                <td class="align-middle">
+                                                                    @if($isSundayOverload)
+                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle"><i class="feather-alert-triangle me-1"></i>Overloaded (Non-working Day)</span>
+                                                                    @elseif($isOverloaded)
+                                                                        <span class="badge bg-soft-danger text-danger border border-danger-subtle"><i class="feather-alert-octagon me-1"></i>Overloaded</span>
+                                                                    @elseif($day['capacity_minutes'] == 0)
+                                                                        <span class="badge bg-soft-secondary text-secondary border border-secondary-subtle">Closed</span>
+                                                                    @else
+                                                                        <span class="badge bg-soft-success text-success border border-success-subtle">Normal Capacity</span>
+                                                                    @endif
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
                             @empty
                                 <tr>
                                     <td colspan="6" class="text-center py-4 text-muted">
@@ -357,6 +479,24 @@
         <x-slot name="footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('production.back') ?? 'Back' }}</button>
             <button type="submit" class="btn btn-danger" onclick="document.getElementById('cancelFormMain').submit();">{{ __('production.cancel_schedule') }}</button>
+        </x-slot>
+    </x-ui.modal>
+
+    {{-- Reschedule Start Modal --}}
+    <x-ui.modal id="rescheduleStartModal" title="Change Schedule Start Date" class="text-start">
+        <form method="POST" action="{{ route('production.schedules.reschedule-start', $schedule->id) }}" id="rescheduleStartFormMain">
+            @csrf
+            <div class="mb-3 text-dark">
+                <label class="form-label fw-bold fs-12 mb-1">New Start Date & Time</label>
+                <input type="datetime-local" name="start_date" class="form-control fs-13" value="{{ $schedule->operations->min('planned_start')?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i') }}" required>
+                <small class="text-muted mt-2 d-block fs-11">
+                    This will delete all current planned operations for this order, recalculate using the corrected calendar working days, and schedule them starting from this new date.
+                </small>
+            </div>
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-warning" onclick="document.getElementById('rescheduleStartFormMain').submit();">Apply & Recalculate</button>
         </x-slot>
     </x-ui.modal>
 @endsection
