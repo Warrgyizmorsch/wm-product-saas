@@ -152,6 +152,7 @@ return [
     'tasklist_updated' => 'Списъкът е обновен.',
     'tasklist_removed' => 'Списъкът е премахнат.',
     'tasks' => 'Задачи',
+    'milestone_progress_caption' => ':completed от :total задачи завършени',
     'add_task' => 'Добавяне на задача',
     'edit_task' => 'Редактиране на задача',
     'task_details' => 'Детайли за задачата',

@@ -64,4 +64,8 @@
         @include('modules.projects.tasks._modal')
         @include('modules.projects.tasks._drawer')
     @endif
+
+    @push('scripts')
+        <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
+    @endpush
 @endsection

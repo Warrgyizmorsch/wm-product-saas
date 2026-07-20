@@ -16,16 +16,20 @@ use App\Domains\Projects\Services\TaskListService;
 use App\Domains\Projects\Services\TaskService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\InlineEdit\HandlesInlineFieldUpdates;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class MilestoneController extends Controller
 {
     use BuildsBackUrl;
+    use HandlesInlineFieldUpdates;
 
     public function __construct(
         private readonly MilestoneService $milestones,
@@ -277,5 +281,56 @@ class MilestoneController extends Controller
         return redirect()
             ->to($this->backUrlWithQuery(route('projects.show', $project), ['tab' => 'milestones']))
             ->with('success', __('projects.milestone_removed'));
+    }
+
+    public function updateField(Request $request, Project $project, Milestone $milestone): JsonResponse
+    {
+        return $this->handleInlineFieldUpdate($request, $milestone);
+    }
+
+    protected function inlineFieldSchema(): array
+    {
+        return [
+            'name' => [
+                'rules'   => ['required', 'string', 'max:255'],
+                'handler' => fn (Milestone $milestone, $value) => $this->milestones->updateField($milestone, 'name', $value),
+            ],
+            'description' => [
+                'rules'   => ['nullable', 'string'],
+                'handler' => fn (Milestone $milestone, $value) => $this->milestones->updateField($milestone, 'description', $value),
+            ],
+            'status' => [
+                'rules'   => ['nullable', Rule::in(Milestone::STATUSES)],
+                'handler' => fn (Milestone $milestone, $value) => $this->milestones->updateField($milestone, 'status', $value),
+            ],
+            'owner_id' => [
+                'rules'   => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', require_tenant_id())],
+                'handler' => fn (Milestone $milestone, $value) => $this->milestones->updateField($milestone, 'owner_id', $value),
+            ],
+            'start_date' => [
+                'rules'   => ['nullable', 'date'],
+                'handler' => function (Milestone $milestone, $value) {
+                    if ($value !== null && $milestone->due_date && Carbon::parse($value)->gt($milestone->due_date)) {
+                        throw ValidationException::withMessages([
+                            'value' => 'The start date must be a date before or equal to due date.',
+                        ]);
+                    }
+
+                    return $this->milestones->updateField($milestone, 'start_date', $value)?->format('Y-m-d');
+                },
+            ],
+            'due_date' => [
+                'rules'   => ['nullable', 'date'],
+                'handler' => function (Milestone $milestone, $value) {
+                    if ($value !== null && $milestone->start_date && Carbon::parse($value)->lt($milestone->start_date)) {
+                        throw ValidationException::withMessages([
+                            'value' => 'The due date must be a date after or equal to start date.',
+                        ]);
+                    }
+
+                    return $this->milestones->updateField($milestone, 'due_date', $value)?->format('Y-m-d');
+                },
+            ],
+        ];
     }
 }

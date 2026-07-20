@@ -99,6 +99,29 @@ class MilestoneService
         });
     }
 
+    /**
+     * Update a single field on a milestone (inline-edit). Kept independent of
+     * update()'s completion-activity branching, since none of the fields using
+     * this path today participate in that workflow.
+     */
+    public function updateField(Milestone $milestone, string $field, mixed $value): mixed
+    {
+        return DB::transaction(function () use ($milestone, $field, $value) {
+            $project = $milestone->project;
+            $milestone = $this->milestones->update($milestone->id, [$field => $value]);
+
+            $this->activity->record(
+                $project,
+                'milestone.updated',
+                "Milestone '{$milestone->name}' updated",
+                null,
+                $milestone,
+            );
+
+            return $milestone->{$field};
+        });
+    }
+
     public function delete(Milestone $milestone): bool
     {
         return DB::transaction(function () use ($milestone) {

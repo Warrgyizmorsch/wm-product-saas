@@ -165,6 +165,7 @@ return [
     'tasklist_removed' => 'Task list removed.',
     'tasks' => 'Tasks',
     'tasks_completed' => 'Completed',
+    'milestone_progress_caption' => ':completed of :total tasks completed',
     'no_tasks_hint' => 'Create the first task for this task list.',
     'add_task' => 'Add Task',
     'edit_task' => 'Edit Task',

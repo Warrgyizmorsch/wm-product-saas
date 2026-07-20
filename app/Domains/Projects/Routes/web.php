@@ -41,6 +41,7 @@ Route::prefix('projects')
                 Route::get('{milestone}', [MilestoneController::class, 'show'])->name('show');
                 Route::post('/', [MilestoneController::class, 'store'])->name('store');
                 Route::put('{milestone}', [MilestoneController::class, 'update'])->name('update');
+                Route::patch('{milestone}/field', [MilestoneController::class, 'updateField'])->name('field');
                 Route::delete('{milestone}', [MilestoneController::class, 'destroy'])->name('destroy');
             });
 

@@ -152,6 +152,7 @@ return [
     'tasklist_updated' => 'टास्क लिस्ट अपडेट की गई.',
     'tasklist_removed' => 'टास्क लिस्ट हटाई गई.',
     'tasks' => 'टास्क',
+    'milestone_progress_caption' => ':total में से :completed टास्क पूर्ण',
     'add_task' => 'टास्क जोड़ें',
     'edit_task' => 'टास्क संपादित करें',
     'task_details' => 'टास्क विवरण',
