@@ -4,6 +4,14 @@
 @section('page-title', $milestone->name)
 @section('breadcrumb', __('projects.title') . ' / ' . __('projects.milestones') . ' / ' . $milestone->name)
 
+@section('page-actions')
+    <div class="d-flex gap-2">
+        <a href="{{ route('projects.show', ['project' => $project, 'tab' => 'milestones']) }}" class="btn btn-light">
+            <i class="feather-arrow-left me-2"></i>{{ __('projects.back') }}
+        </a>
+    </div>
+@endsection
+
 @section('content')
     <div class="erp-single-panel bg-white">
         @if ($errors->any())
@@ -67,5 +75,6 @@
 
     @push('scripts')
         <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
+        <script src="{{ asset('assets/js/tasklists/inline-create.js') }}"></script>
     @endpush
 @endsection

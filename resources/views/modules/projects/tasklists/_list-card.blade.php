@@ -2,9 +2,22 @@
     $listTasks = $tasksByList->get($taskList->id, collect());
     $listStats = $dashboard['task_lists'][$taskList->id] ?? ['total' => 0, 'done' => 0, 'percent' => 0];
     $taskListBodyId = 'taskListBody' . $taskList->id;
+    $isLastTaskListCard = $index === $taskLists->count() - 1;
+
+    $rowJsData = [
+        'id' => $taskList->id,
+        'updateUrl' => route('projects.tasklists.update', [$project, $taskList]),
+        'deleteUrl' => route('projects.tasklists.destroy', [$project, $taskList]),
+        'name' => $taskList->name,
+        'description' => $taskList->description,
+        'ownerId' => $taskList->owner_id,
+        'ownerName' => $taskList->owner?->name,
+        'milestoneId' => $taskList->milestone_id,
+        'milestoneName' => $taskList->milestone?->name,
+    ];
 @endphp
 
-<div class="border rounded-3 task-list-card {{ !$loop->last ? 'mb-3' : '' }}" data-task-list-card data-task-list-id="{{ $taskList->id }}">
+<div class="border rounded-3 task-list-card {{ !$isLastTaskListCard ? 'mb-3' : '' }}" data-task-list-card data-task-list-id="{{ $taskList->id }}">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 p-3 {{ $listTasks->isNotEmpty() ? 'border-bottom' : '' }}">
         <div class="d-flex align-items-start gap-2 flex-grow-1" style="min-width: 220px;">
             <button type="button" class="btn btn-light btn-sm p-1 task-list-toggle" data-task-list-toggle
@@ -15,18 +28,10 @@
             </button>
             <div>
                 <div class="d-flex flex-wrap align-items-center gap-2">
-                    <div @if ($canManageTaskLists) role="button" style="cursor: pointer;"
-                            onclick="openTaskListDetailsDrawer({
-                                id: {{ $taskList->id }},
-                                updateUrl: @js(route('projects.tasklists.update', [$project, $taskList])),
-                                deleteUrl: @js(route('projects.tasklists.destroy', [$project, $taskList])),
-                                name: @js($taskList->name),
-                                description: @js($taskList->description),
-                                ownerId: @js($taskList->owner_id),
-                                ownerName: @js($taskList->owner?->name),
-                                milestoneId: @js($taskList->milestone_id),
-                                milestoneName: @js($taskList->milestone?->name)
-                            })"
+                    <div @if ($canManageTaskLists)
+                            role="button" style="cursor: pointer;"
+                            data-task-list-drawer-payload="@json($rowJsData)"
+                            onclick="openTaskListCardDrawer(this)"
                         @endif class="fw-semibold text-dark fs-14">
                         {{ $taskList->name }}
                     </div>

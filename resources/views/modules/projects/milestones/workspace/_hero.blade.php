@@ -1,12 +1,4 @@
 @php
-    $heroStatusVariant = match ($milestone->status) {
-        'Active' => 'success',
-        'On Hold' => 'warning',
-        'Completed' => 'primary',
-        'Closed' => 'dark',
-        default => 'secondary',
-    };
-
     $heroHealthVariant = match ($milestone->health_state) {
         'on_track' => 'success',
         'at_risk' => 'warning',
@@ -23,9 +15,9 @@
         ? (int) round(($completedTasks / $totalTasks) * 100)
         : (int) ($milestone->completion_percentage ?? 0);
 
-    // At 100% the bar should always read as done, even if health_state resolved to
-    // "not_applicable" (secondary/gray) because the milestone's status is Completed.
-    $heroProgressVariant = $heroTaskProgress >= 100 ? 'success' : $heroHealthVariant;
+    // This bar tracks task completion, not milestone health, so it always reads
+    // as green progress regardless of health_state (health has its own badge/dot).
+    $heroProgressVariant = 'success';
 
     $heroJsData = [
         'id' => $milestone->id,
@@ -61,19 +53,16 @@
                 <i class="feather-flag text-muted"></i>
             </span>
             <div>
-                <h4 class="fw-bold text-dark mb-1">
-                    @if ($canManageMilestones)
-                        <x-ui.inline-edit field="name" :value="$milestone->name"
-                            :url="route('projects.milestones.field', [$project, $milestone])" :label="__('projects.milestone_name')" />
-                    @else
-                        {{ $milestone->name }}
-                    @endif
-                </h4>
-                <div class="d-flex flex-wrap align-items-center gap-2 fs-13 mt-1">
-                    <x-ui.badge variant="{{ $heroStatusVariant }}" soft>
-                        {{ __('projects.statuses.' . $milestone->status) }}
-                    </x-ui.badge>
-                    <span class="d-inline-flex align-items-center gap-1 text-muted">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <h4 class="fw-bold text-dark mb-1">
+                        @if ($canManageMilestones)
+                            <x-ui.inline-edit field="name" :value="$milestone->name"
+                                :url="route('projects.milestones.field', [$project, $milestone])" :label="__('projects.milestone_name')" />
+                        @else
+                            {{ $milestone->name }}
+                        @endif
+                    </h4>
+                    <span class="d-inline-flex align-items-center gap-1 text-muted fs-13 mb-1">
                         <span class="health-dot bg-{{ $heroHealthVariant }}"></span>
                         {{ __('projects.health_states.' . $milestone->health_state) }}
                         @if ($milestone->health_reason)
@@ -81,13 +70,16 @@
                         @endif
                     </span>
                 </div>
+                {{-- Status itself is intentionally not repeated here: it's the editable
+                     "Status" tile in the metadata strip below (Band D) — showing it again
+                     as a static badge up here was pure duplication with no extra info. --}}
                 @if ($canManageMilestones)
-                    <div class="fs-13 text-muted mb-0 mt-1">
+                    <div class="fs-13 text-muted mb-0 mt-2">
                         <x-ui.inline-edit field="description" :value="$milestone->description"
                             :url="route('projects.milestones.field', [$project, $milestone])" type="textarea" :label="__('projects.description')" />
                     </div>
                 @elseif ($milestone->description)
-                    <p class="fs-13 text-muted mb-0 mt-1 text-clamp-2">{{ $milestone->description }}</p>
+                    <p class="fs-13 text-muted mb-0 mt-2 text-clamp-2">{{ $milestone->description }}</p>
                 @endif
             </div>
         </div>

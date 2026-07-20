@@ -33,7 +33,14 @@ class TaskListService
         return DB::transaction(function () use ($project, $data) {
             $data['project_id'] = $project->id;
             $data['tenant_id'] = $project->tenant_id;
-            $data['position'] = $this->nextPosition($project);
+
+            // New task lists are always inserted at the top: shift every existing
+            // list down a position first, then take position 1 ourselves.
+            TaskList::query()
+                ->where('project_id', $project->id)
+                ->increment('position');
+
+            $data['position'] = 1;
 
             $taskList = $this->taskLists->create($data);
 
@@ -120,10 +127,5 @@ class TaskListService
 
             return $taskList->refresh();
         });
-    }
-
-    private function nextPosition(Project $project): int
-    {
-        return (int) (TaskList::query()->where('project_id', $project->id)->max('position') + 1);
     }
 }
