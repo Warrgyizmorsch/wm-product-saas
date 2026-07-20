@@ -119,6 +119,11 @@ Route::prefix('production')
         Route::post('orders/{order}/complete', [ProductionOrderController::class, 'complete'])->name('orders.complete');
         Route::post('orders/{order}/close', [ProductionOrderController::class, 'close'])->name('orders.close');
         Route::post('orders/{order}/cancel', [ProductionOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::post('orders/{order}/request-additional-material', [ProductionOrderController::class, 'requestAdditionalMaterial'])->name('orders.request-additional-material');
+        Route::post('orders/{order}/cost-adjustments', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'store'])->name('orders.cost-adjustments.store');
+        Route::put('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'update'])->name('cost-adjustments.update');
+        Route::delete('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'destroy'])->name('cost-adjustments.destroy');
+        Route::get('cost-adjustments/{adjustment}/download', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'downloadAttachment'])->name('cost-adjustments.download');
         Route::resource('orders', ProductionOrderController::class);
 
         // ── Requisition Slips (Material Requests) ─────────────────────────────

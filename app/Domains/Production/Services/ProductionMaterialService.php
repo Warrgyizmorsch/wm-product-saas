@@ -40,6 +40,15 @@ class ProductionMaterialService
         $res->quantity_reserved += $quantity;
         $res->save();
 
+        app(ProductionEventService::class)->writeEvent($res->tenant_id, [
+            'production_order_id' => $res->production_order_id,
+            'event_type'          => 'Material Reserved',
+            'title'               => 'Material Reserved',
+            'description'         => "Reserved {$quantity} of product #{$res->product_id} for order #{$res->production_order_id}.",
+            'severity'            => 'info',
+            'event_source'        => 'ProductionMaterialService',
+        ]);
+
         return $res;
     }
 

@@ -17,11 +17,21 @@ class CapaService
      */
     public function createCapa(int $tenantId, array $data): ProductionCapa
     {
-        return ProductionCapa::create(array_merge($data, [
-            'tenant_id' => $tenantId,
+        $capa = ProductionCapa::create(array_merge($data, [
+            'tenant_id'   => $tenantId,
             'capa_number' => 'CAPA-'.strtoupper(uniqid()),
-            'status' => 'draft',
+            'status'      => 'draft',
         ]));
+
+        $this->eventService->writeEvent($tenantId, [
+            'event_type'   => 'CAPA Created',
+            'title'        => 'CAPA Opened',
+            'description'  => "Corrective action CAPA {$capa->capa_number} opened.",
+            'severity'     => 'warning',
+            'event_source' => 'CapaService',
+        ]);
+
+        return $capa;
     }
 
     /**

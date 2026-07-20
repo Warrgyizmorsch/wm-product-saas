@@ -2,81 +2,155 @@
 
 @section('title', 'Production Order ' . $order->order_number . ' | SaaS ERP')
 
+@push('styles')
+    <style>
+        .production-sidebar-sticky {
+            position: sticky;
+            top: 85px;
+            align-self: flex-start;
+            max-height: calc(100vh - 260px);
+            min-height: 480px;
+            overflow-y: auto;
+        }
+        .production-main-content-scroll {
+            max-height: calc(100vh - 260px);
+            min-height: 480px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 8px;
+            padding-top: 10px;
+            background-color: #F8FAFC;
+        }
+        .production-main-content-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .production-main-content-scroll::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+        }
+        .production-main-content-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+        .erp-vertical-tabs .nav-link {
+            font-size: 11.5px !important;
+            padding: 7.5px 10px !important;
+            letter-spacing: 0.15px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .erp-vertical-tabs .nav-link i {
+            font-size: 13px !important;
+            margin-right: 7px !important;
+            flex-shrink: 0;
+        }
+        .table-responsive:has(.dropdown.show) {
+            overflow: visible !important;
+        }
+        @media (max-width: 767.98px) {
+            .production-sidebar-sticky {
+                display: none !important;
+            }
+            .production-main-content-scroll {
+                max-height: none !important;
+                min-height: auto !important;
+                overflow-y: visible !important;
+                padding-right: 0 !important;
+            }
+        }
+    </style>
+@endpush
+
 @section('page-actions')
-    {{-- Back to List --}}
-    <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-soft-secondary">
-        <i class="feather-arrow-left me-1"></i>Back to List
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        {{-- Back to List Button --}}
+        <x-ui.icon-btn href="{{ route('production.orders.index') }}" icon="feather-arrow-left" variant="transparent-dark" title="Back to List">
+            Back to List
+        </x-ui.icon-btn>
 
-    @if($order->isDraft())
-        <a href="{{ route('production.orders.edit', $order->id) }}" class="btn btn-sm btn-soft-primary">
-            <i class="feather-edit me-1"></i>Edit Order
-        </a>
+        {{-- Grouped Header Actions Dropdown --}}
+        <x-ui.action-dropdown id="headerActionsDropdown">
+            @if($order->isDraft())
+                <li>
+                    <a href="{{ route('production.orders.edit', $order->id) }}" class="dropdown-item py-1.5 fs-12">
+                        <i class="feather-edit me-2 text-primary fs-12"></i>Edit Order
+                    </a>
+                </li>
+                <li>
+                    <form method="POST" action="{{ route('production.orders.release', $order->id) }}">
+                        @csrf
+                        <button type="submit" class="dropdown-item text-success py-1.5 fs-12">
+                            <i class="feather-play-circle me-2 text-success fs-12"></i>Release Order
+                        </button>
+                    </form>
+                </li>
+                <li>
+                    <form method="POST" action="{{ route('production.orders.destroy', $order->id) }}" onsubmit="return confirm('Delete this draft production order?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
+                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Order
+                        </button>
+                    </form>
+                </li>
+            @endif
 
-        <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline">
-            @csrf
-            <button type="submit" class="btn btn-sm btn-soft-success">
-                <i class="feather-play-circle me-1"></i>Release Order
-            </button>
-        </form>
+            @if($order->isReleased() || $order->isInProgress())
+                <li>
+                    <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal" data-bs-target="#progressModal">
+                        <i class="feather-edit-3 me-2 text-primary fs-12"></i>Log Execution Progress
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal" data-bs-target="#issueModal">
+                        <i class="feather-log-in me-2 text-info fs-12"></i>Issue Materials
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal" data-bs-target="#returnModal">
+                        <i class="feather-log-out me-2 text-secondary fs-12"></i>Return Materials
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal" data-bs-target="#receiptModal">
+                        <i class="feather-download me-2 text-warning fs-12"></i>Receive Finished Goods
+                    </a>
+                </li>
+                <li>
+                    <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal" data-bs-target="#scrapReworkModal">
+                        <i class="feather-alert-triangle me-2 text-danger fs-12"></i>Log Scrap / Rework
+                    </a>
+                </li>
+                <li>
+                    <form method="POST" action="{{ route('production.orders.complete', $order->id) }}" onsubmit="return confirm('Complete this Production Order? All operations must be completed.');">
+                        @csrf
+                        <button type="submit" class="dropdown-item text-success py-1.5 fs-12">
+                            <i class="feather-check-circle me-2 text-success fs-12"></i>Complete Order
+                        </button>
+                    </form>
+                </li>
+                <li>
+                    <form method="POST" action="{{ route('production.orders.cancel', $order->id) }}" onsubmit="return confirm('Cancel this Production Order?');">
+                        @csrf
+                        <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
+                            <i class="feather-slash me-2 text-danger fs-12"></i>Cancel Order
+                        </button>
+                    </form>
+                </li>
+            @endif
 
-        <form method="POST" action="{{ route('production.orders.destroy', $order->id) }}" class="d-inline"
-              onsubmit="return confirm('Delete this draft production order?');">
-            @csrf
-            @method('DELETE')
-            <button type="submit" class="btn btn-sm btn-soft-danger">
-                <i class="feather-trash-2 me-1"></i>Delete Order
-            </button>
-        </form>
-    @endif
-
-    @if($order->isReleased() || $order->isInProgress())
-        <button type="button" class="btn btn-sm btn-soft-primary" data-bs-toggle="modal" data-bs-target="#progressModal">
-            <i class="feather-edit-3 me-1"></i>Log Progress
-        </button>
-
-        <button type="button" class="btn btn-sm btn-soft-info" data-bs-toggle="modal" data-bs-target="#issueModal">
-            <i class="feather-log-in me-1"></i>Issue Materials
-        </button>
-
-        <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#returnModal">
-            <i class="feather-log-out me-1"></i>Return Materials
-        </button>
-
-        <button type="button" class="btn btn-sm btn-soft-warning text-dark" data-bs-toggle="modal" data-bs-target="#receiptModal">
-            <i class="feather-download me-1"></i>Receive FG
-        </button>
-
-        <button type="button" class="btn btn-sm btn-soft-danger" data-bs-toggle="modal" data-bs-target="#scrapReworkModal">
-            <i class="feather-alert-triangle me-1"></i>Log Scrap/Rework
-        </button>
-
-        <form method="POST" action="{{ route('production.orders.complete', $order->id) }}" class="d-inline"
-              onsubmit="return confirm('Complete this Production Order? All operations must be completed.');">
-            @csrf
-            <button type="submit" class="btn btn-sm btn-soft-success">
-                <i class="feather-check-circle me-1"></i>Complete Order
-            </button>
-        </form>
-
-        <form method="POST" action="{{ route('production.orders.cancel', $order->id) }}" class="d-inline"
-              onsubmit="return confirm('Cancel this Production Order?');">
-            @csrf
-            <button type="submit" class="btn btn-sm btn-outline-danger">
-                <i class="feather-slash me-1"></i>Cancel Order
-            </button>
-        </form>
-    @endif
-
-    @if($order->isCompleted())
-        <form method="POST" action="{{ route('production.orders.close', $order->id) }}" class="d-inline"
-              onsubmit="return confirm('Close and Archive this completed order? Costs will be locked.');">
-            @csrf
-            <button type="submit" class="btn btn-sm btn-soft-secondary">
-                <i class="feather-archive me-1"></i>Close &amp; Archive
-            </button>
-        </form>
-    @endif
+            @if($order->isCompleted())
+                <li>
+                    <form method="POST" action="{{ route('production.orders.close', $order->id) }}" onsubmit="return confirm('Close and Archive this completed order? Costs will be locked.');">
+                        @csrf
+                        <button type="submit" class="dropdown-item text-secondary py-1.5 fs-12">
+                            <i class="feather-archive me-2 text-secondary fs-12"></i>Close &amp; Archive
+                        </button>
+                    </form>
+                </li>
+            @endif
+        </x-ui.action-dropdown>
+    </div>
 @endsection
 
 
@@ -174,84 +248,105 @@
         </div>
     </div>
 
-    {{-- ── Tab Navigation (BOM-style) ───────────────────────────────────── --}}
-    <div class="erp-tabs-nav">
-        <a class="erp-tabs-link active" id="btn-tab-overview"      onclick="switchTab('overview')">Overview</a>
-        <a class="erp-tabs-link"        id="btn-tab-operations"    onclick="switchTab('operations')">Operations</a>
-        <a class="erp-tabs-link"        id="btn-tab-wip"           onclick="switchTab('wip')">WIP Tracking</a>
-        <a class="erp-tabs-link"        id="btn-tab-reservations"  onclick="switchTab('reservations')">Reservations</a>
-        <a class="erp-tabs-link"        id="btn-tab-issues"        onclick="switchTab('issues')">Material Issues</a>
-        <a class="erp-tabs-link"        id="btn-tab-progress"      onclick="switchTab('progress')">Progress Logs</a>
-        <a class="erp-tabs-link"        id="btn-tab-scrap"         onclick="switchTab('scrap')">Scrap &amp; Rework</a>
-        <a class="erp-tabs-link"        id="btn-tab-cost"          onclick="switchTab('cost')">Cost Analysis</a>
-        <a class="erp-tabs-link"        id="btn-tab-audit"         onclick="switchTab('audit')">Audit Trail</a>
-    </div>
+    {{-- ── 2-Column Vertical Tabs Layout ────────────────────────────────── --}}
+    @php
+        $activeTab = request('tab', request('active_tab', 'vtab-overview'));
+        if (request()->has('adjustments_page') && !request()->has('tab')) {
+            $activeTab = 'vtab-cost-adjustments';
+        }
 
-    {{-- ── Tab Content ──────────────────────────────────────────────────── --}}
-    <div class="tab-content mt-3">
+        $verticalTabs = [
+            ['id' => 'vtab-overview',         'label' => 'Overview',                          'active' => $activeTab === 'vtab-overview',         'icon' => 'feather-activity'],
+            ['id' => 'vtab-operations',       'label' => 'Operations Routing',                'active' => $activeTab === 'vtab-operations',       'icon' => 'feather-cpu'],
+            ['id' => 'vtab-wip',              'label' => 'WIP Tracking',                      'active' => $activeTab === 'vtab-wip',              'icon' => 'feather-layers'],
+            ['id' => 'vtab-reservations',     'label' => 'Material Reservations',             'active' => $activeTab === 'vtab-reservations',     'icon' => 'feather-archive'],
+            ['id' => 'vtab-issues',           'label' => 'Material Issues',                   'active' => $activeTab === 'vtab-issues',           'icon' => 'feather-arrow-up-right'],
+            ['id' => 'vtab-progress',         'label' => 'Progress Logs',                     'active' => $activeTab === 'vtab-progress',         'icon' => 'feather-clock'],
+            ['id' => 'vtab-scrap',            'label' => 'Scrap & Rework',                    'active' => $activeTab === 'vtab-scrap',            'icon' => 'feather-alert-triangle'],
+            ['id' => 'vtab-cost',             'label' => 'Cost Analysis',                     'active' => $activeTab === 'vtab-cost',             'icon' => 'feather-pie-chart'],
+            ['id' => 'vtab-cost-adjustments', 'label' => 'Cost Adjustments',                  'active' => $activeTab === 'vtab-cost-adjustments', 'icon' => 'feather-dollar-sign'],
+            ['id' => 'vtab-procurement',      'label' => 'Procurement & Requisitions',        'active' => $activeTab === 'vtab-procurement',      'icon' => 'feather-shopping-cart'],
+            ['id' => 'vtab-audit',            'label' => 'Audit Trail Events',                'active' => $activeTab === 'vtab-audit',            'icon' => 'feather-file-text'],
+        ];
+    @endphp
 
-        {{-- Tab 1: Overview --}}
-        <div class="tab-pane-custom" id="tab-overview">
-            <div class="row g-4">
-                <div class="col-md-8">
-                    <h5 class="fw-bold text-dark mb-3">Shop Floor Remarks &amp; Notes</h5>
-                    <p class="text-dark fs-13">{{ $order->description ?? 'No specific remarks or shop floor notes logged for this production order.' }}</p>
-
-                    <h6 class="fw-bold text-muted text-uppercase fs-11 mb-3 mt-4">Actual Execution Timeline</h6>
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <div class="bg-light p-3 rounded">
-                                <div class="text-muted fs-11 text-uppercase mb-1">Scheduled Window</div>
-                                <div class="text-dark fw-bold fs-14">
-                                    {{ $order->start_date->format('Y-m-d') }} → {{ $order->end_date->format('Y-m-d') }}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="bg-light p-3 rounded">
-                                <div class="text-muted fs-11 text-uppercase mb-1">Actual Execution Dates</div>
-                                <div class="text-dark fw-bold fs-14">
-                                    {{ $order->actual_start_date ? $order->actual_start_date->format('Y-m-d H:i') : '—' }}
-                                    →
-                                    {{ $order->actual_end_date ? $order->actual_end_date->format('Y-m-d H:i') : '—' }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-4">
-                    <h5 class="fw-bold text-dark mb-3">Frozen Engineering References</h5>
-                    <div class="mb-3 pb-2 border-bottom">
-                        <div class="text-muted fs-11 text-uppercase mb-1">BOM Version (Frozen)</div>
-                        <a href="{{ route('production.boms.show', $order->bom_id ?? 0) }}" class="fw-bold text-primary">
-                            {{ $order->bom->bom_number ?? 'BOM Reference' }} (v{{ $order->bom->version ?? '1.0' }})
-                        </a>
-                        <div class="fs-12 text-muted mt-1">{{ $order->bom->bom_name ?? 'Default BOM' }}</div>
-                    </div>
-                    <div class="mb-3 pb-2 border-bottom">
-                        <div class="text-muted fs-11 text-uppercase mb-1">Routing Version (Frozen)</div>
-                        <a href="{{ route('production.routing.show', $order->routing_id ?? 0) }}" class="fw-bold text-primary">
-                            {{ $order->routing->routing_number ?? 'Routing Reference' }}
-                        </a>
-                        <div class="fs-12 text-muted mt-1">{{ $order->routing->name ?? 'Default Routing' }} (v{{ $order->routing->version ?? '1.0' }})</div>
-                    </div>
-                    <div>
-                        <div class="text-muted fs-11 text-uppercase mb-1">Source Planning Order</div>
-                        @if($order->plan)
-                            <a href="{{ route('production.plans.show', $order->production_plan_id) }}" class="fw-bold text-primary">
-                                {{ $order->plan->plan_number }}
-                            </a>
-                        @else
-                            <span class="text-dark fw-bold">Direct Order (No Plan)</span>
-                        @endif
-                    </div>
-                </div>
-            </div>
+    <div class="row mt-4">
+        {{-- Left Vertical Navigation Sidebar Column (Desktop & Tablet) --}}
+        <div class="col-md-3 col-lg-2 border-end pe-md-3 mb-4 mb-md-0 production-sidebar-sticky d-none d-md-block">
+            <x-ui.vertical-tabs id="productionOrderVerticalTabs" :tabs="$verticalTabs" />
         </div>
 
-        {{-- Tab: WIP Tracking --}}
-        <div class="tab-pane-custom d-none" id="tab-wip">
+        {{-- Right Content Area Column --}}
+        <div class="col-md-9 col-lg-10 ps-md-2 production-main-content-scroll">
+
+            {{-- Top Horizontal Navigation Bar (Mobile Screens Only) --}}
+            <div class="d-block d-md-none mb-3 bg-white p-2 rounded border">
+                <x-ui.horizontal-tabs id="mobileProductionOrderTabs" :tabs="$verticalTabs" />
+            </div>
+            <div class="tab-content" style="background-color: white; padding: 10px;" id="productionOrderVerticalTabsContent">
+
+                {{-- Tab 1: Overview --}}
+                <div class="tab-pane fade {{ $activeTab === 'vtab-overview' ? 'show active' : '' }}" id="vtab-overview" role="tabpanel" aria-labelledby="vtab-overview-tab">
+                    <div class="row g-4">
+                        <div class="col-md-8">
+                            <h5 class="fw-bold text-dark mb-3">Shop Floor Remarks &amp; Notes</h5>
+                            <p class="text-dark fs-13">{{ $order->description ?? 'No specific remarks or shop floor notes logged for this production order.' }}</p>
+
+                            <h6 class="fw-bold text-muted text-uppercase fs-11 mb-3 mt-4">Actual Execution Timeline</h6>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="bg-light p-3 rounded">
+                                        <div class="text-muted fs-11 text-uppercase mb-1">Scheduled Window</div>
+                                        <div class="text-dark fw-bold fs-14">
+                                            {{ $order->start_date->format('Y-m-d') }} → {{ $order->end_date->format('Y-m-d') }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="bg-light p-3 rounded">
+                                        <div class="text-muted fs-11 text-uppercase mb-1">Actual Execution Dates</div>
+                                        <div class="text-dark fw-bold fs-14">
+                                            {{ $order->actual_start_date ? $order->actual_start_date->format('Y-m-d H:i') : '—' }}
+                                            →
+                                            {{ $order->actual_end_date ? $order->actual_end_date->format('Y-m-d H:i') : '—' }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <h5 class="fw-bold text-dark mb-3">Frozen Engineering References</h5>
+                            <div class="mb-3 pb-2 border-bottom">
+                                <div class="text-muted fs-11 text-uppercase mb-1">BOM Version (Frozen)</div>
+                                <a href="{{ route('production.boms.show', $order->bom_id ?? 0) }}" class="fw-bold text-primary">
+                                    {{ $order->bom->bom_number ?? 'BOM Reference' }} (v{{ $order->bom->version ?? '1.0' }})
+                                </a>
+                                <div class="fs-12 text-muted mt-1">{{ $order->bom->bom_name ?? 'Default BOM' }}</div>
+                            </div>
+                            <div class="mb-3 pb-2 border-bottom">
+                                <div class="text-muted fs-11 text-uppercase mb-1">Routing Version (Frozen)</div>
+                                <a href="{{ route('production.routing.show', $order->routing_id ?? 0) }}" class="fw-bold text-primary">
+                                    {{ $order->routing->routing_number ?? 'Routing Reference' }}
+                                </a>
+                                <div class="fs-12 text-muted mt-1">{{ $order->routing->name ?? 'Default Routing' }} (v{{ $order->routing->version ?? '1.0' }})</div>
+                            </div>
+                            <div>
+                                <div class="text-muted fs-11 text-uppercase mb-1">Source Planning Order</div>
+                                @if($order->plan)
+                                    <a href="{{ route('production.plans.show', $order->production_plan_id) }}" class="fw-bold text-primary">
+                                        {{ $order->plan->plan_number }}
+                                    </a>
+                                @else
+                                    <span class="text-dark fw-bold">Direct Order (No Plan)</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+        {{-- Tab 3: WIP Tracking --}}
+        <div class="tab-pane fade {{ $activeTab === 'vtab-wip' ? 'show active' : '' }}" id="vtab-wip" role="tabpanel" aria-labelledby="vtab-wip-tab">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold text-dark mb-0"><i class="feather-activity text-primary me-2"></i> WIP Tracking Status</h5>
                 <span class="fs-12 text-muted">Tracks active shop floor progress and accrued costing sheets.</span>
@@ -379,7 +474,7 @@
         </div>
 
         {{-- Tab 2: Operations --}}
-        <div class="tab-pane-custom d-none" id="tab-operations">
+        <div class="tab-pane fade {{ $activeTab === 'vtab-operations' ? 'show active' : '' }}" id="vtab-operations" role="tabpanel" aria-labelledby="vtab-operations-tab">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold text-dark mb-0">Routing Operations &amp; Capacity Execution</h5>
                 <span class="fs-12 text-muted">Operations must be processed sequentially.</span>
@@ -433,11 +528,15 @@
                                 </td>
                                 <td class="text-end">
                                     @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
-                                        <button type="button" class="btn btn-sm btn-primary"
-                                                data-bs-toggle="modal" data-bs-target="#progressModal"
-                                                onclick="var selectEl = document.getElementById('op_select_id'); if (selectEl) { selectEl.value = '{{ $op->id }}'; selectEl.dispatchEvent(new Event('change')); if (window.jQuery && jQuery().select2) { $(selectEl).trigger('change'); } }">
-                                            Log
-                                        </button>
+                                        <x-ui.action-dropdown id="opActionDropdown{{ $op->id }}">
+                                            <li>
+                                                <a class="dropdown-item py-1.5 fs-12" href="javascript:void(0)"
+                                                   data-bs-toggle="modal" data-bs-target="#progressModal"
+                                                   onclick="var selectEl = document.getElementById('op_select_id'); if (selectEl) { selectEl.value = '{{ $op->id }}'; selectEl.dispatchEvent(new Event('change')); if (window.jQuery && jQuery().select2) { $(selectEl).trigger('change'); } }">
+                                                    <i class="feather-edit-3 me-2 text-primary fs-12"></i>Log Execution Progress
+                                                </a>
+                                            </li>
+                                        </x-ui.action-dropdown>
                                     @else
                                         —
                                     @endif
@@ -449,9 +548,16 @@
             </div>
         </div>
 
-        {{-- Tab 3: Reservations --}}
-        <div class="tab-pane-custom d-none" id="tab-reservations">
-            <h5 class="fw-bold text-dark mb-3">Component Material Reservations</h5>
+        {{-- Tab 4: Reservations --}}
+        <div class="tab-pane fade {{ $activeTab === 'vtab-reservations' ? 'show active' : '' }}" id="vtab-reservations" role="tabpanel" aria-labelledby="vtab-reservations-tab">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-dark mb-0">Component Material Reservations</h5>
+                @if(($order->isReleased() || $order->isInProgress()) && !$order->isCompleted() && !$order->isClosed() && !$order->isCancelled())
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#requestAdditionalMaterialModal">
+                        <i class="feather-plus-circle me-1"></i> Request Additional Material
+                    </button>
+                @endif
+            </div>
             <div class="table-responsive">
                 <table class="erp-thin-table">
                     <thead>
@@ -479,16 +585,22 @@
                                 <td>{{ $res->uom->name }}</td>
                                 <td class="text-end">
                                     @if($order->isReleased() || $order->isInProgress())
-                                        <button type="button" class="btn btn-sm btn-outline-info me-1"
-                                                data-bs-toggle="modal" data-bs-target="#issueModal"
-                                                onclick="document.getElementById('issue_reservation_id').value = '{{ $res->id }}';">
-                                            Issue
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-outline-secondary"
-                                                data-bs-toggle="modal" data-bs-target="#returnModal"
-                                                onclick="document.getElementById('return_reservation_id').value = '{{ $res->id }}';">
-                                            Return
-                                        </button>
+                                        <x-ui.action-dropdown id="resActionDropdown{{ $res->id }}">
+                                            <li>
+                                                <a class="dropdown-item py-1.5 fs-12" href="javascript:void(0)"
+                                                   data-bs-toggle="modal" data-bs-target="#issueModal"
+                                                   onclick="document.getElementById('issue_reservation_id').value = '{{ $res->id }}';">
+                                                    <i class="feather-log-in me-2 text-info fs-12"></i>Issue Materials
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item py-1.5 fs-12" href="javascript:void(0)"
+                                                   data-bs-toggle="modal" data-bs-target="#returnModal"
+                                                   onclick="document.getElementById('return_reservation_id').value = '{{ $res->id }}';">
+                                                    <i class="feather-log-out me-2 text-secondary fs-12"></i>Return Materials
+                                                </a>
+                                            </li>
+                                        </x-ui.action-dropdown>
                                     @else
                                         —
                                     @endif
@@ -500,8 +612,8 @@
             </div>
         </div>
 
-        {{-- Tab 4: Material Issues --}}
-        <div class="tab-pane-custom d-none" id="tab-issues">
+        {{-- Tab 5: Material Issues --}}
+        <div class="tab-pane fade {{ $activeTab === 'vtab-issues' ? 'show active' : '' }}" id="vtab-issues" role="tabpanel" aria-labelledby="vtab-issues-tab">
             <h5 class="fw-bold text-dark mb-3">Shop Floor Material Issues &amp; Returns Log</h5>
             <div class="table-responsive">
                 <table class="erp-thin-table">
@@ -553,8 +665,8 @@
             </div>
         </div>
 
-        {{-- Tab 5: Progress Logs --}}
-        <div class="tab-pane-custom d-none" id="tab-progress">
+        {{-- Tab 6: Progress Logs --}}
+        <div class="tab-pane fade {{ $activeTab === 'vtab-progress' ? 'show active' : '' }}" id="vtab-progress" role="tabpanel" aria-labelledby="vtab-progress-tab">
             {{-- KPI Summary Row --}}
             <div class="row g-3 mb-4">
                 <div class="col-md-3">
@@ -663,8 +775,8 @@
             </div>
         </div>
 
-        {{-- Tab 6: Scrap & Rework --}}
-        <div class="tab-pane-custom d-none" id="tab-scrap">
+        {{-- Tab 7: Scrap & Rework --}}
+        <div class="tab-pane fade {{ $activeTab === 'vtab-scrap' ? 'show active' : '' }}" id="vtab-scrap" role="tabpanel" aria-labelledby="vtab-scrap-tab">
             <div class="row g-4">
                 <div class="col-md-6">
                     <h5 class="fw-bold text-dark mb-3">Scrap Log Entries</h5>
@@ -743,8 +855,8 @@
             </div>
         </div>
 
-        {{-- Tab 7: Cost Analysis --}}
-        <div class="tab-pane-custom d-none" id="tab-cost">
+        {{-- Tab: Cost Analysis --}}
+        <div class="tab-pane fade {{ $activeTab === 'vtab-cost' ? 'show active' : '' }}" id="vtab-cost" role="tabpanel" aria-labelledby="vtab-cost-tab">
             {{-- Cost KPI Row --}}
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
@@ -810,10 +922,368 @@
                     </tbody>
                 </table>
             </div>
+
+            {{-- Final Manufacturing Cost Summary (Automatic + Manual Adjustments) --}}
+            <h5 class="fw-bold text-dark mt-5 mb-3"><i class="feather-pie-chart text-primary me-2"></i> Final Manufacturing Cost Breakdown</h5>
+            <div class="table-responsive">
+                <table class="erp-thin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:25%">Cost Component</th>
+                            <th style="width:25%" class="text-end">Automatic Cost</th>
+                            <th style="width:25%" class="text-end">Manual Adjustments</th>
+                            <th style="width:25%" class="text-end">Final Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="fw-bold text-dark">Material Cost</td>
+                            <td class="text-end">${{ number_format($finalCostingSummary['material']['auto'], 2) }}</td>
+                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['material']['manual'], 2) }}</td>
+                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['material']['final'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-dark">Labor Cost</td>
+                            <td class="text-end">${{ number_format($finalCostingSummary['labor']['auto'], 2) }}</td>
+                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['labor']['manual'], 2) }}</td>
+                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['labor']['final'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-dark">Machine Cost</td>
+                            <td class="text-end">${{ number_format($finalCostingSummary['machine']['auto'], 2) }}</td>
+                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['machine']['manual'], 2) }}</td>
+                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['machine']['final'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-dark">Work Center Overhead</td>
+                            <td class="text-end">${{ number_format($finalCostingSummary['overhead']['auto'], 2) }}</td>
+                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['overhead']['manual'], 2) }}</td>
+                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['overhead']['final'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-dark">Other / Uncategorized Expenses</td>
+                            <td class="text-end text-muted">$0.00</td>
+                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['other']['manual'], 2) }}</td>
+                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['other']['final'], 2) }}</td>
+                        </tr>
+                        <tr class="table-light">
+                            <td class="fw-bold text-dark text-uppercase fs-12">Total Manufacturing Cost</td>
+                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['totals']['auto'], 2) }}</td>
+                            <td class="text-end fw-bold text-warning">${{ number_format($finalCostingSummary['totals']['manual'], 2) }}</td>
+                            <td class="text-end fw-bold text-primary fs-14">${{ number_format($finalCostingSummary['totals']['final'], 2) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {{-- Day-Wise Production & Costing History Table --}}
+            <h5 class="fw-bold text-dark mt-5 mb-3"><i class="feather-calendar text-primary me-2"></i> Day-Wise Production &amp; Costing History</h5>
+            <div class="table-responsive">
+                <table class="erp-thin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:9%">Date</th>
+                            <th style="width:13%">Ops Worked</th>
+                            <th style="width:10%" class="text-center">Produced / Scrap</th>
+                            <th style="width:8%" class="text-center">Hours</th>
+                            <th style="width:12%">Operators &amp; Machines</th>
+                            <th style="width:9%" class="text-end">Auto Cost</th>
+                            <th style="width:9%" class="text-end">Manual Adj.</th>
+                            <th style="width:10%" class="text-end">Final Daily Cost</th>
+                            <th style="width:10%" class="text-end">Cumul. Auto</th>
+                            <th style="width:10%" class="text-end">Cumul. Adj.</th>
+                            <th style="width:10%" class="text-end">Cumul. Final</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($dailyHistory as $day)
+                            <tr>
+                                <td class="fw-bold text-dark font-monospace">{{ $day['date'] }}</td>
+                                <td>{{ $day['operations_worked'] ?: '—' }}</td>
+                                <td class="text-center">
+                                    <span class="text-success fw-bold">{{ number_format($day['quantity_produced'], 2) }}</span>
+                                    /
+                                    <span class="text-danger">{{ number_format($day['quantity_scrapped'] + $day['quantity_rejected'], 2) }}</span>
+                                </td>
+                                <td class="text-center fw-semibold">{{ number_format($day['total_minutes'] / 60, 2) }}h</td>
+                                <td>
+                                    <small class="d-block text-dark">{{ $day['operators'] ?: '—' }}</small>
+                                    <small class="text-muted font-monospace fs-10">{{ $day['machines'] ?: '—' }}</small>
+                                </td>
+                                <td class="text-end fw-semibold text-dark">${{ number_format($day['automatic_daily_cost'], 2) }}</td>
+                                <td class="text-end text-warning fw-semibold">${{ number_format($day['manual_daily_adjustment'], 2) }}</td>
+                                <td class="text-end fw-bold text-primary">${{ number_format($day['final_daily_cost'], 2) }}</td>
+                                <td class="text-end text-muted">${{ number_format($day['cumulative_automatic_cost'], 2) }}</td>
+                                <td class="text-end text-warning">${{ number_format($day['cumulative_manual_adjustment'], 2) }}</td>
+                                <td class="text-end fw-bold text-dark">${{ number_format($day['cumulative_final_cost'], 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="11" class="text-center py-4 text-muted">
+                                    <i class="feather-info me-1"></i>No day-wise production or material issue logs recorded yet.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {{-- Tab: Cost Adjustments --}}
+        <div class="tab-pane fade {{ $activeTab === 'vtab-cost-adjustments' ? 'show active' : '' }}" id="vtab-cost-adjustments" role="tabpanel" aria-labelledby="vtab-cost-adjustments-tab">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="fw-bold text-dark mb-0"><i class="feather-dollar-sign text-primary me-2"></i> Manual Cost Adjustments</h5>
+                    <span class="fs-12 text-muted">Record unexpected manual expenses (machine breakdown, emergency maintenance, fuel, quality failure, etc.).</span>
+                </div>
+                @if(!$order->isCompleted() && !$order->isClosed() && !$order->isCancelled())
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addCostAdjustmentModal">
+                        <i class="feather-plus-circle me-1"></i> Add Cost Adjustment
+                    </button>
+                @endif
+            </div>
+
+            {{-- Summary Cards --}}
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="card border bg-light py-2 px-3 text-center">
+                        <span class="fs-11 text-muted text-uppercase fw-semibold">Total Manual Adjustments</span>
+                        <h4 class="fw-bold text-primary mb-0 mt-1">${{ number_format($finalCostingSummary['totals']['manual'], 2) }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border bg-light py-2 px-3 text-center">
+                        <span class="fs-11 text-muted text-uppercase fw-semibold">Adjustment Records</span>
+                        <h4 class="fw-bold text-dark mb-0 mt-1">{{ $costAdjustments->total() }}</h4>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="erp-thin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:12%">Date</th>
+                            <th style="width:12%">Component</th>
+                            <th style="width:18%">Category</th>
+                            <th style="width:25%">Description</th>
+                            <th style="width:12%" class="text-end">Amount</th>
+                            <th style="width:10%">Attachment</th>
+                            <th style="width:11%">Created By</th>
+                            <th style="width:10%" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($costAdjustments as $adj)
+                            <tr>
+                                <td class="fw-bold text-dark font-monospace">{{ $adj->adjustment_date ? $adj->adjustment_date->format('Y-m-d') : '—' }}</td>
+                                <td>
+                                    <span class="badge bg-soft-info text-info text-uppercase fs-10">
+                                        {{ $costComponents[$adj->cost_component] ?? ucfirst($adj->cost_component) }}
+                                    </span>
+                                </td>
+                                <td class="fw-semibold text-dark">{{ $adj->category }}</td>
+                                <td>
+                                    {{ $adj->description }}
+                                    @if($adj->notes)
+                                        <small class="d-block text-muted">{{ $adj->notes }}</small>
+                                    @endif
+                                </td>
+                                <td class="text-end fw-bold text-danger">${{ number_format($adj->amount, 2) }}</td>
+                                <td>
+                                    @if($adj->attachment_path)
+                                        <a href="{{ route('production.cost-adjustments.download', $adj->id) }}" class="btn btn-xs btn-outline-secondary" title="Download Attachment">
+                                            <i class="feather-paperclip me-1"></i> File
+                                        </a>
+                                    @else
+                                        <span class="text-muted fs-11">—</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <small class="text-dark">{{ $adj->creator ? $adj->creator->name : 'System' }}</small>
+                                </td>
+                                <td class="text-end">
+                                    @if(!$order->isCompleted() && !$order->isClosed() && !$order->isCancelled())
+                                        <x-ui.action-dropdown id="adjActionDropdown{{ $adj->id }}">
+                                            <li>
+                                                <a class="dropdown-item py-1.5 fs-12" href="javascript:void(0)"
+                                                   data-bs-toggle="modal" data-bs-target="#editCostAdjustmentModal{{ $adj->id }}">
+                                                    <i class="feather-edit me-2 text-muted fs-12"></i>Edit Adjustment
+                                                </a>
+                                            </li>
+                                            @if($adj->attachment_path)
+                                                <li>
+                                                    <a class="dropdown-item py-1.5 fs-12" href="{{ route('production.cost-adjustments.download', $adj->id) }}">
+                                                        <i class="feather-paperclip me-2 text-muted fs-12"></i>Download Attachment
+                                                    </a>
+                                                </li>
+                                            @endif
+                                            <li>
+                                                <form method="POST" action="{{ route('production.cost-adjustments.destroy', $adj->id) }}" onsubmit="return confirm('Are you sure you want to soft-delete this cost adjustment?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Adjustment
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </x-ui.action-dropdown>
+                                    @else
+                                        <span class="text-muted fs-11">Locked</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">
+                                    <i class="feather-info me-1"></i>No manual cost adjustments recorded for this order yet.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            @if($costAdjustments->hasPages())
+                <div class="mt-3">
+                    {{ $costAdjustments->links() }}
+                </div>
+            @endif
+        </div>
+
+        {{-- Tab: Material Requests & Procurement --}}
+        <div class="tab-pane fade {{ $activeTab === 'vtab-procurement' ? 'show active' : '' }}" id="vtab-procurement" role="tabpanel" aria-labelledby="vtab-procurement-tab">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-dark mb-0"><i class="feather-truck text-primary me-2"></i> Material Requests &amp; Procurement Status</h5>
+                <span class="fs-12 text-muted">Tracks requisition slips, purchase requisitions, and purchase orders.</span>
+            </div>
+
+            @php
+                $slips = $order->requisitionSlips;
+                $totalSlips = $slips->count();
+                $pendingSlips = $slips->where('status', 'pending')->count();
+                $allPrs = collect();
+                foreach($slips as $s) {
+                    foreach($s->purchaseRequisitions as $pr) {
+                        $allPrs->push($pr);
+                    }
+                }
+                $pendingPrs = $allPrs->where('status', 'Draft')->count();
+            @endphp
+
+            {{-- Summary Badges --}}
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card border bg-light py-2 px-3 text-center">
+                        <span class="fs-11 text-muted text-uppercase fw-semibold">Total Requisition Slips</span>
+                        <h4 class="fw-bold text-dark mb-0 mt-1">{{ $totalSlips }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border bg-light py-2 px-3 text-center">
+                        <span class="fs-11 text-muted text-uppercase fw-semibold">Pending Material Requests</span>
+                        <h4 class="fw-bold text-warning mb-0 mt-1">{{ $pendingSlips }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border bg-light py-2 px-3 text-center">
+                        <span class="fs-11 text-muted text-uppercase fw-semibold">Linked Purchase Requisitions</span>
+                        <h4 class="fw-bold text-primary mb-0 mt-1">{{ $allPrs->count() }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card border bg-light py-2 px-3 text-center">
+                        <span class="fs-11 text-muted text-uppercase fw-semibold">Pending PR Approval</span>
+                        <h4 class="fw-bold text-info mb-0 mt-1">{{ $pendingPrs }}</h4>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="erp-thin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:15%">Slip #</th>
+                            <th style="width:12%">Request Date</th>
+                            <th style="width:10%">Status</th>
+                            <th style="width:10%" class="text-center">Items</th>
+                            <th style="width:25%">Linked Purchase Requisition (PR)</th>
+                            <th style="width:18%">PR Status</th>
+                            <th style="width:10%" class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($slips as $slip)
+                            <tr>
+                                <td>
+                                    <a href="{{ route('production.material-requests.show', $slip->id) }}" class="fw-bold text-primary font-monospace">
+                                        {{ $slip->requisition_number }}
+                                    </a>
+                                </td>
+                                <td class="text-muted">{{ $slip->requisition_date }}</td>
+                                <td>
+                                    @if($slip->status === 'completed')
+                                        <span class="badge bg-soft-success text-success text-uppercase">Completed</span>
+                                    @elseif($slip->status === 'partial')
+                                        <span class="badge bg-soft-warning text-warning text-uppercase">Partial</span>
+                                    @else
+                                        <span class="badge bg-soft-danger text-danger text-uppercase">Pending</span>
+                                    @endif
+                                </td>
+                                <td class="text-center fw-semibold">{{ $slip->items->count() }}</td>
+                                <td>
+                                    @if($slip->purchaseRequisitions->isNotEmpty())
+                                        @foreach($slip->purchaseRequisitions as $pr)
+                                            <div>
+                                                @if(Route::has('purchase.requisitions.show'))
+                                                    <a href="{{ route('purchase.requisitions.show', $pr->id) }}" class="fw-bold text-primary font-monospace">
+                                                        {{ $pr->requisition_number }}
+                                                    </a>
+                                                @else
+                                                    <span class="fw-bold text-dark font-monospace">{{ $pr->requisition_number }}</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    @else
+                                        <span class="text-muted fs-12">Not required (In Stock)</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($slip->purchaseRequisitions->isNotEmpty())
+                                        @foreach($slip->purchaseRequisitions as $pr)
+                                            <div>
+                                                @if($pr->status === 'Approved')
+                                                    <span class="badge bg-soft-success text-success">PR Approved</span>
+                                                @elseif($pr->status === 'Cancelled')
+                                                    <span class="badge bg-soft-danger text-danger">PR Cancelled</span>
+                                                @else
+                                                    <span class="badge bg-soft-warning text-warning">PR Pending Review</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    @else
+                                        <span class="text-muted fs-12">—</span>
+                                    @endif
+                                </td>
+                                <td class="text-end">
+                                    <x-ui.action-dropdown :viewUrl="route('production.material-requests.show', $slip->id)">
+                                    </x-ui.action-dropdown>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="feather-info fs-20 d-block mb-2"></i>No material requisition slips recorded.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         {{-- Tab 8: Audit Trail --}}
-        <div class="tab-pane-custom d-none" id="tab-audit">
+        <div class="tab-pane fade {{ $activeTab === 'vtab-audit' ? 'show active' : '' }}" id="vtab-audit" role="tabpanel" aria-labelledby="vtab-audit-tab">
             <h5 class="fw-bold text-dark mb-3">Audit Logs Trail</h5>
             <ul class="list-unstyled mb-0 fs-13">
                 <li class="mb-3 d-flex align-items-start">
@@ -861,7 +1331,9 @@
             </ul>
         </div>
 
-    </div>{{-- end .tab-content --}}
+            </div>{{-- end .tab-content --}}
+        </div>{{-- end right content col --}}
+    </div>{{-- end 2-column row --}}
 
     {{-- ── MODALS (using x-ui.modal component — body.appendChild fixes z-index) ── --}}
 
@@ -1080,17 +1552,248 @@
         <x-slot name="footer"></x-slot>
     </x-ui.modal>
 
+    {{-- Request Additional Material Modal --}}
+    <x-ui.modal id="requestAdditionalMaterialModal" title="Request Additional Material" size="lg" class="text-start">
+        <form method="POST" action="{{ route('production.orders.request-additional-material', $order->id) }}" id="additionalMaterialForm">
+            @csrf
+            
+            <div class="bg-light p-3 rounded mb-3 border fs-13">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <span class="text-muted d-block fs-11 text-uppercase">Production Order</span>
+                        <strong class="text-dark fs-14">{{ $order->order_number }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted d-block fs-11 text-uppercase">Target Product</span>
+                        <strong class="text-dark fs-14">{{ $order->product->name }} ({{ $order->product->sku }})</strong>
+                    </div>
+                </div>
+            </div>
+
+            <p class="fs-12 text-muted mb-2">Select components and enter the additional quantity requested from warehouse or procurement:</p>
+
+            <div class="table-responsive mb-3">
+                <table class="table table-sm table-bordered align-middle fs-12 mb-0">
+                    <thead class="bg-soft-light text-uppercase fs-11 fw-semibold text-muted">
+                        <tr>
+                            <th style="width:5%" class="text-center">Select</th>
+                            <th style="width:30%">Component Material</th>
+                            <th style="width:12%" class="text-center">Planned</th>
+                            <th style="width:12%" class="text-center">Issued</th>
+                            <th style="width:12%" class="text-center">Shortage</th>
+                            <th style="width:14%" class="text-center">Requested Qty</th>
+                            <th style="width:15%">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($order->reservations as $idx => $res)
+                            @php
+                                $shortage = max(0.0, $res->quantity_planned - $res->quantity_issued);
+                            @endphp
+                            <tr>
+                                <td class="text-center">
+                                    <input type="checkbox" name="items[{{ $idx }}][selected]" value="1" class="form-check-input item-checkbox" id="chk_{{ $idx }}" checked>
+                                    <input type="hidden" name="items[{{ $idx }}][product_id]" value="{{ $res->product_id }}">
+                                </td>
+                                <td>
+                                    <label for="chk_{{ $idx }}" class="fw-bold text-dark mb-0 cursor-pointer">{{ $res->product->name }}</label>
+                                    <div class="text-muted font-monospace fs-10">{{ $res->product->sku }}</div>
+                                </td>
+                                <td class="text-center fw-semibold text-dark">{{ number_format($res->quantity_planned, 2) }}</td>
+                                <td class="text-center text-success fw-bold">{{ number_format($res->quantity_issued, 2) }}</td>
+                                <td class="text-center text-danger fw-bold">{{ number_format($shortage, 2) }}</td>
+                                <td>
+                                    <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm" step="0.0001" min="0.0001" value="{{ $shortage > 0 ? $shortage : 1 }}">
+                                </td>
+                                <td>
+                                    <input type="text" name="items[{{ $idx }}][notes]" class="form-control form-control-sm" placeholder="e.g. Extra scrap">
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <x-ui.odoo-form-ui type="input" label="Requisition Notes / Reason" name="notes" placeholder="Reason for additional material request..." />
+
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitAdHocForm()">Submit Requisition</button>
+        </x-slot>
+    </x-ui.modal>
+
+    <script>
+        function submitAdHocForm() {
+            document.querySelectorAll('#additionalMaterialForm tbody tr').forEach(row => {
+                const chk = row.querySelector('.item-checkbox');
+                if (chk && !chk.checked) {
+                    row.querySelectorAll('input').forEach(i => i.disabled = true);
+                }
+            });
+            document.getElementById('additionalMaterialForm').submit();
+        }
+    </script>
+
+    {{-- Add Cost Adjustment Modal --}}
+    <x-ui.modal id="addCostAdjustmentModal" title="Add Manual Cost Adjustment" size="lg" class="text-start" :showFooter="true">
+        <form method="POST" action="{{ route('production.orders.cost-adjustments.store', $order->id) }}" enctype="multipart/form-data" id="addCostAdjustmentForm">
+            @csrf
+            
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="input" label="Adjustment Date" name="adjustment_date" inputType="date" value="{{ now()->toDateString() }}" :required="true" />
+                </div>
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="select" label="Cost Component" name="cost_component" :required="true">
+                        @foreach($costComponents as $key => $label)
+                            <option value="{{ $key }}">{{ $label }}</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="select" label="Category (Reason)" name="category" :required="true">
+                        @foreach($categories as $catKey => $catLabel)
+                            <option value="{{ $catKey }}">{{ $catLabel }}</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="input" label="Amount" name="amount" inputType="number" step="0.01" min="0.01" placeholder="0.00" :required="true" />
+                </div>
+            </div>
+
+            <x-ui.odoo-form-ui type="input" label="Description" name="description" placeholder="Brief explanation of manual expense" :required="true" />
+
+            <div class="mb-3">
+                <label class="form-label fs-12 fw-semibold text-dark">Attachment (Receipt / Invoice / Proof)</label>
+                <input type="file" name="attachment" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.zip">
+                <small class="text-muted fs-11">Supported formats: PDF, Images, Word, Excel, ZIP (Max 10MB)</small>
+            </div>
+
+            <x-ui.odoo-form-ui type="textarea" label="Notes / Comments" name="notes" placeholder="Additional details or remarks..." rows="2" />
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="document.getElementById('addCostAdjustmentForm').submit();">Save Cost Adjustment</button>
+        </x-slot>
+    </x-ui.modal>
+
+    {{-- Edit Cost Adjustment Modals --}}
+    @foreach($costAdjustments as $adj)
+        <x-ui.modal id="editCostAdjustmentModal{{ $adj->id }}" title="Edit Cost Adjustment #{{ $adj->id }}" size="lg" class="text-start" :showFooter="true">
+            <form method="POST" action="{{ route('production.cost-adjustments.update', $adj->id) }}" enctype="multipart/form-data" id="editCostAdjustmentForm{{ $adj->id }}">
+                @csrf
+                @method('PUT')
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="Adjustment Date" name="adjustment_date" inputType="date" value="{{ $adj->adjustment_date ? $adj->adjustment_date->format('Y-m-d') : '' }}" :required="true" />
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="select" label="Cost Component" name="cost_component" :required="true">
+                            @foreach($costComponents as $key => $label)
+                                <option value="{{ $key }}" {{ $adj->cost_component === $key ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="select" label="Category (Reason)" name="category" :required="true">
+                            @foreach($categories as $catKey => $catLabel)
+                                <option value="{{ $catKey }}" {{ $adj->category === $catKey ? 'selected' : '' }}>{{ $catLabel }}</option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
+                    </div>
+                    <div class="col-md-6">
+                        <x-ui.odoo-form-ui type="input" label="Amount" name="amount" inputType="number" step="0.01" min="0.01" value="{{ $adj->amount }}" :required="true" />
+                    </div>
+                </div>
+
+                <x-ui.odoo-form-ui type="input" label="Description" name="description" value="{{ $adj->description }}" :required="true" />
+
+                <div class="mb-3">
+                    <label class="form-label fs-12 fw-semibold text-dark">Attachment (Optional replacement)</label>
+                    <input type="file" name="attachment" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.zip">
+                    @if($adj->attachment_path)
+                        <small class="text-success d-block mt-1">Existing file uploaded. Selecting a new file will replace it.</small>
+                    @endif
+                </div>
+
+                <x-ui.odoo-form-ui type="textarea" label="Notes / Comments" name="notes" value="{{ $adj->notes }}" rows="2" />
+            </form>
+            <x-slot name="footer">
+                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('editCostAdjustmentForm{{ $adj->id }}').submit();">Update Adjustment</button>
+            </x-slot>
+        </x-ui.modal>
+    @endforeach
+
 </div>{{-- end .erp-single-panel --}}
 
 <script>
-    function switchTab(tabId) {
-        // Remove active from all tab links
-        document.querySelectorAll('.erp-tabs-link').forEach(link => link.classList.remove('active'));
-        document.getElementById('btn-tab-' + tabId).classList.add('active');
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Synchronize URL query parameter & active classes when user switches tabs (desktop & mobile)
+        document.querySelectorAll('#productionOrderVerticalTabs, #mobileProductionOrderTabs').forEach(tabContainer => {
+            tabContainer.addEventListener('click', function(e) {
+                const button = e.target.closest('button[data-bs-toggle="pill"], button[data-bs-toggle="tab"]');
+                if (button) {
+                    const targetId = button.getAttribute('data-bs-target')?.replace('#', '');
+                    if (targetId) {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('tab', targetId);
+                        window.history.replaceState(null, '', url.toString());
 
-        // Hide all panes, show target
-        document.querySelectorAll('.tab-pane-custom').forEach(pane => pane.classList.add('d-none'));
-        document.getElementById('tab-' + tabId).classList.remove('d-none');
-    }
+                        // Sync active class across both vertical (desktop) and horizontal (mobile) tab buttons
+                        document.querySelectorAll(`[data-bs-target="#${targetId}"]`).forEach(btn => {
+                            btn.classList.add('active');
+                            btn.setAttribute('aria-selected', 'true');
+                        });
+                        document.querySelectorAll(`[data-bs-target]:not([data-bs-target="#${targetId}"])`).forEach(btn => {
+                            if (btn.closest('#productionOrderVerticalTabs, #mobileProductionOrderTabs')) {
+                                btn.classList.remove('active');
+                                btn.setAttribute('aria-selected', 'false');
+                            }
+                        });
+                    }
+                }
+            });
+        });
+
+        // 2. Automatically attach current active tab to all form submissions on the page
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function() {
+                const currentTab = new URLSearchParams(window.location.search).get('tab');
+                if (currentTab) {
+                    let hiddenInput = form.querySelector('input[name="tab"]');
+                    if (!hiddenInput) {
+                        hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = 'tab';
+                        form.appendChild(hiddenInput);
+                    }
+                    hiddenInput.value = currentTab;
+                }
+            });
+        });
+
+        // 3. Handle initial page load from URL parameter or adjustments_page
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTabFromUrl = urlParams.get('tab') || (urlParams.has('adjustments_page') ? 'vtab-cost-adjustments' : null);
+        if (activeTabFromUrl) {
+            document.querySelectorAll(`[data-bs-target="#${activeTabFromUrl}"]`).forEach(activeBtn => {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+                    bootstrap.Tab.getOrCreateInstance(activeBtn).show();
+                } else {
+                    activeBtn.click();
+                }
+            });
+        }
+    });
 </script>
 @endsection

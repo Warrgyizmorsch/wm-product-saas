@@ -15,22 +15,30 @@
 
         {{-- Search Sheet --}}
         <x-ui.odoo-form-ui type="sheet">
-            <h5 class="fw-bold mb-3 text-dark"><i class="feather-search text-primary me-2"></i> Trace Batch / Serial / Order</h5>
+            <h5 class="fw-bold mb-3 text-dark"><i class="feather-search text-primary me-2"></i> Trace Batch / Serial / Order / Material Lot</h5>
             <form method="GET" action="{{ route('production.mes.traceability.search') }}">
                 <div class="row g-3 align-items-end fs-13 text-dark">
                     <div class="col-md-3">
                         <x-ui.odoo-form-ui type="select" label="Entity Type" name="type" id="type" :required="true">
-                            <option value="batch" @selected(request('type') === 'batch')>Batch Number</option>
+                            <option value="batch" @selected(request('type', 'batch') === 'batch')>Production Batch</option>
                             <option value="serial" @selected(request('type') === 'serial')>Serial Number</option>
                             <option value="order" @selected(request('type') === 'order')>Production Order</option>
+                            <option value="lot" @selected(request('type') === 'lot')>Inventory Lot</option>
                         </x-ui.odoo-form-ui>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-3">
+                        <x-ui.odoo-form-ui type="select" label="Trace Direction" name="direction" id="direction">
+                            <option value="both" @selected(request('direction', 'both') === 'both')>Full Genealogy (Both)</option>
+                            <option value="forward" @selected(request('direction') === 'forward')>Forward Trace (Where Used)</option>
+                            <option value="backward" @selected(request('direction') === 'backward')>Backward Trace (Source Origin)</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+                    <div class="col-md-4">
                         <x-ui.odoo-form-ui type="input" label="Unique Code" name="code" placeholder="Enter batch/serial/order number..." value="{{ request('code') }}" :required="true" />
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100 py-2">
-                            <i class="feather-sliders me-1"></i> Trace Entity
+                            <i class="feather-sliders me-1"></i> Trace
                         </button>
                     </div>
                 </div>
@@ -42,8 +50,14 @@
             <div class="row">
                 <div class="col-12">
                     <div class="card border-0 shadow-sm">
-                        <div class="card-header bg-transparent border-bottom pt-4 pb-3">
-                            <h5 class="fw-bold text-dark mb-0">Trace Result: {{ strtoupper($searchedType) }} [{{ $searchedCode }}]</h5>
+                        <div class="card-header bg-transparent border-bottom pt-4 pb-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">Trace Result: {{ strtoupper($searchedType) }} [{{ $searchedCode }}]</h5>
+                                <span class="badge bg-soft-info text-info text-uppercase fs-10 mt-1">Direction: {{ $searchedDirection ?? 'both' }}</span>
+                            </div>
+                            <a href="{{ route('production.mes.traceability.export-csv', ['type' => $searchedType, 'code' => $searchedCode]) }}" class="btn btn-sm btn-outline-secondary">
+                                <i class="feather-download me-1"></i> Export CSV
+                            </a>
                         </div>
                         <div class="card-body">
                             {{-- Visual Genealogy Tree Timeline --}}

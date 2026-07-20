@@ -9,9 +9,22 @@
             .erp-horizontal-tabs {
                 border-bottom: 2px solid #e2e8f0;
                 gap: 8px;
+                overflow-x: auto;
+                overflow-y: hidden;
+                flex-wrap: nowrap;
+                white-space: nowrap;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none; /* Firefox */
+                -ms-overflow-style: none; /* IE and Edge */
+            }
+            .erp-horizontal-tabs::-webkit-scrollbar {
+                display: none; /* Chrome, Safari, Opera */
+                width: 0;
+                height: 0;
             }
             .erp-horizontal-tabs .nav-item {
                 margin-bottom: -2px;
+                flex-shrink: 0;
             }
             .erp-horizontal-tabs .nav-link {
                 border: none !important;
@@ -26,6 +39,8 @@
                 align-items: center;
                 border-top-left-radius: 4px;
                 border-top-right-radius: 4px;
+                white-space: nowrap;
+                flex-shrink: 0;
             }
             .erp-horizontal-tabs .nav-link i {
                 font-size: 14px;

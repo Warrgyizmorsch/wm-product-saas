@@ -601,6 +601,73 @@ class ProductionOrderService
         }
     }
 
+    public function createAdHocRequisitionSlip(ProductionOrder $order, array $items, ?int $userId = null, ?string $notes = null): ProductionRequisitionSlip
+    {
+        return DB::transaction(function () use ($order, $items, $userId, $notes) {
+            $year = now()->format('Y');
+            $prefix = "MR-{$year}-";
+            $lastSlip = ProductionRequisitionSlip::withoutGlobalScopes()
+                ->where('tenant_id', $order->tenant_id)
+                ->where('requisition_number', 'like', "{$prefix}%")
+                ->orderBy('id', 'desc')
+                ->first();
+            $nextNum = 1;
+            if ($lastSlip) {
+                $lastNumStr = str_replace($prefix, '', $lastSlip->requisition_number);
+                $nextNum = ((int) $lastNumStr) + 1;
+            }
+            $reqNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+            $slipNotes = 'Ad-hoc Production Requirement for Order ' . $order->order_number;
+            if (!empty($notes)) {
+                $slipNotes .= ' — ' . $notes;
+            }
+
+            $slip = ProductionRequisitionSlip::create([
+                'tenant_id' => $order->tenant_id,
+                'production_order_id' => $order->id,
+                'requisition_number' => $reqNumber,
+                'status' => 'pending',
+                'requested_by' => $userId ?? auth()->id(),
+                'requisition_date' => now()->toDateString(),
+                'notes' => $slipNotes,
+            ]);
+
+            foreach ($items as $item) {
+                $productId = (int) $item['product_id'];
+                $qty = (float) $item['quantity'];
+                $itemNotes = $item['notes'] ?? null;
+
+                $product = \App\Domains\Inventory\Models\Product::findOrFail($productId);
+                $uomId = $product->uom_id ?? 1;
+
+                ProductionRequisitionSlipItem::create([
+                    'tenant_id' => $order->tenant_id,
+                    'production_requisition_slip_id' => $slip->id,
+                    'product_id' => $productId,
+                    'quantity_planned' => $qty,
+                    'quantity_reserved' => 0.0,
+                    'quantity_issued' => 0.0,
+                    'uom_id' => $uomId,
+                ]);
+            }
+
+            // Write timeline event
+            if (class_exists(ProductionEventService::class)) {
+                app(ProductionEventService::class)->writeEvent($order->tenant_id, [
+                    'production_order_id' => $order->id,
+                    'event_type'          => 'material_requested',
+                    'title'               => 'Ad-hoc Material Requisition Created',
+                    'description'         => "Ad-hoc material requisition {$reqNumber} created (" . count($items) . " items).",
+                    'severity'            => 'info',
+                    'triggered_by'        => $userId ?? auth()->id(),
+                ]);
+            }
+
+            return $slip;
+        });
+    }
+
     private function createRequisitionSlip(ProductionOrder $order, array $itemsToResolve): void
     {
         $year = now()->format('Y');

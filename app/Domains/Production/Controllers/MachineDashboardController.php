@@ -12,17 +12,26 @@ class MachineDashboardController extends Controller
     public function index()
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-        $machines = Machine::with('workCenter')
+        $tenantId = require_tenant_id();
+
+        $machines = Machine::where('tenant_id', $tenantId)
+            ->with('workCenter')
             ->active()
             ->orderBy('name')
             ->get();
 
-        // Attach current operation to each machine
-        $machines->each(function ($machine) {
-            $machine->currentOp = ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation'])
-                ->where('machine_id', $machine->id)
-                ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
-                ->first();
+        $machineIds = $machines->pluck('id')->toArray();
+
+        // Fetch all running operations in a single query to eliminate N+1
+        $runningOps = ProductionScheduleOperation::where('tenant_id', $tenantId)
+            ->whereIn('machine_id', $machineIds)
+            ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
+            ->with(['schedule.order.product', 'orderOperation'])
+            ->get()
+            ->keyBy('machine_id');
+
+        $machines->each(function ($machine) use ($runningOps) {
+            $machine->currentOp = $runningOps->get($machine->id);
         });
 
         return view('modules.production.mes.machine-dashboard', compact('machines'));
