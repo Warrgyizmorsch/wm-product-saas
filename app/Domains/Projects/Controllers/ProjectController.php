@@ -158,6 +158,51 @@ class ProjectController extends Controller
             ->with('success', 'Project successfully deleted.');
     }
 
+    public function bulkAction(Request $request): RedirectResponse
+    {
+        $action = $request->input('action');
+        $ids = $request->input('ids');
+
+        if (empty($ids) || !is_array($ids)) {
+            return redirect()->route('projects.index')->with('error', 'No projects selected.');
+        }
+
+        if ($action !== 'delete') {
+            return redirect()->route('projects.index')->with('error', 'Invalid action.');
+        }
+
+        $tenantId = require_tenant_id();
+        $projects = Project::whereIn('id', $ids)->where('tenant_id', $tenantId)->get();
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        foreach ($projects as $project) {
+            if (auth()->user()->can('delete', $project)) {
+                $this->projects->delete($project);
+                $successCount++;
+            } else {
+                $failedCount++;
+            }
+        }
+
+        if ($successCount === 0) {
+            return redirect()
+                ->route('projects.index')
+                ->with('error', 'No projects could be deleted. Check your permissions.');
+        }
+
+        if ($failedCount > 0) {
+            return redirect()
+                ->route('projects.index')
+                ->with('success', "Successfully deleted {$successCount} project(s). {$failedCount} project(s) could not be deleted due to permission rules.");
+        }
+
+        return redirect()
+            ->route('projects.index')
+            ->with('success', "Successfully deleted {$successCount} project(s).");
+    }
+
     public function updateField(Request $request, Project $project): JsonResponse
     {
         return $this->handleInlineFieldUpdate($request, $project);

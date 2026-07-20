@@ -78,8 +78,8 @@
         </div>
 
         @if ($canManageMilestones)
-            <div class="hstack gap-2 flex-shrink-0">
-                <a href="javascript:void(0);" class="action-dropdown-btn action-dropdown-btn--accent" title="{{ __('projects.edit_milestone') }}" aria-label="{{ __('projects.edit_milestone') }}" data-bs-toggle="tooltip"
+            <div class="hstack gap-2 flex-shrink-0 milestone-hero-actions">
+                <a href="javascript:void(0);" class="action-dropdown-btn" title="{{ __('projects.edit_milestone') }}" aria-label="{{ __('projects.edit_milestone') }}" data-bs-toggle="tooltip"
                    onclick="openMilestoneModal('edit', @js($heroJsData))">
                     <i class="feather feather-edit-2"></i>
                 </a>
@@ -224,7 +224,7 @@
                 overflow: hidden;
             }
 
-            .action-dropdown-btn--accent {
+            .milestone-hero-actions .action-dropdown-btn {
                 border-color: var(--bs-primary) !important;
                 color: var(--bs-primary) !important;
             }

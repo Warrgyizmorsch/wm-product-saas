@@ -14,12 +14,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Covers the modal-based create/edit refactor in ProjectController. Description is
- * the only field still edited via the full-form "editProjectModal-{id}" (see
- * resources/views/modules/projects/_edit-description-modal.blade.php); every other
- * field uses inline editing instead. The modal scopes old()/$errors to itself via a
- * hidden "_modal" input, since old() and $errors are global to the request but the
- * index page renders one edit modal per visible project.
+ * Covers the modal-based quick-create flow in ProjectController. Description edits
+ * (and all other field edits) go through inline editing on the show page instead
+ * (see ProjectInlineFieldDescriptionTest) — the directory listing no longer offers
+ * a full-form edit modal. The create modal scopes old()/$errors to itself via a
+ * hidden "_modal" input, since old() and $errors are global to the request.
  */
 class ProjectEditModalTest extends TestCase
 {
@@ -55,103 +54,6 @@ class ProjectEditModalTest extends TestCase
             'priority' => Project::PRIORITY_MEDIUM,
             'status' => Project::STATUS_DRAFT,
         ], $overrides));
-    }
-
-    /** @test */
-    public function failed_edit_reopens_only_the_submitted_projects_modal(): void
-    {
-        $projectA = $this->createProject(['project_code' => 'PRJ-0001', 'name' => 'Alpha']);
-        $projectB = $this->createProject(['project_code' => 'PRJ-0002', 'name' => 'Beta']);
-
-        $response = $this->actingAs($this->tenantOwner)
-            ->withHeader('X-Tenant', 'test-tenant')
-            ->from(route('projects.index'))
-            ->put(route('projects.update', $projectA), [
-                '_modal'     => 'editProjectModal-' . $projectA->id,
-                'name'       => 'Alpha Rework Attempt',
-                'owner_id'   => $this->tenantOwner->id,
-                'start_date' => now()->toDateString(),
-                'end_date'   => now()->subDay()->toDateString(), // before start_date -> invalid
-                'priority'   => Project::PRIORITY_MEDIUM,
-                'status'     => Project::STATUS_ACTIVE,
-            ]);
-
-        $response->assertRedirect(route('projects.index'));
-        $response->assertSessionHasErrors('end_date');
-
-        // Underlying record is untouched by the failed submission.
-        $this->assertSame('Alpha', $projectA->fresh()->name);
-
-        $reopen = $this->get(route('projects.index'));
-        $reopen->assertOk();
-
-        // Every rendered modal carries its own boilerplate relocation script (see
-        // x-ui.modal), which also calls getElementById with that modal's id — so we
-        // isolate the *reopen* script specifically (identified by its unique
-        // ".show()" call) rather than asserting on getElementById() in general.
-        $content = $reopen->getContent();
-        $marker = 'if (modalEl && window.bootstrap)';
-        $markerPos = strpos($content, $marker);
-        $this->assertNotFalse($markerPos, 'Expected the modal reopen script to be present.');
-
-        $reopenSnippet = substr($content, max(0, $markerPos - 200), 250);
-        $this->assertStringContainsString('editProjectModal-' . $projectA->id, $reopenSnippet);
-        $this->assertStringNotContainsString('editProjectModal-' . $projectB->id, $reopenSnippet);
-    }
-
-    /** @test */
-    public function edit_validation_errors_and_old_input_do_not_leak_into_other_project_modals(): void
-    {
-        $projectA = $this->createProject(['project_code' => 'PRJ-0001', 'name' => 'Alpha']);
-        $projectB = $this->createProject(['project_code' => 'PRJ-0002', 'name' => 'Beta']);
-
-        $response = $this->actingAs($this->tenantOwner)
-            ->withHeader('X-Tenant', 'test-tenant')
-            ->from(route('projects.index'))
-            ->put(route('projects.update', $projectA), [
-                '_modal'     => 'editProjectModal-' . $projectA->id,
-                'name'       => 'Alpha Rework Attempt',
-                'owner_id'   => $this->tenantOwner->id,
-                'start_date' => now()->toDateString(),
-                'end_date'   => now()->subDay()->toDateString(), // before start_date -> invalid
-                'priority'   => Project::PRIORITY_MEDIUM,
-                'status'     => Project::STATUS_ACTIVE,
-            ]);
-
-        $response->assertSessionHasErrors('end_date');
-        $errorMessage = session('errors')->first('end_date');
-        $this->assertNotEmpty($errorMessage);
-
-        $reopen = $this->get(route('projects.index'));
-        $reopen->assertOk();
-
-        $content = $reopen->getContent();
-
-        $startA = strpos($content, 'id="editProjectModal-' . $projectA->id . '"');
-        $startB = strpos($content, 'id="editProjectModal-' . $projectB->id . '"');
-
-        $this->assertNotFalse($startA, 'Expected project A\'s edit modal to be rendered.');
-        $this->assertNotFalse($startB, 'Expected project B\'s edit modal to be rendered.');
-        $this->assertLessThan($startB, $startA, 'Expected project A to render before project B (sorted by project_code).');
-
-        // Bound blockB before the trailing reopen-script/toast scripts at the end of the
-        // page (which legitimately echo the raw error message globally) so we're only
-        // inspecting project B's own modal markup, not unrelated page-level scripts.
-        $trailingScriptsPos = strpos($content, 'if (modalEl && window.bootstrap)', $startB);
-        $this->assertNotFalse($trailingScriptsPos, 'Expected the modal reopen script to be present.');
-
-        $blockA = substr($content, $startA, $startB - $startA);
-        $blockB = substr($content, $startB, $trailingScriptsPos - $startB);
-
-        // The submitted modal shows the stale (invalid) old() input and the field error.
-        $this->assertStringContainsString('Alpha Rework Attempt', $blockA);
-        $this->assertStringContainsString($errorMessage, $blockA);
-
-        // The other project's modal must show its own unrelated stored data, not the
-        // failed submission's stale input or error.
-        $this->assertStringNotContainsString('Alpha Rework Attempt', $blockB);
-        $this->assertStringNotContainsString($errorMessage, $blockB);
-        $this->assertStringContainsString('value="Beta"', $blockB);
     }
 
     /** @test */
@@ -210,8 +112,6 @@ class ProjectEditModalTest extends TestCase
             ->get(route('projects.index'));
 
         $index->assertOk();
-        $index->assertSee('data-bs-target="#editProjectModal-' . $ownProject->id . '"', false);
-        $index->assertDontSee('id="editProjectModal-' . $otherProject->id . '"', false);
 
         // Update succeeds for the project they own.
         $allowed = $this->actingAs($editor)

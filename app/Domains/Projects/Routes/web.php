@@ -15,6 +15,7 @@ Route::prefix('projects')
     ->group(function (): void {
         Route::get('/', [ProjectController::class, 'index'])->name('index');
         Route::post('/', [ProjectController::class, 'store'])->name('store');
+        Route::post('bulk-action', [ProjectController::class, 'bulkAction'])->name('bulk-action');
 
         Route::get('milestones', [MilestoneController::class, 'index'])->name('milestones.index');
 

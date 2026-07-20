@@ -17,10 +17,29 @@
     ];
 @endphp
 
-<div class="border rounded-3 task-list-card {{ !$isLastTaskListCard ? 'mb-3' : '' }}" data-task-list-card data-task-list-id="{{ $taskList->id }}">
+@once
+    @push('styles')
+        <style>
+            .task-list-icon-btn {
+                border: 1.5px solid var(--bs-primary) !important;
+                color: var(--bs-primary) !important;
+                background-color: #ffffff !important;
+            }
+            .task-list-icon-btn:disabled {
+                opacity: 0.4;
+            }
+            .task-list-toggle.collapsed {
+                background-color: var(--bs-primary) !important;
+                color: #ffffff !important;
+            }
+        </style>
+    @endpush
+@endonce
+
+<div class="border rounded-3 task-list-card project-content-card {{ !$isLastTaskListCard ? 'mb-3' : '' }}" data-task-list-card data-task-list-id="{{ $taskList->id }}">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 p-3 {{ $listTasks->isNotEmpty() ? 'border-bottom' : '' }}">
         <div class="d-flex align-items-start gap-2 flex-grow-1" style="min-width: 220px;">
-            <button type="button" class="btn btn-light btn-sm p-1 task-list-toggle" data-task-list-toggle
+            <button type="button" class="btn btn-light btn-sm p-1 task-list-toggle task-list-icon-btn" data-task-list-toggle
                     data-bs-toggle="collapse" data-bs-target="#{{ $taskListBodyId }}"
                     aria-expanded="true" aria-controls="{{ $taskListBodyId }}"
                     title="{{ __('projects.expand_collapse') }}">
@@ -74,14 +93,14 @@
                     <form method="POST" action="{{ route('projects.tasklists.move-up', [$project, $taskList]) }}">
                         @csrf
                         @method('PATCH')
-                        <button type="submit" class="btn btn-light btn-sm p-1" title="{{ __('projects.move_up') }}" @disabled($index === 0)>
+                        <button type="submit" class="btn btn-light btn-sm p-1 task-list-icon-btn" title="{{ __('projects.move_up') }}" @disabled($index === 0)>
                             <i class="feather-chevron-up"></i>
                         </button>
                     </form>
                     <form method="POST" action="{{ route('projects.tasklists.move-down', [$project, $taskList]) }}">
                         @csrf
                         @method('PATCH')
-                        <button type="submit" class="btn btn-light btn-sm p-1" title="{{ __('projects.move_down') }}" @disabled($index === $taskLists->count() - 1)>
+                        <button type="submit" class="btn btn-light btn-sm p-1 task-list-icon-btn" title="{{ __('projects.move_down') }}" @disabled($index === $taskLists->count() - 1)>
                             <i class="feather-chevron-down"></i>
                         </button>
                     </form>
