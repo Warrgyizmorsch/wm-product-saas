@@ -7,7 +7,6 @@ use App\Core\Database\BaseModel;
 class SalaryComponent extends BaseModel
 {
     protected $fillable = [
-        'organization_id',
         'company_id',
         'pay_group_id',
         'name',
@@ -33,14 +32,6 @@ class SalaryComponent extends BaseModel
     public function scopeAdhoc($query)
     {
         return $query->where('is_adhoc', true);
-    }
-
-    /**
-     * Get the organization that owns the salary component.
-     */
-    public function organization()
-    {
-        return $this->belongsTo(Organization::class);
     }
 
     /**

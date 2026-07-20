@@ -1,6 +1,6 @@
 @php
     $isSalary = request()->routeIs('hrms.salary-structure.index') || request()->query('tab') === 'salary-structure';
-    $isLeave = request()->routeIs('hrms.leave-structure.index');
+    $isLeave = request()->routeIs('hrms.leave-structure.index') || request()->routeIs('hrms.leave-structure.transition');
     $isPenalty = request()->routeIs('hrms.penalization-policy.index');
     $isRoster = request()->routeIs('hrms.roster.index');
     $isAsset = request()->routeIs('hrms.assets.index');

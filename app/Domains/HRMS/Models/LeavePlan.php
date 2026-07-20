@@ -12,11 +12,13 @@ class LeavePlan extends BaseModel
         'effective_from',
         'description',
         'status',
+        'last_renewed_at',
     ];
 
     protected $casts = [
         'status' => 'boolean',
         'effective_from' => 'date',
+        'last_renewed_at' => 'date',
     ];
 
     public function company()

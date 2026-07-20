@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Leave Applications | SaaS ERP')
-@section('page-title', 'Leave Applications')
-@section('breadcrumb', 'HRMS / Leave Applications')
+@section('title', __('hrms.leave.app.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.leave.app.title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.leave.app.title'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#applyLeaveModal" class="fw-bold text-uppercase">
-            Apply Leave
+            {{ __('hrms.leave.app.apply_leave') }}
         </x-ui.button>
     </div>
 @endsection
@@ -226,12 +226,12 @@
                 var empId = $(this).val();
                 var $leaveTypeSelect = $('#leave_type_select');
                 
-                $leaveTypeSelect.empty().append('<option value="">Select Leave Type</option>');
+                $leaveTypeSelect.empty().append('<option value="">{{ __('hrms.leave.app.select_leave_type') }}</option>');
 
                 if (empId && employeeDataMap[empId]) {
                     var types = employeeDataMap[empId];
                     types.forEach(function(t) {
-                        var text = t.name + ' (Remaining: ' + t.remaining + ' / ' + t.quota + ' days)';
+                        var text = t.name + ' (' + '{{ __('hrms.leave.app.remaining') }}' + ': ' + t.remaining + ' / ' + t.quota + ' ' + '{{ __('hrms.leave.days') }}' + ')';
                         var option = $('<option>', {
                             value: t.id,
                             text: text
@@ -253,10 +253,10 @@
                 var defaultEmpId = "{{ $employee ? $employee->id : '' }}";
                 if (defaultEmpId && employeeDataMap[defaultEmpId]) {
                     var $leaveTypeSelect = $('#leave_type_select');
-                    $leaveTypeSelect.empty().append('<option value="">Select Leave Type</option>');
+                    $leaveTypeSelect.empty().append('<option value="">{{ __('hrms.leave.app.select_leave_type') }}</option>');
                     var types = employeeDataMap[defaultEmpId];
                     types.forEach(function(t) {
-                        var text = t.name + ' (Remaining: ' + t.remaining + ' / ' + t.quota + ' days)';
+                        var text = t.name + ' (' + '{{ __('hrms.leave.app.remaining') }}' + ': ' + t.remaining + ' / ' + t.quota + ' ' + '{{ __('hrms.leave.days') }}' + ')';
                         var option = $('<option>', {
                             value: t.id,
                             text: text
@@ -296,7 +296,8 @@
                     // Minimum & Maximum Duration
                     var minDur = appRules.min_duration || 1;
                     var maxDur = appRules.max_duration || 10;
-                    $('#policy_duration').html('<span class="policy-icon-wrapper"><i class="feather-clock"></i></span><span>Duration: <strong>' + minDur + ' to ' + maxDur + ' day(s)</strong> per application.</span>');
+                    var durationTpl = "{{ __('hrms.leave.app.duration_range', ['min' => '__min__', 'max' => '__max__']) }}";
+                    $('#policy_duration').html('<span class="policy-icon-wrapper"><i class="feather-clock"></i></span><span>' + durationTpl.replace('__min__', '<strong>' + minDur + '</strong>').replace('__max__', '<strong>' + maxDur + '</strong>') + '</span>');
 
                     // Apply in Advance & Disable invalid dates
                     if (appRules.apply_in_advance) {
@@ -321,7 +322,8 @@
                             $('#end_date').val('');
                         }
 
-                        $('#policy_advance').html('<span class="policy-icon-wrapper"><i class="feather-alert-circle"></i></span><span>Notice required: Apply at least <strong>' + advanceDays + ' day(s)</strong> in advance.</span>').removeClass('d-none');
+                        var advanceTpl = "{{ __('hrms.leave.app.notice_required_days', ['days' => '__days__']) }}";
+                        $('#policy_advance').html('<span class="policy-icon-wrapper"><i class="feather-alert-circle"></i></span><span>' + advanceTpl.replace('__days__', '<strong>' + advanceDays + '</strong>') + '</span>').removeClass('d-none');
                     } else {
                         $('#start_date').removeAttr('min');
                         $('#end_date').removeAttr('min');
@@ -330,35 +332,44 @@
 
                     // Probation Rule
                     if (probRules.probation_rule && probRules.probation_rule !== 'allow') {
+                        var cannotProbTxt = "{{ __('hrms.leave.app.cannot_apply_probation') }}";
+                        var allowedProbTpl = "{{ __('hrms.leave.app.allowed_after_months', ['months' => '__months__']) }}";
                         var probTxt = probRules.probation_rule === 'disallow' 
-                            ? 'Cannot apply during probation.' 
-                            : 'Allowed only after <strong>' + (probRules.probation_months || 3) + ' months</strong> of service.';
-                        $('#policy_probation').html('<span class="policy-icon-wrapper"><i class="feather-user-check"></i></span><span>Probation: ' + probTxt + '</span>').removeClass('d-none');
+                            ? cannotProbTxt 
+                            : allowedProbTpl.replace('__months__', '<strong>' + (probRules.probation_months || 3) + '</strong>');
+                        $('#policy_probation').html('<span class="policy-icon-wrapper"><i class="feather-user-check"></i></span><span>' + '{{ __('hrms.leave.probation') }}' + ': ' + probTxt + '</span>').removeClass('d-none');
                     } else {
                         $('#policy_probation').addClass('d-none');
                     }
 
                     // Notice Period Rule
                     if (noticeRules.notice_rule && noticeRules.notice_rule !== 'allow') {
+                        var cannotNoticeTxt = "{{ __('hrms.leave.app.cannot_apply_notice') }}";
+                        var specialNoticeTxt = "{{ __('hrms.leave.app.special_permission_notice') }}";
                         var noticeTxt = noticeRules.notice_rule === 'disallow' 
-                            ? 'Cannot apply during notice period.' 
-                            : 'Requires special permission during notice period.';
-                        $('#policy_notice').html('<span class="policy-icon-wrapper"><i class="feather-user-x"></i></span><span>Notice Period: ' + noticeTxt + '</span>').removeClass('d-none');
+                            ? cannotNoticeTxt 
+                            : specialNoticeTxt;
+                        $('#policy_notice').html('<span class="policy-icon-wrapper"><i class="feather-user-x"></i></span><span>' + '{{ __('hrms.leave.notice') }}' + ': ' + noticeTxt + '</span>').removeClass('d-none');
                     } else {
                         $('#policy_notice').addClass('d-none');
                     }
 
                     // Attachment Required
                     if (appRules.require_attachment) {
-                        $('#policy_attachment').html('<span class="policy-icon-wrapper"><i class="feather-paperclip"></i></span><span>Attachment: Required for <strong>' + (appRules.attachment_days || 3) + ' day(s) or more</strong>.</span>').removeClass('d-none');
+                        var attachmentTpl = "{{ __('hrms.leave.app.attachment_required_for', ['days' => '__days__']) }}";
+                        $('#policy_attachment').html('<span class="policy-icon-wrapper"><i class="feather-paperclip"></i></span><span>' + attachmentTpl.replace('__days__', '<strong>' + (appRules.attachment_days || 3) + '</strong>') + '</span>').removeClass('d-none');
                     } else {
                         $('#policy_attachment').addClass('d-none');
                     }
 
                     // Approval levels
                     var approvalLevel = approvalRules.workflow_level || '1_level';
-                    var approvalText = approvalLevel === 'auto' ? 'Auto-Approved' : (approvalLevel === '1_level' ? '1 Level Approval Required' : '2 Levels Approval Required');
-                    $('#policy_approval').html('<span class="policy-icon-wrapper"><i class="feather-check-square"></i></span><span>Workflow: ' + approvalText + '</span>');
+                    var autoTxt = "{{ __('hrms.leave.app.auto_approved') }}";
+                    var oneLvlTxt = "{{ __('hrms.leave.app.one_level_req') }}";
+                    var twoLvlTxt = "{{ __('hrms.leave.app.two_level_req') }}";
+                    var approvalText = approvalLevel === 'auto' ? autoTxt : (approvalLevel === '1_level' ? oneLvlTxt : twoLvlTxt);
+                    var workflowTpl = "{{ __('hrms.leave.app.workflow_label', ['type' => '__type__']) }}";
+                    $('#policy_approval').html('<span class="policy-icon-wrapper"><i class="feather-check-square"></i></span><span>' + workflowTpl.replace('__type__', approvalText) + '</span>');
 
                     // Re-calculate expected duration and attachment requirement immediately
                     calculateExpectedDuration();
@@ -384,7 +395,8 @@
 
                         if (duration >= attachmentDays && !hasFile) {
                             e.preventDefault();
-                            alert("An attachment is required for this leave type when the duration is " + attachmentDays + " day(s) or more. Please upload a supporting document before submitting.");
+                            var alertMsg = "{{ __('hrms.leave.app.attachment_required_alert', ['days' => '__days__']) }}";
+                            alert(alertMsg.replace('__days__', attachmentDays));
                             return false;
                         }
                     }
@@ -422,7 +434,7 @@
                 var end = new Date(endDateStr);
 
                 if (end < start) {
-                    $('#calculated_duration_display').text('End date must be on or after start date');
+                    $('#calculated_duration_display').text("{{ __('hrms.leave.app.date_validation_error') }}");
                     return 0;
                 }
 
@@ -452,7 +464,8 @@
                     }
                 }
 
-                $('#calculated_duration_display').html('Estimated Duration: <strong>' + duration + ' day(s)</strong> (excluding Sundays)');
+                var estTpl = "{{ __('hrms.leave.app.estimated_duration', ['duration' => '__duration__']) }}";
+                $('#calculated_duration_display').html(estTpl.replace('__duration__', '<strong>' + duration + '</strong>'));
 
                 // Real-time dynamic attachment warning constraint
                 var selectedOption = $('#leave_type_select').find('option:selected');
@@ -684,8 +697,8 @@
             <div class="col-12 mb-4">
                 <div class="card border-0 shadow-sm rounded-3">
                     <div class="card-header bg-white border-0 pt-4">
-                        <h5 class="fw-bold text-dark mb-0">Your Leave Balances</h5>
-                        <p class="text-muted fs-12 mb-0">Leave Plan: <span class="badge bg-secondary fw-semibold">{{ $employee->leavePlan ? $employee->leavePlan->name : 'No active plan assigned' }}</span></p>
+                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.app.your_leave_balances') }}</h5>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.leave_plan') }} <span class="badge bg-secondary fw-semibold">{{ $employee->leavePlan ? $employee->leavePlan->name : __('hrms.leave.app.no_active_plan') }}</span></p>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -695,7 +708,7 @@
                                         <h6 class="text-muted text-uppercase fs-11 fw-bolder mb-2">{{ $balance->leaveType->name }}</h6>
                                         <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
                                             <span class="fs-1 fw-bold text-primary">{{ $balance->remaining }}</span>
-                                            <span class="text-muted fs-13">/ {{ $balance->allocated }} days</span>
+                                            <span class="text-muted fs-13">/ {{ $balance->allocated }} {{ __('hrms.leave.days') }}</span>
                                         </div>
                                         <div class="progress progress-sm" style="height: 6px;">
                                             @php
@@ -704,14 +717,14 @@
                                             <div class="progress-bar bg-success" role="progressbar" style="width: {{ 100 - $pct }}%"></div>
                                         </div>
                                         <div class="d-flex justify-content-between mt-3 fs-12 text-muted">
-                                            <span>Used: <strong>{{ $balance->used }}</strong></span>
-                                            <span>Type: <strong>{{ ucfirst($balance->leaveType->type) }}</strong></span>
+                                            <span>{{ __('hrms.leave.app.used') }} <strong>{{ $balance->used }}</strong></span>
+                                            <span>{{ __('hrms.leave.app.type') }} <strong>{{ $balance->leaveType->type === 'paid' ? __('hrms.leave.paid') : __('hrms.leave.unpaid') }}</strong></span>
                                         </div>
                                     </div>
                                 </div>
                             @empty
                                 <div class="col-12 text-center py-4">
-                                    <p class="text-muted mb-0">No active leave type balances found for your assigned plan.</p>
+                                    <p class="text-muted mb-0">{{ __('hrms.leave.app.no_balances_found') }}</p>
                                 </div>
                             @endforelse
                         </div>
@@ -725,8 +738,8 @@
             <div class="card border-0 shadow-sm rounded-3">
                 <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0">Leave Applications</h5>
-                        <p class="text-muted fs-12 mb-0">Review applied leaves, approval cycles, and status updates.</p>
+                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.app.title') }}</h5>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.review_applications_desc') }}</p>
                     </div>
                     
                     <div class="d-flex align-items-center gap-2">
@@ -734,38 +747,38 @@
                             <!-- Registry Style Search Input -->
                             <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                <input type="text" id="leaves_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search Employee..." style="box-shadow: none; height: 32px;">
+                                <input type="text" id="leaves_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;">
                             </div>
 
                             <!-- Sort Dropdown with Checkmark Icons -->
-                            <x-ui.sort-dropdown label="Sort">
+                            <x-ui.sort-dropdown :label="__('hrms.common.sort')">
                                 <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="changeLeavesSort('date_desc', this); event.preventDefault();">
-                                    <span>Newest Applied</span>
+                                    <span>{{ __('hrms.leave.app.sort_newest') }}</span>
                                     <i class="feather-check text-dark ms-auto sort-check"></i>
                                 </a>
                                 <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('date_asc', this); event.preventDefault();">
-                                    <span>Oldest Applied</span>
+                                    <span>{{ __('hrms.leave.app.sort_oldest') }}</span>
                                     <i class="feather-check text-dark ms-auto sort-check d-none"></i>
                                 </a>
                                 <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_desc', this); event.preventDefault();">
-                                    <span>Duration (High-Low)</span>
+                                    <span>{{ __('hrms.leave.app.sort_duration_high_low') }}</span>
                                     <i class="feather-check text-dark ms-auto sort-check d-none"></i>
                                 </a>
                                 <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_asc', this); event.preventDefault();">
-                                    <span>Duration (Low-High)</span>
+                                    <span>{{ __('hrms.leave.app.sort_duration_low_high') }}</span>
                                     <i class="feather-check text-dark ms-auto sort-check d-none"></i>
                                 </a>
                             </x-ui.sort-dropdown>
 
                             <!-- Filter Dropdown -->
-                            <x-ui.filter label="Filter" offset="0, 5">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                                 
                                 @if($isAdmin)
                                     <div class="mb-3" style="min-width: 250px;">
-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Employee</label>
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</label>
                                         <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_employee_id">
-                                            <option value="">All Employees</option>
+                                            <option value="">{{ __('hrms.common.all_employees') ?? 'All Employees' }}</option>
                                             @foreach($allEmployees as $emp)
                                                 <option value="{{ $emp->id }}">
                                                     {{ $emp->full_name }}
@@ -776,20 +789,20 @@
                                 @endif
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
                                     <x-ui.odoo-form-ui type="select" name="status" id="filter_status">
-                                        <option value="">All Statuses</option>
-                                        <option value="pending">Pending</option>
-                                        <option value="approved">Approved</option>
-                                        <option value="rejected">Rejected</option>
+                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
+                                        <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
+                                        <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
+                                        <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
                                 <div class="dropdown-divider my-3"></div>
 
                                 <div class="d-flex gap-2">
-                                    <button type="button" id="btnApplyFilters" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
-                                    <button type="button" id="btnResetFilters" class="btn btn-light btn-sm border flex-grow-1">Reset</button>
+                                    <button type="button" id="btnApplyFilters" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
+                                    <button type="button" id="btnResetFilters" class="btn btn-light btn-sm border flex-grow-1">{{ __('hrms.common.reset') }}</button>
                                 </div>
                             </x-ui.filter>
                         </form>
@@ -802,14 +815,14 @@
                             <thead class="table-light">
                                 <tr>
                                     @if($isAdmin)
-                                        <th>Employee</th>
+                                        <th>{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
                                     @endif
-                                    <th>Leave Type</th>
-                                    <th>Duration & Timeline</th>
-                                    <th>Reason</th>
-                                    <th>Workflow Level</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
+                                    <th>{{ __('hrms.leave.leave_types') }}</th>
+                                    <th>{{ __('hrms.leave.app.duration_timeline') }}</th>
+                                    <th>{{ __('hrms.leave.app.reason') }}</th>
+                                    <th>{{ __('hrms.leave.app.workflow_level') }}</th>
+                                    <th>{{ __('ui.status') ?? 'Status' }}</th>
+                                    <th class="text-end">{{ __('hrms.leave.app.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="leavesTableBody">
@@ -840,7 +853,7 @@
                                                 $rowAllocated = $rowBalance ? floatval($rowBalance->allocated) : floatval($req->leaveType->quota);
                                             @endphp
                                             <div class="text-muted fs-11" style="white-space: nowrap;">
-                                                Balance: <strong>{{ $rowRemaining }}</strong> / {{ $rowAllocated }} days
+                                                {{ __('hrms.leave.app.remaining') }}: <strong>{{ $rowRemaining }}</strong> / {{ $rowAllocated }} {{ __('hrms.leave.days') }}
                                             </div>
                                         </td>
                                         <td>
@@ -856,13 +869,13 @@
                                                 }
                                             @endphp
                                             <div class="fs-13 text-dark fw-bold">
-                                                {{ $dateRange }} <span class="text-secondary fs-12 fw-normal">({{ floatval($req->duration) }} day(s))</span>
+                                                {{ $dateRange }} <span class="text-secondary fs-12 fw-normal">({{ __('hrms.leave.app.duration_days', ['duration' => floatval($req->duration)]) }})</span>
                                             </div>
                                             @if($req->start_date_type !== 'full_day' || $req->end_date_type !== 'full_day')
                                                 <small class="text-muted fs-11">
-                                                    Session: <span class="text-capitalize">{{ str_replace('_', ' ', $req->start_date_type) }}</span> 
+                                                    {{ __('hrms.leave.app.session') }} <span class="text-capitalize">{{ __('hrms.leave.app.' . $req->start_date_type) }}</span> 
                                                     @if(!$req->start_date->isSameDay($req->end_date))
-                                                        to <span class="text-capitalize">{{ str_replace('_', ' ', $req->end_date_type) }}</span>
+                                                        {{ __('hrms.leave.app.to') }} <span class="text-capitalize">{{ __('hrms.leave.app.' . $req->end_date_type) }}</span>
                                                     @endif
                                                 </small>
                                             @endif
@@ -874,7 +887,7 @@
                                                       data-bs-toggle="popover" 
                                                       data-bs-trigger="click" 
                                                       data-bs-placement="top" 
-                                                      title="Application Reason" 
+                                                      title="{{ __('hrms.leave.app.application_reason') }}" 
                                                       data-bs-content="{{ $req->reason }}">
                                                     {{ Str::limit($req->reason, 25) }} <i class="feather-zoom-in fs-11 text-muted"></i>
                                                 </span>
@@ -885,13 +898,13 @@
                                         <td>
                                              <span class="text-secondary fs-12">
                                                  @if($req->status === 'approved')
-                                                     Approved
+                                                     {{ __('hrms.leave.app.status_approved') }}
                                                  @elseif($req->status === 'rejected')
-                                                     Rejected
+                                                     {{ __('hrms.leave.app.status_rejected') }}
                                                  @elseif($req->status === 'unauthorized' || $req->status === 'unpaid')
-                                                     Processed
+                                                     {{ __('hrms.leave.app.processed') }}
                                                  @else
-                                                     Level {{ $req->current_level }}
+                                                     {{ __('hrms.leave.app.level_n', ['level' => $req->current_level]) }}
                                                  @endif
                                              </span>
                                          </td>
@@ -902,20 +915,20 @@
                                                        data-bs-toggle="popover" 
                                                        data-bs-trigger="click" 
                                                        data-bs-placement="top" 
-                                                       title="Rejection Reason" 
+                                                       title="{{ __('hrms.leave.app.rejection_reason') }}" 
                                                        data-bs-content="{{ $req->rejection_reason }}">
-                                                     Rejected <i class="feather-help-circle fs-10"></i>
+                                                     {{ __('hrms.leave.app.status_rejected') }} <i class="feather-help-circle fs-10"></i>
                                                  </span>
                                              @else
                                                  <span class="badge rounded-pill fw-semibold px-3 py-2 fs-11 badge-{{ $req->status }}">
-                                                     {{ ucfirst($req->status) }}
+                                                     {{ __('hrms.leave.app.status_' . $req->status) }}
                                                  </span>
                                              @endif
                                          </td>
                                          <td class="text-end">
                                              <div class="d-flex align-items-center justify-content-end gap-2">
                                                  @if($req->attachment_path)
-                                                     <a href="{{ asset('storage/' . $req->attachment_path) }}" target="_blank" class="btn btn-light btn-sm" title="View Attachment">
+                                                     <a href="{{ asset('storage/' . $req->attachment_path) }}" target="_blank" class="btn btn-light btn-sm" title="{{ __('hrms.leave.app.view_attachment') }}">
                                                          <i class="feather-paperclip text-secondary"></i>
                                                      </a>
                                                  @endif
@@ -923,11 +936,11 @@
                                                      <form method="POST" action="{{ route('hrms.leaves.update-status', $req->id) }}" class="m-0 p-0">
                                                          @csrf
                                                          <select name="status" class="form-select form-select-sm status-dropdown fw-semibold fs-11" data-id="{{ $req->id }}" style="width: 130px; border-radius: 6px;">
-                                                             <option value="pending" {{ $req->status === 'pending' ? 'selected' : '' }}>Pending</option>
-                                                             <option value="approved" {{ $req->status === 'approved' ? 'selected' : '' }}>Approved</option>
-                                                             <option value="rejected" {{ $req->status === 'rejected' ? 'selected' : '' }}>Rejected</option>
-                                                             <option value="unauthorized" {{ $req->status === 'unauthorized' ? 'selected' : '' }}>Unauthorized</option>
-                                                             <option value="unpaid" {{ $req->status === 'unpaid' ? 'selected' : '' }}>Unpaid</option>
+                                                             <option value="pending" {{ $req->status === 'pending' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_pending') }}</option>
+                                                             <option value="approved" {{ $req->status === 'approved' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_approved') }}</option>
+                                                             <option value="rejected" {{ $req->status === 'rejected' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_rejected') }}</option>
+                                                             <option value="unauthorized" {{ $req->status === 'unauthorized' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_unauthorized') }}</option>
+                                                             <option value="unpaid" {{ $req->status === 'unpaid' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_unpaid') }}</option>
                                                          </select>
                                                      </form>
                                                  @endif
@@ -938,14 +951,14 @@
                                     <tr>
                                         <td colspan="10" class="text-center py-5 text-muted">
                                             <i class="feather-folder fs-3 d-block mb-3 text-secondary"></i>
-                                            No leave applications submitted yet.
+                                            {{ __('hrms.leave.app.no_applications_submitted') }}
                                         </td>
                                     </tr>
                                 @endforelse
                                 <tr id="no_matching_leaves_row" class="d-none">
                                     <td colspan="10" class="text-center py-5 text-muted">
                                         <i class="feather-folder fs-3 d-block mb-3 text-secondary"></i>
-                                        No matching leave applications found.
+                                        {{ __('hrms.leave.app.no_matching_applications') }}
                                     </td>
                                 </tr>
                             </tbody>
@@ -956,7 +969,11 @@
                             <!-- Dynamically generated pagination links -->
                         </ul>
                         <div class="erp-pagination-info">
-                            Showing <span id="leaves_showing_start">0</span> to <span id="leaves_showing_end">0</span> of <strong id="leaves_total_count">0</strong> entries
+                            {!! __('hrms.leave.app.showing_entries', [
+                                'start' => '<span id="leaves_showing_start">0</span>',
+                                'end' => '<span id="leaves_showing_end">0</span>',
+                                'total' => '<strong id="leaves_total_count">0</strong>'
+                            ]) !!}
                         </div>
                     </div>
                 </div>
@@ -969,7 +986,7 @@
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0">
                 <div class="modal-header border-bottom py-3">
-                    <h5 class="modal-title fw-bold text-dark" id="applyLeaveModalLabel">Apply for Leave</h5>
+                    <h5 class="modal-title fw-bold text-dark" id="applyLeaveModalLabel">{{ __('hrms.leave.app.apply_for_leave') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form action="{{ route('hrms.leaves.store') }}" method="POST" enctype="multipart/form-data">
@@ -988,7 +1005,7 @@
                         @if ($isAdmin)
                             <div class="row mb-3">
                                 <div class="col-12">
-                                    <x-ui.odoo-form-ui type="select" label="Employee" name="employee_id" id="employee_select" :required="true" class="odoo-select2-custom">
+                                    <x-ui.odoo-form-ui type="select" :label="__('hrms.employees.tbl_employee') ?? 'Employee'" name="employee_id" id="employee_select" :required="true" class="odoo-select2-custom">
                                         @foreach ($allEmployees as $emp)
                                             <option value="{{ $emp->id }}" {{ ($employee && $employee->id == $emp->id) ? 'selected' : '' }}>
                                                 {{ $emp->full_name }} ({{ $emp->employee_id }})
@@ -1005,59 +1022,59 @@
 
                         <div class="row">
                             <div class="col-12 mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Leave Type" name="leave_type_id" id="leave_type_select" :required="true" class="odoo-select2-custom">
-                                    <option value="">Select Leave Type</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.leave_types')" name="leave_type_id" id="leave_type_select" :required="true" class="odoo-select2-custom">
+                                    <option value="">{{ __('hrms.leave.app.select_leave_type') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" id="start_date" :required="true" class="odoo-underline-input" />
+                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.leave.app.start_date')" name="start_date" id="start_date" :required="true" class="odoo-underline-input" />
                             </div>
                             <div class="col-md-6 mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Start Session" name="start_date_type" id="start_date_type" :required="true" class="odoo-select2-custom">
-                                    <option value="full_day">Full Day</option>
-                                    <option value="first_half">First Half</option>
-                                    <option value="second_half">Second Half</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.app.start_session')" name="start_date_type" id="start_date_type" :required="true" class="odoo-select2-custom">
+                                    <option value="full_day">{{ __('hrms.leave.app.full_day') }}</option>
+                                    <option value="first_half">{{ __('hrms.leave.app.first_half') }}</option>
+                                    <option value="second_half">{{ __('hrms.leave.app.second_half') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <x-ui.odoo-form-ui type="input" inputType="date" label="End Date" name="end_date" id="end_date" :required="true" class="odoo-underline-input" />
+                                <x-ui.odoo-form-ui type="input" inputType="date" :label="__('hrms.leave.app.end_date')" name="end_date" id="end_date" :required="true" class="odoo-underline-input" />
                             </div>
                             <div class="col-md-6 mb-3">
-                                <x-ui.odoo-form-ui type="select" label="End Session" name="end_date_type" id="end_date_type" :required="true" class="odoo-select2-custom">
-                                    <option value="full_day">Full Day</option>
-                                    <option value="first_half">First Half</option>
-                                    <option value="second_half">Second Half</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.app.end_session')" name="end_date_type" id="end_date_type" :required="true" class="odoo-select2-custom">
+                                    <option value="full_day">{{ __('hrms.leave.app.full_day') }}</option>
+                                    <option value="first_half">{{ __('hrms.leave.app.first_half') }}</option>
+                                    <option value="second_half">{{ __('hrms.leave.app.second_half') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
 
                         <div class="col-12 mb-3">
                             <div id="calculated_duration_display" class="alert alert-info py-2 fs-12 mb-0">
-                                Estimated Duration: 0 day(s)
+                                {{ __('hrms.leave.app.estimated_duration_simple', ['duration' => 0]) }}
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="textarea" label="Reason for Leave" name="reason" :required="true" class="odoo-underline-input" placeholder="Please describe details of your leave request..."></x-ui.odoo-form-ui>
+                            <x-ui.odoo-form-ui type="textarea" :label="__('hrms.leave.app.reason_for_leave')" name="reason" :required="true" class="odoo-underline-input" :placeholder="__('hrms.leave.app.reason_placeholder')"></x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label for="attachment" class="form-label fw-bold text-secondary fs-13">Upload Attachment (e.g. medical certificates or documents)</label>
+                            <label for="attachment" class="form-label fw-bold text-secondary fs-13">{{ __('hrms.leave.app.upload_attachment') }}</label>
                             <input type="file" name="attachment" id="attachment" class="form-control">
-                            <small class="text-muted fs-11">Formats allowed: PDF, PNG, JPG, JPEG (Max size: 5MB)</small>
+                            <small class="text-muted fs-11">{{ __('hrms.leave.app.formats_allowed') }}</small>
                             <div id="attachment_required_warning" class="text-danger fs-12 mt-1 d-none fw-semibold">
-                                <i class="feather-alert-triangle"></i> Supporting document is required for this duration according to leave policy.
+                                <i class="feather-alert-triangle"></i> {{ __('hrms.leave.app.attachment_required_warning') }}
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="Notify Members" name="notified_contacts[]" id="notified_contacts" :required="false" :multiple="true" class="odoo-select2-custom" placeholder="Select team members to keep informed">
+                            <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.app.notify_members')" name="notified_contacts[]" id="notified_contacts" :required="false" :multiple="true" class="odoo-select2-custom" :placeholder="__('hrms.leave.app.notify_placeholder')">
                                 @foreach ($allEmployees as $emp)
                                     @if (!$employee || $emp->id !== $employee->id)
                                         <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
@@ -1066,9 +1083,9 @@
                             </x-ui.odoo-form-ui>
                         </div>
                     </div>
-                    <div class="modal-footer border-top py-3">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary text-dark">Submit Request</button>
+                    <div class="modal-header border-top py-3 d-flex justify-content-end gap-2" style="border-bottom: none;">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
+                        <button type="submit" class="btn btn-primary text-dark">{{ __('hrms.leave.app.submit_request') }}</button>
                     </div>
                 </form>
             </div>
@@ -1080,20 +1097,20 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0">
                 <div class="modal-header border-bottom py-3">
-                    <h5 class="modal-title fw-bold text-dark" id="rejectLeaveModalLabel">Reject Leave Application</h5>
+                    <h5 class="modal-title fw-bold text-dark" id="rejectLeaveModalLabel">{{ __('hrms.leave.app.reject_title') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="rejectLeaveForm" method="POST">
                     @csrf
                     <div class="modal-body p-4">
                         <div class="mb-3">
-                            <label for="rejection_reason" class="form-label fw-bold text-secondary fs-13">Rejection Reason <span class="text-danger">*</span></label>
-                            <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="4" placeholder="Please provide reason for rejecting this leave request..." required></textarea>
+                            <label for="rejection_reason" class="form-label fw-bold text-secondary fs-13">{{ __('hrms.leave.app.rejection_reason') }} <span class="text-danger">*</span></label>
+                            <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="4" :placeholder="__('hrms.leave.app.rejection_reason_placeholder')" required></textarea>
                         </div>
                     </div>
                     <div class="modal-footer border-top py-3">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger text-white">Confirm Rejection</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
+                        <button type="submit" class="btn btn-danger text-white">{{ __('hrms.leave.app.confirm_rejection') }}</button>
                     </div>
                 </form>
             </div>

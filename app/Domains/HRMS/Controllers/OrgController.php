@@ -4,7 +4,6 @@ namespace App\Domains\HRMS\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Company;
-use App\Domains\HRMS\Models\Organization;
 use App\Domains\HRMS\Models\BusinessUnit;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\Branch;
@@ -292,8 +291,6 @@ class OrgController extends Controller {
             'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
-        $organization = Organization::currentDefault();
-
         $logo = null;
 
         if ($request->hasFile('logo')) {
@@ -312,7 +309,6 @@ class OrgController extends Controller {
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active');
 
         Company::create([
-            'organization_id' => $organization->id,
             'company_name' => $request->company_name,
             'legal_name' => $request->legal_name,
             'gst_number' => $request->gst_number,
@@ -839,7 +835,6 @@ class OrgController extends Controller {
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
         SalaryComponent::create([
-            'organization_id' => Organization::currentDefault()->id,
             'company_id' => $request->company_id,
             'name' => $request->name,
             'code' => $request->code,

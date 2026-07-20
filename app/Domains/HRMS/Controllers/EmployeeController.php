@@ -129,6 +129,8 @@ class EmployeeController extends Controller
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
+        $oldPlanId = $employee->leave_plan_id;
+
         $validated = $this->validatePayload($request, $employee);
         $validated = $this->normalizeHierarchy($validated);
         $validated['status'] = $request->input('status', '1') === '1';
@@ -140,6 +142,13 @@ class EmployeeController extends Controller
         }
 
         $employee->update($validated);
+
+        $newPlanId = $employee->leave_plan_id;
+        if ($oldPlanId != $newPlanId) {
+            $action = $request->input('leave_transition_action', 'transfer');
+            $unusedAction = $request->input('leave_transition_unused', 'carry');
+            $employee->migrateToLeavePlan($oldPlanId, $newPlanId, $action, $unusedAction);
+        }
 
         return redirect()
             ->route('hrms.employees.index')
@@ -170,6 +179,8 @@ class EmployeeController extends Controller
             'designation_id' => ['required', 'exists:designations,id'],
             'pay_group_id' => ['nullable', 'exists:pay_groups,id'],
             'leave_plan_id' => ['nullable', 'exists:leave_plans,id'],
+            'leave_transition_action' => ['nullable', 'string', 'in:transfer,prorate'],
+            'leave_transition_unused' => ['nullable', 'string', 'in:carry,lapse'],
             'employee_id' => [
                 'nullable',
                 'string',
@@ -497,14 +508,31 @@ class EmployeeController extends Controller
             ->where('status', true)
             ->get();
 
-        // Self-healing: Recalculate and reconcile leave balances for this employee to match approved requests
+        // Self-healing: Recalculate and reconcile leave balances for this employee to match approved requests within the current cycle exactly
         try {
             $balancesList = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)->get();
+            $currentCycleStart = null;
+            if ($employee->leavePlan && $employee->leavePlan->effective_from) {
+                $startDate = \Carbon\Carbon::parse($employee->leavePlan->effective_from);
+                $now = \Carbon\Carbon::now();
+                $diffInYears = $startDate->diffInYears($now);
+                $currentCycleStart = $startDate->copy()->addYears($diffInYears);
+                if ($currentCycleStart->isAfter($now)) {
+                    $currentCycleStart->subYear();
+                }
+            }
+
             foreach ($balancesList as $bal) {
-                $approvedSum = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+                $query = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
                     ->where('leave_type_id', $bal->leave_type_id)
-                    ->where('status', 'approved')
-                    ->sum('duration');
+                    ->where('status', 'approved');
+
+                if ($currentCycleStart) {
+                    $query->where('start_date', '>=', $currentCycleStart);
+                }
+
+                $approvedSum = $query->sum('duration');
+
                 if (floatval($bal->used) !== floatval($approvedSum)) {
                     $bal->update(['used' => $approvedSum]);
                 }
