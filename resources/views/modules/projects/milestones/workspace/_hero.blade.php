@@ -16,7 +16,7 @@
         : (int) ($milestone->completion_percentage ?? 0);
 
     // This bar tracks task completion, not milestone health, so it always reads
-    // as green progress regardless of health_state (health has its own badge/dot).
+    // as green progress regardless of health_state (health has its own metadata tile).
     $heroProgressVariant = 'success';
 
     $heroJsData = [
@@ -62,13 +62,6 @@
                             {{ $milestone->name }}
                         @endif
                     </h4>
-                    <span class="d-inline-flex align-items-center gap-1 text-muted fs-13 mb-1">
-                        <span class="health-dot bg-{{ $heroHealthVariant }}"></span>
-                        {{ __('projects.health_states.' . $milestone->health_state) }}
-                        @if ($milestone->health_reason)
-                            <i class="feather-info fs-14" tabindex="0" role="button" aria-label="{{ __('projects.health') }}: {{ $milestone->health_reason }}" data-bs-toggle="tooltip" title="{{ $milestone->health_reason }}" style="cursor: pointer;"></i>
-                        @endif
-                    </span>
                 </div>
                 {{-- Status itself is intentionally not repeated here: it's the editable
                      "Status" tile in the metadata strip below (Band D) — showing it again
@@ -174,6 +167,19 @@
                     @endif
                 </span>
                 <span class="fs-11 text-muted">{{ __('projects.due_date') }}</span>
+            </div>
+        </div>
+        <div class="d-flex align-items-start gap-2 ps-3 metadata-divider metadata-item">
+            <i class="feather-activity text-muted fs-14 metadata-icon"></i>
+            <div class="d-flex flex-column">
+                <span class="fs-13 fw-semibold text-dark d-inline-flex align-items-center gap-1">
+                    <span class="health-dot bg-{{ $heroHealthVariant }}"></span>
+                    {{ __('projects.health_states.' . $milestone->health_state) }}
+                    @if ($milestone->health_reason)
+                        <i class="feather-info fs-14" tabindex="0" role="button" aria-label="{{ __('projects.health') }}: {{ $milestone->health_reason }}" data-bs-toggle="tooltip" title="{{ $milestone->health_reason }}" style="cursor: pointer;"></i>
+                    @endif
+                </span>
+                <span class="fs-11 text-muted">{{ __('projects.health') }}</span>
             </div>
         </div>
 
