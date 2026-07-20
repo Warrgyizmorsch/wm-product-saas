@@ -18,14 +18,105 @@ class LeaveRequestController extends Controller
 {
     public function index(Request $request): View
     {
-        // Self-healing: Automatically reconcile used balances to ensure they match approved durations exactly
+        // On-the-fly plan-level automatic year-end renewal check
         try {
-            $allBalances = LeaveBalance::all();
+            $now = Carbon::now();
+            $plans = \App\Domains\HRMS\Models\LeavePlan::where('status', true)->get();
+
+            foreach ($plans as $plan) {
+                if (!$plan->effective_from) {
+                    continue;
+                }
+
+                $startDate = Carbon::parse($plan->effective_from);
+                $diffInYears = $startDate->diffInYears($now);
+                
+                if ($diffInYears > 0) {
+                    // Calculate the start date of the current cycle
+                    $currentCycleStart = $startDate->copy()->addYears($diffInYears);
+                    if ($currentCycleStart->isAfter($now)) {
+                        $currentCycleStart->subYear();
+                    }
+
+                    // Check if renewal for this current cycle hasn't been run yet
+                    $lastRenewed = $plan->last_renewed_at ? Carbon::parse($plan->last_renewed_at) : null;
+                    
+                    if (!$lastRenewed || $lastRenewed->isBefore($currentCycleStart)) {
+                        // Reset balances for all active employees assigned to this plan
+                        $employees = Employee::where('leave_plan_id', $plan->id)
+                            ->where('status', true)
+                            ->get();
+
+                        foreach ($employees as $employee) {
+                            foreach ($plan->types as $ltype) {
+                                $balance = LeaveBalance::firstOrCreate([
+                                    'tenant_id' => $employee->tenant_id,
+                                    'company_id' => $employee->company_id,
+                                    'employee_id' => $employee->id,
+                                    'leave_type_id' => $ltype->id,
+                                ], [
+                                    'allocated' => floatval($ltype->quota),
+                                    'used' => 0.0,
+                                ]);
+
+                                // Calculate rollover
+                                $rules = $ltype->rules ?? [];
+                                $action = $rules['yearend']['action'] ?? 'lapse';
+                                $maxCarry = floatval($rules['yearend']['max_carry'] ?? 0.0);
+
+                                $remaining = floatval($balance->remaining);
+                                $rollover = 0.0;
+
+                                if ($action === 'carry_forward' && $remaining > 0.0) {
+                                    $rollover = min($remaining, $maxCarry);
+                                }
+
+                                $newAllocated = floatval($ltype->quota) + $rollover;
+
+                                $balance->update([
+                                    'allocated' => $newAllocated,
+                                    'used' => 0.0,
+                                ]);
+                            }
+                        }
+
+                        // Mark this plan as renewed for this cycle
+                        $plan->update([
+                            'last_renewed_at' => $currentCycleStart->toDateString(),
+                        ]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Silence errors in case migration is not fully run yet
+        }
+
+        // Self-healing: Automatically reconcile used balances to ensure they match approved durations within the current cycle exactly
+        try {
+            $allBalances = LeaveBalance::with('employee.leavePlan')->get();
             foreach ($allBalances as $bal) {
-                $approvedDuration = LeaveRequest::where('employee_id', $bal->employee_id)
+                $currentCycleStart = null;
+                $emp = $bal->employee;
+                if ($emp && $emp->leavePlan && $emp->leavePlan->effective_from) {
+                    $startDate = Carbon::parse($emp->leavePlan->effective_from);
+                    $now = Carbon::now();
+                    $diffInYears = $startDate->diffInYears($now);
+                    $currentCycleStart = $startDate->copy()->addYears($diffInYears);
+                    if ($currentCycleStart->isAfter($now)) {
+                        $currentCycleStart->subYear();
+                    }
+                }
+
+                $query = LeaveRequest::where('employee_id', $bal->employee_id)
                     ->where('leave_type_id', $bal->leave_type_id)
-                    ->where('status', 'approved')
-                    ->sum('duration');
+                    ->where('status', 'approved');
+
+                if ($currentCycleStart) {
+                    $query->where('start_date', '>=', $currentCycleStart);
+                }
+
+                $approvedDuration = $query->sum('duration');
+
                 if (floatval($bal->used) !== floatval($approvedDuration)) {
                     $bal->update(['used' => $approvedDuration]);
                 }
@@ -44,7 +135,7 @@ class LeaveRequestController extends Controller
         // Build a complete lookup map of all active employees' leave types, quotas, remaining balances, and rules
         $employeeDataMap = [];
         foreach ($allEmployees as $emp) {
-            if ($emp->leavePlan) {
+            if ($emp->leavePlan && $emp->leavePlan->status) {
                 foreach ($emp->leavePlan->types()->where('status', true)->get() as $type) {
                     LeaveBalance::firstOrCreate([
                         'tenant_id' => $emp->tenant_id,
@@ -58,7 +149,15 @@ class LeaveRequestController extends Controller
                 }
             }
 
-            $balances = LeaveBalance::where('employee_id', $emp->id)->with('leaveType')->get();
+            $balances = LeaveBalance::where('employee_id', $emp->id)
+                ->whereHas('leaveType.plan', function($q) {
+                    $q->where('status', true);
+                })
+                ->whereHas('leaveType', function($q) {
+                    $q->where('status', true);
+                })
+                ->with('leaveType')
+                ->get();
             $typesList = [];
             foreach ($balances as $bal) {
                 $typesList[] = [
@@ -130,11 +229,17 @@ class LeaveRequestController extends Controller
                 ->orWhere('office_email', auth()->user()->email)
                 ->first();
             if (!$employee) {
-                return redirect()->back()->with('error', 'Employee record not found for your account.');
+                return redirect()->back()->with('error', __('hrms.leave.app.emp_not_found'));
             }
         }
 
         $leaveType = LeaveType::findOrFail($request->leave_type_id);
+        
+        // Block leave applications if the leave type's plan is inactive
+        if ($leaveType->plan && !$leaveType->plan->status) {
+            return redirect()->back()->with('error', __('hrms.leave.app.plan_inactive'));
+        }
+
         $rules = $leaveType->rules ?? [];
         
         $startDate = Carbon::parse($request->start_date);
@@ -167,7 +272,7 @@ class LeaveRequestController extends Controller
         }
 
         if ($duration == 0) {
-            return redirect()->back()->withErrors(['end_date' => 'Applied duration cannot be 0 days.']);
+            return redirect()->back()->withErrors(['end_date' => __('hrms.leave.app.duration_zero')]);
         }
 
         // Prevent overlapping active (pending or approved) leave requests for this employee
@@ -180,7 +285,7 @@ class LeaveRequestController extends Controller
             ->exists();
 
         if ($overlapExists) {
-            return redirect()->back()->withErrors(['start_date' => 'An active leave application already exists that overlaps with this date range.']);
+            return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.overlap_exists')]);
         }
 
         $appRules = $rules['application'] ?? [];
@@ -192,12 +297,12 @@ class LeaveRequestController extends Controller
             $doj = $employee->date_of_joining;
             
             if ($probRule === 'disallow' && $employee->employee_stage === 'Probation') {
-                return redirect()->back()->withErrors(['start_date' => 'You cannot apply for this leave during your probation period.']);
+                return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.probation_restricted')]);
             }
             if ($probRule === 'allow_after_months') {
                 $requiredMonths = intval($probationRules['probation_months'] ?? 3);
                 if ($doj && Carbon::parse($doj)->addMonths($requiredMonths)->isFuture()) {
-                    return redirect()->back()->withErrors(['start_date' => "You can only apply for this leave after {$requiredMonths} months of service."]);
+                    return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.probation_months_restricted', ['months' => $requiredMonths])]);
                 }
             }
         }
@@ -206,7 +311,7 @@ class LeaveRequestController extends Controller
         $noticeRules = $rules['notice'] ?? [];
         if (!empty($noticeRules['notice_rule']) && $noticeRules['notice_rule'] === 'disallow') {
             if ($employee->employee_stage === 'Notice Period') {
-                return redirect()->back()->withErrors(['start_date' => 'You cannot apply for this leave during your notice period.']);
+                return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.notice_restricted')]);
             }
         }
 
@@ -215,7 +320,7 @@ class LeaveRequestController extends Controller
             $advanceDays = intval($appRules['advance_days'] ?? 3);
             $minAllowedDate = Carbon::today()->addDays($advanceDays);
             if ($startDate->lt($minAllowedDate)) {
-                return redirect()->back()->withErrors(['start_date' => "This leave must be applied at least {$advanceDays} days in advance (earliest allowed: " . $minAllowedDate->format('d M, Y') . ")."]);
+                return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.advance_restricted', ['days' => $advanceDays, 'date' => $minAllowedDate->format('d M, Y')])]);
             }
         }
 
@@ -223,17 +328,17 @@ class LeaveRequestController extends Controller
         $minDuration = floatval($appRules['min_duration'] ?? 1);
         $maxDuration = floatval($appRules['max_duration'] ?? 10);
         if ($duration < $minDuration) {
-            return redirect()->back()->withErrors(['end_date' => "Leave duration must be at least {$minDuration} day(s)."]);
+            return redirect()->back()->withErrors(['end_date' => __('hrms.leave.app.min_duration_restricted', ['min' => $minDuration])]);
         }
         if ($duration > $maxDuration) {
-            return redirect()->back()->withErrors(['end_date' => "Leave duration cannot exceed {$maxDuration} day(s)."]);
+            return redirect()->back()->withErrors(['end_date' => __('hrms.leave.app.max_duration_restricted', ['max' => $maxDuration])]);
         }
 
         // 5. Validate Attachment Requirements
         if (!empty($appRules['require_attachment'])) {
             $attachmentDays = intval($appRules['attachment_days'] ?? 3);
             if ($duration >= $attachmentDays && !$request->hasFile('attachment')) {
-                return redirect()->back()->withErrors(['attachment' => "An attachment is required for leave duration of {$attachmentDays} days or more."]);
+                return redirect()->back()->withErrors(['attachment' => __('hrms.leave.app.attachment_required', ['days' => $attachmentDays])]);
             }
         }
 
@@ -248,7 +353,7 @@ class LeaveRequestController extends Controller
             
             $remaining = $balance ? floatval($balance->remaining) : 0.0;
             if ($duration > $remaining) {
-                return redirect()->back()->withErrors(['end_date' => "Insufficient leave balance. You have {$remaining} days remaining, but requested {$duration} days."]);
+                return redirect()->back()->withErrors(['end_date' => __('hrms.leave.app.insufficient_balance', ['remaining' => $remaining, 'duration' => $duration])]);
             }
         }
 
@@ -290,7 +395,7 @@ class LeaveRequestController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', $status === 'approved' ? 'Leave request submitted and auto-approved!' : 'Leave request submitted successfully.');
+        return redirect()->back()->with('success', $status === 'approved' ? __('hrms.leave.app.submitted_auto_approved') : __('hrms.leave.app.submitted_successfully'));
     }
 
     public function approve(LeaveRequest $leaveRequest): RedirectResponse
@@ -309,7 +414,7 @@ class LeaveRequestController extends Controller
             $leaveRequest->update([
                 'current_level' => '2'
             ]);
-            return redirect()->back()->with('success', 'First level approval recorded. Pending final second level approval.');
+            return redirect()->back()->with('success', __('hrms.leave.app.first_level_approved'));
         }
 
         // Final approval (level 1 of a 1_level workflow, or level 2 of a 2_level workflow)
@@ -333,7 +438,7 @@ class LeaveRequestController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', 'Leave request approved successfully.');
+        return redirect()->back()->with('success', __('hrms.leave.app.approved_successfully'));
     }
 
     public function reject(Request $request, LeaveRequest $leaveRequest): RedirectResponse
@@ -350,7 +455,7 @@ class LeaveRequestController extends Controller
             'rejection_reason' => $request->rejection_reason
         ]);
 
-        return redirect()->back()->with('success', 'Leave request rejected.');
+        return redirect()->back()->with('success', __('hrms.leave.app.rejected_successfully'));
     }
 
     public function updateStatus(Request $request, LeaveRequest $leaveRequest): RedirectResponse
@@ -390,7 +495,7 @@ class LeaveRequestController extends Controller
                 $leaveRequest->update([
                     'current_level' => '2'
                 ]);
-                return redirect()->back()->with('success', 'First level approval recorded. Pending final second level approval.');
+                return redirect()->back()->with('success', __('hrms.leave.app.first_level_approved'));
             }
 
             $leaveRequest->update([
@@ -425,6 +530,6 @@ class LeaveRequestController extends Controller
             ]);
         }
 
-        return redirect()->back()->with('success', 'Leave request status updated to ' . ucfirst($status) . ' successfully.');
+        return redirect()->back()->with('success', __('hrms.leave.app.status_updated_successfully', ['status' => __('hrms.leave.app.status_' . $status)]));
     }
 }

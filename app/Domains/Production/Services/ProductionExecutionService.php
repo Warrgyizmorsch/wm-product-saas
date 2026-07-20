@@ -55,6 +55,16 @@ class ProductionExecutionService
                 throw new InvalidArgumentException('Cannot log progress on a closed, completed, or cancelled order.');
             }
 
+            // Prevent logging total processed quantity (produced + rejected + scrapped) beyond planned target
+            $plannedTarget = (float) $order->quantity_ordered;
+            $currentProcessed = (float) ($op->quantity_produced + $op->quantity_rejected + $op->quantity_scrapped);
+            $newProcessed = (float) ($produced + $rejected + $scrapped);
+            
+            if (($currentProcessed + $newProcessed) > $plannedTarget) {
+                $maxRemaining = max(0.0, $plannedTarget - $currentProcessed);
+                throw new InvalidArgumentException("Cannot log progress: The total processed quantity (Produced: {$produced}, Rejected: {$rejected}, Scrapped: {$scrapped}) exceeds the remaining planned target limit of {$maxRemaining} (Total Planned: {$plannedTarget}, Already Logged: {$currentProcessed}).");
+            }
+
             // 2. Create the progress log entry
             $log = ProductionOrderProgressLog::create([
                 'tenant_id'            => $op->tenant_id,

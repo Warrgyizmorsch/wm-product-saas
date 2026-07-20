@@ -36,6 +36,10 @@
             border-color: var(--bs-primary) !important;
             color: #fff !important;
         }
+        /* Remove horizontal scrollbar */
+        .table-responsive {
+            overflow-x: visible !important;
+        }
     </style>
 @endpush
 
@@ -1041,6 +1045,11 @@
                 setPreview('edit', employee.photo, employee.full_name);
 
                 initModalSelects(document.getElementById('editEmployeeModal'));
+                
+                // Store original leave plan ID for migration detection
+                $('#edit_leave_plan_id').attr('data-original-val', employee.leave_plan_id || '');
+                $('#edit_leave_transition_options').addClass('d-none');
+                
                 bootstrap.Modal.getOrCreateInstance(document.getElementById('editEmployeeModal')).show();
             }
 
@@ -1376,6 +1385,18 @@
                 var url = $(this).attr('href');
                 if (!url || url.indexOf('javascript') === 0 || url.startsWith('#')) return;
                 loadEmployeeList(url);
+            });
+
+             // Listen to edit_leave_plan_id changes to toggle transition options
+            $(document).on('change', '#edit_leave_plan_id', function() {
+                let originalVal = $(this).attr('data-original-val') || '';
+                let currentVal = $(this).val() || '';
+                
+                if (originalVal !== '' && currentVal !== '' && originalVal !== currentVal) {
+                    $('#edit_leave_transition_options').removeClass('d-none');
+                } else {
+                    $('#edit_leave_transition_options').addClass('d-none');
+                }
             });
         });
     </script>

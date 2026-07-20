@@ -89,6 +89,29 @@
                     <option value="">{{ __('hrms.employees.frm_select_leave_plan') }}</option>
                 </x-ui.odoo-form-ui>
             </div>
+            @if($prefix === 'edit')
+            <div class="col-12 d-none border rounded p-3 bg-light mt-2 mb-2" id="edit_leave_transition_options" style="border-color: #cbd5e1 !important;">
+                <div class="fw-bold text-dark fs-13 mb-1"><i class="feather-shuffle me-1 text-primary"></i> Leave Plan Transition Options</div>
+                <p class="text-muted fs-11 mb-3">You are changing the employee's Leave Plan. Please choose how to handle their current leave balances:</p>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fs-12 text-dark mb-1">Transition Method</label>
+                        <select class="form-select form-select-sm" name="leave_transition_action" style="font-size: 13px; height: 36px; padding: 6px 12px;">
+                            <option value="transfer" selected>Transfer & Carry Forward (Full Quota)</option>
+                            <option value="prorate">Prorate & Reset (Pro-rata Quota)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fs-12 text-dark mb-1">Unused Leaves Action</label>
+                        <select class="form-select form-select-sm" name="leave_transition_unused" style="font-size: 13px; height: 36px; padding: 6px 12px;">
+                            <option value="carry" selected>Carry Forward Unused</option>
+                            <option value="lapse">Lapse Unused</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            @endif
         </div>
 
         <div class="employee-modal-section-title">{{ __('hrms.employees.basic_details') }}</div>

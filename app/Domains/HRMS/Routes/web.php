@@ -75,6 +75,9 @@ Route::prefix('hrms')
         Route::post('/leave-structure/plan/store', [LeaveStructureController::class, 'storePlan'])->name('leave-structure.plan.store');
         Route::post('/leave-structure/plan/update/{leavePlan}', [LeaveStructureController::class, 'updatePlan'])->name('leave-structure.plan.update');
         Route::delete('/leave-structure/plan/delete/{leavePlan}', [LeaveStructureController::class, 'destroyPlan'])->name('leave-structure.plan.destroy');
+        Route::post('/leave-structure/plan/renew', [LeaveStructureController::class, 'renewPlanBalances'])->name('leave-structure.plan.renew');
+        Route::get('/leave-structure/transition', [LeaveStructureController::class, 'transitionView'])->name('leave-structure.transition');
+        Route::post('/leave-structure/transition/process', [LeaveStructureController::class, 'processTransition'])->name('leave-structure.transition.process');
         Route::post('/leave-structure/type/store', [LeaveStructureController::class, 'storeType'])->name('leave-structure.type.store');
         Route::post('/leave-structure/type/update/{leaveType}', [LeaveStructureController::class, 'updateType'])->name('leave-structure.type.update');
         Route::delete('/leave-structure/type/delete/{leaveType}', [LeaveStructureController::class, 'destroyType'])->name('leave-structure.type.destroy');

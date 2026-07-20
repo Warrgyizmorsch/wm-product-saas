@@ -91,7 +91,7 @@
                             </td>
                             <td>
                                 <a href="{{ route('production.orders.show', $wip->production_order_id) }}" class="fw-semibold text-dark">
-                                    {{ $wip->order->order_number }}
+                                    {{ $wip->order->order_number ?? 'Order #' . $wip->production_order_id }}
                                 </a>
                                 @if($wip->batch)
                                     <div class="fs-10 text-muted"><i class="feather-box"></i> {{ $wip->batch->batch_number }}</div>
@@ -104,7 +104,10 @@
                                 </div>
                             </td>
                             <td>
-                                @if($wip->currentRoutingOperation)
+                                @if($wip->status === 'completed')
+                                    <div class="fw-semibold text-success">Finished Goods (Ready)</div>
+                                    <small class="text-muted">Warehouse Stock</small>
+                                @elseif($wip->currentRoutingOperation)
                                     <div class="fw-semibold text-dark">{{ $wip->currentRoutingOperation->name }}</div>
                                     <small class="text-muted">{{ $wip->currentWorkCenter->name ?? '' }}</small>
                                 @else

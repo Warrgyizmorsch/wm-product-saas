@@ -435,7 +435,7 @@
                                     @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
                                         <button type="button" class="btn btn-sm btn-primary"
                                                 data-bs-toggle="modal" data-bs-target="#progressModal"
-                                                onclick="document.getElementById('op_select_id').value = '{{ $op->id }}';">
+                                                onclick="var selectEl = document.getElementById('op_select_id'); if (selectEl) { selectEl.value = '{{ $op->id }}'; selectEl.dispatchEvent(new Event('change')); if (window.jQuery && jQuery().select2) { $(selectEl).trigger('change'); } }">
                                             Log
                                         </button>
                                     @else
@@ -616,6 +616,45 @@
                             <tr>
                                 <td colspan="5" class="text-center py-5 text-muted">
                                     <i class="feather-info fs-20 d-block mb-2"></i>No finished goods receipts logged.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <h5 class="fw-bold text-dark mt-4 mb-3">Daily Shopfloor Execution Logs</h5>
+            <div class="table-responsive">
+                <table class="erp-thin-table">
+                    <thead>
+                        <tr>
+                            <th style="width:18%">Log Date</th>
+                            <th style="width:25%">Operation Step</th>
+                            <th style="width:12%" class="text-center">Qty Produced</th>
+                            <th style="width:12%" class="text-center">Qty Rejected</th>
+                            <th style="width:12%" class="text-center">Qty Scrapped</th>
+                            <th style="width:10%" class="text-center">Time Spent</th>
+                            <th style="width:10%">Logged By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($order->progressLogs as $log)
+                            <tr>
+                                <td class="text-muted">{{ $log->recorded_at->format('Y-m-d H:i') }}</td>
+                                <td>
+                                    <span class="fw-semibold text-dark">{{ $log->operation->name ?? '—' }}</span>
+                                    <small class="text-muted d-block font-monospace fs-10">Op: {{ $log->operation->operation_number ?? '—' }}</small>
+                                </td>
+                                <td class="text-center text-success fw-bold">{{ number_format($log->quantity_produced, 2) }}</td>
+                                <td class="text-center text-warning fw-bold">{{ number_format($log->quantity_rejected, 2) }}</td>
+                                <td class="text-center text-danger fw-bold">{{ number_format($log->quantity_scrapped, 2) }}</td>
+                                <td class="text-center">{{ number_format(($log->setup_minutes_logged + $log->run_minutes_logged)/60, 2) }} hrs</td>
+                                <td>{{ $log->user->name ?? 'Operator' }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="feather-info fs-20 d-block mb-2"></i>No daily shopfloor execution logs found.
                                 </td>
                             </tr>
                         @endforelse

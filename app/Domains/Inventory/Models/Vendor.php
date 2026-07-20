@@ -17,6 +17,7 @@ class Vendor extends BaseModel
         'code',
         'email',
         'phone',
+        'address',
         'status',
     ];
 }

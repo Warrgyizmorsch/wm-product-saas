@@ -148,7 +148,7 @@
             /* Borderless Select2 theme custom override for Odoo Look in Tables */
             .odoo-table td .select2-container--bootstrap-5 .select2-selection {
                 border: none !important;
-                border-bottom: 1px solid transparent !important;
+                border-bottom: 1px solid #ced4da !important;
                 border-radius: 0 !important;
                 background-color: transparent !important;
                 padding-left: 2px !important;
@@ -179,7 +179,7 @@
             }
             .odoo-table-input {
                 border: none;
-                border-bottom: 1px solid transparent;
+                border-bottom: 1px solid #ced4da;
                 background: transparent;
                 border-radius: 0;
                 padding: 4px 2px;
@@ -193,9 +193,14 @@
                 box-shadow: none;
                 background: transparent !important;
             }
+            .odoo-table-input[readonly],
+            .odoo-table-input:read-only {
+                border-bottom: 1px solid transparent !important;
+                cursor: default;
+            }
             .odoo-table-select {
                 border: none;
-                border-bottom: 1px solid transparent;
+                border-bottom: 1px solid #ced4da;
                 background: transparent;
                 padding: 4px 2px;
                 width: 100%;

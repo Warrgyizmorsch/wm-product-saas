@@ -1370,9 +1370,22 @@
                             </div>
                             <div class="card-body p-4">
                                 @if($employee->leavePlan)
+                                    @if(!$employee->leavePlan->status)
+                                        <div class="alert alert-warning py-2 px-3 mb-3 fs-12 d-flex align-items-center gap-2 border-0" style="background-color: #fef3c7; color: #92400e;">
+                                            <i class="feather-alert-triangle"></i>
+                                            <span>This leave plan is currently inactive.</span>
+                                        </div>
+                                    @endif
                                     <div class="mb-3">
-                                        <h6 class="fw-bold mb-1">{{ $employee->leavePlan->name }}</h6>
-                                        <p class="text-muted fs-13 mb-0">{{ $employee->leavePlan->description ?: 'No description provided.' }}</p>
+                                        <div class="d-flex align-items-center justify-content-between">
+                                            <h6 class="fw-bold mb-0">{{ $employee->leavePlan->name }}</h6>
+                                            @if(!$employee->leavePlan->status)
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-10 px-2 py-0.5 rounded">Inactive</span>
+                                            @else
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 px-2 py-0.5 rounded">Active</span>
+                                            @endif
+                                        </div>
+                                        <p class="text-muted fs-13 mb-0 mt-1.5">{{ $employee->leavePlan->description ?: 'No description provided.' }}</p>
                                     </div>
                                     <div class="border-top pt-3">
                                         <div class="info-label">{{ __('hrms.employees.lbl_effective_from') }}</div>

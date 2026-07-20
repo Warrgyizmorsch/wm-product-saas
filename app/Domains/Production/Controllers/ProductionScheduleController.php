@@ -101,7 +101,7 @@ class ProductionScheduleController extends Controller
         }
     }
 
-    public function show(int $id)
+    public function show(Request $request, int $id)
     {
         $schedule = ProductionSchedule::with([
             'order.product',
@@ -121,9 +121,10 @@ class ProductionScheduleController extends Controller
         $overloads = $this->schedulingService->detectOverloads($tenantId);
         $conflicts = $this->schedulingService->detectConflicts($tenantId);
         $warnings = array_merge($overloads, $conflicts);
-        $capacityDetails = $this->schedulingService->getWorkCenterCapacityDetails($schedule);
+        $groupBy = $request->input('group_by');
+        $capacityDetails = $this->schedulingService->getWorkCenterCapacityDetails($schedule, $groupBy);
 
-        return view('modules.production.schedules.show', compact('schedule', 'warnings', 'capacityDetails'));
+        return view('modules.production.schedules.show', compact('schedule', 'warnings', 'capacityDetails', 'groupBy'));
     }
 
     public function destroy(int $id)
@@ -185,6 +186,40 @@ class ProductionScheduleController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Schedule [{$schedule->schedule_number}] cancelled.");
+    }
+
+    public function rescheduleStart(Request $request, int $id)
+    {
+        $schedule = ProductionSchedule::findOrFail($id);
+
+        $this->authorize('create', ProductionSchedule::class);
+
+        if ($schedule->isFrozen()) {
+            return redirect()->back()->with('error', 'Cannot reschedule a schedule that is completed or cancelled.');
+        }
+
+        $request->validate([
+            'start_date' => 'required|date',
+        ]);
+
+        try {
+            $startDate = Carbon::parse($request->input('start_date'));
+            $newSchedule = $this->schedulingService->generateSchedule(
+                $schedule->order,
+                $startDate,
+                $schedule->scheduling_type
+            );
+
+            if ($schedule->notes) {
+                $newSchedule->update(['notes' => $schedule->notes]);
+            }
+
+            return redirect()
+                ->route('production.schedules.show', $newSchedule->id)
+                ->with('success', "Schedule rescheduled to {$startDate->format('d/m/Y H:i')} successfully.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to reschedule schedule: ' . $e->getMessage());
+        }
     }
 
     public function calendarView(Request $request)

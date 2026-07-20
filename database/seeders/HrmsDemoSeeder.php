@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Tenant;
 use App\Models\User;
-use App\Domains\HRMS\Models\Organization;
 use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\BusinessUnit;
 use App\Domains\HRMS\Models\Branch;
@@ -64,7 +63,6 @@ class HrmsDemoSeeder extends Seeder
         DB::table('leave_types')->truncate();
         DB::table('leave_plans')->truncate();
         DB::table('companies')->truncate();
-        DB::table('organizations')->truncate();
 
         Schema::enableForeignKeyConstraints();
 
@@ -99,22 +97,10 @@ class HrmsDemoSeeder extends Seeder
             ]);
         }
 
-        // 2. Organization & Company
-        $org = Organization::create([
-            'tenant_id' => $tenant->id,
-            'name' => 'Acme Corporation',
-            'slug' => 'acme-corp',
-            'logo' => null,
-            'email' => 'contact@acme.com',
-            'phone' => '+1234567890',
-            'website' => 'https://acme.com',
-            'subscription_plan' => 'enterprise',
-            'status' => true,
-        ]);
+        // 2. Company
 
         $company = Company::create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $org->id,
             'company_name' => 'Acme India Pvt Ltd',
             'legal_name' => 'Acme India Private Limited',
             'gst_number' => '29AAAAA1111A1Z1',
@@ -137,7 +123,6 @@ class HrmsDemoSeeder extends Seeder
         // 3. Pay Groups
         $payGroupStandard = PayGroup::create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $org->id,
             'company_id' => $company->id,
             'name' => 'Standard Employees Pay Group',
             'description' => 'Default monthly payroll group for general staff.',
@@ -146,7 +131,6 @@ class HrmsDemoSeeder extends Seeder
 
         $payGroupExecutive = PayGroup::create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $org->id,
             'company_id' => $company->id,
             'name' => 'Executive Pay Group',
             'description' => 'Payroll group for management and executives.',
@@ -156,7 +140,6 @@ class HrmsDemoSeeder extends Seeder
         // 4. Salary Components
         $basicComp = SalaryComponent::create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $org->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
             'name' => 'Basic Salary',
@@ -171,7 +154,6 @@ class HrmsDemoSeeder extends Seeder
 
         $hraComp = SalaryComponent::create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $org->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
             'name' => 'House Rent Allowance',
@@ -186,7 +168,6 @@ class HrmsDemoSeeder extends Seeder
 
         $pfComp = SalaryComponent::create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $org->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
             'name' => 'Provident Fund',
@@ -201,7 +182,6 @@ class HrmsDemoSeeder extends Seeder
 
         $bonusComp = SalaryComponent::create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $org->id,
             'company_id' => $company->id,
             'pay_group_id' => $payGroupStandard->id,
             'name' => 'Performance Bonus',

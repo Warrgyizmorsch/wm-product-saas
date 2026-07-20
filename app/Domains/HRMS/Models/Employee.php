@@ -236,4 +236,131 @@ class Employee extends BaseModel
     {
         return $this->full_name ?: trim($this->first_name . ' ' . $this->last_name);
     }
+
+    /**
+     * Migrate the employee to a new leave plan and reconcile balances.
+     */
+    public function migrateToLeavePlan($oldPlanId, $newPlanId, $action = 'transfer', $unusedAction = 'carry')
+    {
+        if (empty($newPlanId) || (int) $oldPlanId === (int) $newPlanId) {
+            return;
+        }
+
+        $oldPlan = \App\Domains\HRMS\Models\LeavePlan::with('types')->find($oldPlanId);
+        $newPlan = \App\Domains\HRMS\Models\LeavePlan::with('types')->find($newPlanId);
+
+        if (!$newPlan) {
+            return;
+        }
+
+        // Fetch current balances for the employee
+        $oldBalances = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $this->id)->get();
+        $oldBalancesMap = $oldBalances->keyBy('leave_type_id');
+
+        // Map old types by code
+        $oldTypesMap = $oldPlan ? $oldPlan->types->keyBy('code') : collect();
+        
+        // Calculate passed & remaining months in current cycle (based on new plan's effective date)
+        $startOfYear = \Carbon\Carbon::now()->startOfYear();
+        if ($newPlan->effective_from) {
+            $startOfYear = \Carbon\Carbon::parse($newPlan->effective_from);
+            $now = \Carbon\Carbon::now();
+            $diffInYears = $startOfYear->diffInYears($now);
+            $startOfYear->addYears($diffInYears);
+            if ($startOfYear->isAfter($now)) {
+                $startOfYear->subYear();
+            }
+        }
+        
+        $monthsPassed = min(12, max(0, $startOfYear->diffInMonths(\Carbon\Carbon::now())));
+        $monthsRemaining = 12 - $monthsPassed;
+
+        $processedNewTypeIds = [];
+
+        foreach ($newPlan->types as $newType) {
+            // Find matching old type by code
+            $oldType = $oldTypesMap->get($newType->code);
+            $oldBalance = $oldType ? $oldBalancesMap->get($oldType->id) : null;
+
+            $newAllocated = floatval($newType->quota);
+            $newUsed = 0.0;
+
+            if ($oldBalance) {
+                $newUsed = floatval($oldBalance->used);
+            }
+
+            // Determine if we should calculate based on accruals
+            if ($oldBalance && $oldType) {
+                $oldRules = $oldType->rules ?? [];
+                $accrualRate = $oldRules['accrual']['rate'] ?? 'immediate';
+                $accrualFrequency = $oldRules['accrual']['frequency'] ?? 'monthly';
+
+                // Calculate old accrued quota up to now
+                $oldAccruedQuota = floatval($oldType->quota);
+                if ($accrualRate === 'periodic') {
+                    if ($accrualFrequency === 'monthly') {
+                        $oldAccruedQuota = ($oldType->quota / 12.0) * $monthsPassed;
+                    } elseif ($accrualFrequency === 'quarterly') {
+                        $quartersPassed = floor($monthsPassed / 3.0);
+                        $oldAccruedQuota = ($oldType->quota / 4.0) * $quartersPassed;
+                    } elseif ($accrualFrequency === 'yearly') {
+                        $oldAccruedQuota = ($monthsPassed >= 12) ? floatval($oldType->quota) : 0.0;
+                    } else {
+                        $oldAccruedQuota = ($oldType->quota / 12.0) * $monthsPassed;
+                    }
+                } elseif ($accrualRate === 'attendance') {
+                    $oldAccruedQuota = ($oldType->quota / 12.0) * $monthsPassed;
+                }
+
+                // Unused accrued leaves
+                $netAccruedUnused = $oldAccruedQuota - $newUsed;
+
+                // Carry forward rules (action & limit)
+                $oldAction = $oldRules['yearend']['action'] ?? 'lapse';
+                $maxCarry = floatval($oldRules['yearend']['max_carry'] ?? 999.0);
+
+                if ($netAccruedUnused > 0) {
+                    if ($unusedAction === 'carry' && $oldAction === 'carry_forward') {
+                        $oldUnused = min($netAccruedUnused, $maxCarry);
+                    } else {
+                        $oldUnused = 0.0; // Lapsed
+                    }
+                } else {
+                    // Excess leaves taken are always carried forward as a negative deduction
+                    $oldUnused = $netAccruedUnused;
+                }
+            } else {
+                $oldUnused = 0.0;
+            }
+
+            if ($action === 'prorate') {
+                // New plan prorated quota for remaining months
+                $newProratedQuota = ($newType->quota / 12.0) * $monthsRemaining;
+                $newAllocated = $newProratedQuota + $oldUnused + $newUsed;
+            } else {
+                // Full quota
+                $newAllocated = floatval($newType->quota) + $oldUnused + $newUsed;
+            }
+
+            // Create or update LeaveBalance
+            $newBalance = \App\Domains\HRMS\Models\LeaveBalance::updateOrCreate([
+                'tenant_id' => $this->tenant_id,
+                'company_id' => $this->company_id,
+                'employee_id' => $this->id,
+                'leave_type_id' => $newType->id,
+            ], [
+                'allocated' => round($newAllocated, 2),
+                'used' => round($newUsed, 2),
+            ]);
+
+            $processedNewTypeIds[] = $newType->id;
+        }
+
+        // Clean up or remove old balance records that are not in the new plan
+        foreach ($oldBalances as $oldBal) {
+            if (!in_array($oldBal->leave_type_id, $processedNewTypeIds)) {
+                $oldBal->delete();
+            }
+        }
+    }
 }
