@@ -4,7 +4,6 @@ namespace App\Domains\HRMS\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Models\Company;
-use App\Domains\HRMS\Models\Organization;
 use App\Domains\HRMS\Models\SalaryComponent;
 use App\Domains\HRMS\Models\SalaryStructure;
 use App\Domains\HRMS\Models\SalaryStructureItem;
@@ -186,7 +185,6 @@ class SalaryStructureController extends Controller
         $payGroup = PayGroup::findOrFail($request->pay_group_id);
 
         SalaryComponent::create([
-            'organization_id' => Organization::currentDefault()->id,
             'company_id' => $payGroup->company_id,
             'pay_group_id' => $request->pay_group_id,
             'name' => $request->name,
@@ -441,7 +439,6 @@ class SalaryStructureController extends Controller
         $status = ($request->status === 'success' || $request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $payGroup = PayGroup::create([
-            'organization_id' => Organization::currentDefault()->id,
             'company_id' => $request->company_id,
             'name' => $request->name,
             'description' => $request->description,

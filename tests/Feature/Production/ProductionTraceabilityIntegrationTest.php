@@ -6,7 +6,6 @@ use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\Department;
 use App\Domains\HRMS\Models\Designation;
 use App\Domains\HRMS\Models\Employee;
-use App\Domains\HRMS\Models\Organization;
 use App\Domains\Inventory\Models\Batch as InventoryBatch;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\ProductWarehouseStock;
@@ -50,7 +49,6 @@ class ProductionTraceabilityIntegrationTest extends TestCase
     private Company $company;
     private Department $department;
     private Designation $designation;
-    private Organization $org;
 
     protected function setUp(): void
     {
@@ -141,15 +139,7 @@ class ProductionTraceabilityIntegrationTest extends TestCase
         ]);
 
         // Setup HRMS prerequisites to avoid Foreign Key violations
-        $this->org = Organization::create([
-            'name' => 'Acme Test Corp',
-            'slug' => 'acme-test',
-            'status' => true,
-            'subscription_plan' => 'enterprise',
-        ]);
-
         $this->company = Company::create([
-            'organization_id' => $this->org->id,
             'company_name' => 'Acme Test India',
             'status' => true,
         ]);

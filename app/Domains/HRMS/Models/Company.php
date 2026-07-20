@@ -7,7 +7,6 @@ use App\Core\Database\BaseModel;
 class Company extends BaseModel
 {
     protected $fillable = [
-        'organization_id',
         'company_name',
         'legal_name',
         'gst_number',
@@ -32,13 +31,6 @@ class Company extends BaseModel
         'status' => 'boolean',
     ];
 
-    /**
-     * Company belongs to an Organization.
-     */
-    public function organization()
-    {
-        return $this->belongsTo(Organization::class);
-    }
 
     public function businessUnits()
     {

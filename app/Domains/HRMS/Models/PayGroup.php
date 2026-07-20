@@ -7,7 +7,6 @@ use App\Core\Database\BaseModel;
 class PayGroup extends BaseModel
 {
     protected $fillable = [
-        'organization_id',
         'company_id',
         'name',
         'description',
@@ -17,14 +16,6 @@ class PayGroup extends BaseModel
     protected $casts = [
         'status' => 'boolean',
     ];
-
-    /**
-     * Get the organization that owns the pay group.
-     */
-    public function organization()
-    {
-        return $this->belongsTo(Organization::class);
-    }
 
     /**
      * Get the company that owns the pay group.

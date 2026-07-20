@@ -5,9 +5,14 @@
 @section('breadcrumb', 'HRMS / ' . __('hrms.leave.title'))
 
 @section('page-actions')
-    <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
-        {{ __('hrms.leave.add_plan') }}
-    </x-ui.button>
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ route('hrms.leave-structure.transition') }}" class="btn btn-outline-primary d-flex align-items-center" style="height: 38px; font-weight: 500; font-size: 13px;">
+            <i class="feather-shuffle me-2"></i> Transition Leave Plans
+        </a>
+        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
+            {{ __('hrms.leave.add_plan') }}
+        </x-ui.button>
+    </div>
 @endsection
 
 @push('styles')
@@ -22,6 +27,21 @@
 
 @section('content')
     <style>
+        .btn-outline-primary {
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+            background-color: transparent !important;
+        }
+        .btn-outline-primary:hover,
+        .btn-outline-primary:focus,
+        .btn-outline-primary:active,
+        .btn-outline-primary.active,
+        .btn-outline-primary.show {
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            color: #fff !important;
+        }
+
         /* Sidebar and Workspace layout alignment */
         @media (min-width: 992px) {
             .nxl-content {
@@ -205,12 +225,14 @@
         <div class="settings-content-col">
 
             @if(session('success'))
+                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
                 <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
                     {{ session('success') }}
                 </x-ui.alert>
             @endif
 
             @if(session('error'))
+                <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
                 <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                     {{ session('error') }}
                 </x-ui.alert>
@@ -304,18 +326,32 @@
                                     <div class="p-4">
                                         <!-- Selected Plan Details and Actions -->
                                         <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
+                                            @php
+                                                $currentCycleEnd = null;
+                                                if ($selectedPlan->effective_from) {
+                                                    $startDate = \Carbon\Carbon::parse($selectedPlan->effective_from);
+                                                    $now = \Carbon\Carbon::now();
+                                                    $diffInYears = $startDate->diffInYears($now);
+                                                    $currentCycleStart = $startDate->copy()->addYears($diffInYears);
+                                                    if ($currentCycleStart->isAfter($now)) {
+                                                        $currentCycleStart->subYear();
+                                                    }
+                                                    $currentCycleEnd = $currentCycleStart->copy()->addYear()->subDay();
+                                                }
+                                            @endphp
                                             <div>
                                                 <h5 class="fw-bold text-dark mb-1" style="font-size: 16px;">{{ $selectedPlan->name }}</h5>
-                                                <div class="text-muted d-flex align-items-center gap-2" style="font-size: 12px;">
-                                                    <span><i class="feather-briefcase me-1"></i>{{ $selectedPlan->company ? $selectedPlan->company->company_name : __('hrms.salary.all_companies') }}</span>
-                                                    <span>&bull;</span>
-                                                    <span><i class="feather-calendar me-1"></i>{{ __('hrms.leave.effective_from') }}: <strong>{{ $selectedPlan->effective_from ? $selectedPlan->effective_from->format('d M, Y') : '-' }}</strong></span>
-                                                    <span>&bull;</span>
-                                                    <span>
+                                                <div class="text-muted d-flex flex-wrap align-items-center mt-2" style="font-size: 12px; line-height: 1.5; gap: 18px;">
+                                                    <span class="d-inline-flex align-items-center"><i class="feather-briefcase text-muted" style="margin-right: 6px; font-size: 13px;"></i>{{ $selectedPlan->company ? $selectedPlan->company->company_name : __('hrms.salary.all_companies') }}</span>
+                                                    <span class="d-inline-flex align-items-center"><i class="feather-calendar text-muted" style="margin-right: 6px; font-size: 13px;"></i>{{ __('hrms.leave.effective_from') }}: <strong class="text-dark" style="margin-left: 4px;">{{ $selectedPlan->effective_from ? $selectedPlan->effective_from->format('d M, Y') : '-' }}</strong></span>
+                                                    @if($currentCycleEnd)
+                                                        <span class="d-inline-flex align-items-center text-primary"><i class="feather-clock text-primary" style="margin-right: 6px; font-size: 13px;"></i>{{ __('hrms.leave.cycle_ends') }}: <strong class="text-primary" style="margin-left: 4px;">{{ $currentCycleEnd->format('d M, Y') }}</strong></span>
+                                                    @endif
+                                                    <span class="d-inline-flex align-items-center">
                                                         @if($selectedPlan->status)
-                                                            <span class="text-success"><i class="feather-check-circle me-1"></i>{{ __('hrms.employees.frm_status_active') }}</span>
+                                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded" style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Active</span>
                                                         @else
-                                                            <span class="text-danger"><i class="feather-slash me-1"></i>{{ __('hrms.employees.frm_status_inactive') }}</span>
+                                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded" style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Inactive</span>
                                                         @endif
                                                     </span>
                                                 </div>
@@ -330,6 +366,23 @@
                                                         <a class="dropdown-item edit-plan-btn" href="javascript:void(0)" data-plan="{{ base64_encode($selectedPlan->toJson()) }}">
                                                             <i class="feather feather-edit-3 me-3"></i>
                                                             <span>{{ __('hrms.leave.edit_plan') }}</span>
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a class="dropdown-item renew-plan-btn" href="javascript:void(0)" 
+                                                           data-plan-id="{{ $selectedPlan->id }}" 
+                                                           data-plan-name="{{ $selectedPlan->name }}"
+                                                           data-types="{{ base64_encode(json_encode($selectedPlan->types->map(function($t) {
+                                                               return [
+                                                                   'id' => $t->id,
+                                                                   'name' => $t->name,
+                                                                   'code' => $t->code,
+                                                                   'action' => $t->rules['yearend']['action'] ?? 'lapse',
+                                                                   'max_carry' => floatval($t->rules['yearend']['max_carry'] ?? 0.0),
+                                                               ];
+                                                           }))) }}">
+                                                            <i class="feather feather-refresh-cw me-3"></i>
+                                                            <span>{{ __('hrms.leave.renew_plan_balances') }}</span>
                                                         </a>
                                                     </li>
                                                     <li class="dropdown-divider"></li>
@@ -720,6 +773,51 @@
                     <div class="modal-footer">
                         <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</x-ui.button>
                         <x-ui.button type="submit" variant="primary">{{ __('hrms.common.save_changes') }}</x-ui.button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Manual Year-End Leave Plan Renewal -->
+    <div class="modal fade" id="renewPlanBalancesModal" tabindex="-1" aria-labelledby="renewPlanBalancesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form action="{{ route('hrms.leave-structure.plan.renew') }}" method="POST">
+                    @csrf
+                    <div class="modal-header bg-light px-4 py-3 border-bottom">
+                        <div>
+                            <h5 class="modal-title fw-bold text-dark" id="renewPlanBalancesModalLabel">{{ __('hrms.leave.renew_leave_plan_balances') }}</h5>
+                            <p class="text-muted mb-0 fs-12">{{ __('hrms.leave.renew_plan_subtitle') }}</p>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    
+                    <div class="modal-body px-4 py-3">
+                        <input type="hidden" name="leave_plan_id" id="renew_plan_id">
+                        <h6 class="fw-bold text-dark mb-3">{{ __('hrms.leave.leave_type_policies_for_plan') }} <span id="renew_plan_display_name" class="text-primary"></span></h6>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 border">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>{{ __('hrms.leave.leave_types') }}</th>
+                                        <th>{{ __('hrms.leave.year_end_policy_action') }}</th>
+                                        <th style="width: 220px;">{{ __('hrms.leave.max_carry_forward_days') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="renew-plan-leave-types-body">
+                                    <!-- Loaded dynamically via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light px-4 py-3 border-top">
+                        <x-ui.button variant="light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</x-ui.button>
+                        <x-ui.button type="submit" variant="primary" id="renewSubmitBtn" data-loading-text="{{ __('hrms.leave.processing_renewal') }}">
+                            <span class="spinner-border spinner-border-sm d-none me-2" id="renewSpinner" role="status" aria-hidden="true"></span>
+                            <span id="renewBtnText">{{ __('hrms.leave.confirm_and_renew_balances') }}</span>
+                        </x-ui.button>
                     </div>
                 </form>
             </div>
@@ -1242,9 +1340,9 @@
                 $('#edit_plan_company_id').val(plan.company_id || '');
                 
                 if (plan.effective_from) {
-                    let dateObj = new Date(plan.effective_from);
-                    let formattedDate = dateObj.toISOString().split('T')[0];
-                    $('#edit_plan_effective_from').val(formattedDate);
+                    // Extract date portion directly from string format YYYY-MM-DD to avoid timezone offset shifts in browser Date parser
+                    let dateStr = plan.effective_from.split('T')[0];
+                    $('#edit_plan_effective_from').val(dateStr);
                 } else {
                     $('#edit_plan_effective_from').val('');
                 }
@@ -1254,6 +1352,81 @@
                 $('#edit_plan_description').val(plan.description || '');
 
                 $('#editLeavePlanModal').modal('show');
+            });
+
+            // Renew Leave Plan Trigger
+            $(document).on('click', '.renew-plan-btn', function() {
+                let planId = $(this).attr('data-plan-id');
+                let planName = $(this).attr('data-plan-name');
+                let typesData = $(this).attr('data-types');
+                
+                if (!planId || !typesData) return;
+
+                let types = JSON.parse(atob(typesData));
+                
+                $('#renew_plan_id').val(planId);
+                $('#renew_plan_display_name').text(planName);
+                
+                let tbody = $('#renew-plan-leave-types-body');
+                tbody.empty();
+                
+                types.forEach(type => {
+                    let isCarry = type.action === 'carry_forward';
+                    let selectHtml = `
+                        <select class="form-select odoo-table-select renew-type-action" name="yearend_rules[${type.id}][action]" data-type-id="${type.id}" style="font-size: 13px; padding: 4px 8px; width: 100%;">
+                            <option value="lapse" ${!isCarry ? 'selected' : ''}>{{ __('hrms.leave.lapse_expire') }}</option>
+                            <option value="carry_forward" ${isCarry ? 'selected' : ''}>{{ __('hrms.leave.carry_forward_rollover') }}</option>
+                        </select>
+                    `;
+                    let inputHtml = `
+                        <input type="number" class="form-control odoo-table-input text-center renew-type-max-carry" 
+                               name="yearend_rules[${type.id}][max_carry]"
+                               data-type-id="${type.id}" 
+                               value="${type.max_carry}" 
+                               style="width: 100px; font-size: 13px; height: 32px;" 
+                               min="0" step="0.5" 
+                               ${!isCarry ? 'disabled' : ''}>
+                    `;
+                    
+                    let row = `
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-dark fs-13">${type.name}</div>
+                                <code class="fs-11">${type.code}</code>
+                            </td>
+                            <td>${selectHtml}</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    ${inputHtml}
+                                    <span class="fs-12 text-muted">{{ __('hrms.leave.days') }}</span>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                });
+
+                $('#renewPlanBalancesModal').modal('show');
+            });
+
+            // Handle dropdown change within the renewal modal to enable/disable input
+            $(document).on('change', '.renew-type-action', function() {
+                let typeId = $(this).attr('data-type-id');
+                let isCarry = $(this).val() === 'carry_forward';
+                let input = $(`.renew-type-max-carry[data-type-id="${typeId}"]`);
+                if (isCarry) {
+                    input.removeAttr('disabled');
+                } else {
+                    input.attr('disabled', true).val('0');
+                }
+            });
+
+            // Show loading spinner when submitting the renewal form
+            $(document).on('submit', '#renewPlanBalancesModal form', function() {
+                $('#renewSubmitBtn').attr('disabled', true);
+                $('#renewSpinner').removeClass('d-none');
+                let loadingText = $('#renewSubmitBtn').attr('data-loading-text') || 'Processing Renewal...';
+                $('#renewBtnText').text(loadingText);
             });
 
             // Edit Leave Type Trigger (opens modal, populates form values)
