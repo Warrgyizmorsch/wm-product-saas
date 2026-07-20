@@ -140,6 +140,7 @@ Route::prefix('production')
         Route::get('schedules/work-center-view', [ProductionScheduleController::class, 'workCenterView'])->name('schedules.work-center-view');
         Route::post('schedules/{schedule}/release', [ProductionScheduleController::class, 'release'])->name('schedules.release');
         Route::post('schedules/{schedule}/cancel', [ProductionScheduleController::class, 'cancel'])->name('schedules.cancel');
+        Route::post('schedules/{schedule}/reschedule-start', [ProductionScheduleController::class, 'rescheduleStart'])->name('schedules.reschedule-start');
         Route::resource('schedules', ProductionScheduleController::class)->except(['edit', 'update']);
 
         // ── Capacity Planning ──────────────────────────────────────────────────

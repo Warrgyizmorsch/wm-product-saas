@@ -98,20 +98,98 @@
                                 @csrf
                                 <div class="mb-3">
                                     <label class="form-label text-muted fw-semibold fs-12">Select Disposition Strategy</label>
-                                    <select name="disposition_type" class="form-select form-select-sm" required>
+                                    <select id="disposition_type_select" name="disposition_type" class="form-select form-select-sm" required>
                                         <option value="rework">Generate Rework Order (RWK)</option>
-                                        <option value="scrap">Scrap & Disposal Log</option>
+                                        <option value="scrap">Scrap &amp; Disposal Log</option>
                                         <option value="use_as_is">Accept Deviation (Use As-Is)</option>
                                     </select>
                                 </div>
 
-                                {{-- Hidden defaults for easy service integration --}}
                                 <input type="hidden" name="original_production_order_id" value="{{ $ncr->production_order_id }}">
-                                <input type="hidden" name="work_center_id" value="{{ $workCenters->first()->id ?? 1 }}">
-                                <input type="hidden" name="category" value="finished_good">
-                                <input type="hidden" name="reason_code" value="defect">
-                                <input type="hidden" name="quantity" value="10">
-                                <input type="hidden" name="cost" value="150">
+
+                                {{-- Rework specific inputs --}}
+                                <div id="rework_fields">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted fw-semibold fs-12">Rework Work Center</label>
+                                        <select name="work_center_id" class="form-select form-select-sm">
+                                            @foreach($workCenters as $wc)
+                                                <option value="{{ $wc->id }}">{{ $wc->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label text-muted fw-semibold fs-12">Quantity to Rework</label>
+                                            <input type="number" name="quantity" class="form-control form-control-sm" value="1" min="1" step="any">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label text-muted fw-semibold fs-12">Rework Cost Est. ($)</label>
+                                            <input type="number" name="cost_estimate" class="form-control form-control-sm" value="150" min="0" step="any">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Scrap specific inputs --}}
+                                <div id="scrap_fields" style="display: none;">
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label text-muted fw-semibold fs-12">Quantity to Scrap</label>
+                                            <input type="number" id="scrap_qty_input" class="form-control form-control-sm" value="1" min="0.0001" step="any">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label text-muted fw-semibold fs-12">Disposal Cost ($)</label>
+                                            <input type="number" name="cost" class="form-control form-control-sm" value="50" min="0" step="any">
+                                        </div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6">
+                                            <label class="form-label text-muted fw-semibold fs-12">Category</label>
+                                            <select name="category" class="form-select form-select-sm">
+                                                <option value="finished_good" selected>Finished Good</option>
+                                                <option value="wip_part">WIP Part</option>
+                                                <option value="raw_material">Raw Material</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label text-muted fw-semibold fs-12">Reason Code</label>
+                                            <input type="text" name="reason_code" class="form-control form-control-sm" value="defect">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', function () {
+                                        const dispSelect = document.getElementById('disposition_type_select');
+                                        const reworkFields = document.getElementById('rework_fields');
+                                        const scrapFields = document.getElementById('scrap_fields');
+                                        const scrapQtyInput = document.getElementById('scrap_qty_input');
+
+                                        function toggleFields() {
+                                            const type = dispSelect.value;
+                                            if (type === 'rework') {
+                                                reworkFields.style.display = 'block';
+                                                scrapFields.style.display = 'none';
+                                                // Make sure rework's quantity input is named "quantity"
+                                                reworkFields.querySelector('input[name="quantity"]').disabled = false;
+                                                scrapQtyInput.removeAttribute('name');
+                                            } else if (type === 'scrap') {
+                                                reworkFields.style.display = 'none';
+                                                scrapFields.style.display = 'block';
+                                                // Disable rework quantity and make scrap quantity named "quantity"
+                                                reworkFields.querySelector('input[name="quantity"]').disabled = true;
+                                                scrapQtyInput.setAttribute('name', 'quantity');
+                                            } else {
+                                                reworkFields.style.display = 'none';
+                                                scrapFields.style.display = 'none';
+                                                reworkFields.querySelector('input[name="quantity"]').disabled = true;
+                                                scrapQtyInput.removeAttribute('name');
+                                            }
+                                        }
+
+                                        dispSelect.addEventListener('change', toggleFields);
+                                        toggleFields(); // Run initial state check
+                                    });
+                                </script>
 
                                 <button type="submit" class="btn btn-warning btn-sm w-100">
                                     <i class="feather-tool me-1"></i>Apply Quality Disposition

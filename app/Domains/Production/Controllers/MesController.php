@@ -30,47 +30,48 @@ class MesController extends Controller
         $tenantId  = require_tenant_id();
         $userId    = auth()->id();
 
-        // Running operations in this tenant
+        // Retrieve active schedules in this tenant with operations
+        $activeSchedules = ProductionSchedule::with([
+            'order.product',
+            'operations.workCenter',
+            'operations.machine',
+            'operations.orderOperation'
+        ])
+        ->where('tenant_id', $tenantId)
+        ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+        // Running operations (for stopwatch timer block countdowns)
         $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
             ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
             ->orderBy('planned_start')
             ->get();
 
-        // Ready queue — operations ready to start across active schedules
-        $ready = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
-            ->where('status', ProductionScheduleOperation::STATUS_READY)
-            ->orderBy('priority')
-            ->orderBy('planned_start')
-            ->get();
-
-        // Upcoming — next waiting operations (not yet ready) for active schedules
-        $upcoming = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
-            ->where('status', ProductionScheduleOperation::STATUS_WAITING)
-            ->orderBy('planned_start')
-            ->take(10)
-            ->get();
-
-        // Completed today
-        $completedToday = ProductionScheduleOperation::with(['schedule.order.product'])
-            ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
-            ->whereDate('actual_finish', today())
-            ->count();
-
-        // Paused / on-hold
+        // Paused operations (for completion modals)
         $paused = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
             ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
             ->orderBy('planned_start')
             ->get();
 
+        // Completed today count
+        $completedToday = ProductionScheduleOperation::where('tenant_id', $tenantId)
+            ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
+            ->whereDate('actual_finish', today())
+            ->count();
+
+        // Active ready count (for performance sidebar tracker badge)
+        $readyCount = ProductionScheduleOperation::whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+            ->where('status', ProductionScheduleOperation::STATUS_READY)
+            ->count();
+
         // Shifts assigned/active
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
 
         return view('modules.production.mes.dashboard', compact(
-            'running', 'ready', 'upcoming', 'completedToday', 'paused', 'shifts'
+            'activeSchedules', 'running', 'paused', 'completedToday', 'readyCount', 'shifts'
         ));
     }
 

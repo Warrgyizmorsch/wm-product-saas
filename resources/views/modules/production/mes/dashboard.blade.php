@@ -22,7 +22,7 @@
             background: #ffffff;
         }
         .paused-card {
-            border-left: 5px solid #dc3545 !important;
+            border-left: 5px solid #ffc107 !important;
             background: #ffffff;
         }
         .ready-card {
@@ -32,7 +32,7 @@
         .mes-action-btn {
             min-width: 100px;
         }
-        @@keyframes pulse-glowing {
+        @keyframes pulse-glowing {
             0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
             70% { box-shadow: 0 0 0 8px rgba(40, 167, 69, 0); }
             100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
@@ -52,6 +52,122 @@
         .sidebar-widget {
             border-radius: 12px;
             border: 1px solid rgba(0,0,0,0.06);
+        }
+        /* Visual Routing Timelines */
+        .mes-progress-track {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            position: relative;
+            margin: 24px 0;
+            padding: 0 10px;
+        }
+        .mes-progress-track::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            right: 30px;
+            height: 4px;
+            background-color: #e9ecef;
+            z-index: 1;
+        }
+        .mes-track-line-filled {
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            height: 4px;
+            background-color: #28a745;
+            z-index: 2;
+            transition: width 0.3s ease;
+        }
+        .mes-progress-step {
+            position: relative;
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            text-align: center;
+        }
+        .mes-step-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #ffffff;
+            border: 3px solid #dee2e6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #6c757d;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        .mes-progress-step.step-completed .mes-step-icon {
+            border-color: #28a745;
+            background-color: #28a745;
+            color: #ffffff;
+        }
+        .mes-progress-step.step-running .mes-step-icon {
+            border-color: #0d6efd;
+            background-color: #0d6efd;
+            color: #ffffff;
+            box-shadow: 0 0 0 5px rgba(13, 110, 253, 0.2);
+        }
+        .mes-progress-step.step-paused .mes-step-icon {
+            border-color: #ffc107;
+            background-color: #ffc107;
+            color: #212529;
+            box-shadow: 0 0 0 5px rgba(255, 193, 7, 0.2);
+        }
+        .mes-progress-step.step-ready .mes-step-icon {
+            border-color: #17a2b8;
+            background-color: #ffffff;
+            color: #17a2b8;
+            border-style: dashed;
+        }
+        .mes-step-title {
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
+            color: #495057;
+            line-height: 1.2;
+            max-width: 100px;
+        }
+        .mes-step-subtitle {
+            font-size: 9px;
+            color: #6c757d;
+            margin-top: 2px;
+        }
+        .mes-step-status-badge {
+            font-size: 8px;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-top: 4px;
+            font-weight: 700;
+        }
+        .step-completed .mes-step-status-badge {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+        .step-running .mes-step-status-badge {
+            background-color: #cfe2ff;
+            color: #084298;
+            animation: pulse-glowing 2s infinite;
+        }
+        .step-paused .mes-step-status-badge {
+            background-color: #fff3cd;
+            color: #664d03;
+        }
+        .step-ready .mes-step-status-badge {
+            background-color: #cff4fc;
+            color: #087990;
+        }
+        .step-waiting .mes-step-status-badge {
+            background-color: #f8f9fa;
+            color: #6c757d;
         }
     </style>
 @endpush
@@ -210,95 +326,209 @@
         @endif
 
         <div class="row g-4">
-            {{-- LEFT COLUMN: Production Queue Lists (8 Cols) --}}
+            {{-- LEFT COLUMN: Production Project Dashboard (8 Cols) --}}
             <div class="col-lg-8">
                 
-                {{-- 1. Currently Running operations --}}
-                <div class="mb-4">
-                    <div class="d-flex align-items-center mb-3">
-                        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
-                            <span class="pulse-dot me-2"></span>Currently Running Operations
-                        </h5>
-                        <span class="badge bg-soft-success text-success rounded-pill ms-2 fw-bold font-monospace">{{ $running->count() }}</span>
-                    </div>
+                <div class="d-flex align-items-center mb-4">
+                    <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
+                        <i class="feather-grid me-2 text-primary"></i>Active Manufacturing Projects
+                    </h5>
+                    <span class="badge bg-soft-primary text-primary rounded-pill ms-2 fw-bold font-monospace">{{ $activeSchedules->count() }}</span>
+                </div>
 
-                    @forelse($running as $op)
-                        <div class="card mes-op-card running-card mb-3">
-                            <div class="card-body p-4">
-                                <div class="row align-items-center g-3">
-                                    <div class="col-md-6">
-                                        <div class="d-flex align-items-start gap-3">
-                                            <div class="avatar-text avatar-lg bg-soft-success text-success rounded">
-                                                <i class="feather-play-circle fs-20"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="fw-bold text-dark mb-1 fs-14">{{ $op->orderOperation->name ?? 'Operation #' . $op->sequence }}</h6>
-                                                <div class="text-muted fs-12 mb-2">
-                                                    <span class="fw-semibold text-secondary">{{ $op->order->product->name ?? '—' }}</span>
-                                                    <span class="mx-1">&middot;</span>
-                                                    <span class="font-monospace fs-11">{{ $op->order->order_number ?? '' }}</span>
-                                                </div>
-                                                <div class="d-flex flex-wrap gap-2">
-                                                    <span class="badge bg-light text-secondary fs-10 px-2 py-1 border">
-                                                        <i class="feather-settings me-1 fs-9"></i>{{ $op->workCenter->name ?? '—' }}
-                                                    </span>
-                                                    @if($op->machine)
-                                                        <span class="badge bg-light text-secondary fs-10 px-2 py-1 border">
-                                                            <i class="feather-cpu me-1 fs-9"></i>{{ $op->machine->name }}
-                                                        </span>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="bg-light p-3 rounded border mes-timer-block" 
-                                             data-start="{{ $op->actual_start ? $op->actual_start->toISOString() : '' }}"
-                                             data-planned-start="{{ $op->planned_start ? $op->planned_start->toISOString() : '' }}"
-                                             data-finish="{{ $op->planned_finish ? $op->planned_finish->toISOString() : '' }}"
-                                             data-status="{{ $op->status }}"
-                                             data-accumulated-paused-seconds="{{ $op->accumulated_paused_seconds ?? 0 }}"
-                                             data-last-paused-at="{{ $op->last_paused_at ? $op->last_paused_at->toISOString() : '' }}"
-                                             data-server-time="{{ now()->toISOString() }}">
-                                            <div class="row text-center g-2">
-                                                <div class="col-6 border-end">
-                                                    <small class="text-muted text-uppercase d-block fs-9 mb-1 fw-bold">Elapsed Stopwatch</small>
-                                                    <span class="timer-elapsed font-monospace fw-bold text-dark fs-14">00:00:00</span>
-                                                </div>
-                                                <div class="col-6">
-                                                    <small class="text-muted text-uppercase d-block fs-9 mb-1 fw-bold">Planned Countdown</small>
-                                                    <span class="timer-remaining font-monospace fw-bold text-success fs-14">00:00:00</span>
-                                                </div>
-                                            </div>
-                                            <div class="progress progress-sm bg-white border mt-2">
-                                                <div class="progress-bar timer-progress-bar bg-success" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-                                            </div>
-                                        </div>
-                                    </div>
+                @forelse($activeSchedules as $schedule)
+                    @php
+                        $order = $schedule->order;
+                        $ops = $schedule->operations->sortBy('sequence');
+                        $totalOps = $ops->count();
+                        $completedOps = $ops->where('status', 'completed')->count();
+                        $progressPercent = $totalOps > 0 ? ($completedOps / $totalOps) * 100 : 0;
+                        
+                        // Active operations that need control panels
+                        $activeOps = $ops->whereIn('status', ['running', 'paused', 'ready']);
+                    @endphp
+
+                    <div class="card mb-4 border border-light shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                        {{-- Card Header --}}
+                        <div class="card-header bg-light border-bottom border-light p-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <div>
+                                <h6 class="fw-bold text-dark mb-1 fs-14">
+                                    <span class="text-primary">{{ $order->order_number ?? '' }}</span>
+                                    <span class="mx-1 text-muted">&middot;</span>
+                                    {{ $order->product->name ?? 'Unknown Product' }}
+                                </h6>
+                                <div class="text-muted fs-11">
+                                    Schedule: <strong class="text-secondary">{{ $schedule->schedule_number }}</strong>
+                                    <span class="mx-2">|</span>
+                                    Quantity: <strong class="text-secondary">{{ (int)$order->quantity_ordered }} units</strong>
                                 </div>
-                                
-                                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
-                                    <div class="fs-11 text-muted">
-                                        Started: <span class="fw-semibold text-dark">{{ $op->actual_start ? $op->actual_start->format('d M, H:i') : '—' }}</span>
-                                    </div>
-                                    <div class="d-flex gap-2">
-                                        <form method="POST" action="{{ route('production.mes.pause', $op->id) }}">
-                                            @csrf
-                                            <button type="submit" class="btn btn-sm btn-warning text-dark px-3 fw-semibold">
-                                                <i class="feather-pause me-1"></i>Pause
-                                            </button>
-                                        </form>
-                                        <button type="button" class="btn btn-sm btn-success px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#completeModal{{ $op->id }}">
-                                            <i class="feather-check-circle me-1"></i>Complete
-                                        </button>
-                                    </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-soft-success text-success fs-10 px-2 py-1 rounded-pill mb-1">
+                                    {{ $completedOps }} / {{ $totalOps }} Steps Complete
+                                </span>
+                                <div class="progress progress-sm bg-white border" style="width: 150px; height: 6px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ $progressPercent }}%" aria-valuenow="{{ $progressPercent }}" aria-valuemin="0" aria-valuemax="100"></div>
                                 </div>
                             </div>
                         </div>
 
-                        {{-- Complete Operation Modal --}}
-                        <x-ui.modal id="completeModal{{ $op->id }}" title="Log Production Progress — {{ $op->orderOperation->name ?? 'Op #'.$op->sequence }}" class="text-start">
-                            <form method="POST" action="{{ route('production.mes.complete', $op->id) }}" id="completeForm{{ $op->id }}">
+                        {{-- Card Body: Visual Routing Flow --}}
+                        <div class="card-body p-4 bg-white">
+                            <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">Project Routing Sequence</h6>
+                            
+                            <div class="mes-progress-track">
+                                @php
+                                    $stepPercent = $totalOps > 1 ? ($completedOps / ($totalOps - 1)) * 100 : 0;
+                                    if ($completedOps === $totalOps) {
+                                        $stepPercent = 100;
+                                    }
+                                @endphp
+                                <div class="mes-track-line-filled" style="width: calc({{ $stepPercent }}% - 60px);"></div>
+                                
+                                @foreach($ops as $op)
+                                    @php
+                                        $stepClass = 'step-waiting';
+                                        $stepIcon = 'lock';
+                                        if ($op->status === 'completed') {
+                                            $stepClass = 'step-completed';
+                                            $stepIcon = 'check';
+                                        } elseif ($op->status === 'running') {
+                                            $stepClass = 'step-running';
+                                            $stepIcon = 'play';
+                                        } elseif ($op->status === 'paused') {
+                                            $stepClass = 'step-paused';
+                                            $stepIcon = 'pause';
+                                        } elseif ($op->status === 'ready') {
+                                            $stepClass = 'step-ready';
+                                            $stepIcon = 'arrow-right';
+                                        }
+                                    @endphp
+                                    
+                                    <div class="mes-progress-step {{ $stepClass }}">
+                                        <div class="mes-step-icon" title="{{ ucfirst($op->status) }}">
+                                            <i class="feather-{{ $stepIcon }}"></i>
+                                        </div>
+                                        <div class="mes-step-title text-truncate" title="{{ $op->orderOperation->name ?? $op->name }}">
+                                            {{ $op->orderOperation->name ?? 'Op' }}
+                                        </div>
+                                        <div class="mes-step-subtitle text-truncate" title="{{ $op->workCenter->name ?? '' }}">
+                                            {{ $op->workCenter->name ?? '' }}
+                                        </div>
+                                        <span class="mes-step-status-badge">{{ $op->status }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            {{-- Card Footer: Active Action Area --}}
+                            @if($activeOps->count() > 0)
+                                <div class="mt-4 pt-3 border-top">
+                                    <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">Active Shopfloor Controls</h6>
+                                    
+                                    @foreach($activeOps as $activeOp)
+                                        <div class="p-3 bg-light rounded border mb-3">
+                                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                                                <div>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <strong class="text-dark fs-13">{{ $activeOp->orderOperation->name ?? 'Operation' }}</strong>
+                                                        <span class="badge bg-secondary font-monospace fs-10 px-2 py-0.5">Seq {{ $activeOp->sequence }}</span>
+                                                    </div>
+                                                    <div class="text-muted fs-11 mt-1">
+                                                        <i class="feather-settings me-1"></i>Work Center: <strong>{{ $activeOp->workCenter->name ?? 'Generic' }}</strong>
+                                                        @if($activeOp->machine)
+                                                            <span class="mx-1">&middot;</span>
+                                                            <i class="feather-cpu me-1"></i>Machine: <strong>{{ $activeOp->machine->name }}</strong>
+                                                        @endif
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex align-items-center gap-3 flex-grow-1 flex-md-grow-0 justify-content-end">
+                                                    @if($activeOp->status === 'running')
+                                                        {{-- Timer block --}}
+                                                        <div class="bg-white px-3 py-2 rounded border mes-timer-block shadow-none text-center"
+                                                             style="min-width: 200px;"
+                                                             data-start="{{ $activeOp->actual_start ? $activeOp->actual_start->toISOString() : '' }}"
+                                                             data-planned-start="{{ $activeOp->planned_start ? $activeOp->planned_start->toISOString() : '' }}"
+                                                             data-finish="{{ $activeOp->planned_finish ? $activeOp->planned_finish->toISOString() : '' }}"
+                                                             data-status="{{ $activeOp->status }}"
+                                                             data-accumulated-paused-seconds="{{ $activeOp->accumulated_paused_seconds ?? 0 }}"
+                                                             data-last-paused-at="{{ $activeOp->last_paused_at ? $activeOp->last_paused_at->toISOString() : '' }}"
+                                                             data-server-time="{{ now()->toISOString() }}">
+                                                            <div class="d-flex justify-content-between gap-3">
+                                                                <div>
+                                                                    <small class="text-muted text-uppercase d-block fs-8 fw-bold">Stopwatch</small>
+                                                                    <span class="timer-elapsed font-monospace fw-bold text-dark fs-12">00:00:00</span>
+                                                                </div>
+                                                                <div class="border-end"></div>
+                                                                <div>
+                                                                    <small class="text-muted text-uppercase d-block fs-8 fw-bold">Countdown</small>
+                                                                    <span class="timer-remaining font-monospace fw-bold text-success fs-12">00:00:00</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="d-flex gap-2">
+                                                            <form method="POST" action="{{ route('production.mes.pause', $activeOp->id) }}">
+                                                                @csrf
+                                                                <button type="submit" class="btn btn-sm btn-warning text-dark px-3 fw-semibold">
+                                                                    <i class="feather-pause me-1"></i>Pause
+                                                                </button>
+                                                            </form>
+                                                            <button type="button" class="btn btn-sm btn-success px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#completeModal{{ $activeOp->id }}">
+                                                                <i class="feather-check-circle me-1"></i>Complete
+                                                                </button>
+                                                        </div>
+
+                                                    @elseif($activeOp->status === 'paused')
+                                                        {{-- Paused display --}}
+                                                        <div class="bg-white px-3 py-2 rounded border text-center" style="min-width: 200px;">
+                                                            <span class="text-danger fw-bold fs-12 d-block"><i class="feather-pause-circle me-1"></i>Paused</span>
+                                                            <small class="text-muted fs-10 italic">"{{ $activeOp->remarks ?? 'No remarks' }}"</small>
+                                                        </div>
+
+                                                        <div class="d-flex gap-2">
+                                                            <form method="POST" action="{{ route('production.mes.resume', $activeOp->id) }}">
+                                                                @csrf
+                                                                <button type="submit" class="btn btn-sm btn-primary px-3 fw-semibold">
+                                                                    <i class="feather-play me-1"></i>Resume
+                                                                </button>
+                                                            </form>
+                                                            <button type="button" class="btn btn-sm btn-success px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#completeModal{{ $activeOp->id }}">
+                                                                <i class="feather-check-circle me-1"></i>Complete
+                                                            </button>
+                                                        </div>
+
+                                                    @elseif($activeOp->status === 'ready')
+                                                        {{-- Ready to start --}}
+                                                        <form method="POST" action="{{ route('production.mes.start', $activeOp->id) }}">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-sm btn-success px-4 py-2 fw-bold shadow-sm">
+                                                                <i class="feather-play me-1"></i>Start Operation
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Completion Modals for active operations in this schedule --}}
+                    @foreach($activeOps->whereIn('status', ['running', 'paused']) as $activeOp)
+                        @php
+                            $elapsedSecs = 0;
+                            if ($activeOp->actual_start && $activeOp->last_paused_at) {
+                                $elapsedSecs = max(0, $activeOp->last_paused_at->timestamp - $activeOp->actual_start->timestamp - $activeOp->accumulated_paused_seconds);
+                            } elseif ($activeOp->actual_start) {
+                                $elapsedSecs = max(0, now()->timestamp - $activeOp->actual_start->timestamp - $activeOp->accumulated_paused_seconds);
+                            }
+                            $elapsedMinutes = round($elapsedSecs / 60, 1);
+                        @endphp
+                        <x-ui.modal id="completeModal{{ $activeOp->id }}" title="Log Production Progress — {{ $activeOp->orderOperation->name ?? 'Op #'.$activeOp->sequence }}" class="text-start">
+                            <form method="POST" action="{{ route('production.mes.complete', $activeOp->id) }}" id="completeForm{{ $activeOp->id }}">
                                 @csrf
                                 <div class="row g-3">
                                     <div class="col-md-6">
@@ -314,7 +544,7 @@
                                         <x-ui.odoo-form-ui type="input" label="Setup Time (min)" name="setup_minutes" inputType="number" step="any" value="0" />
                                     </div>
                                     <div class="col-md-12">
-                                        <x-ui.odoo-form-ui type="input" label="Run Time (min)" name="run_minutes" inputType="number" step="any" value="0" />
+                                        <x-ui.odoo-form-ui type="input" label="Run Time (min)" name="run_minutes" inputType="number" step="any" value="{{ $elapsedMinutes }}" />
                                     </div>
                                     <div class="col-md-12">
                                         <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Optional completion notes..." />
@@ -323,226 +553,21 @@
                             </form>
                             <x-slot name="footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-success px-4" onclick="document.getElementById('completeForm{{ $op->id }}').submit();">
+                                <button type="submit" class="btn btn-success px-4" onclick="document.getElementById('completeForm{{ $activeOp->id }}').submit();">
                                     <i class="feather-check me-1"></i>Complete Operation
                                 </button>
                             </x-slot>
                         </x-ui.modal>
-                    @empty
-                        <div class="card p-4 text-center border bg-white rounded-3 shadow-xs mb-4">
-                            <div class="avatar-text avatar-lg bg-soft-light text-muted rounded mx-auto mb-3">
-                                <i class="feather-play-circle fs-24"></i>
-                            </div>
-                            <h6 class="fw-bold text-dark">No active operations running</h6>
-                            <p class="text-muted fs-12 mb-0">Select an operation from the Ready Queue below to initiate work center progress.</p>
+                    @endforeach
+                @empty
+                    <div class="card p-5 text-center border bg-white rounded-3 shadow-sm mb-4">
+                        <div class="avatar-text avatar-lg bg-soft-light text-muted rounded mx-auto mb-3">
+                            <i class="feather-grid fs-28"></i>
                         </div>
-                    @endforelse
-                </div>
-
-                {{-- 2. Ready Queue --}}
-                <div class="mb-4">
-                    <div class="d-flex align-items-center mb-3">
-                        <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
-                            <i class="feather-check-square text-info me-2 fs-18"></i>Ready Queue
-                        </h5>
-                        <span class="badge bg-soft-info text-info rounded-pill ms-2 fw-bold font-monospace">{{ $ready->count() }}</span>
+                        <h6 class="fw-bold text-dark">No active projects running</h6>
+                        <p class="text-muted fs-12 mb-0">Create and release a production schedule to see the visual routing flows here.</p>
                     </div>
-
-                    @if($ready->count() > 0)
-                        <div class="table-responsive border rounded bg-white">
-                            <x-ui.odoo-form-ui type="table" class="mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Operation</th>
-                                        <th>Order / Item</th>
-                                        <th>Work Center / Asset</th>
-                                        <th>Planned Start</th>
-                                        <th class="text-end">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($ready as $op)
-                                        <tr>
-                                            <td>
-                                                <span class="fw-bold text-dark d-block fs-13">{{ $op->orderOperation->name ?? 'Op #'.$op->sequence }}</span>
-                                                <small class="text-muted">Seq {{ $op->sequence }}</small>
-                                            </td>
-                                            <td>
-                                                <div class="fw-semibold text-secondary fs-12">{{ $op->order->product->name ?? '—' }}</div>
-                                                <small class="text-muted font-monospace">{{ $op->order->order_number ?? '' }}</small>
-                                            </td>
-                                            <td>
-                                                <div class="fs-12 text-dark"><i class="feather-settings me-1 fs-10 text-muted"></i>{{ $op->workCenter->name ?? '—' }}</div>
-                                                <small class="text-muted"><i class="feather-cpu me-1 fs-10"></i>{{ $op->machine->name ?? 'Generic Capacity' }}</small>
-                                            </td>
-                                            <td class="fs-12 text-muted">{{ $op->planned_start->format('d M, H:i') }}</td>
-                                            <td class="text-end">
-                                                <form method="POST" action="{{ route('production.mes.start', $op->id) }}" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-success px-3 fw-semibold">
-                                                        <i class="feather-play me-1"></i>Start
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </x-ui.odoo-form-ui>
-                        </div>
-                    @else
-                        <div class="card p-4 text-center border bg-white rounded-3 shadow-xs">
-                            <div class="avatar-text avatar-lg bg-soft-light text-muted rounded mx-auto mb-3">
-                                <i class="feather-inbox fs-24"></i>
-                            </div>
-                            <h6 class="fw-bold text-dark">Ready Queue is empty</h6>
-                            <p class="text-muted fs-12 mb-0">No scheduling operations have been released to the shop floor.</p>
-                        </div>
-                    @endif
-                </div>
-
-                {{-- 3. On Hold / Paused --}}
-                @if($paused->count() > 0)
-                    <div class="mb-4">
-                        <div class="d-flex align-items-center mb-3">
-                            <h5 class="fw-bold text-danger mb-0 d-flex align-items-center">
-                                <i class="feather-pause-circle me-2 fs-18"></i>On Hold &amp; Paused Operations
-                            </h5>
-                            <span class="badge bg-soft-danger text-danger rounded-pill ms-2 fw-bold font-monospace">{{ $paused->count() }}</span>
-                        </div>
-                        <div class="table-responsive border rounded bg-white">
-                            <x-ui.odoo-form-ui type="table" class="mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Operation</th>
-                                        <th>Order / Item</th>
-                                        <th>Work Center</th>
-                                        <th>Reason / Remarks</th>
-                                        <th class="text-end">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($paused as $op)
-                                        <tr class="table-danger-soft">
-                                            <td>
-                                                <span class="fw-bold text-dark d-block fs-13">{{ $op->orderOperation->name ?? 'Op #'.$op->sequence }}</span>
-                                                <small class="text-muted">Seq {{ $op->sequence }}</small>
-                                            </td>
-                                            <td>
-                                                <div class="fw-semibold text-secondary fs-12">{{ $op->order->product->name ?? '—' }}</div>
-                                                <small class="text-muted font-monospace">{{ $op->order->order_number ?? '' }}</small>
-                                            </td>
-                                            <td class="text-muted fs-12">{{ $op->workCenter->name ?? '—' }}</td>
-                                            <td class="text-muted fs-12 italic">
-                                                {{ $op->remarks ?? 'No remarks provided.' }}
-                                            </td>
-                                            <td class="text-end">
-                                                <div class="d-flex justify-content-end gap-2">
-                                                    <form method="POST" action="{{ route('production.mes.resume', $op->id) }}" class="d-inline">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm btn-primary px-3 fw-semibold">
-                                                            <i class="feather-play me-1"></i>Resume
-                                                        </button>
-                                                    </form>
-                                                    <button type="button" class="btn btn-sm btn-success px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#completeModal{{ $op->id }}">
-                                                        <i class="feather-check-circle me-1"></i>Complete
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                             </x-ui.odoo-form-ui>
-                         </div>
-                     </div>
-
-                     {{-- Modals for Paused Operations --}}
-                     @foreach($paused as $op)
-                         @php
-                             $elapsedSecs = 0;
-                             if ($op->actual_start && $op->last_paused_at) {
-                                 $elapsedSecs = max(0, $op->last_paused_at->timestamp - $op->actual_start->timestamp - $op->accumulated_paused_seconds);
-                             } elseif ($op->actual_start) {
-                                 $elapsedSecs = max(0, now()->timestamp - $op->actual_start->timestamp - $op->accumulated_paused_seconds);
-                             }
-                             $elapsedMinutes = round($elapsedSecs / 60, 1);
-                         @endphp
-                         <x-ui.modal id="completeModal{{ $op->id }}" title="Log Production Progress — {{ $op->orderOperation->name ?? 'Op #'.$op->sequence }}" class="text-start">
-                             <form method="POST" action="{{ route('production.mes.complete', $op->id) }}" id="completeForm{{ $op->id }}">
-                                 @csrf
-                                 <div class="row g-3">
-                                     <div class="col-md-6">
-                                         <x-ui.odoo-form-ui type="input" label="Qty Produced" name="quantity_produced" inputType="number" step="any" value="0" :required="true" />
-                                     </div>
-                                     <div class="col-md-6">
-                                         <x-ui.odoo-form-ui type="input" label="Qty Rejected" name="quantity_rejected" inputType="number" step="any" value="0" />
-                                     </div>
-                                     <div class="col-md-6">
-                                         <x-ui.odoo-form-ui type="input" label="Qty Scrapped" name="quantity_scrapped" inputType="number" step="any" value="0" />
-                                     </div>
-                                     <div class="col-md-6">
-                                         <x-ui.odoo-form-ui type="input" label="Setup Time (min)" name="setup_minutes" inputType="number" step="any" value="0" />
-                                     </div>
-                                     <div class="col-md-12">
-                                         <x-ui.odoo-form-ui type="input" label="Run Time (min)" name="run_minutes" inputType="number" step="any" value="{{ $elapsedMinutes }}" />
-                                     </div>
-                                     <div class="col-md-12">
-                                         <x-ui.odoo-form-ui type="textarea" label="Remarks" name="remarks" placeholder="Optional completion notes..." />
-                                     </div>
-                                 </div>
-                             </form>
-                             <x-slot name="footer">
-                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                 <button type="submit" class="btn btn-success px-4" onclick="document.getElementById('completeForm{{ $op->id }}').submit();">
-                                     <i class="feather-check me-1"></i>Complete Operation
-                                 </button>
-                             </x-slot>
-                         </x-ui.modal>
-                     @endforeach
-                 @endif
-
-                {{-- 4. Upcoming operations --}}
-                @if($upcoming->count() > 0)
-                    <div class="mb-4">
-                        <div class="d-flex align-items-center mb-3">
-                            <h5 class="fw-bold text-muted mb-0 d-flex align-items-center">
-                                <i class="feather-clock me-2 fs-18"></i>Upcoming Operations
-                            </h5>
-                            <span class="badge bg-soft-secondary text-secondary rounded-pill ms-2 fw-bold font-monospace">{{ $upcoming->count() }}</span>
-                        </div>
-                        <div class="table-responsive border rounded bg-white">
-                            <x-ui.odoo-form-ui type="table" class="mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Operation</th>
-                                        <th>Order / Item</th>
-                                        <th>Work Center</th>
-                                        <th>Estimated Start</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($upcoming as $op)
-                                        <tr>
-                                            <td>
-                                                <span class="fw-bold text-dark d-block fs-13">{{ $op->orderOperation->name ?? 'Op #'.$op->sequence }}</span>
-                                                <small class="text-muted">Seq {{ $op->sequence }}</small>
-                                            </td>
-                                            <td>
-                                                <div class="fw-semibold text-secondary fs-12">{{ $op->order->product->name ?? '—' }}</div>
-                                                <small class="text-muted font-monospace">{{ $op->order->order_number ?? '' }}</small>
-                                            </td>
-                                            <td class="text-muted fs-12">{{ $op->workCenter->name ?? '—' }}</td>
-                                            <td class="text-muted fs-12">{{ $op->planned_start->format('d M, H:i') }}</td>
-                                            <td>
-                                                <span class="badge bg-soft-secondary text-secondary fs-10 px-2 py-0.5">Waiting</span>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </x-ui.odoo-form-ui>
-                        </div>
-                    </div>
-                @endif
+                @endforelse
             </div>
 
             {{-- RIGHT COLUMN: Secondary Metadata Widgets & Shortcuts (4 Cols) --}}
