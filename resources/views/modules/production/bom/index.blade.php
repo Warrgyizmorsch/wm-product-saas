@@ -4,27 +4,8 @@
 @section('page-title', __('production.bom_management'))
 @section('breadcrumb', __('production.bom_management'))
 
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
-    <style>
-        .erp-single-panel {
-            display: flex !important;
-            flex-direction: column !important;
-            min-height: calc(100vh - 180px) !important;
-        }
-        .table-responsive {
-            position: relative;
-        }
-        .table-responsive:has(.dropdown.show) {
-            overflow: visible !important;
-        }
-    </style>
-@endpush
 
 @push('scripts')
-    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const headerCheckbox = document.getElementById('check-all-boms');

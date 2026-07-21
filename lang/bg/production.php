@@ -793,7 +793,8 @@ return [
     // Production Orders Specific Keys
     'production_orders' => 'Производствени поръчки',
     'production_order_execution' => 'Производствени поръчки (Производствено изпълнение)',
-    'create_direct_order' => 'Създай директна поръчка',
+    'create_direct_order' => 'Създай производствена поръчка',
+
     'new_production_order' => 'Нова производствена поръчка',
     'create_production_order' => 'Създай производствена поръчка',
     'edit_production_order' => 'Редактиране на производствена поръчка',

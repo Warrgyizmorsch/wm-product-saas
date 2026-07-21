@@ -39,7 +39,7 @@ class ProductionBomDTO
             bom_name: $data['bom_name'] ?? null,
             bom_type: $data['bom_type'] ?? 'manufacturing',
             product_id: (int) $data['product_id'],
-            base_quantity: isset($data['base_quantity']) ? (float) $data['base_quantity'] : 1.0000,
+            base_quantity: isset($data['base_quantity']) ? (float) $data['base_quantity'] : 1.00,
             base_uom_id: !empty($data['base_uom_id']) ? (int) $data['base_uom_id'] : null,
             version: $data['version'] ?? '1.0.0',
             revision_reason: $data['revision_reason'] ?? null,

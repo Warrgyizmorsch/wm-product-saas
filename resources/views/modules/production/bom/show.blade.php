@@ -2,22 +2,6 @@
 
 @section('title', __('production.bom_details') . ' | SaaS ERP')
 
-@push('styles')
-    <style>
-        .erp-child-bom-row td {
-            color: #828a96 !important;
-            font-weight: 300 !important;
-        }
-        .erp-child-bom-row td .text-dark {
-            color: #828a96 !important;
-            font-weight: 400 !important;
-        }
-        .erp-child-bom-row td .fw-bold {
-            font-weight: 400 !important;
-        }
-    </style>
-@endpush
-
 @section('page-actions')
     <a href="{{ route('production.boms.index') }}" class="btn btn-secondary me-2">
         <i class="feather-arrow-left me-2"></i>{{ __('production.back_to_list') }}
@@ -169,7 +153,7 @@
                         <span class="fw-semibold text-muted fs-13">{{ __('production.base_quantity') }}:</span>
                     </div>
                     <div class="col-md-8">
-                        <span class="text-dark fw-bold fs-13">{{ number_format($bom->base_quantity, 4) }} {{ $bom->baseUom ? $bom->baseUom->code : 'PCS' }}</span>
+                        <span class="text-dark fw-bold fs-13">{{ number_format($bom->base_quantity, 2) }} {{ $bom->baseUom ? $bom->baseUom->code : 'PCS' }}</span>
                     </div>
                 </div>
             </div>
@@ -289,7 +273,7 @@
                                             echo '</td>';
                                             
                                             // Quantity
-                                            echo '<td class="text-end fw-bold align-middle">' . number_format($item->quantity, 4) . '</td>';
+                                            echo '<td class="text-end fw-bold align-middle">' . number_format($item->quantity, 2) . '</td>';
                                             
                                             // Unit
                                             echo '<td class="align-middle text-muted">' . e($item->uom ? $item->uom->code : 'PCS') . '</td>';
@@ -352,10 +336,10 @@
                             echo '</div>';
                             echo '</td>';
                             
-                            echo '<td class="text-end fw-bold">' . number_format($qty, 4) . '</td>';
+                            echo '<td class="text-end fw-bold">' . number_format($qty, 2) . '</td>';
                             echo '<td>' . e($node['uom_code']) . '</td>';
                             echo '<td class="text-end text-danger">' . number_format($scrap, 2) . '%</td>';
-                            echo '<td class="text-end fw-bold text-primary">' . number_format($gross, 4) . '</td>';
+                            echo '<td class="text-end fw-bold text-primary">' . number_format($gross, 2) . '</td>';
                             echo '<td>' . e($bomVersion !== 'N/A' ? "v{$bomVersion}" : '—') . '</td>';
                             echo '<td>';
                             if (isset($node['has_sub_bom']) && $node['has_sub_bom']) {
@@ -443,7 +427,7 @@
                                                         @foreach($op->materials as $opMat)
                                                             <li>
                                                                  <span class="text-secondary fw-semibold">{{ __('production.seq') }} {{ $opMat->sequence }}:</span>
-                                                                <strong>{{ $opMat->material->name }}</strong>: {{ number_format($opMat->quantity, 4) }} {{ $opMat->uom->code }}
+                                                                <strong>{{ $opMat->material->name }}</strong>: {{ number_format($opMat->quantity, 2) }} {{ $opMat->uom->code }}
                                                                 <span class="badge bg-light text-dark fs-8">{{ $opMat->consumption_type ?? 'manual' }}</span>
                                                             </li>
                                                         @endforeach
@@ -516,7 +500,7 @@
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
                             <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.component_cost_net') }}</span>
-                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['material_cost'] - $costSummary['scrap_adjustment'], 4) }}</h4>
+                            <h4 class="text-dark fw-bold mt-1">{{ format_currency($costSummary['material_cost'] - $costSummary['scrap_adjustment']) }}</h4>
                             <small class="text-muted">{{ __('production.net_scrap_loss_desc') ?? 'Net of scrap loss' }}</small>
                         </div>
                     </div>
@@ -524,7 +508,7 @@
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
                             <span class="text-muted fs-11 text-uppercase fw-bold text-danger">{{ __('production.scrap_loss') ?? 'Scrap Loss' }}</span>
-                            <h4 class="text-danger fw-bold mt-1">${{ number_format($costSummary['scrap_adjustment'], 4) }}</h4>
+                            <h4 class="text-danger fw-bold mt-1">{{ format_currency($costSummary['scrap_adjustment']) }}</h4>
                             <small class="text-muted">{{ __('production.expected_scrap_desc') ?? 'Expected material scrap value' }}</small>
                         </div>
                     </div>
@@ -532,7 +516,7 @@
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
                             <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.labor_cost') ?? 'Labor Cost' }}</span>
-                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['labor_cost'], 4) }}</h4>
+                            <h4 class="text-dark fw-bold mt-1">{{ format_currency($costSummary['labor_cost']) }}</h4>
                             <small class="text-muted">{{ __('production.labor_desc') ?? 'Routing setup & run labor' }}</small>
                         </div>
                     </div>
@@ -540,7 +524,7 @@
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
                             <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.machine_cost') ?? 'Machine Cost' }}</span>
-                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['machine_cost'], 4) }}</h4>
+                            <h4 class="text-dark fw-bold mt-1">{{ format_currency($costSummary['machine_cost']) }}</h4>
                             <small class="text-muted">{{ __('production.machine_desc') ?? 'Machine runtime cost' }}</small>
                         </div>
                     </div>
@@ -548,7 +532,7 @@
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center">
                             <span class="text-muted fs-11 text-uppercase fw-bold">Work Center Overhead</span>
-                            <h4 class="text-dark fw-bold mt-1">${{ number_format($costSummary['overhead_cost'], 4) }}</h4>
+                            <h4 class="text-dark fw-bold mt-1">{{ format_currency($costSummary['overhead_cost']) }}</h4>
                             <small class="text-muted">WC hourly overhead rate x duration</small>
                         </div>
                     </div>
@@ -556,7 +540,7 @@
                     <div class="col-md-4">
                         <div class="bg-light p-3 rounded border text-center bg-soft-primary border-primary">
                             <span class="text-primary fs-11 text-uppercase fw-bold">{{ __('production.total_mfg_cost') ?? 'Total Manufacturing Cost' }}</span>
-                            <h4 class="text-primary fw-bold mt-1">${{ number_format($costSummary['total_cost'], 4) }}</h4>
+                            <h4 class="text-primary fw-bold mt-1">{{ format_currency($costSummary['total_cost']) }}</h4>
                             <small class="text-primary">{{ __('production.mfg_desc') ?? 'Sum of all cost layers' }}</small>
                         </div>
                     </div>
@@ -585,11 +569,11 @@
                                             <small class="text-muted font-monospace fs-10">{{ $cItem['material_sku'] }}</small>
                                         </div>
                                     </td>
-                                    <td class="text-end">{{ number_format($cItem['quantity'], 4) }} {{ $cItem['uom_code'] }}</td>
+                                    <td class="text-end">{{ number_format($cItem['quantity'], 2) }} {{ $cItem['uom_code'] }}</td>
                                     <td class="text-end text-danger">{{ number_format($cItem['scrap_percentage'], 2) }}%</td>
-                                    <td class="text-end fw-bold">{{ number_format($cItem['gross_quantity'], 4) }} {{ $cItem['uom_code'] }}</td>
-                                    <td class="text-end">${{ number_format($cItem['unit_cost'], 4) }}</td>
-                                    <td class="text-end text-dark fw-bold">${{ number_format($cItem['total_cost'], 4) }}</td>
+                                    <td class="text-end fw-bold">{{ number_format($cItem['gross_quantity'], 2) }} {{ $cItem['uom_code'] }}</td>
+                                    <td class="text-end">{{ format_currency($cItem['unit_cost']) }}</td>
+                                    <td class="text-end text-dark fw-bold">{{ format_currency($cItem['total_cost']) }}</td>
                                 </tr>
                             @empty
                                 <tr>
@@ -598,11 +582,13 @@
                             @endforelse
                             <tr class="table-light fw-bold">
                                 <td colspan="5" class="text-end">{{ __('production.est_total_material_cost') }}</td>
-                                <td class="text-end text-primary fs-14">${{ number_format($materialCost, 4) }}</td>
+                                <td class="text-end text-primary fs-14">{{ format_currency($materialCost) }}</td>
                             </tr>
                         </tbody>
                     </x-ui.odoo-form-ui>
                 </div>
+
+
             </div>
 
             <!-- Tab 5: Approval History -->

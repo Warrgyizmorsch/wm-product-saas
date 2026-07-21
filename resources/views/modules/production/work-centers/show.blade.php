@@ -101,14 +101,15 @@
                 <div class="d-flex flex-column gap-4 py-2 px-2">
                     <div>
                         <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.overhead_cost_rate') }}</span>
-                        <span class="fs-24 fw-bold text-dark">${{ number_format($workCenter->cost_per_hour, 2) }} <span class="fs-13 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
+                        <span class="fs-24 fw-bold text-dark">{{ format_currency($workCenter->cost_per_hour) }} <span class="fs-13 fw-normal text-muted">/ {{ __('production.hour') }}</span></span>
                         <small class="text-muted d-block mt-1">{{ __('production.overhead_cost_rate_help') }}</small>
                     </div>
                     
                     <div class="border-top pt-3 mt-2">
                         <h6 class="fw-bold text-dark mb-2">{{ __('production.wc_cost_guide') }}</h6>
                         <ul class="fs-12 text-muted ps-3 mb-0">
-                            <li class="mb-1">{{ __('production.wc_cost_guide_text_1', ['cost' => $workCenter->cost_per_hour]) }}</li>
+                            <li class="mb-1">{{ __('production.wc_cost_guide_text_1', ['cost' => format_currency($workCenter->cost_per_hour)]) }}</li>
+
                             <li>{{ __('production.wc_cost_guide_text_2') }}</li>
                         </ul>
                     </div>

@@ -875,7 +875,8 @@ return [
     // Production Orders Specific Keys
     'production_orders' => 'Production Orders',
     'production_order_execution' => 'Production Orders (Manufacturing Execution)',
-    'create_direct_order' => 'Create Direct Order',
+    'create_direct_order' => 'Create Production Order',
+
     'new_production_order' => 'New Production Order',
     'create_production_order' => 'Create Production Order',
     'edit_production_order' => 'Edit Production Order',

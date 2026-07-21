@@ -48,7 +48,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Estimated Cost Value ($)</label>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Estimated Cost Value ({{ active_currency_symbol() }})</label>
                         <input type="number" step="0.01" name="cost" class="form-control" placeholder="Cost Value" required>
                     </div>
 
@@ -82,7 +82,8 @@
                                 <td class="text-capitalize text-dark fw-medium">{{ str_replace('_', ' ', $sc->category) }}</td>
                                 <td class="text-capitalize text-muted">{{ $sc->reason_code }}</td>
                                 <td class="text-end fw-bold text-dark">{{ number_format($sc->quantity, 2) }}</td>
-                                <td class="text-end text-danger fw-bold">${{ number_format($sc->cost, 2) }}</td>
+                                <td class="text-end text-danger fw-bold">{{ format_currency($sc->cost) }}</td>
+
                                 <td>
                                     @if($sc->status === 'approved')
                                         <span class="erp-badge-active">Approved</span>

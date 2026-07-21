@@ -107,7 +107,15 @@ class NcrController extends Controller
             'cost',
         ]);
 
+        if (isset($data['cost_estimate'])) {
+            $data['cost_estimate'] = convert_to_base($data['cost_estimate']);
+        }
+        if (isset($data['cost'])) {
+            $data['cost'] = convert_to_base($data['cost']);
+        }
+
         $this->ncrService->processDisposition($id, $type, $data, $tenantId);
+
 
         return redirect()->back()->with('success', 'Disposition type registered.');
     }

@@ -793,7 +793,8 @@ return [
     // Production Orders Specific Keys
     'production_orders' => 'उत्पादन आदेश (Production Orders)',
     'production_order_execution' => 'उत्पादन आदेश (मैन्युफैक्चरिंग एग्जीक्यूशन)',
-    'create_direct_order' => 'प्रत्यक्ष आदेश बनाएं',
+    'create_direct_order' => 'उत्पादन आदेश बनाएं',
+
     'new_production_order' => 'नया उत्पादन आदेश',
     'create_production_order' => 'उत्पादन आदेश बनाएं',
     'edit_production_order' => 'उत्पादन आदेश संपादित करें',

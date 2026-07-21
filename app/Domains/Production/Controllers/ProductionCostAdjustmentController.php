@@ -26,15 +26,20 @@ class ProductionCostAdjustmentController extends Controller
         $order = ProductionOrder::findOrFail($orderId);
 
         try {
+            $data = $request->validated();
+            if (isset($data['amount'])) {
+                $data['amount'] = convert_to_base($data['amount']);
+            }
             $adjustment = $this->adjustmentService->createAdjustment(
                 $order,
-                $request->validated(),
+                $data,
                 $request->file('attachment'),
                 auth()->id()
             );
 
+            $fmtAmount = format_currency($adjustment->amount);
             return redirect()->back()
-                ->with('success', "Manual cost adjustment of {$adjustment->amount} ({$adjustment->cost_component}) successfully recorded.");
+                ->with('success', "Manual cost adjustment of {$fmtAmount} ({$adjustment->cost_component}) successfully recorded.");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to create cost adjustment: ' . $e->getMessage());
         }
@@ -45,9 +50,13 @@ class ProductionCostAdjustmentController extends Controller
         $adjustment = ProductionCostAdjustment::findOrFail($id);
 
         try {
+            $data = $request->validated();
+            if (isset($data['amount'])) {
+                $data['amount'] = convert_to_base($data['amount']);
+            }
             $updated = $this->adjustmentService->updateAdjustment(
                 $adjustment,
-                $request->validated(),
+                $data,
                 $request->file('attachment'),
                 auth()->id()
             );
@@ -58,6 +67,7 @@ class ProductionCostAdjustmentController extends Controller
             return redirect()->back()->with('error', 'Failed to update cost adjustment: ' . $e->getMessage());
         }
     }
+
 
     public function destroy(Request $request, int $id)
     {

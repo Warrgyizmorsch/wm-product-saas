@@ -4,45 +4,6 @@
 @section('page-title', __('production.create_bom'))
 @section('breadcrumb', __('production.create_bom'))
 
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
-    <style>
-        /* Keep input components inside table cells extremely compact */
-        .erp-thin-table td .mb-3 {
-            margin-bottom: 0 !important;
-        }
-        .erp-thin-table td .form-control,
-        .erp-thin-table td .form-select {
-            height: 34px !important;
-            padding: 4px 8px !important;
-            font-size: 12px !important;
-        }
-        .erp-thin-table td .select2-container--bootstrap-5 .select2-selection {
-            min-height: 34px !important;
-            height: 34px !important;
-            padding: 3px 8px !important;
-            font-size: 12px !important;
-        }
-        .bom-select2-dropdown {
-            z-index: 2055;
-        }
-        .bom-select2-dropdown .select2-results__options {
-            max-height: 260px;
-        }
-        .c-pointer {
-            cursor: pointer;
-        }
-    </style>
-@endpush
-
-@push('scripts')
-    <!-- Load Alpine.js for dynamic component grid management -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
-@endpush
-
 @section('content')
     <div class="erp-single-panel bg-white" x-data="bomForm">        
 
@@ -103,7 +64,7 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" :label="__('production.base_quantity')" name="base_quantity" inputType="number" step="any" placeholder="1.0" :value="old('base_quantity', '1.0000')" :required="true" :error-text="$errors->first('base_quantity')" alpineError="errors.base_quantity" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.base_quantity')" name="base_quantity" inputType="number" step="any" placeholder="1.0" :value="old('base_quantity', '1.00')" :required="true" :error-text="$errors->first('base_quantity')" alpineError="errors.base_quantity" />
                         
                         <x-ui.odoo-form-ui type="select" :label="__('production.base_uom')" name="base_uom_id" :required="true" data-master="uom" :error-text="$errors->first('base_uom_id')" alpineError="errors.base_uom_id">
                             <option value="">{{ __('production.select_uom') }}</option>

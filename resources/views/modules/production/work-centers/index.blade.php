@@ -293,7 +293,7 @@
                                     {{ $wc->capacity_per_hour !== null ? number_format($wc->capacity_per_hour, 2) : __('production.unlimited') }}
                                 </td>
                                 <td class="text-end text-muted">{{ number_format($wc->efficiency_percentage, 0) }}%</td>
-                                <td class="text-end fw-semibold text-dark">${{ number_format($wc->cost_per_hour, 2) }}</td>
+                                <td class="text-end fw-semibold text-dark">{{ format_currency($wc->cost_per_hour) }}</td>
                                 <td class="text-center">
                                     @if($wc->machines_count > 0)
                                         <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}"
@@ -420,7 +420,7 @@
                                     {{ $wc->capacity_per_hour !== null ? number_format($wc->capacity_per_hour, 2) : __('production.unlimited') }}
                                 </td>
                                 <td class="text-end text-muted">{{ number_format($wc->efficiency_percentage, 0) }}%</td>
-                                <td class="text-end fw-semibold text-dark">${{ number_format($wc->cost_per_hour, 2) }}</td>
+                                <td class="text-end fw-semibold text-dark">{{ format_currency($wc->cost_per_hour) }}</td>
                                 <td class="text-center">
                                     <a href="{{ route('production.machines.index', ['work_center_id' => $wc->id]) }}"
                                         class="badge bg-soft-info text-info rounded-pill px-2 py-1 fw-bold">
