@@ -13,12 +13,14 @@ class LeaveBalance extends BaseModel
         'employee_id',
         'leave_type_id',
         'allocated',
-        'used'
+        'used',
+        'encashed'
     ];
 
     protected $casts = [
         'allocated' => 'decimal:1',
-        'used' => 'decimal:1'
+        'used' => 'decimal:1',
+        'encashed' => 'decimal:1'
     ];
 
     public function employee(): BelongsTo
@@ -33,6 +35,6 @@ class LeaveBalance extends BaseModel
 
     public function getRemainingAttribute(): float
     {
-        return max(0.0, floatval($this->allocated) - floatval($this->used));
+        return max(0.0, floatval($this->allocated) - floatval($this->used) - floatval($this->encashed ?? 0.0));
     }
 }

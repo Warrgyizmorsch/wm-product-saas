@@ -218,6 +218,12 @@
                                         <span class="fw-semibold text-secondary">{{ $order->vendor->code }}</span>
                                     </div>
                                 @endif
+                                @if($order->supplier_quotation_number)
+                                    <div class="mb-2 d-flex align-items-baseline">
+                                        <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">Quotation No:</span>
+                                        <span class="fw-bold text-primary">{{ $order->supplier_quotation_number }}</span>
+                                    </div>
+                                @endif
                                 <div class="mb-2 d-flex align-items-baseline">
                                     <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">Supplier Address:</span>
                                     <span class="text-dark" style="line-height: 1.4; white-space: pre-line;">{{ $order->vendor->address ?? '—' }}</span>

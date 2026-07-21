@@ -47,6 +47,18 @@ class QualityInspectionService
                 ]);
             }
 
+            $this->eventService->writeEvent($tenantId, [
+                'production_order_id'           => $inspection->production_order_id,
+                'production_order_operation_id' => $inspection->production_order_operation_id,
+                'machine_id'                    => $inspection->machine_id,
+                'operator_id'                   => $inspection->operator_id,
+                'event_type'                    => 'Inspection Created',
+                'title'                         => 'Quality Inspection Created',
+                'description'                   => "Quality inspection #{$inspection->id} created for stage [{$inspection->stage}].",
+                'severity'                      => 'info',
+                'event_source'                  => 'QualityInspectionService',
+            ]);
+
             return $inspection;
         });
     }

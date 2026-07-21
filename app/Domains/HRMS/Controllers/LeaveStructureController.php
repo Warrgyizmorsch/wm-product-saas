@@ -263,23 +263,47 @@ class LeaveStructureController extends Controller
                         'used' => 0.0,
                     ]);
 
-                    // Calculate rollover based on Year-End Rules
+                    // Calculate rollover & encashment based on Year-End Rules
                     $rules = $ltype->rules ?? [];
                     $action = $rules['yearend']['action'] ?? 'lapse';
                     $maxCarry = floatval($rules['yearend']['max_carry'] ?? 0.0);
+                    $maxEncash = floatval($rules['yearend']['max_encash'] ?? 0.0);
 
                     $remaining = floatval($balance->remaining);
                     $rollover = 0.0;
+                    $autoEncashDays = 0.0;
 
                     if ($action === 'carry_forward' && $remaining > 0.0) {
                         $rollover = min($remaining, $maxCarry);
+                        $leftoverAfterCarry = max(0.0, $remaining - $rollover);
+                        if ($maxEncash > 0.0 && $leftoverAfterCarry > 0.0) {
+                            $autoEncashDays = min($leftoverAfterCarry, $maxEncash);
+                        }
+                    } elseif ($remaining > 0.0 && $maxEncash > 0.0) {
+                        $autoEncashDays = min($remaining, $maxEncash);
+                    }
+
+                    if ($autoEncashDays > 0.0) {
+                        \App\Domains\HRMS\Models\LeaveEncashment::create([
+                            'tenant_id' => $employee->tenant_id,
+                            'company_id' => $employee->company_id,
+                            'employee_id' => $employee->id,
+                            'leave_type_id' => $ltype->id,
+                            'requested_days' => $autoEncashDays,
+                            'status' => 'approved',
+                            'reason' => 'Year-end renewal automatic encashment',
+                            'approved_by' => auth()->id(),
+                            'approved_at' => now(),
+                        ]);
                     }
 
                     $newAllocated = floatval($ltype->quota) + $rollover;
+                    $newAllocated = round($newAllocated * 2) / 2;
 
                     $balance->update([
                         'allocated' => $newAllocated,
                         'used' => 0.0,
+                        'encashed' => 0.0,
                     ]);
                 }
             }
@@ -321,7 +345,7 @@ class LeaveStructureController extends Controller
             'employee_ids.*' => 'exists:employees,id',
             'new_leave_plan_id' => 'required|exists:leave_plans,id',
             'leave_transition_action' => 'required|in:transfer,prorate',
-            'leave_transition_unused' => 'required|in:carry,lapse',
+            'leave_transition_unused' => 'required|in:carry,lapse,encash',
         ]);
 
         try {
@@ -329,6 +353,30 @@ class LeaveStructureController extends Controller
             $newPlanId = $request->new_leave_plan_id;
             $action = $request->leave_transition_action;
             $unusedAction = $request->leave_transition_unused;
+
+            // Check if any of the transitioning employees have pending leave requests
+            $pendingEmployees = [];
+            foreach ($employeeIds as $empId) {
+                $employee = \App\Domains\HRMS\Models\Employee::find($empId);
+                if ($employee && (int)$employee->leave_plan_id !== (int)$newPlanId) {
+                    $hasPendingLeave = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+                        ->where('status', 'pending')
+                        ->exists();
+                    $hasPendingEncash = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
+                        ->where('status', 'pending')
+                        ->exists();
+
+                    if ($hasPendingLeave || $hasPendingEncash) {
+                        $pendingEmployees[] = $employee->full_name;
+                    }
+                }
+            }
+
+            if (!empty($pendingEmployees)) {
+                $names = implode(', ', $pendingEmployees);
+                return redirect()->route('hrms.leaves.index', ['tab' => 'encashments'])
+                    ->with('error', 'Cannot transition leave plans. The following employee(s) have pending leave or encashment requests that must be resolved first: ' . $names);
+            }
 
             $count = 0;
             foreach ($employeeIds as $empId) {

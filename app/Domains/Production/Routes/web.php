@@ -109,6 +109,7 @@ Route::prefix('production')
 
         // ── Production Orders ─────────────────────────────────────────────────
         Route::post('plans/{plan}/create-order', [ProductionOrderController::class, 'createFromPlan'])->name('plans.create-order');
+        Route::post('orders/bulk-action', [ProductionOrderController::class, 'bulkAction'])->name('orders.bulk-action');
         Route::post('orders/{order}/release', [ProductionOrderController::class, 'release'])->name('orders.release');
         Route::post('orders/{order}/issue', [ProductionOrderController::class, 'issueMaterial'])->name('orders.issue');
         Route::post('orders/{order}/return', [ProductionOrderController::class, 'returnMaterial'])->name('orders.return');
@@ -119,6 +120,11 @@ Route::prefix('production')
         Route::post('orders/{order}/complete', [ProductionOrderController::class, 'complete'])->name('orders.complete');
         Route::post('orders/{order}/close', [ProductionOrderController::class, 'close'])->name('orders.close');
         Route::post('orders/{order}/cancel', [ProductionOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::post('orders/{order}/request-additional-material', [ProductionOrderController::class, 'requestAdditionalMaterial'])->name('orders.request-additional-material');
+        Route::post('orders/{order}/cost-adjustments', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'store'])->name('orders.cost-adjustments.store');
+        Route::put('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'update'])->name('cost-adjustments.update');
+        Route::delete('cost-adjustments/{adjustment}', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'destroy'])->name('cost-adjustments.destroy');
+        Route::get('cost-adjustments/{adjustment}/download', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'downloadAttachment'])->name('cost-adjustments.download');
         Route::resource('orders', ProductionOrderController::class);
 
         // ── Requisition Slips (Material Requests) ─────────────────────────────

@@ -227,6 +227,16 @@ class ProductionOrder extends BaseModel
         return $this->hasMany(ProductionWipTransaction::class, 'production_order_id');
     }
 
+    public function requisitionSlips(): HasMany
+    {
+        return $this->hasMany(ProductionRequisitionSlip::class, 'production_order_id');
+    }
+
+    public function costAdjustments(): HasMany
+    {
+        return $this->hasMany(ProductionCostAdjustment::class, 'production_order_id');
+    }
+
     // ── Status Helpers ──
 
     public function isDraft(): bool

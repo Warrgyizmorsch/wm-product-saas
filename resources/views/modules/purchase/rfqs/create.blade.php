@@ -73,10 +73,9 @@
                             <table class="odoo-table" id="rfqItemsTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 40%">Product <span class="text-danger">*</span></th>
-                                        <th style="width: 25%">Destination Warehouse</th>
-                                        <th class="text-end" style="width: 15%">Quantity <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 15%">Est. Cost (₹)</th>
+                                        <th style="width: 50%">Product <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 20%">Quantity <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 25%">Est. Cost (₹)</th>
                                         <th class="text-center" style="width: 5%"></th>
                                     </tr>
                                 </thead>
@@ -89,14 +88,6 @@
                                                     <option value="">Select Product...</option>
                                                     @foreach($products as $p)
                                                         <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" @selected($item['product_id'] == $p->id)>{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-                                            </td>
-                                            <td>
-                                                <x-ui.odoo-form-ui type="select" name="items[{{ $index }}][warehouse_id]" class="warehouse-select select2-simple">
-                                                    <option value="">Select Warehouse...</option>
-                                                    @foreach($warehouses as $w)
-                                                        <option value="{{ $w->id }}" @selected($item['warehouse_id'] == $w->id)>{{ $w->name }}</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
                                             </td>
@@ -117,14 +108,6 @@
                                                     <option value="">Select Product...</option>
                                                     @foreach($products as $p)
                                                         <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-                                            </td>
-                                            <td>
-                                                <x-ui.odoo-form-ui type="select" name="items[0][warehouse_id]" class="warehouse-select select2-simple">
-                                                    <option value="">Select Warehouse...</option>
-                                                    @foreach($warehouses as $w)
-                                                        <option value="{{ $w->id }}" @selected($w->is_default)>{{ $w->name }}</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
                                             </td>
@@ -161,14 +144,6 @@
                     <option value="">Select Product...</option>
                     @foreach($products as $p)
                         <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
-                    @endforeach
-                </select>
-            </td>
-            <td>
-                <select name="items[__INDEX__][warehouse_id]" class="odoo-table-select warehouse-select select2-simple">
-                    <option value="">Select Warehouse...</option>
-                    @foreach($warehouses as $w)
-                        <option value="{{ $w->id }}" @selected($w->is_default)>{{ $w->name }}</option>
                     @endforeach
                 </select>
             </td>
@@ -220,7 +195,6 @@
 
                 if (data) {
                     $newTr.find('.product-select').val(data.product_id).trigger('change.select2');
-                    $newTr.find('.warehouse-select').val(data.warehouse_id).trigger('change.select2');
                     $newTr.find('.qty-input').val(data.quantity.toFixed(4));
                     $newTr.find('.cost-input').val(data.estimated_cost.toFixed(2));
                 }

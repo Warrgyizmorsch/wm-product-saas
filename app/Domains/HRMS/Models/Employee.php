@@ -275,6 +275,21 @@ class Employee extends BaseModel
         $monthsPassed = min(12, max(0, $startOfYear->diffInMonths(\Carbon\Carbon::now())));
         $monthsRemaining = 12 - $monthsPassed;
 
+        $oldCycleStart = null;
+        if ($oldPlan) {
+            if ($oldPlan->last_renewed_at) {
+                $oldCycleStart = \Carbon\Carbon::parse($oldPlan->last_renewed_at);
+            } elseif ($oldPlan->effective_from) {
+                $startDate = \Carbon\Carbon::parse($oldPlan->effective_from);
+                $now = \Carbon\Carbon::now();
+                $diffInYears = $startDate->diffInYears($now);
+                $oldCycleStart = $startDate->copy()->addYears($diffInYears);
+                if ($oldCycleStart->isAfter($now)) {
+                    $oldCycleStart->subYear();
+                }
+            }
+        }
+
         $processedNewTypeIds = [];
 
         foreach ($newPlan->types as $newType) {
@@ -287,6 +302,25 @@ class Employee extends BaseModel
 
             if ($oldBalance) {
                 $newUsed = floatval($oldBalance->used);
+            }
+
+            // Re-link employee's existing leave requests from the old leave type to the new leave type
+            // ONLY if they belong to the current active cycle of the old plan (i.e. on or after $oldCycleStart)
+            if ($oldType) {
+                $reqQuery = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $this->id)
+                    ->where('leave_type_id', $oldType->id);
+                if ($oldCycleStart) {
+                    $reqQuery->where('start_date', '>=', $oldCycleStart);
+                }
+                $reqQuery->update(['leave_type_id' => $newType->id]);
+
+                // Also re-link LeaveEncashments for the same cycle
+                $encQuery = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $this->id)
+                    ->where('leave_type_id', $oldType->id);
+                if ($oldCycleStart) {
+                    $encQuery->where('created_at', '>=', $oldCycleStart);
+                }
+                $encQuery->update(['leave_type_id' => $newType->id]);
             }
 
             // Determine if we should calculate based on accruals
@@ -322,6 +356,22 @@ class Employee extends BaseModel
                 if ($netAccruedUnused > 0) {
                     if ($unusedAction === 'carry' && $oldAction === 'carry_forward') {
                         $oldUnused = min($netAccruedUnused, $maxCarry);
+                    } elseif ($unusedAction === 'encash') {
+                        $encashableDays = round($netAccruedUnused * 2) / 2;
+                        if ($encashableDays > 0.0) {
+                            \App\Domains\HRMS\Models\LeaveEncashment::create([
+                                'tenant_id' => $this->tenant_id,
+                                'company_id' => $this->company_id,
+                                'employee_id' => $this->id,
+                                'leave_type_id' => $oldType->id,
+                                'requested_days' => $encashableDays,
+                                'status' => 'approved',
+                                'reason' => 'Plan transition automatic encashment (Migrated to ' . $newPlan->name . ')',
+                                'approved_by' => auth()->id(),
+                                'approved_at' => now(),
+                            ]);
+                        }
+                        $oldUnused = 0.0;
                     } else {
                         $oldUnused = 0.0; // Lapsed
                     }
@@ -341,6 +391,9 @@ class Employee extends BaseModel
                 // Full quota
                 $newAllocated = floatval($newType->quota) + $oldUnused + $newUsed;
             }
+
+            // Round the final allocated balance to the nearest 0.5 (half day or full day)
+            $newAllocated = round($newAllocated * 2) / 2;
 
             // Create or update LeaveBalance
             $newBalance = \App\Domains\HRMS\Models\LeaveBalance::updateOrCreate([

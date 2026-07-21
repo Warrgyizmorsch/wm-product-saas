@@ -28,6 +28,43 @@
             <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
         @endif
 
+        {{-- WIP Summary Cards --}}
+        @if(isset($wipSummary))
+            <div class="row g-3 mb-4">
+                <div class="col">
+                    <div class="bg-light border rounded p-3 text-center">
+                        <span class="text-muted fs-11 text-uppercase fw-bold">Total WIP Cards</span>
+                        <h4 class="text-dark fw-bold mt-1 mb-0">{{ number_format($wipSummary['total_count']) }}</h4>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="bg-soft-primary border rounded p-3 text-center">
+                        <span class="text-primary fs-11 text-uppercase fw-bold">Active / In-Process</span>
+                        <h4 class="text-primary fw-bold mt-1 mb-0">{{ number_format($wipSummary['active_count']) }}</h4>
+                        <small class="fs-10 text-muted">({{ number_format($wipSummary['total_available'], 2) }} units)</small>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="bg-soft-warning border rounded p-3 text-center">
+                        <span class="text-warning fs-11 text-uppercase fw-bold">Quality Hold</span>
+                        <h4 class="text-warning fw-bold mt-1 mb-0">{{ number_format($wipSummary['hold_count']) }}</h4>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="bg-soft-danger border rounded p-3 text-center">
+                        <span class="text-danger fs-11 text-uppercase fw-bold">Rework</span>
+                        <h4 class="text-danger fw-bold mt-1 mb-0">{{ number_format($wipSummary['rework_count']) }}</h4>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="bg-soft-success border rounded p-3 text-center">
+                        <span class="text-success fs-11 text-uppercase fw-bold">Completed</span>
+                        <h4 class="text-success fw-bold mt-1 mb-0">{{ number_format($wipSummary['completed_count']) }}</h4>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
             <h5 class="fw-bold text-dark mb-0">{{ __('production.wip_list') }}</h5>

@@ -43,14 +43,16 @@ class MesController extends Controller
         ->get();
 
         // Running operations (for stopwatch timer block countdowns)
-        $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+        $running = ProductionScheduleOperation::where('tenant_id', $tenantId)
+            ->with(['schedule.order.product', 'workCenter', 'machine'])
             ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
             ->orderBy('planned_start')
             ->get();
 
         // Paused operations (for completion modals)
-        $paused = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
+        $paused = ProductionScheduleOperation::where('tenant_id', $tenantId)
+            ->with(['schedule.order.product', 'workCenter', 'machine'])
             ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
             ->orderBy('planned_start')
@@ -63,7 +65,8 @@ class MesController extends Controller
             ->count();
 
         // Active ready count (for performance sidebar tracker badge)
-        $readyCount = ProductionScheduleOperation::whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+        $readyCount = ProductionScheduleOperation::where('tenant_id', $tenantId)
+            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_READY)
             ->count();
 

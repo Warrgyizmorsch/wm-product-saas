@@ -6,8 +6,8 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <a href="{{ route('hrms.leave-structure.transition') }}" class="btn btn-outline-primary d-flex align-items-center" style="height: 38px; font-weight: 500; font-size: 13px;">
-            <i class="feather-shuffle me-2"></i> Transition Leave Plans
+        <a href="{{ route('hrms.leave-structure.transition') }}" class="btn btn-outline-primary fw-bold text-uppercase d-flex align-items-center gap-1">
+            <i class="feather-shuffle me-1"></i> Transition Leave Plans
         </a>
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
             {{ __('hrms.leave.add_plan') }}
@@ -845,6 +845,7 @@
                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-application" data-bs-toggle="pill" data-bs-target="#pane-application" type="button" role="tab"><i class="feather-file-text"></i> {{ __('hrms.leave.application') }}</button>
                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-approval" data-bs-toggle="pill" data-bs-target="#pane-approval" type="button" role="tab"><i class="feather-check-square"></i> {{ __('hrms.leave.approval') }}</button>
                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-yearend" data-bs-toggle="pill" data-bs-target="#pane-yearend" type="button" role="tab"><i class="feather-refresh-cw"></i> {{ __('hrms.leave.yearend') }}</button>
+                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-encashment" data-bs-toggle="pill" data-bs-target="#pane-encashment" type="button" role="tab"><i class="feather-dollar-sign"></i> {{ __('hrms.leave.in_cycle_encashment') }}</button>
                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-probation" data-bs-toggle="pill" data-bs-target="#pane-probation" type="button" role="tab"><i class="feather-shield"></i> {{ __('hrms.leave.probation') }}</button>
                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-notice" data-bs-toggle="pill" data-bs-target="#pane-notice" type="button" role="tab"><i class="feather-alert-triangle"></i> {{ __('hrms.leave.notice') }}</button>
                             </div>
@@ -1147,6 +1148,54 @@
                                                   <div class="d-flex align-items-center gap-2">
                                                       <span>{{ __('hrms.leave.max_encash') }}</span>
                                                       <input type="number" id="yearend_max_encash" class="odoo-table-input text-center" style="width: 70px;" value="5"> {{ __('hrms.leave.days') }}
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  <!-- Encashment Tab Pane -->
+                                  <div class="tab-pane fade" id="pane-encashment" role="tabpanel">
+                                      <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.in_cycle_encashment_title') }}</h5>
+                                      
+                                      <div class="card border rounded-3 shadow-none">
+                                          <div class="card-body p-3 fs-13">
+                                              <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
+                                                  <div>
+                                                      <span class="fw-bold text-dark d-block fs-14">{{ __('hrms.leave.enable_voluntary_encashment') }}</span>
+                                                      <span class="text-muted fs-11">{{ __('hrms.leave.enable_voluntary_encashment_desc') }}</span>
+                                                  </div>
+                                                  <div class="form-check form-switch fs-4 mb-0">
+                                                      <input type="checkbox" class="form-check-input" id="encashment_enabled" role="switch">
+                                                  </div>
+                                              </div>
+
+                                              <div class="d-flex flex-column gap-3 d-none border-top pt-3 mt-3" id="encashment_settings_div">
+                                                  <div class="row align-items-center">
+                                                      <div class="col-sm-5 text-muted fw-semibold">{{ __('hrms.leave.allowed_frequency') }}</div>
+                                                      <div class="col-sm-7">
+                                                          <select id="encashment_frequency" class="odoo-table-select" style="max-width: 250px;">
+                                                              <option value="anytime">{{ __('hrms.leave.frequency_anytime') }}</option>
+                                                              <option value="monthly">{{ __('hrms.leave.frequency_monthly') }}</option>
+                                                              <option value="quarterly">{{ __('hrms.leave.frequency_quarterly') }}</option>
+                                                              <option value="half_yearly">{{ __('hrms.leave.frequency_half_yearly') }}</option>
+                                                              <option value="yearly">{{ __('hrms.leave.frequency_yearly') }}</option>
+                                                          </select>
+                                                      </div>
+                                                  </div>
+
+                                                  <div class="row align-items-center">
+                                                      <div class="col-sm-5 text-muted fw-semibold">{{ __('hrms.leave.max_days_per_request') }}</div>
+                                                      <div class="col-sm-7 d-flex align-items-center gap-2">
+                                                          <input type="number" id="encashment_max_days" class="odoo-table-input text-center" style="width: 80px;" value="5" step="0.5"> {{ __('hrms.leave.days') }}
+                                                      </div>
+                                                  </div>
+
+                                                  <div class="row align-items-center">
+                                                      <div class="col-sm-5 text-muted fw-semibold">{{ __('hrms.leave.min_balance_to_retain') }}</div>
+                                                      <div class="col-sm-7 d-flex align-items-center gap-2">
+                                                          <input type="number" id="encashment_min_balance" class="odoo-table-input text-center" style="width: 80px;" value="10" step="0.5"> {{ __('hrms.leave.days') }}
+                                                      </div>
                                                   </div>
                                               </div>
                                           </div>
@@ -1560,6 +1609,11 @@
                 $('#yearend_max_carry').val(rules.yearend?.max_carry || 6);
                 $('#yearend_max_encash').val(rules.yearend?.max_encash || 5);
 
+                $('#encashment_enabled').prop('checked', !!rules.encashment?.enabled).trigger('change');
+                $('#encashment_frequency').val(rules.encashment?.frequency || 'anytime');
+                $('#encashment_max_days').val(rules.encashment?.max_days_per_request !== undefined ? rules.encashment.max_days_per_request : 5);
+                $('#encashment_min_balance').val(rules.encashment?.min_balance_to_keep !== undefined ? rules.encashment.min_balance_to_keep : 10);
+
                 $(`input[name="probation_rule"][value="${rules.probation?.rule || 'allow'}"]`).prop('checked', true).trigger('change');
                 $('#probation_months').val(rules.probation?.months || 3);
 
@@ -1570,6 +1624,13 @@
             });
 
             // Toggle logic for conditional fields
+            $(document).on('change', '#encashment_enabled', function() {
+                if ($(this).is(':checked')) {
+                    $('#encashment_settings_div').removeClass('d-none');
+                } else {
+                    $('#encashment_settings_div').addClass('d-none');
+                }
+            });
             $(document).on('change', 'input[name="accrual_rate"]', function() {
                 let rateVal = $(this).val();
                 if (rateVal === 'attendance') {
@@ -1677,6 +1738,12 @@
                         workflow_level: $('input[name="approval_workflow_level"]:checked').val(),
                         first_approver: $('#approval_first_approver').val(),
                         second_approver: $('#approval_second_approver').val()
+                    },
+                    encashment: {
+                        enabled: $('#encashment_enabled').is(':checked'),
+                        frequency: $('#encashment_frequency').val(),
+                        max_days_per_request: parseFloat($('#encashment_max_days').val()) || 5,
+                        min_balance_to_keep: parseFloat($('#encashment_min_balance').val()) || 10
                     },
                     yearend: {
                         action: $('input[name="yearend_action"]:checked').val(),

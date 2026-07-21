@@ -59,7 +59,28 @@ class WipController extends Controller
 
         $wips = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
 
-        return view('modules.production.wip.index', compact('wips'));
+        // Calculate tenant-scoped summary KPI metrics
+        $summary = ProductionWip::where('tenant_id', $tenantId)
+            ->selectRaw('
+                count(*) as total_count,
+                sum(available_quantity) as total_available,
+                sum(case when status = "active" then 1 else 0 end) as active_count,
+                sum(case when status = "quality_hold" then 1 else 0 end) as hold_count,
+                sum(case when status = "rework" then 1 else 0 end) as rework_count,
+                sum(case when status = "completed" then 1 else 0 end) as completed_count
+            ')
+            ->first();
+
+        $wipSummary = [
+            'total_count'     => (int) ($summary->total_count ?? 0),
+            'total_available' => (float) ($summary->total_available ?? 0),
+            'active_count'    => (int) ($summary->active_count ?? 0),
+            'hold_count'      => (int) ($summary->hold_count ?? 0),
+            'rework_count'    => (int) ($summary->rework_count ?? 0),
+            'completed_count' => (int) ($summary->completed_count ?? 0),
+        ];
+
+        return view('modules.production.wip.index', compact('wips', 'wipSummary'));
     }
 
     public function show(int $id)

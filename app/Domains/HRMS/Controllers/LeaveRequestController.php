@@ -9,7 +9,6 @@ use App\Domains\HRMS\Models\LeaveBalance;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\View\View;
 use Carbon\Carbon;
@@ -18,6 +17,15 @@ class LeaveRequestController extends Controller
 {
     public function index(Request $request): View
     {
+        // Programmatically run migrations on-the-fly if table or column doesn't exist
+        try {
+            if (!\Illuminate\Support\Facades\Schema::hasTable('leave_encashments') || !\Illuminate\Support\Facades\Schema::hasColumn('leave_balances', 'encashed')) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            }
+        } catch (\Exception $e) {
+            // Silently log or ignore migration execution errors
+        }
+
         // On-the-fly plan-level automatic year-end renewal check
         try {
             $now = Carbon::now();
@@ -117,8 +125,26 @@ class LeaveRequestController extends Controller
 
                 $approvedDuration = $query->sum('duration');
 
+                $encashQuery = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $bal->employee_id)
+                    ->where('leave_type_id', $bal->leave_type_id)
+                    ->where('status', 'approved');
+
+                if ($currentCycleStart) {
+                    $encashQuery->where('created_at', '>=', $currentCycleStart);
+                }
+
+                $approvedEncashSum = $encashQuery->sum('requested_days');
+
+                $updates = [];
                 if (floatval($bal->used) !== floatval($approvedDuration)) {
-                    $bal->update(['used' => $approvedDuration]);
+                    $updates['used'] = round($approvedDuration * 2) / 2;
+                }
+                if (floatval($bal->encashed ?? 0.0) !== floatval($approvedEncashSum)) {
+                    $updates['encashed'] = round($approvedEncashSum * 2) / 2;
+                }
+
+                if (!empty($updates)) {
+                    $bal->update($updates);
                 }
             }
         } catch (\Exception $e) {
@@ -130,25 +156,10 @@ class LeaveRequestController extends Controller
             ->orWhere('office_email', auth()->user()->email)
             ->first();
 
-        $allEmployees = Employee::where('status', true)->orderBy('full_name')->get();
-
-        // Build a complete lookup map of all active employees' leave types, quotas, remaining balances, and rules
+        // Prepare employee balances mapping for JavaScript dynamically
+        $allEmployees = $isAdmin ? Employee::where('status', true)->get() : collect([$employee])->filter();
         $employeeDataMap = [];
         foreach ($allEmployees as $emp) {
-            if ($emp->leavePlan && $emp->leavePlan->status) {
-                foreach ($emp->leavePlan->types()->where('status', true)->get() as $type) {
-                    LeaveBalance::firstOrCreate([
-                        'tenant_id' => $emp->tenant_id,
-                        'company_id' => $emp->company_id,
-                        'employee_id' => $emp->id,
-                        'leave_type_id' => $type->id,
-                    ], [
-                        'allocated' => $type->quota,
-                        'used' => 0.0
-                    ]);
-                }
-            }
-
             $balances = LeaveBalance::where('employee_id', $emp->id)
                 ->whereHas('leaveType.plan', function($q) {
                     $q->where('status', true);
@@ -176,19 +187,24 @@ class LeaveRequestController extends Controller
         $balances = $employee ? LeaveBalance::where('employee_id', $employee->id)->with('leaveType')->get() : collect();
 
         $query = LeaveRequest::query()->with(['employee', 'leaveType']);
+        $encashQuery = \App\Domains\HRMS\Models\LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
 
         if ($isAdmin) {
             if ($request->filled('employee_id')) {
                 $query->where('employee_id', $request->employee_id);
+                $encashQuery->where('employee_id', $request->employee_id);
             }
             if ($request->filled('status')) {
                 $query->where('status', $request->status);
+                $encashQuery->where('status', $request->status);
             }
         } else {
             if ($employee) {
                 $query->where('employee_id', $employee->id);
+                $encashQuery->where('employee_id', $employee->id);
             } else {
                 $query->where('id', 0);
+                $encashQuery->where('id', 0);
             }
         }
 
@@ -198,11 +214,16 @@ class LeaveRequestController extends Controller
                 $q->where('full_name', 'like', '%' . $request->search . '%')
                   ->orWhere('employee_id', 'like', '%' . $request->search . '%');
             });
+            $encashQuery->whereHas('employee', function($q) use ($request) {
+                $q->where('full_name', 'like', '%' . $request->search . '%')
+                  ->orWhere('employee_id', 'like', '%' . $request->search . '%');
+            });
         }
 
         $leaveRequests = $query->orderBy('created_at', 'desc')->get();
+        $leaveEncashments = $encashQuery->orderBy('created_at', 'desc')->get();
 
-        return view('modules.hrms.leaves.index', compact('leaveRequests', 'balances', 'isAdmin', 'employee', 'allEmployees', 'employeeDataMap'));
+        return view('modules.hrms.leaves.index', compact('leaveRequests', 'leaveEncashments', 'balances', 'isAdmin', 'employee', 'allEmployees', 'employeeDataMap'));
     }
 
     public function store(Request $request): RedirectResponse

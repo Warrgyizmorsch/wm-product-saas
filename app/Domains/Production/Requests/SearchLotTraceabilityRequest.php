@@ -14,8 +14,9 @@ class SearchLotTraceabilityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => 'required|string|in:batch,serial,order',
-            'code' => 'required|string|max:100',
+            'type'      => 'required|string|in:batch,serial,order,lot',
+            'code'      => 'required|string|max:100',
+            'direction' => 'nullable|string|in:both,forward,backward',
         ];
     }
 }

@@ -76,7 +76,6 @@ class PurchaseRfqController extends Controller
                         'product_id' => $item->product_id,
                         'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
                         'quantity' => $item->quantity,
-                        'warehouse_id' => $item->warehouse_id,
                         'estimated_cost' => $item->estimated_cost,
                     ];
                 }
@@ -98,7 +97,6 @@ class PurchaseRfqController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.0001',
-            'items.*.warehouse_id' => 'nullable|exists:warehouses,id',
             'items.*.estimated_cost' => 'nullable|numeric|min:0',
         ]);
 
@@ -132,7 +130,6 @@ class PurchaseRfqController extends Controller
                 PurchaseRfqItem::create([
                     'purchase_rfq_id' => $rfq->id,
                     'product_id' => $item['product_id'],
-                    'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
                     'estimated_cost' => $item['estimated_cost'] ?? 0.00,
                 ]);
@@ -158,10 +155,12 @@ class PurchaseRfqController extends Controller
     {
         $tenantId = require_tenant_id();
         $rfq = PurchaseRfq::where('tenant_id', $tenantId)
-            ->with(['requisition', 'items.product', 'items.warehouse', 'rfqVendors.vendor', 'rfqVendors.rates.product'])
+            ->with(['requisition', 'items.product', 'rfqVendors.vendor', 'rfqVendors.rates.product'])
             ->findOrFail($id);
 
-        return view('modules.purchase.rfqs.show', compact('rfq'));
+        $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
+
+        return view('modules.purchase.rfqs.show', compact('rfq', 'warehouses'));
     }
 
     public function edit(int $id)
@@ -205,7 +204,6 @@ class PurchaseRfqController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.0001',
-            'items.*.warehouse_id' => 'nullable|exists:warehouses,id',
             'items.*.estimated_cost' => 'nullable|numeric|min:0',
         ]);
 
@@ -222,7 +220,6 @@ class PurchaseRfqController extends Controller
                 PurchaseRfqItem::create([
                     'purchase_rfq_id' => $rfq->id,
                     'product_id' => $item['product_id'],
-                    'warehouse_id' => $item['warehouse_id'] ?? null,
                     'quantity' => $item['quantity'],
                     'estimated_cost' => $item['estimated_cost'] ?? 0.00,
                 ]);
@@ -462,5 +459,126 @@ class PurchaseRfqController extends Controller
 
         return redirect()->route('purchase.rfqs.show', $rfq->id)
             ->with('success', 'Vendor quotation rates and details updated successfully.');
+    }
+
+    public function createPo(Request $request, int $id)
+    {
+        $tenantId = require_tenant_id();
+        $rfq = PurchaseRfq::where('tenant_id', $tenantId)->findOrFail($id);
+
+        $validated = $request->validate([
+            'vendor_id' => 'required|integer|exists:vendors,id',
+            'location' => 'required|string|exists:warehouses,name',
+            'date' => 'required|date',
+            'delivery_date' => 'nullable|date|after_or_equal:date',
+            'reference' => 'nullable|string|max:255',
+            'supplier_quotation_number' => 'nullable|string|max:255',
+            'discount_type' => 'required|string|in:without_discount,item_wise,order_wise',
+            'tax_type' => 'required|string|in:without_tax,item_wise_tax,order_wise_tax',
+            'gst_type' => 'required|string|in:cgst_sgst,igst',
+            'notes' => 'nullable|string',
+            'subtotal' => 'required|numeric|min:0',
+            'discount_amount' => 'required|numeric|min:0',
+            'cgst_amount' => 'required|numeric|min:0',
+            'sgst_amount' => 'required|numeric|min:0',
+            'igst_amount' => 'required|numeric|min:0',
+            'tax_amount' => 'required|numeric|min:0',
+            'grand_total' => 'required|numeric|min:0',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.0001',
+            'items.*.rate' => 'required|numeric|min:0',
+            'items.*.discount_percent' => 'nullable|numeric|min:0|max:100',
+            'items.*.discount_amount' => 'nullable|numeric|min:0',
+            'items.*.tax_percent' => 'nullable|numeric|min:0',
+            'items.*.cgst_percent' => 'nullable|numeric|min:0',
+            'items.*.sgst_percent' => 'nullable|numeric|min:0',
+            'items.*.igst_percent' => 'nullable|numeric|min:0',
+            'items.*.cgst_amount' => 'nullable|numeric|min:0',
+            'items.*.sgst_amount' => 'nullable|numeric|min:0',
+            'items.*.igst_amount' => 'nullable|numeric|min:0',
+            'items.*.tax_amount' => 'nullable|numeric|min:0',
+            'items.*.total_amount' => 'nullable|numeric|min:0',
+        ]);
+
+        return DB::transaction(function () use ($validated, $rfq, $tenantId) {
+            // Find warehouse ID
+            $warehouse = Warehouse::where('tenant_id', $tenantId)
+                ->where('name', $validated['location'])
+                ->first();
+            $warehouseId = $warehouse ? $warehouse->id : null;
+
+            // Generate sequence number YYYY-000001
+            $year = now()->format('Y');
+            $prefix = "PO-{$year}-";
+            $latest = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+                ->where('purchase_order_number', 'like', "{$prefix}%")
+                ->orderBy('id', 'desc')
+                ->first();
+            $nextNum = 1;
+            if ($latest) {
+                $lastNumStr = str_replace($prefix, '', $latest->purchase_order_number);
+                $nextNum = ((int) $lastNumStr) + 1;
+            }
+            $poNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+
+            $rfqVendor = $rfq->rfqVendors()->where('vendor_id', $validated['vendor_id'])->first();
+            $quoteNo = $validated['supplier_quotation_number'] ?? ($rfqVendor?->quotation_number);
+
+            $po = \App\Domains\Purchase\Models\PurchaseOrder::create([
+                'tenant_id' => $tenantId,
+                'purchase_order_number' => $poNumber,
+                'purchase_requisition_id' => $rfq->purchase_requisition_id,
+                'source_type' => 'rfq',
+                'vendor_id' => $validated['vendor_id'],
+                'location' => $validated['location'],
+                'reference' => $validated['reference'] ?? "RFQ: {$rfq->rfq_number}",
+                'supplier_quotation_number' => $quoteNo,
+                'date' => $validated['date'],
+                'delivery_date' => $validated['delivery_date'] ?? null,
+                'discount_type' => $validated['discount_type'],
+                'tax_type' => $validated['tax_type'],
+                'gst_type' => $validated['gst_type'],
+                'subtotal' => $validated['subtotal'],
+                'discount_amount' => $validated['discount_amount'],
+                'cgst_amount' => $validated['cgst_amount'],
+                'sgst_amount' => $validated['sgst_amount'],
+                'igst_amount' => $validated['igst_amount'],
+                'tax_amount' => $validated['tax_amount'],
+                'grand_total' => $validated['grand_total'],
+                'status' => 'Draft',
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => auth()->id() ?: 1,
+            ]);
+
+            foreach ($validated['items'] as $item) {
+                $amount = $item['quantity'] * $item['rate'];
+                \App\Domains\Purchase\Models\PurchaseOrderItem::create([
+                    'purchase_order_id' => $po->id,
+                    'product_id' => $item['product_id'],
+                    'warehouse_id' => $warehouseId,
+                    'quantity' => $item['quantity'],
+                    'rate' => $item['rate'],
+                    'amount' => $amount,
+                    'discount_percent' => $item['discount_percent'] ?? 0.00,
+                    'discount_amount' => $item['discount_amount'] ?? 0.00,
+                    'tax_percent' => $item['tax_percent'] ?? 0.00,
+                    'cgst_percent' => $item['cgst_percent'] ?? 0.00,
+                    'sgst_percent' => $item['sgst_percent'] ?? 0.00,
+                    'igst_percent' => $item['igst_percent'] ?? 0.00,
+                    'cgst_amount' => $item['cgst_amount'] ?? 0.00,
+                    'sgst_amount' => $item['sgst_amount'] ?? 0.00,
+                    'igst_amount' => $item['igst_amount'] ?? 0.00,
+                    'tax_amount' => $item['tax_amount'] ?? 0.00,
+                    'total_amount' => $item['total_amount'] ?? $amount,
+                ]);
+            }
+
+            // Update RFQ status to Confirmed
+            $rfq->update(['status' => 'Confirmed']);
+
+            return redirect()->route('purchase.rfqs.index')
+                ->with('success', "Purchase Order {$poNumber} created from RFQ successfully.");
+        });
     }
 }

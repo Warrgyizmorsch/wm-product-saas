@@ -23,7 +23,7 @@
                 align-items: center;
                 text-align: left;
                 width: 100%;
-                border-left: 3px solid transparent !important;
+                border-left: 1px solid transparent !important;
             }
             .erp-vertical-tabs .nav-link i {
                 font-size: 15px;
@@ -39,9 +39,9 @@
             .erp-vertical-tabs .nav-link.active {
                 color: #ffffff !important;
                 background-color: var(--bs-primary) !important;
-                border-left: 4px solid rgba(255, 255, 255, 0.4) !important;
+                border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
                 font-weight: 700;
-                box-shadow: 0 4px 12px rgba(var(--bs-primary-rgb), 0.2);
+                box-shadow: 0 4px 12px rgba(var(--bs-primary-rgb), 0.4);
             }
             .erp-vertical-tabs .nav-link.active i {
                 transform: scale(1.15);
