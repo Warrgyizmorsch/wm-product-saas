@@ -34,7 +34,7 @@ class BatchProductionService
                 'production_order_id' => $orderId,
                 'product_id'          => $productId,
                 'planned_quantity'    => $plannedQty,
-                'actual_quantity'     => 0.0000,
+                'actual_quantity'     => 0.00,
                 'expiry_date'         => $expiryDate,
                 'status'              => $status,
                 'remarks'             => $remarks,
@@ -114,7 +114,7 @@ class BatchProductionService
             }
 
             // Deduct split qty from parent planned/actual quantity
-            $newPlanned = max(0.0000, $parent->planned_quantity - $totalSplitQty);
+            $newPlanned = max(0.00, $parent->planned_quantity - $totalSplitQty);
             $parent->update([
                 'planned_quantity' => $newPlanned,
                 'remarks'          => $parent->remarks . " | Split {$totalSplitQty} quantity into children.",

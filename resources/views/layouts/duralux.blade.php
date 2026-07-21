@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ $currentLanguage['dir'] ?? 'ltr' }}">
+
 <head>
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="IE=edge">
@@ -15,14 +16,39 @@
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/theme.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/css/erp.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/production.css') }}">
     <script>
-        (function() {
+        (function () {
             var savedColor = localStorage.getItem('erp_primary_color');
             if (savedColor) {
                 document.documentElement.style.setProperty('--bs-primary', savedColor);
             }
         })();
+        window.AppCurrency = {
+            code: @json(active_currency()),
+            symbol: @json(active_currency_symbol()),
+            rate: {{ active_currency_rate() }},
+            position: @json(active_currency_info()['position'] ?? 'prefix'),
+            convertFromBase: function (amount) {
+                return (parseFloat(amount) || 0) * this.rate;
+            },
+            convertToBase: function (amount) {
+                return (parseFloat(amount) || 0) / (this.rate || 1);
+            },
+            format: function (amountInBase, decimals = 2, includeSymbol = true) {
+                const val = this.convertFromBase(amountInBase);
+                const isNeg = val < 0;
+                const locale = this.code === 'INR' ? 'en-IN' : 'en-US';
+                const formatted = Math.abs(val).toLocaleString(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+                if (!includeSymbol) return (isNeg ? '-' : '') + formatted;
+                if (this.position === 'suffix') return (isNeg ? '-' : '') + formatted + ' ' + this.symbol;
+                return (isNeg ? '-' : '') + this.symbol + formatted;
+            }
+        };
     </script>
+
+
+
     <style>
         .nxl-container .nxl-content .main-content {
             padding: 10px !important;
@@ -30,6 +56,7 @@
     </style>
     @stack('styles')
 </head>
+
 <body>
     <div class="loader-bg">
         <div class="spinner-border text-primary" role="status">
@@ -42,6 +69,10 @@
 
     <main class="nxl-container">
         <div class="nxl-content">
+            @if(request()->routeIs('production.*') || request()->is('production*'))
+                @include('partials.duralux.production-workflow-strip')
+            @endif
+
             <div class="page-header">
                 <div class="page-header-left d-flex align-items-center">
                     <div class="page-header-title">
@@ -80,6 +111,9 @@
         @include('partials.duralux.footer')
     </main>
 
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="{{ asset('assets/js/production.js') }}"></script>
+
     <script src="{{ asset('assets/vendors/js/jquery.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/vendors.min.js') }}"></script>
     <script src="{{ asset('assets/vendors/js/moment.min.js') }}"></script>
@@ -113,7 +147,7 @@
                     theme: "bootstrap-5",
                     dropdownParent: modal
                 };
-                
+
                 if (selectorType === 'icon' || selectorType === 'visibility' || selectorType === 'privacy') {
                     options.templateResult = typeof iformat !== 'undefined' ? iformat : undefined;
                     options.templateSelection = typeof iformat !== 'undefined' ? iformat : undefined;
@@ -154,17 +188,17 @@
                     options.templateResult = typeof programmingformat !== 'undefined' ? programmingformat : undefined;
                     options.templateSelection = typeof programmingformat !== 'undefined' ? programmingformat : undefined;
                 }
-                
+
                 select.select2(options);
             });
         });
         // Initialize and bind primary color picker
-        $(document).ready(function() {
+        $(document).ready(function () {
             var savedColor = localStorage.getItem('erp_primary_color') || '#0000FF';
             var picker = $('#primaryColorPicker');
             if (picker.length) {
                 picker.val(savedColor);
-                picker.on('input change', function() {
+                picker.on('input change', function () {
                     var color = $(this).val();
                     document.documentElement.style.setProperty('--bs-primary', color);
                     localStorage.setItem('erp_primary_color', color);
@@ -173,7 +207,7 @@
         });
 
         // Generic Quick Create Master Dropdown handler
-        $(document).on('change', '.erp-premium-select, select[data-master]', function() {
+        $(document).on('change', '.erp-premium-select, select[data-master]', function () {
             var select = $(this);
             if (select.val() === '__ADD_NEW__') {
                 var master = select.attr('data-master');
@@ -189,7 +223,7 @@
         });
 
         // Ensure button[form] works across all browsers/shells
-        $(document).on('click', 'button[form]', function(e) {
+        $(document).on('click', 'button[form]', function (e) {
             var btn = $(this);
             var formId = btn.attr('form');
             if (formId) {
@@ -202,7 +236,7 @@
         });
 
         // Click handler for div-based quick-create forms
-        $(document).on('click', '.btn-save-master', function(e) {
+        $(document).on('click', '.btn-save-master', function (e) {
             e.preventDefault();
             var btn = $(this);
             var formId = btn.attr('data-form');
@@ -213,7 +247,7 @@
         });
 
         // Keydown Enter handler for quick-create input fields
-        $(document).on('keydown', '.quick-create-form input', function(e) {
+        $(document).on('keydown', '.quick-create-form input', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 var formEl = $(this).closest('.quick-create-form');
@@ -241,14 +275,14 @@
                 url: form.attr('data-action'),
                 method: 'POST',
                 data: formData,
-                success: function(response) {
+                success: function (response) {
                     submitBtn.prop('disabled', false);
                     if (response.id && response.name) {
                         var modal = bootstrap.Modal.getInstance(modalEl[0]);
                         modal.hide();
-                        
+
                         // Clear inputs
-                        inputs.each(function() {
+                        inputs.each(function () {
                             var el = $(this);
                             if (el.attr('type') !== 'hidden' && el.attr('name') !== '_token') {
                                 el.val('');
@@ -268,11 +302,11 @@
                         }
                     }
                 },
-                error: function(xhr) {
+                error: function (xhr) {
                     submitBtn.prop('disabled', false);
                     if (xhr.status === 422) {
                         var errors = xhr.responseJSON.errors;
-                        $.each(errors, function(field, messages) {
+                        $.each(errors, function (field, messages) {
                             var input = form.find('[name="' + field + '"]');
                             if (input.length) {
                                 input.addClass('is-invalid');
@@ -349,7 +383,7 @@
     </div>
 
     <script>
-        $(function() {
+        $(function () {
             @if (session('success'))
                 var successToastEl = document.getElementById('globalSuccessToast');
                 if (successToastEl) {
@@ -357,17 +391,18 @@
                     successToast.show();
                 }
             @endif
-            @if (session('error') || session('danger') || $errors->any())
-                var errorToastEl = document.getElementById('globalErrorToast');
-                if (errorToastEl) {
-                    var errorToast = bootstrap.Toast.getOrCreateInstance(errorToastEl);
-                    errorToast.show();
-                }
-            @endif
+                @if (session('error') || session('danger') || $errors->any())
+                    var errorToastEl = document.getElementById('globalErrorToast');
+                    if (errorToastEl) {
+                        var errorToast = bootstrap.Toast.getOrCreateInstance(errorToastEl);
+                        errorToast.show();
+                    }
+                @endif
         });
     </script>
 
     <script src="{{ asset('assets/js/dynamic-geography.js') }}"></script>
     @stack('scripts')
 </body>
+
 </html>

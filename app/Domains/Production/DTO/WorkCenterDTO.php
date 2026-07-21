@@ -14,7 +14,7 @@ class WorkCenterDTO
         public readonly ?string $location = null,
         public readonly ?float  $capacity_per_hour = null,
         public readonly float   $efficiency_percentage = 100.00,
-        public readonly float   $cost_per_hour = 0.0000,
+        public readonly float   $cost_per_hour = 0.00,
         public readonly ?int    $parent_id = null,
         public readonly ?string $type = 'work_center',
     ) {}
@@ -31,7 +31,7 @@ class WorkCenterDTO
             location:              $data['location'] ?? null,
             capacity_per_hour:     isset($data['capacity_per_hour']) ? (float) $data['capacity_per_hour'] : null,
             efficiency_percentage: isset($data['efficiency_percentage']) ? (float) $data['efficiency_percentage'] : 100.00,
-            cost_per_hour:         isset($data['cost_per_hour']) ? (float) $data['cost_per_hour'] : 0.0000,
+            cost_per_hour:         isset($data['cost_per_hour']) ? (float) $data['cost_per_hour'] : 0.00,
             parent_id:             !empty($data['parent_id']) ? (int) $data['parent_id'] : null,
             type:                  $data['type'] ?? 'work_center',
         );

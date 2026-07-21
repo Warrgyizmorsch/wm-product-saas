@@ -109,8 +109,9 @@
                                 <span class="erp-badge-draft text-uppercase">{{ $rwk->status }}</span>
                             @endif
                         </td>
-                        <td class="text-end text-muted">${{ number_format($rwk->cost_estimate, 2) }}</td>
-                        <td class="text-end fw-bold text-dark">${{ number_format($rwk->actual_cost, 2) }}</td>
+                        <td class="text-end text-muted">{{ format_currency($rwk->cost_estimate) }}</td>
+                        <td class="text-end fw-bold text-dark">{{ format_currency($rwk->actual_cost) }}</td>
+
                         <td class="text-dark">{{ number_format($rwk->labor_hours_actual, 2) }} hrs</td>
                         <td class="text-end">
                             <x-ui.action-dropdown :viewUrl="route('production.rework.show', $rwk->id)" />

@@ -4,39 +4,6 @@
 @section('page-title', __('production.edit_bill_of_materials'))
 @section('breadcrumb', __('production.edit_bom'))
 
-@push('styles')
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
-    <style>
-        /* Keep input components inside table cells extremely compact */
-        .erp-thin-table td .mb-3 {
-            margin-bottom: 0 !important;
-        }
-        .erp-thin-table td .form-control,
-        .erp-thin-table td .form-select {
-            height: 34px !important;
-            padding: 4px 8px !important;
-            font-size: 12px !important;
-        }
-        .erp-thin-table td .select2-container--bootstrap-5 .select2-selection {
-            min-height: 34px !important;
-            height: 34px !important;
-            padding: 3px 8px !important;
-            font-size: 12px !important;
-        }
-        .c-pointer {
-            cursor: pointer;
-        }
-    </style>
-@endpush
-
-@push('scripts')
-    <!-- Load Alpine.js for dynamic component grid management -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
-    <script src="{{ asset('assets/vendors/js/select2-active.min.js') }}"></script>
-@endpush
-
 @section('content')
     <div class="erp-single-panel bg-white" x-data="bomForm">
 
@@ -66,7 +33,7 @@
                 <!-- BOM Header Fields -->
                 <div class="row g-4 mb-4 fs-13 text-dark">
                     <!-- Left Column -->
-                    <div class="col-md-6 border-end">
+                    <div class="col-md-6">
                         <x-ui.odoo-form-ui type="input" :label="__('production.bom_number')" name="bom_number" placeholder="{{ __('production.bom_number_edit_placeholder') }}" :value="old('bom_number', $bom->bom_number)" :required="true" :error-text="$errors->first('bom_number')" alpineError="errors.bom_number" />
                         <x-ui.odoo-form-ui type="select" :label="__('production.item_to_produce')" name="product_id" id="product_id" :required="true" data-master="product" :error-text="$errors->first('product_id')" alpineError="errors.product_id">
                             <option value="">{{ __('production.select_product') }}</option>
@@ -170,13 +137,13 @@
                                 </thead>
                                 <tbody>
                                     <template x-for="(item, index) in items" :key="item.uid">
-                                        <tr x-init="$nextTick(() => initRowSelects($el, item))">
+                                        <tr class="bom-component-row" x-init="$nextTick(() => initRowSelects($el, item))">
                                             <!-- Sequence -->
                                             <td class="fw-bold text-center align-middle" x-text="index + 1"></td>
                                             
                                             <!-- Material Selection -->
                                             <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="select" name="items[][material_id]" x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required data-select2-selector="default" data-master="product" alpineError="errors['items.' + index + '.material_id']">
+                                                <x-ui.odoo-form-ui type="select" name="items[][material_id]" x-bind:name="'items['+index+'][material_id]'" class="odoo-table-select" x-model="item.material_id" required select2Selector="default" data-master="product" alpineError="errors['items.' + index + '.material_id']">
                                                     <option value="">{{ __('production.select_component') }}</option>
                                                     <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_product') }}</option>
                                                     @foreach($materials as $material)
@@ -238,7 +205,7 @@
                                             
                                             <!-- UOM -->
                                             <td class="align-middle">
-                                                <x-ui.odoo-form-ui type="select" name="items[][uom_id]" x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required data-select2-selector="default" data-master="uom" alpineError="errors['items.' + index + '.uom_id']">
+                                                <x-ui.odoo-form-ui type="select" name="items[][uom_id]" x-bind:name="'items['+index+'][uom_id]'" class="odoo-table-select" x-model="item.uom_id" required select2Selector="default" data-master="uom" alpineError="errors['items.' + index + '.uom_id']">
                                                     <option value="">{{ __('production.select_uom') }}</option>
                                                     <option value="__ADD_NEW__" class="fw-bold text-primary">{{ __('production.add_new_uom') }}</option>
                                                     @foreach($uoms as $uom)
@@ -524,16 +491,14 @@
                                 }
                             });
                             if ($select.data('select2')) {
-                                $select.select2({
-                                    theme: "bootstrap-5",
-                                    dropdownParent: $select.closest('.table-responsive')
-                                });
+                                $select.select2(self.select2RowOptions());
                             }
                         });
                     });
 
                     // Trigger initial load
                     this.loadOperations();
+                    this.$nextTick(() => this.initAllRowSelects());
                 },
 
                 loadOperations() {
@@ -578,6 +543,7 @@
                         child_bom_versions: [],
                         child_bom_loading: false
                     });
+                    this.$nextTick(() => this.initAllRowSelects());
                 },
 
                 removeItem(index) {
@@ -593,10 +559,9 @@
                     $(rowEl).find('[data-select2-selector="default"]').each(function() {
                         var $select = $(this);
                         
-                        if ($select.data('select2-initialized')) {
+                        if ($select.data('select2-initialized') && $select.hasClass('select2-hidden-accessible')) {
                             return;
                         }
-                        $select.data('select2-initialized', true);
                         
                         // Disable parent product if selected
                         var parentProductId = $('#product_id').val();
@@ -610,11 +575,12 @@
                             });
                         }
 
-                        // Initialize select2 with bootstrap-5 theme
-                        $select.select2({
-                            theme: "bootstrap-5",
-                            dropdownParent: $(rowEl).closest('.table-responsive')
-                        });
+                        if ($select.hasClass('select2-hidden-accessible')) {
+                            $select.select2('destroy');
+                        }
+
+                        $select.data('select2-initialized', true);
+                        $select.select2(self.select2RowOptions());
                         
                         // Capture type on init
                         var nameAttr = $select.attr('name') || '';
@@ -625,7 +591,7 @@
                         }
                         
                         // Sync select2 changes to Alpine.js
-                        $select.on('change.select2', function () {
+                        $select.off('change.bom-row-select').on('change.bom-row-select', function () {
                             var val = $select.val();
                             var nameAttr = $select.attr('name') || '';
                             
@@ -644,6 +610,24 @@
                             this.dispatchEvent(new Event('input', { bubbles: true }));
                         });
                     });
+                },
+
+                initAllRowSelects() {
+                    var self = this;
+                    $('.bom-component-row').each(function(index) {
+                        if (self.items[index]) {
+                            self.initRowSelects(this, self.items[index]);
+                        }
+                    });
+                },
+
+                select2RowOptions() {
+                    return {
+                        theme: "bootstrap-5",
+                        width: '100%',
+                        dropdownParent: $('body'),
+                        dropdownCssClass: 'bom-select2-dropdown'
+                    };
                 },
 
             }));

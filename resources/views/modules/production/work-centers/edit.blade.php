@@ -86,7 +86,7 @@
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.efficiency')" name="efficiency_percentage" inputType="number" :value="old('efficiency_percentage', $workCenter->efficiency_percentage)" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="input" :label="__('production.cost_per_hour')" name="cost_per_hour" inputType="number" :value="old('cost_per_hour', $workCenter->cost_per_hour)" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.cost_per_hour') . ' (' . active_currency_symbol() . ')'" name="cost_per_hour" inputType="number" step="0.01" :value="old('cost_per_hour', number_format(convert_from_base($workCenter->cost_per_hour), 2, '.', ''))" :required="true" />
                         
                         <x-ui.odoo-form-ui type="select" :label="__('production.active_shifts')" name="shifts[]" :multiple="true" :searchable="true">
                             @foreach($shifts as $shift)

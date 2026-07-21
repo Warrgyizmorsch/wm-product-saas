@@ -32,11 +32,15 @@ class ScrapController extends Controller
         $this->authorize('manage', ProductionScrapDisposal::class);
         $tenantId = require_tenant_id();
         $data = $request->validated();
+        if (isset($data['cost'])) {
+            $data['cost'] = convert_to_base($data['cost']);
+        }
 
         $this->scrapService->createScrapDisposal($tenantId, $data);
 
         return redirect()->back()->with('success', 'Scrap registered and pending disposal approval.');
     }
+
 
     public function approve(Request $request, int $id)
     {

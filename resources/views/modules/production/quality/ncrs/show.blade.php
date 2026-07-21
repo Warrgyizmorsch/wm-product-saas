@@ -137,9 +137,10 @@
                                             <input type="number" id="scrap_qty_input" class="form-control form-control-sm" value="1" min="0.0001" step="any">
                                         </div>
                                         <div class="col-6">
-                                            <label class="form-label text-muted fw-semibold fs-12">Disposal Cost ($)</label>
+                                            <label class="form-label text-muted fw-semibold fs-12">Disposal Cost ({{ active_currency_symbol() }})</label>
                                             <input type="number" name="cost" class="form-control form-control-sm" value="50" min="0" step="any">
                                         </div>
+
                                     </div>
                                     <div class="row g-2 mb-3">
                                         <div class="col-6">

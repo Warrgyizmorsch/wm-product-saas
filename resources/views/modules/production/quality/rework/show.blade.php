@@ -46,15 +46,16 @@
             <div class="col-md-3">
                 <div class="border p-3 rounded text-center bg-light-soft">
                     <span class="text-muted fs-10 text-uppercase d-block mb-1">Rework Cost Estimate</span>
-                    <h5 class="fw-bold text-dark mb-0">${{ number_format($rework->cost_estimate, 2) }}</h5>
+                    <h5 class="fw-bold text-dark mb-0">{{ format_currency($rework->cost_estimate) }}</h5>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="border p-3 rounded text-center border-warning bg-soft-warning">
                     <span class="text-warning-emphasis fs-10 text-uppercase d-block mb-1">Actual Rework Cost</span>
-                    <h5 class="fw-bold text-warning mb-0">${{ number_format($rework->actual_cost, 2) }}</h5>
+                    <h5 class="fw-bold text-warning mb-0">{{ format_currency($rework->actual_cost) }}</h5>
                 </div>
             </div>
+
             <div class="col-md-3">
                 <div class="border p-3 rounded text-center bg-light-soft">
                     <span class="text-muted fs-10 text-uppercase d-block mb-1">Labor Hours Logged</span>

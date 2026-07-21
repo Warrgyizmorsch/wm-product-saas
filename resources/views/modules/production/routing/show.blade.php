@@ -179,7 +179,7 @@
                     <div class="d-flex flex-column gap-4 py-2 px-2">
                         <div>
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.routing_cost_per_unit') }}</span>
-                            <span class="fs-24 fw-bold text-primary">${{ number_format($costSummary['total_cost'], 4) }}</span>
+                            <span class="fs-24 fw-bold text-primary">{{ format_currency($costSummary['total_cost']) }}</span>
                             <small class="text-muted d-block mt-1">{{ __('production.cost_yield_desc') }}</small>
                         </div>
                         
@@ -187,12 +187,14 @@
                             <h6 class="fw-bold text-dark mb-2">{{ __('production.cost_contribution_details') }}</h6>
                             <div class="d-flex justify-content-between align-items-center mb-1 fs-12">
                                 <span class="text-muted">{{ __('production.labor_cost') }}:</span>
-                                <span class="fw-semibold text-dark">${{ number_format(collect($costSummary['operations'])->sum('labor_cost'), 4) }}</span>
+                                <span class="fw-semibold text-dark">{{ format_currency(collect($costSummary['operations'])->sum('labor_cost')) }}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center fs-12">
                                 <span class="text-muted">{{ __('production.machine_cost') }}:</span>
-                                <span class="fw-semibold text-dark">${{ number_format(collect($costSummary['operations'])->sum('machine_cost'), 4) }}</span>
+                                <span class="fw-semibold text-dark">{{ format_currency(collect($costSummary['operations'])->sum('machine_cost')) }}</span>
                             </div>
+
+
                         </div>
                     </div>
                 @else

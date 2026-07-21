@@ -1027,3 +1027,18 @@ a.btn:hover, a.btn:focus, a.btn:active { text-decoration: none !important; }
 .table-responsive:has(.dropdown.show) {
     overflow: visible !important;
 }
+
+.select2-container .select2-selection--single .select2-selection__rendered {
+    padding: 0 !important;
+}
+
+.btn {
+    padding: 8px 6px !important;
+}
+
+.bom-select2-dropdown {
+    z-index: 2055;
+}
+.bom-select2-dropdown .select2-results__options {
+    max-height: 260px;
+}

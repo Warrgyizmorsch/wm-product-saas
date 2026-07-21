@@ -328,15 +328,16 @@
                     <div class="col-md-4">
                         <div class="bg-soft-success rounded p-3 text-center border border-success">
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.est_material_cost') }}</span>
-                            <h4 class="fw-bold text-success mt-1 mb-0">${{ number_format($summary['estimated_material_cost'], 2) }}</h4>
+                            <h4 class="fw-bold text-success mt-1 mb-0">{{ format_currency($summary['estimated_material_cost']) }}</h4>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="bg-soft-primary rounded p-3 text-center border border-primary">
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.manufacturing_overhead') }}</span>
-                            <h4 class="fw-bold text-primary mt-1 mb-0">${{ number_format($summary['estimated_manufacturing_cost'], 2) }}</h4>
+                            <h4 class="fw-bold text-primary mt-1 mb-0">{{ format_currency($summary['estimated_manufacturing_cost']) }}</h4>
                         </div>
                     </div>
+
                     <div class="col-md-4">
                         <div class="bg-light rounded p-3 text-center border">
                             <span class="text-muted fs-11 text-uppercase d-block mb-1">{{ __('production.capacity_utilization') }}</span>

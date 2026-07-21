@@ -478,8 +478,8 @@ class ProductionExecutionService
             if ($wip && $wip->available_quantity > 0) {
                 // Clear WIP balances
                 $wip->update([
-                    'quantity' => 0.0000,
-                    'available_quantity' => 0.0000,
+                    'quantity' => 0.00,
+                    'available_quantity' => 0.00,
                     'status' => 'completed',
                 ]);
 

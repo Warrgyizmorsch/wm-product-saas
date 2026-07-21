@@ -152,28 +152,28 @@
                                     <h6 class="mb-0 fw-semibold text-dark">{{ __('production.material_cost') }}</h6>
                                     <small class="text-muted">Issued component materials cost</small>
                                 </div>
-                                <span class="fw-bold text-dark">${{ number_format($wip->material_cost, 2) }}</span>
+                                <span class="fw-bold text-dark">{{ format_currency($wip->material_cost) }}</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <div>
                                     <h6 class="mb-0 fw-semibold text-dark">{{ __('production.labor_cost') }}</h6>
                                     <small class="text-muted">Routing labor setup & runtime</small>
                                 </div>
-                                <span class="fw-bold text-dark">${{ number_format($wip->labor_cost, 2) }}</span>
+                                <span class="fw-bold text-dark">{{ format_currency($wip->labor_cost) }}</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <div>
                                     <h6 class="mb-0 fw-semibold text-dark">{{ __('production.machine_cost') }}</h6>
                                     <small class="text-muted">Routing machine operation costs</small>
                                 </div>
-                                <span class="fw-bold text-dark">${{ number_format($wip->machine_cost, 2) }}</span>
+                                <span class="fw-bold text-dark">{{ format_currency($wip->machine_cost) }}</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
                                 <div>
                                     <h6 class="mb-0 fw-semibold text-dark">{{ __('production.overhead_cost') }}</h6>
                                     <small class="text-muted">Work center overhead rate</small>
                                 </div>
-                                <span class="fw-bold text-dark">${{ number_format($wip->overhead_cost, 2) }}</span>
+                                <span class="fw-bold text-dark">{{ format_currency($wip->overhead_cost) }}</span>
                             </li>
                             <li
                                 class="list-group-item d-flex justify-content-between align-items-center px-0 pb-0 border-0 bg-soft-primary rounded p-3 mt-3">
@@ -181,8 +181,9 @@
                                     <h5 class="mb-0 fw-bold text-primary">{{ __('production.total_value') }}</h5>
                                     <small class="text-primary-emphasis">Total accrued manufacturing value</small>
                                 </div>
-                                <span class="fs-18 fw-bold text-primary">${{ number_format($wip->total_value, 2) }}</span>
+                                <span class="fs-18 fw-bold text-primary">{{ format_currency($wip->total_value) }}</span>
                             </li>
+
                         </ul>
                     </div>
                 </div>
@@ -252,9 +253,9 @@
                                                             @endif
                                                         </td>
                                                         <td class="text-end text-success fw-semibold">
-                                                            @if($tx->cost_added > 0)
-                                                                +${{ number_format($tx->cost_added, 2) }}
-                                                            @else
+                                                             @if($tx->cost_added > 0)
+                                                                 +{{ format_currency($tx->cost_added) }}
+                                                             @else
                                                                 —
                                                             @endif
                                                         </td>
@@ -309,7 +310,7 @@
     <x-ui.modal id="adjustWipModal" title="{{ __('production.adjust_wip') }}"
         formAction="{{ route('production.wip.adjust', $wip->id) }}" submitText="Apply Adjustment" closeText="Cancel">
         <x-ui.odoo-form-ui type="input" label="Current Total Qty" name="current_quantity_dummy"
-            :value="number_format($wip->quantity, 4)" readonly />
+            :value="number_format($wip->quantity, 2)" readonly />
 
         <x-ui.odoo-form-ui type="input" inputType="number" label="New Total Qty (Good + Scrap + Rejects)" name="quantity"
             step="0.0001" :value="$wip->quantity" required />
@@ -335,7 +336,8 @@
         <x-ui.modal id="convertToFgModal" title="{{ __('production.convert_to_fg') }}"
             formAction="{{ route('production.wip.convert', $wip->id) }}" submitText="Complete FG Inflow" closeText="Cancel">
             <x-ui.odoo-form-ui type="input" label="Convert Qty" name="convert_qty_dummy"
-                :value="number_format($wip->available_quantity, 4) . ' units'" readonly />
+                :value="number_format($wip->available_quantity, 2) . ' units'" readonly />
+
 
             <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id" :searchable="false" required>
                 @foreach($warehouses as $w)

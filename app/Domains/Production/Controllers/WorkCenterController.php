@@ -52,8 +52,12 @@ class WorkCenterController extends Controller
 
         try {
             $tenantId = require_tenant_id();
-            $dto      = WorkCenterDTO::fromArray($request->validated());
-            $wc       = $this->service->create($dto, $tenantId);
+            $data = $request->validated();
+            if (isset($data['cost_per_hour'])) {
+                $data['cost_per_hour'] = convert_to_base($data['cost_per_hour']);
+            }
+            $dto = WorkCenterDTO::fromArray($data);
+            $wc  = $this->service->create($dto, $tenantId);
 
             // Sync shifts
             $shifts = $request->input('shifts', []);
@@ -104,8 +108,13 @@ class WorkCenterController extends Controller
 
         try {
             $tenantId = require_tenant_id();
-            $dto = WorkCenterDTO::fromArray($request->validated());
+            $data = $request->validated();
+            if (isset($data['cost_per_hour'])) {
+                $data['cost_per_hour'] = convert_to_base($data['cost_per_hour']);
+            }
+            $dto = WorkCenterDTO::fromArray($data);
             $wc  = $this->service->update($id, $dto);
+
 
             // Sync shifts
             $shifts = $request->input('shifts', []);

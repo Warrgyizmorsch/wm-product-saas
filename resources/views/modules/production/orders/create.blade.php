@@ -188,7 +188,8 @@
                                         @if($product)
                                             — {{ $product->name }} ({{ $product->sku }})
                                         @endif
-                                        — Qty: {{ rtrim(rtrim(number_format((float) $request->quantity_requested, 4, '.', ''), '0'), '.') }}
+                                        — Qty: {{ rtrim(rtrim(number_format((float) $request->quantity_requested, 2, '.', ''), '0'), '.') }}
+
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>

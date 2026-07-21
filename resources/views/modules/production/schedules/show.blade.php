@@ -59,9 +59,9 @@
 
         {{-- Summary Cards --}}
         @php
-            $totalOps     = $schedule->operations->count();
+            $totalOps = $schedule->operations->count();
             $completedOps = $schedule->operations->where('status', 'completed')->count();
-            $runningOps   = $schedule->operations->where('status', 'running')->count();
+            $runningOps = $schedule->operations->where('status', 'running')->count();
             $remainingOps = $totalOps - $completedOps;
         @endphp
         <div class="row g-3 mb-4">
@@ -180,7 +180,7 @@
                     @endforeach
                 </div>
             </div>
-            
+
             <style>
                 .warning-scrollbar-custom::-webkit-scrollbar {
                     width: 6px;
@@ -201,9 +201,9 @@
 
         {{-- Tabs --}}
         <x-ui.horizontal-tabs id="scheduleTabs" :tabs="[
-            ['id' => 'tab-operations', 'label' => __('production.schedule_operations'), 'active' => true, 'icon' => 'feather-list'],
-            ['id' => 'tab-capacity', 'label' => __('production.capacity_analysis'), 'active' => false, 'icon' => 'feather-activity'],
-        ]" />
+        ['id' => 'tab-operations', 'label' => __('production.schedule_operations'), 'active' => true, 'icon' => 'feather-list'],
+        ['id' => 'tab-capacity', 'label' => __('production.capacity_analysis'), 'active' => false, 'icon' => 'feather-activity'],
+    ]" />
 
         <div class="tab-content mt-3">
             <div class="tab-pane fade show active" id="tab-operations" role="tabpanel">

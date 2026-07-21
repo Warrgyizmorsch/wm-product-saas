@@ -72,7 +72,7 @@
                 <form method="GET" action="{{ route('production.wip.index') }}" class="d-inline">
                     <x-ui.filter :label="__('ui.filter')" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('production.filter_options') }}</h6>
-                        
+
                         <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.search_keywords') }}</label>
                             <x-ui.odoo-form-ui type="input" name="search" placeholder="Search product or order..." value="{{ request('search') }}" />
@@ -158,8 +158,9 @@
                                 {{ number_format($wip->completed_quantity, 2) }}
                             </td>
                             <td class="text-end text-primary fw-bold">
-                                ${{ number_format($wip->total_value, 2) }}
+                                {{ format_currency($wip->total_value) }}
                             </td>
+
                             <td>
                                 @if($wip->status === 'active')
                                     <span class="badge bg-soft-success text-success text-uppercase">Active</span>

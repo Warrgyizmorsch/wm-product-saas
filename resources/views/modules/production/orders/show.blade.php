@@ -406,23 +406,23 @@
                                 <table class="w-100 fs-13">
                                     <tr class="border-bottom py-1">
                                         <td class="text-muted py-2">{{ __('production.material_costs') }}</td>
-                                        <td class="text-end fw-semibold text-dark">${{ number_format($wip->material_cost, 2) }}</td>
+                                        <td class="text-end fw-semibold text-dark">{{ format_currency($wip->material_cost) }}</td>
                                     </tr>
                                     <tr class="border-bottom py-1">
                                         <td class="text-muted py-2">{{ __('production.labor_cost') }}</td>
-                                        <td class="text-end fw-semibold text-dark">${{ number_format($wip->labor_cost, 2) }}</td>
+                                        <td class="text-end fw-semibold text-dark">{{ format_currency($wip->labor_cost) }}</td>
                                     </tr>
                                     <tr class="border-bottom py-1">
                                         <td class="text-muted py-2">{{ __('production.machine_utilization_cost') }}</td>
-                                        <td class="text-end fw-semibold text-dark">${{ number_format($wip->machine_cost, 2) }}</td>
+                                        <td class="text-end fw-semibold text-dark">{{ format_currency($wip->machine_cost) }}</td>
                                     </tr>
                                     <tr class="border-bottom py-1">
                                         <td class="text-muted py-2">{{ __('production.work_center_overhead') }}</td>
-                                        <td class="text-end fw-semibold text-dark">${{ number_format($wip->overhead_cost, 2) }}</td>
+                                        <td class="text-end fw-semibold text-dark">{{ format_currency($wip->overhead_cost) }}</td>
                                     </tr>
                                     <tr class="py-1">
                                         <td class="fw-bold text-primary pt-2">{{ __('production.total_cost') }}</td>
-                                        <td class="text-end fw-bold text-primary pt-2 fs-15">${{ number_format($wip->total_value, 2) }}</td>
+                                        <td class="text-end fw-bold text-primary pt-2 fs-15">{{ format_currency($wip->total_value) }}</td>
                                     </tr>
                                 </table>
                             </div>
@@ -451,9 +451,10 @@
                                                 <td>{{ $tx->fromOperation ? $tx->fromOperation->name : '—' }}</td>
                                                 <td>{{ $tx->toOperation ? $tx->toOperation->name : '—' }}</td>
                                                 <td class="text-end fw-semibold">{{ number_format($tx->quantity, 2) }}</td>
-                                                <td class="text-end text-success fw-semibold">{{ $tx->cost_added > 0 ? '+$' . number_format($tx->cost_added, 2) : '—' }}</td>
+                                                <td class="text-end text-success fw-semibold">{{ $tx->cost_added > 0 ? '+' . format_currency($tx->cost_added) : '—' }}</td>
                                                 <td class="text-muted">{{ $tx->remarks }}</td>
                                             </tr>
+
                                         @empty
                                             <tr>
                                                 <td colspan="7" class="text-center text-muted py-3">{{ __('production.no_daily_cost_history') }}</td>
@@ -579,9 +580,9 @@
                                     <small class="text-muted font-monospace fs-10">{{ $res->product->sku }}</small>
                                 </td>
                                 <td class="text-muted">{{ $res->warehouse?->name ?? __('production.not_reserved') }}</td>
-                                <td class="text-center fw-semibold text-dark">{{ number_format($res->quantity_planned, 4) }}</td>
-                                <td class="text-center fw-bold" style="color: var(--bs-info);">{{ number_format($res->quantity_reserved, 4) }}</td>
-                                <td class="text-center fw-bold text-success">{{ number_format($res->quantity_issued, 4) }}</td>
+                                <td class="text-center fw-semibold text-dark">{{ number_format($res->quantity_planned, 2) }}</td>
+                                <td class="text-center fw-bold" style="color: var(--bs-info);">{{ number_format($res->quantity_reserved, 2) }}</td>
+                                <td class="text-center fw-bold text-success">{{ number_format($res->quantity_issued, 2) }}</td>
                                 <td>{{ $res->uom->name }}</td>
                                 <td class="text-end">
                                     @if($order->isReleased() || $order->isInProgress())
@@ -637,7 +638,7 @@
                                 <td>{{ $iss->product->name }}</td>
                                 <td class="text-muted">{{ $iss->warehouse?->name ?? '—' }}</td>
                                 <td class="text-center fw-bold {{ $iss->quantity_issued < 0 ? 'text-danger' : 'text-success' }}">
-                                    {{ number_format($iss->quantity_issued, 4) }}
+                                    {{ number_format($iss->quantity_issued, 2) }}
                                 </td>
                                 <td>
                                     @if($iss->issue_type === 'standard')
@@ -862,13 +863,13 @@
                 <div class="col-md-4">
                     <div class="bg-light rounded p-4 text-center border">
                         <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.total_planned_cost') }}</span>
-                        <h2 class="text-dark fw-bold mt-2 mb-0">${{ number_format($costs['totals']['planned'], 2) }}</h2>
+                        <h2 class="text-dark fw-bold mt-2 mb-0">{{ format_currency($costs['totals']['planned']) }}</h2>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="bg-light rounded p-4 text-center border">
                         <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.total_actual_cost') }}</span>
-                        <h2 class="text-dark fw-bold mt-2 mb-0">${{ number_format($costs['totals']['actual'], 2) }}</h2>
+                        <h2 class="text-dark fw-bold mt-2 mb-0">{{ format_currency($costs['totals']['actual']) }}</h2>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -876,7 +877,7 @@
                     <div class="bg-light rounded p-4 text-center border {{ $vVal > 0 ? 'border-danger' : ($vVal < 0 ? 'border-success' : '') }}">
                         <span class="text-muted fs-11 text-uppercase fw-bold">{{ __('production.variance') }}</span>
                         <h2 class="fw-bold mt-2 mb-0 {{ $vVal > 0 ? 'text-danger' : ($vVal < 0 ? 'text-success' : 'text-muted') }}">
-                            ${{ number_format($vVal, 2) }}
+                            {{ format_currency($vVal) }}
                             <span class="fs-12 fw-normal">({{ $costs['totals']['variance_percentage'] }}%)</span>
                         </h2>
                     </div>
@@ -891,9 +892,10 @@
                             <th style="width:35%">{{ __('production.cost_element') }}</th>
                             <th style="width:20%" class="text-end">{{ __('production.planned_cost') }}</th>
                             <th style="width:20%" class="text-end">{{ __('production.actual_cost') }}</th>
-                            <th style="width:25%" class="text-end">{{ __('production.variance_amount_pct') }}</th>
+                            <th style="width:25%" class="text-end">{{ __('production.variance') }} ({{ active_currency_symbol() }} / %)</th>
                         </tr>
                     </thead>
+
                     <tbody>
                         @foreach([
                             ['label' => __('production.material_costs'),           'key' => 'material'],
@@ -903,21 +905,22 @@
                         ] as $row)
                             <tr>
                                 <td class="fw-bold text-dark">{{ $row['label'] }}</td>
-                                <td class="text-end">${{ number_format($costs[$row['key']]['planned'], 2) }}</td>
-                                <td class="text-end">${{ number_format($costs[$row['key']]['actual'], 2) }}</td>
+                                <td class="text-end">{{ format_currency($costs[$row['key']]['planned']) }}</td>
+                                <td class="text-end">{{ format_currency($costs[$row['key']]['actual']) }}</td>
                                 <td class="text-end fw-bold {{ $costs[$row['key']]['variance'] > 0 ? 'text-danger' : 'text-success' }}">
-                                    ${{ number_format($costs[$row['key']]['variance'], 2) }}
+                                    {{ format_currency($costs[$row['key']]['variance']) }}
                                 </td>
                             </tr>
                         @endforeach
                         <tr class="table-light">
                             <td class="fw-bold text-dark text-uppercase fs-12">{{ __('production.total_cost') }}</td>
-                            <td class="text-end fw-bold text-dark">${{ number_format($costs['totals']['planned'], 2) }}</td>
-                            <td class="text-end fw-bold text-dark">${{ number_format($costs['totals']['actual'], 2) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($costs['totals']['planned']) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($costs['totals']['actual']) }}</td>
                             <td class="text-end fw-bold {{ $costs['totals']['variance'] > 0 ? 'text-danger' : 'text-success' }}">
-                                ${{ number_format($costs['totals']['variance'], 2) }}
+                                {{ format_currency($costs['totals']['variance']) }}
                                 ({{ $costs['totals']['variance_percentage'] }}%)
                             </td>
+
                         </tr>
                     </tbody>
                 </table>
@@ -938,39 +941,39 @@
                     <tbody>
                         <tr>
                             <td class="fw-bold text-dark">{{ __('production.material_costs') }}</td>
-                            <td class="text-end">${{ number_format($finalCostingSummary['material']['auto'], 2) }}</td>
-                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['material']['manual'], 2) }}</td>
-                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['material']['final'], 2) }}</td>
+                            <td class="text-end">{{ format_currency($finalCostingSummary['material']['auto']) }}</td>
+                            <td class="text-end text-warning fw-semibold">{{ format_currency($finalCostingSummary['material']['manual']) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($finalCostingSummary['material']['final']) }}</td>
                         </tr>
                         <tr>
                             <td class="fw-bold text-dark">{{ __('production.labor_cost') }}</td>
-                            <td class="text-end">${{ number_format($finalCostingSummary['labor']['auto'], 2) }}</td>
-                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['labor']['manual'], 2) }}</td>
-                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['labor']['final'], 2) }}</td>
+                            <td class="text-end">{{ format_currency($finalCostingSummary['labor']['auto']) }}</td>
+                            <td class="text-end text-warning fw-semibold">{{ format_currency($finalCostingSummary['labor']['manual']) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($finalCostingSummary['labor']['final']) }}</td>
                         </tr>
                         <tr>
                             <td class="fw-bold text-dark">{{ __('production.machine_utilization_cost') }}</td>
-                            <td class="text-end">${{ number_format($finalCostingSummary['machine']['auto'], 2) }}</td>
-                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['machine']['manual'], 2) }}</td>
-                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['machine']['final'], 2) }}</td>
+                            <td class="text-end">{{ format_currency($finalCostingSummary['machine']['auto']) }}</td>
+                            <td class="text-end text-warning fw-semibold">{{ format_currency($finalCostingSummary['machine']['manual']) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($finalCostingSummary['machine']['final']) }}</td>
                         </tr>
                         <tr>
                             <td class="fw-bold text-dark">{{ __('production.work_center_overhead') }}</td>
-                            <td class="text-end">${{ number_format($finalCostingSummary['overhead']['auto'], 2) }}</td>
-                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['overhead']['manual'], 2) }}</td>
-                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['overhead']['final'], 2) }}</td>
+                            <td class="text-end">{{ format_currency($finalCostingSummary['overhead']['auto']) }}</td>
+                            <td class="text-end text-warning fw-semibold">{{ format_currency($finalCostingSummary['overhead']['manual']) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($finalCostingSummary['overhead']['final']) }}</td>
                         </tr>
                         <tr>
                             <td class="fw-bold text-dark">{{ __('production.other_uncategorized_expenses') }}</td>
-                            <td class="text-end text-muted">$0.00</td>
-                            <td class="text-end text-warning fw-semibold">${{ number_format($finalCostingSummary['other']['manual'], 2) }}</td>
-                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['other']['final'], 2) }}</td>
+                            <td class="text-end text-muted">{{ format_currency(0) }}</td>
+                            <td class="text-end text-warning fw-semibold">{{ format_currency($finalCostingSummary['other']['manual']) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($finalCostingSummary['other']['final']) }}</td>
                         </tr>
                         <tr class="table-light">
                             <td class="fw-bold text-dark text-uppercase fs-12">{{ __('production.total_manufacturing_cost') }}</td>
-                            <td class="text-end fw-bold text-dark">${{ number_format($finalCostingSummary['totals']['auto'], 2) }}</td>
-                            <td class="text-end fw-bold text-warning">${{ number_format($finalCostingSummary['totals']['manual'], 2) }}</td>
-                            <td class="text-end fw-bold text-primary fs-14">${{ number_format($finalCostingSummary['totals']['final'], 2) }}</td>
+                            <td class="text-end fw-bold text-dark">{{ format_currency($finalCostingSummary['totals']['auto']) }}</td>
+                            <td class="text-end fw-bold text-warning">{{ format_currency($finalCostingSummary['totals']['manual']) }}</td>
+                            <td class="text-end fw-bold text-primary fs-14">{{ format_currency($finalCostingSummary['totals']['final']) }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1010,12 +1013,12 @@
                                     <small class="d-block text-dark">{{ $day['operators'] ?: '—' }}</small>
                                     <small class="text-muted font-monospace fs-10">{{ $day['machines'] ?: '—' }}</small>
                                 </td>
-                                <td class="text-end fw-semibold text-dark">${{ number_format($day['automatic_daily_cost'], 2) }}</td>
-                                <td class="text-end text-warning fw-semibold">${{ number_format($day['manual_daily_adjustment'], 2) }}</td>
-                                <td class="text-end fw-bold text-primary">${{ number_format($day['final_daily_cost'], 2) }}</td>
-                                <td class="text-end text-muted">${{ number_format($day['cumulative_automatic_cost'], 2) }}</td>
-                                <td class="text-end text-warning">${{ number_format($day['cumulative_manual_adjustment'], 2) }}</td>
-                                <td class="text-end fw-bold text-dark">${{ number_format($day['cumulative_final_cost'], 2) }}</td>
+                                <td class="text-end fw-semibold text-dark">{{ format_currency($day['automatic_daily_cost']) }}</td>
+                                <td class="text-end text-warning fw-semibold">{{ format_currency($day['manual_daily_adjustment']) }}</td>
+                                <td class="text-end fw-bold text-primary">{{ format_currency($day['final_daily_cost']) }}</td>
+                                <td class="text-end text-muted">{{ format_currency($day['cumulative_automatic_cost']) }}</td>
+                                <td class="text-end text-warning">{{ format_currency($day['cumulative_manual_adjustment']) }}</td>
+                                <td class="text-end fw-bold text-dark">{{ format_currency($day['cumulative_final_cost']) }}</td>
                             </tr>
                         @empty
                             <tr>
@@ -1048,7 +1051,7 @@
                 <div class="col-md-6">
                     <div class="card border bg-light py-2 px-3 text-center">
                         <span class="fs-11 text-muted text-uppercase fw-semibold">{{ __('production.total_manual_adjustments') }}</span>
-                        <h4 class="fw-bold text-primary mb-0 mt-1">${{ number_format($finalCostingSummary['totals']['manual'], 2) }}</h4>
+                        <h4 class="fw-bold text-primary mb-0 mt-1">{{ format_currency($finalCostingSummary['totals']['manual']) }}</h4>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -1089,7 +1092,8 @@
                                         <small class="d-block text-muted">{{ $adj->notes }}</small>
                                     @endif
                                 </td>
-                                <td class="text-end fw-bold text-danger">${{ number_format($adj->amount, 2) }}</td>
+                                <td class="text-end fw-bold text-danger">{{ format_currency($adj->amount) }}</td>
+
                                 <td>
                                     @if($adj->attachment_path)
                                         <a href="{{ route('production.cost-adjustments.download', $adj->id) }}" class="btn btn-xs btn-outline-secondary" title="{{ __('production.download_attachment') }}">
@@ -1662,7 +1666,7 @@
                     </x-ui.odoo-form-ui>
                 </div>
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" label="{{ __('production.amount') }}" name="amount" inputType="number" step="0.01" min="0.01" placeholder="0.00" :required="true" />
+                    <x-ui.odoo-form-ui type="input" label="{{ __('production.amount') }} ({{ active_currency_symbol() }})" name="amount" inputType="number" step="0.01" min="0.01" placeholder="0.00" :required="true" />
                 </div>
             </div>
 
@@ -1711,9 +1715,10 @@
                         </x-ui.odoo-form-ui>
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="{{ __('production.amount') }}" name="amount" inputType="number" step="0.01" min="0.01" value="{{ $adj->amount }}" :required="true" />
+                        <x-ui.odoo-form-ui type="input" label="{{ __('production.amount') }} ({{ active_currency_symbol() }})" name="amount" inputType="number" step="0.01" min="0.01" value="{{ number_format(convert_from_base($adj->amount), 2, '.', '') }}" :required="true" />
                     </div>
                 </div>
+
 
                 <x-ui.odoo-form-ui type="input" label="{{ __('production.description') }}" name="description" value="{{ $adj->description }}" :required="true" />
 

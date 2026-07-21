@@ -1,0 +1,230 @@
+/* Production ERP Module Styles */
+
+.erp-single-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: calc(100vh - 180px) !important;
+}
+
+.table-responsive {
+    position: relative;
+}
+
+.table-responsive:has(.dropdown.show) {
+    overflow: visible !important;
+}
+
+.erp-thin-table td .select2-container--bootstrap-5 .select2-selection {
+    min-height: 34px !important;
+    height: 34px !important;
+    padding: 3px 8px !important;
+    font-size: 12px !important;
+}
+
+.routing-select2-dropdown {
+    z-index: 2055;
+}
+
+.routing-select2-dropdown .select2-results__options {
+    max-height: 260px;
+}
+
+.warning-scrollbar-custom::-webkit-scrollbar {
+    width: 6px;
+}
+
+.warning-scrollbar-custom::-webkit-scrollbar-track {
+    background: rgba(245, 158, 11, 0.05);
+    border-radius: 4px;
+}
+
+.warning-scrollbar-custom::-webkit-scrollbar-thumb {
+    background: rgba(245, 158, 11, 0.2);
+    border-radius: 4px;
+}
+
+.warning-scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 158, 11, 0.4);
+}
+
+.transition-icon {
+    transition: transform 0.2s ease-in-out;
+    display: inline-block;
+}
+
+tr[aria-expanded="true"] .transition-icon {
+    transform: rotate(90deg);
+}
+
+.hover-bg-light:hover {
+    background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+select.odoo-form-control {
+    height: 30px !important;
+    border-bottom: 1px solid #ced4da !important;
+    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") no-repeat right .25rem center/8px 10px !important;
+    padding-right: 1.25rem !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+/* Production Order Details Sticky Sidebar Layout */
+.production-sidebar-sticky {
+    position: sticky;
+    top: 85px;
+    align-self: flex-start;
+    max-height: calc(100vh - 260px);
+    min-height: 480px;
+    overflow-y: auto;
+}
+
+.production-main-content-scroll {
+    max-height: calc(100vh - 260px);
+    min-height: 480px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 8px;
+    padding-top: 10px;
+    background-color: #F8FAFC;
+}
+
+.production-main-content-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.production-main-content-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+.production-main-content-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.erp-vertical-tabs .nav-link {
+    font-size: 11.5px !important;
+    padding: 7.5px 10px !important;
+    letter-spacing: 0.15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.erp-vertical-tabs .nav-link i {
+    font-size: 13px !important;
+    margin-right: 7px !important;
+    flex-shrink: 0;
+}
+
+@media (max-width: 767.98px) {
+    .production-sidebar-sticky {
+        display: none !important;
+    }
+    .production-main-content-scroll {
+        max-height: none !important;
+        min-height: auto !important;
+        overflow-y: visible !important;
+        padding-right: 0 !important;
+    }
+}
+
+/* Production Workflow Header Card Styles (Primary Color Themed) */
+.production-workflow-card {
+    border: 1px solid #e2e8f0 !important;
+    position: relative;
+    z-index: 1;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    box-sizing: border-box;
+}
+
+.production-workflow-card .badge.bg-primary {
+    background-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+}
+
+.production-flow-tabs-wrapper {
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    scrollbar-width: none !important; /* Firefox: Hide scrollbar */
+    -ms-overflow-style: none !important; /* IE/Edge: Hide scrollbar */
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+
+.production-flow-tabs-wrapper::-webkit-scrollbar {
+    display: none !important; /* Chrome/Safari/Blink: Hide scrollbar */
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.production-flow-tabs-inner {
+    display: inline-flex !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    min-width: max-content !important;
+    width: max-content !important;
+    padding: 2px 0 !important;
+}
+
+.production-flow-tab-item {
+    font-size: 12.5px;
+    line-height: 1.2;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.production-flow-tab-item.future-step {
+    background-color: #f8fafc !important;
+    color: #475569 !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.production-flow-tab-item.future-step:hover {
+    background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent) !important;
+    color: var(--bs-primary) !important;
+    border-color: color-mix(in srgb, var(--bs-primary) 30%, transparent) !important;
+    transform: translateY(-2px);
+}
+
+.production-flow-tab-item.passed-step {
+    background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent) !important;
+    color: var(--bs-primary) !important;
+    border: 1px solid color-mix(in srgb, var(--bs-primary) 22%, transparent) !important;
+}
+
+.production-flow-tab-item.passed-step:hover {
+    background-color: color-mix(in srgb, var(--bs-primary) 15%, transparent) !important;
+    transform: translateY(-2px);
+}
+
+.production-flow-tab-item.passed-step .step-circle-badge {
+    background-color: var(--bs-primary) !important;
+    color: #ffffff !important;
+}
+
+.production-flow-tab-item.active-step {
+    background-color: color-mix(in srgb, var(--bs-primary) 80%, transparent) !important;
+    color: #ffffff !important;
+    border: 1px solid var(--bs-primary) !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--bs-primary) 35%, transparent) !important;
+}
+
+.production-flow-tab-item.active-step .step-circle-badge {
+    background-color: #ffffff !important;
+    color: var(--bs-primary) !important;
+}
+
+.step-circle-badge {
+    font-size: 11px;
+    font-weight: 700;
+}
