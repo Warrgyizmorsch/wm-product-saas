@@ -54,10 +54,12 @@
         {{-- Header Identity Row --}}
         @php
             $projectStatusVariant = match ($project->status) {
+                'Draft' => 'secondary',
                 'Active' => 'success',
                 'On Hold' => 'warning',
-                'Completed' => 'primary',
+                'Completed' => 'info',
                 'Closed' => 'dark',
+                'Cancelled' => 'danger',
                 default => 'secondary',
             };
         @endphp
@@ -187,7 +189,7 @@
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
                                 @php
-                                    $statusOptions = collect(\App\Domains\Projects\Models\Project::EDITABLE_STATUSES)
+                                    $statusOptions = collect($statusTransitions)
                                         ->mapWithKeys(fn($status) => [$status => __('projects.statuses.' . $status)]);
                                 @endphp
                                 <x-ui.inline-edit field="status" :value="$project->status" :url="route('projects.field', $project)" type="select" :options="$statusOptions" :label="__('projects.status')" />

@@ -263,10 +263,12 @@
                             <td>
                                 @php
                                     $projectStatusVariant = match ($project->status) {
+                                        'Draft' => 'secondary',
                                         'Active' => 'success',
                                         'On Hold' => 'warning',
-                                        'Completed' => 'primary',
+                                        'Completed' => 'info',
                                         'Closed' => 'dark',
+                                        'Cancelled' => 'danger',
                                         default => 'secondary',
                                     };
                                 @endphp

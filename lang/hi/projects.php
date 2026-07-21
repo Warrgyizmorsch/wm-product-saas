@@ -63,6 +63,7 @@ return [
         'On Hold' => 'होल्ड पर',
         'Completed' => 'पूर्ण',
         'Closed' => 'बंद',
+        'Cancelled' => 'रद्द',
     ],
     'priorities' => [
         'Low' => 'कम',

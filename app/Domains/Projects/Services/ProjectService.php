@@ -14,15 +14,18 @@ use Illuminate\Validation\ValidationException;
 class ProjectService
 {
     /**
-     * Allowed forward status transitions. Closed is only reachable via the
-     * closure workflow (a later milestone), never through a plain update.
+     * Allowed forward status transitions — the single source of truth for the
+     * project lifecycle. Closed and Cancelled are terminal (no outgoing
+     * transitions); Closing a project is always a manual action taken from
+     * Completed, never automatic.
      */
     private const TRANSITIONS = [
-        Project::STATUS_DRAFT     => [Project::STATUS_ACTIVE],
-        Project::STATUS_ACTIVE    => [Project::STATUS_ON_HOLD, Project::STATUS_COMPLETED],
-        Project::STATUS_ON_HOLD   => [Project::STATUS_ACTIVE],
-        Project::STATUS_COMPLETED => [],
+        Project::STATUS_DRAFT     => [Project::STATUS_ACTIVE, Project::STATUS_CANCELLED],
+        Project::STATUS_ACTIVE    => [Project::STATUS_ON_HOLD, Project::STATUS_COMPLETED, Project::STATUS_CANCELLED],
+        Project::STATUS_ON_HOLD   => [Project::STATUS_ACTIVE, Project::STATUS_CANCELLED],
+        Project::STATUS_COMPLETED => [Project::STATUS_CLOSED],
         Project::STATUS_CLOSED    => [],
+        Project::STATUS_CANCELLED => [],
     ];
 
     public function __construct(
@@ -42,13 +45,83 @@ class ProjectService
     }
 
     /**
-     * Whether a project may move from one status to another. Exposed so
-     * other write paths (e.g. inline field updates) can enforce the same
-     * transition rules as update() without duplicating the map.
+     * Whether a project may move from one status to another.
      */
     public function canTransition(string $from, string $to): bool
     {
         return in_array($to, self::TRANSITIONS[$from] ?? [], true);
+    }
+
+    /**
+     * Single authoritative transition check, used by both the full project
+     * update() path and inline status editing so the two can never drift out
+     * of sync. Same-status "changes" are always allowed (no-op). Throws a
+     * ValidationException keyed by $errorField otherwise.
+     */
+    public function assertTransitionAllowed(string $from, string $to, string $errorField = 'status'): void
+    {
+        if ($from !== $to && !$this->canTransition($from, $to)) {
+            throw ValidationException::withMessages([
+                $errorField => "A project cannot move from '{$from}' to '{$to}'.",
+            ]);
+        }
+    }
+
+    /**
+     * The one authoritative status-change workflow: validates the transition,
+     * persists it, and records project.status_changed with old/new metadata.
+     * Used directly by inline status editing, and shared (via
+     * persistStatusChange()) with update() when a full-form save changes
+     * status, so both entry points produce identical audit records for the
+     * same action. A same-status "change" is a no-op: no write, no log entry.
+     */
+    public function changeStatus(Project $project, string $newStatus, string $errorField = 'status'): Project
+    {
+        $oldStatus = $project->status;
+
+        $this->assertTransitionAllowed($oldStatus, $newStatus, $errorField);
+
+        if ($newStatus === $oldStatus) {
+            return $project;
+        }
+
+        return DB::transaction(fn () => $this->persistStatusChange($project, [], $oldStatus, $newStatus));
+    }
+
+    /**
+     * Persists a status change (optionally alongside other field changes from
+     * a full-form save) and records the single project.status_changed entry
+     * for it. The only place that writes a status change to the database or
+     * logs it, so changeStatus() and update() can never disagree about what
+     * happened.
+     */
+    private function persistStatusChange(Project $project, array $otherData, string $oldStatus, string $newStatus): Project
+    {
+        $project = $this->projects->update($project->id, array_merge($otherData, ['status' => $newStatus]));
+
+        $this->activity->record(
+            $project,
+            'project.status_changed',
+            "Project {$project->project_code} status changed",
+            "Status changed from '{$oldStatus}' to '{$newStatus}'",
+            $project,
+            ['old' => $oldStatus, 'new' => $newStatus],
+        );
+
+        return $project;
+    }
+
+    /**
+     * The statuses a project may be set to next, for building transition-aware
+     * status pickers. Includes the current status first (so re-selecting it is
+     * always a valid no-op), followed by its allowed forward transitions.
+     * Terminal statuses (Closed, Cancelled) return only themselves.
+     *
+     * @return list<string>
+     */
+    public function availableStatusTransitions(Project $project): array
+    {
+        return array_merge([$project->status], self::TRANSITIONS[$project->status] ?? []);
     }
 
     public function summary(): array
@@ -165,33 +238,24 @@ class ProjectService
         $oldStatus = $project->status;
         $newStatus = $data['status'] ?? $oldStatus;
 
-        if ($newStatus !== $oldStatus && !$this->canTransition($oldStatus, $newStatus)) {
-            throw ValidationException::withMessages([
-                'status' => "A project cannot move from '{$oldStatus}' to '{$newStatus}'.",
-            ]);
-        }
+        $this->assertTransitionAllowed($oldStatus, $newStatus);
 
         return DB::transaction(function () use ($project, $data, $oldStatus, $newStatus) {
+            if ($newStatus !== $oldStatus) {
+                $otherData = collect($data)->except('status')->all();
+
+                return $this->persistStatusChange($project, $otherData, $oldStatus, $newStatus);
+            }
+
             $project = $this->projects->update($project->id, $data);
 
-            if ($newStatus !== $oldStatus) {
-                $this->activity->record(
-                    $project,
-                    'project.status_changed',
-                    "Project {$project->project_code} status changed",
-                    "Status changed from '{$oldStatus}' to '{$newStatus}'",
-                    $project,
-                    ['old' => $oldStatus, 'new' => $newStatus],
-                );
-            } else {
-                $this->activity->record(
-                    $project,
-                    'project.updated',
-                    "Project {$project->project_code} updated",
-                    "Project '{$project->name}' details updated",
-                    $project,
-                );
-            }
+            $this->activity->record(
+                $project,
+                'project.updated',
+                "Project {$project->project_code} updated",
+                "Project '{$project->name}' details updated",
+                $project,
+            );
 
             return $project;
         });

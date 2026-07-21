@@ -38,7 +38,7 @@ class UpdateProjectRequest extends FormRequest
             'budget_hours'   => ['nullable', 'numeric', 'min:0'],
             'billing_method' => ['nullable', Rule::in(Project::BILLING_METHODS)],
             'priority'       => ['required', Rule::in(Project::PRIORITIES)],
-            'status'         => ['required', Rule::in(Project::EDITABLE_STATUSES)],
+            'status'         => ['required', Rule::in(Project::STATUSES)],
             'description'    => ['nullable', 'string'],
         ];
     }
@@ -46,7 +46,7 @@ class UpdateProjectRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'status.in' => 'A project cannot be Closed from the edit form.',
+            'status.in' => 'A project cannot be set to that status.',
         ];
     }
 }

@@ -74,6 +74,7 @@ return [
         'On Hold' => 'On Hold',
         'Completed' => 'Completed',
         'Closed' => 'Closed',
+        'Cancelled' => 'Cancelled',
     ],
     'priorities' => [
         'Low' => 'Low',
