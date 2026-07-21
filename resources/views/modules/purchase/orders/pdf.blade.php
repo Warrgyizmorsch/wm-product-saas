@@ -263,6 +263,12 @@
                     @if($order->vendor?->code)
                         <div class="client-info" style="margin-bottom: 2px; font-size: 9.5px; color: #475569;"><strong style="color: #64748b;">Code:</strong> {{ $order->vendor->code }}</div>
                     @endif
+                    @if($order->supplier_quotation_number)
+                        <div class="client-info" style="margin-bottom: 2px; font-size: 9.5px; color: #475569;"><strong style="color: #64748b;">Quote No:</strong> <span style="color: #1e40af; font-weight: bold;">{{ $order->supplier_quotation_number }}</span></div>
+                    @endif
+                    @if($order->reference)
+                        <div class="client-info" style="margin-bottom: 2px; font-size: 9.5px; color: #475569;"><strong style="color: #64748b;">Ref:</strong> {{ $order->reference }}</div>
+                    @endif
                     <div class="client-info" style="margin-bottom: 2px; font-size: 9.5px; color: #475569;"><strong style="color: #64748b;">Email:</strong> {{ $order->vendor->email ?: '—' }}</div>
                     <div class="client-info" style="margin-bottom: 2px; font-size: 9.5px; color: #475569;"><strong style="color: #64748b;">Phone:</strong> {{ $order->vendor->phone ?: '—' }}</div>
                     <div class="client-info" style="margin-top: 4px; font-size: 9.5px; color: #475569; line-height: 1.3;"><strong style="color: #64748b; display: block; margin-bottom: 1px;">Address:</strong> {{ $order->vendor->address ?: '—' }}</div>

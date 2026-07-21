@@ -150,7 +150,9 @@
                                                         id="vendor_radio_{{ $rv->id }}"
                                                         value="{{ $rv->id }}"
                                                         data-vendor-id="{{ $rv->id }}"
+                                                        data-db-vendor-id="{{ $rv->vendor_id }}"
                                                         data-vendor-name="{{ $rv->vendor?->name }}"
+                                                        data-quotation-number="{{ $rv->quotation_number }}"
                                                     >
                                                     <label class="form-check-label fw-bold text-primary fs-12 text-truncate c-pointer" for="vendor_radio_{{ $rv->id }}" style="max-width:160px;">
                                                         {{ $rv->vendor?->name }}
@@ -380,7 +382,11 @@
     </div>
 
     {{-- ===================== Create PO Modal ===================== --}}
-    <x-ui.modal id="createPoModal" title="Create Purchase Order" size="lg" :centered="true" :showFooter="true">
+    <x-ui.modal id="createPoModal" title="Create Purchase Order" size="xl" :centered="true" :showFooter="true" formAction="{{ route('purchase.rfqs.create-po', $rfq->id) }}" formMethod="POST">
+        <input type="hidden" name="vendor_id" id="po-form-vendor-id" value="">
+        <input type="hidden" name="source_type" value="rfq">
+        <div id="po-form-items-inputs"></div>
+
         <div class="fs-13">
 
             {{-- Selected Supplier --}}
@@ -394,44 +400,155 @@
             </div>
 
             <div class="row g-3 mb-3">
+                {{-- Location / Warehouse --}}
+                <div class="col-md-6">
+                    <x-ui.odoo-form-ui type="select" label="Location / Warehouse" name="location" id="po-location" required="true">
+                        <option value="">Select Warehouse...</option>
+                        @foreach($warehouses as $w)
+                            <option value="{{ $w->name }}">{{ $w->name }}</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                </div>
                 {{-- PO Date --}}
                 <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="PO Date" id="po-date" name="po_date" :value="now()->format('Y-m-d')" />
-                </div>
-                {{-- Delivery Remarks --}}
-                <div class="col-md-6">
-                    <x-ui.odoo-form-ui type="input" label="Remarks" id="po-remarks" name="po_remarks" placeholder="Optional notes..." />
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="PO Date" name="date" id="po-date" :value="now()->format('Y-m-d')" required="true" />
                 </div>
             </div>
 
+            <div class="row g-3 mb-3">
+                {{-- Delivery Date --}}
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="Delivery Date" name="delivery_date" id="po-delivery-date" />
+                </div>
+                {{-- Reference --}}
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="input" label="Reference Document" name="reference" id="po-reference" :value="'RFQ: ' . $rfq->rfq_number" />
+                </div>
+                {{-- Supplier Quotation No --}}
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="input" label="Supplier Quotation No." name="supplier_quotation_number" id="po-supplier-quotation-number" placeholder="e.g. QU-9876..." />
+                </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                {{-- Discount Option --}}
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="select" label="Discount Option" name="discount_type" id="po-discount-type" required="true">
+                        <option value="without_discount" selected>Without Discount</option>
+                        <option value="item_wise">With Discount At Item Level</option>
+                        <option value="order_wise">With Discount At Order Level</option>
+                    </x-ui.odoo-form-ui>
+                </div>
+                {{-- Tax Option --}}
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="select" label="Tax Option" name="tax_type" id="po-tax-type" required="true">
+                        <option value="without_tax" selected>Without Tax</option>
+                        <option value="item_wise_tax">Item Wise Tax</option>
+                        <option value="order_wise_tax">Order Wise Tax</option>
+                    </x-ui.odoo-form-ui>
+                </div>
+                {{-- GST Type --}}
+                <div class="col-md-4">
+                    <x-ui.odoo-form-ui type="select" label="GST Type" name="gst_type" id="po-gst-type" required="true">
+                        <option value="cgst_sgst" selected>CGST + SGST (Intra-State)</option>
+                        <option value="igst">IGST (Inter-State)</option>
+                    </x-ui.odoo-form-ui>
+                </div>
+            </div>
+
+
             {{-- Items preview table --}}
             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">Selected Items</label>
-            <div class="table-responsive border rounded mb-3" style="max-height:280px; overflow-y:auto;">
-                <table class="table table-sm table-hover align-middle mb-0 fs-12">
-                    <thead class="table-light">
+            <div class="table-responsive mb-3" style="max-height:280px; overflow-y:auto;">
+                <x-ui.odoo-form-ui type="table" id="poItemsTableModal" style="table-layout: fixed; width: 100%;">
+                    <thead>
                         <tr>
-                            <th>#</th>
-                            <th>Product</th>
-                            <th class="text-end">Qty</th>
-                            <th class="text-end">Rate</th>
-                            <th class="text-end">Total</th>
+                            <th style="width: 4%;">#</th>
+                            <th style="width: 25%;">Product</th>
+                            <th class="text-end" style="width: 10%;">Qty <span class="text-danger">*</span></th>
+                            <th class="text-end" style="width: 10%;">Rate <span class="text-danger">*</span></th>
+                            <th class="text-end" style="width: 12%;">Amount</th>
+                            <!-- Discount Columns -->
+                            <th class="text-end discount-column" style="width: 8%;">Disc %</th>
+                            <th class="text-end discount-column" style="width: 10%;">Disc Amt</th>
+                            <!-- Tax Columns -->
+                            <th class="text-end tax-column" style="width: 8%;">Tax %</th>
+                            <th class="text-end tax-column" style="width: 10%;">Tax Amt</th>
+                            <th class="text-end" style="width: 13%;">Total Amt</th>
                         </tr>
                     </thead>
                     <tbody id="po-preview-tbody">
                         <tr id="po-no-items-row">
-                            <td colspan="5" class="text-center text-muted py-4">
+                            <td colspan="10" class="text-center text-muted py-4">
                                 <i class="feather-package fs-2 d-block mb-2 text-light"></i>
                                 Tick items from the matrix
                             </td>
                         </tr>
                     </tbody>
-                    <tfoot>
-                        <tr class="table-light">
-                            <td colspan="4" class="text-end fw-bold fs-12">Grand Total:</td>
-                            <td class="text-end fw-bold text-success fs-13" id="po-grand-total">&mdash;</td>
-                        </tr>
-                    </tfoot>
-                </table>
+                </x-ui.odoo-form-ui>
+            </div>
+
+            <!-- Calculation Summary Grid -->
+            <div class="row mb-3">
+                <!-- Left side: Terms & Notes Editor -->
+                <div class="col-md-7">
+                    <x-ui.odoo-form-ui type="editor" label="Terms & Notes" name="notes" id="po-notes" placeholder="Specify any delivery terms, quality checks, payment instructions, etc.">
+                    </x-ui.odoo-form-ui>
+                </div>
+
+                <!-- Right side: Calculation Card -->
+                <div class="col-md-5 d-flex flex-column align-items-end fs-13">
+                    <div class="card border-0 shadow-sm w-100" style="max-width: 380px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden;">
+                        <div class="fw-bold py-2 px-3 text-white" style="background-color: #2563eb; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
+                            ORDER SUMMARY
+                        </div>
+                        <div class="p-3 bg-white text-dark">
+                            <!-- Taxable Subtotal -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="text-muted fs-12 fw-semibold">Taxable Subtotal</span>
+                                <input type="text" id="summarySubtotalTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
+                                <input type="hidden" name="subtotal" id="summarySubtotalModal" value="0.00">
+                            </div>
+
+                            <!-- Total Discount -->
+                            <div class="d-flex justify-content-between align-items-center mb-2" id="summaryDiscountRowModal">
+                                <span class="text-muted fs-12 fw-semibold">Discount Amount</span>
+                                <input type="number" name="discount_amount" id="summaryDiscountModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" step="0.01" value="0.00">
+                            </div>
+
+                            <!-- Gross Total -->
+                            <div class="d-flex justify-content-between align-items-center mb-2" id="summaryGrossRowModal">
+                                <span class="text-muted fs-12 fw-semibold">Gross Total (Before Tax)</span>
+                                <input type="text" id="summaryGrossTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
+                            </div>
+
+                            <!-- Tax Rate (Percent) -->
+                            <div class="d-flex justify-content-between align-items-center mb-2" id="orderTaxPercentRowModal">
+                                <span class="text-muted fs-12 fw-semibold">Tax Rate (%)</span>
+                                <input type="number" id="orderTaxPercentModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="0.00">
+                            </div>
+
+                            <!-- Hidden splits submitted to backend -->
+                            <input type="hidden" name="cgst_amount" id="summaryCgstModal" value="0.00">
+                            <input type="hidden" name="sgst_amount" id="summarySgstModal" value="0.00">
+                            <input type="hidden" name="igst_amount" id="summaryIgstModal" value="0.00">
+
+                            <!-- Tax Amount -->
+                            <div class="d-flex justify-content-between align-items-center mb-2" id="summaryTaxRowModal">
+                                <span class="text-muted fs-12 fw-semibold">Tax Amount</span>
+                                <input type="text" id="summaryTaxTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
+                                <input type="hidden" name="tax_amount" id="summaryTaxModal" value="0.00">
+                            </div>
+
+                            <!-- Grand Total -->
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                <span class="fw-bold fs-13" style="color: #2563eb;">Grand Total</span>
+                                <input type="text" id="summaryGrandtotalTextModal" class="form-control form-control-sm text-end fw-extrabold" style="width: 140px; height: 32px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb;" readonly value="0.00">
+                                <input type="hidden" name="grand_total" id="summaryGrandtotalModal" value="0.00">
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {{-- Validation --}}
@@ -441,7 +558,7 @@
 
         <x-slot name="footer">
             <x-ui.button variant="light" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
-            <x-ui.button variant="success" icon="feather-check" id="btn-confirm-po" type="button" onclick="submitCreatePO()">
+            <x-ui.button variant="primary" icon="feather-check" id="btn-confirm-po" type="submit" style="background-color: #714B67; border-color: #714B67;">
                 Confirm &amp; Create PO
             </x-ui.button>
         </x-slot>
@@ -508,6 +625,36 @@
                 syncPoPreview();
             });
 
+            // Handle form submission to validate inputs and set vendor ID
+            $('#createPoModal form').on('submit', function(e) {
+                const vendorId = $('.supplier-select-radio:checked').attr('data-vendor-id');
+                const dbVendorId = $('.supplier-select-radio:checked').attr('data-db-vendor-id');
+                const items = $('.item-select-cb:checked');
+                const alertEl = $('#po-alert');
+                alertEl.addClass('d-none').text('');
+
+                if (!vendorId || !dbVendorId) {
+                    e.preventDefault();
+                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> Please select a supplier using the radio button in the column header.');
+                    return false;
+                }
+                if (!items.length) {
+                    e.preventDefault();
+                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> Please select at least one item.');
+                    return false;
+                }
+
+                $('#po-form-vendor-id').val(dbVendorId);
+                return true;
+            });
+
+            // Toggle Layout in Modal
+            $(document).on('change', '#po-discount-type, #po-tax-type, #po-gst-type', adjustModalLayout);
+
+            // Calculation Triggers in Modal
+            $(document).on('input', '#poItemsTableModal tbody tr.item-row input', calculateAllModal);
+            $('#summaryDiscountModal, #orderTaxPercentModal').on('input', calculateAllModal);
+
         });
 
         function updatePoBtn() {
@@ -544,65 +691,284 @@
             const vendorRadio = $('.supplier-select-radio:checked');
             const vendorId   = vendorRadio.attr('data-vendor-id')   || '';
             const vendorName = vendorRadio.attr('data-vendor-name') || 'None selected';
+            const quoteNo    = vendorRadio.attr('data-quotation-number') || '';
             const currency   = '{{ $currency }}';
 
             $('#po-supplier-name').text(vendorName);
+
+            $('#po-reference').val("RFQ: {{ $rfq->rfq_number }}");
+            $('#po-supplier-quotation-number').val(quoteNo);
 
             const tbody = $('#po-preview-tbody');
             const checked = $('.item-select-cb:checked');
             tbody.empty();
 
             if (!checked.length) {
-                tbody.html('<tr id="po-no-items-row"><td colspan="5" class="text-center text-muted py-4"><i class="feather-package fs-2 d-block mb-2 text-light"></i>Tick items from the matrix</td></tr>');
-                $('#po-grand-total').html('&mdash;');
+                tbody.html('<tr id="po-no-items-row"><td colspan="10" class="text-center text-muted py-4"><i class="feather-package fs-2 d-block mb-2 text-light"></i>Tick items from the matrix</td></tr>');
+                adjustModalLayout();
                 return;
             }
 
-            let grandTotal = 0, rowNum = 1;
+            let rowNum = 1;
             checked.each(function() {
                 const productId   = $(this).attr('data-product-id');
                 const productName = $(this).attr('data-product-name');
                 const rateVal = vendorId ? (parseFloat($(`.vendor-rate-input[data-vendor="${vendorId}"][data-product="${productId}"]`).val()) || 0) : 0;
                 const qtyVal  = vendorId ? (parseFloat($(`.vendor-qty-input[data-vendor="${vendorId}"][data-product="${productId}"]`).val()) || 0) : 0;
-                const total   = rateVal * qtyVal;
-                grandTotal   += total;
-                const rowCls  = rateVal === 0 ? 'class="table-warning"' : '';
-                tbody.append(`<tr ${rowCls}>
+
+                tbody.append(`<tr class="item-row" data-product-id="${productId}">
                     <td class="text-muted">${rowNum++}</td>
-                    <td class="fw-semibold">${productName}</td>
-                    <td class="text-end font-monospace">${qtyVal.toFixed(2)}</td>
-                    <td class="text-end font-monospace">${rateVal > 0 ? currency + ' ' + rateVal.toFixed(2) : '<span class="text-danger">—</span>'}</td>
-                    <td class="text-end font-monospace fw-bold ${total > 0 ? 'text-success' : 'text-danger'}">${total > 0 ? currency + ' ' + total.toLocaleString('en-IN', {minimumFractionDigits:2}) : '—'}</td>
+                    <td class="fw-semibold text-truncate" style="max-width: 150px;" title="${productName}">
+                        ${productName}
+                        <input type="hidden" name="items[${productId}][product_id]" value="${productId}">
+                    </td>
+                    <td>
+                        <input type="number" name="items[${productId}][quantity]" class="odoo-table-input text-end qty-input" step="0.0001" min="0.0001" required value="${qtyVal.toFixed(4)}">
+                    </td>
+                    <td>
+                        <input type="number" name="items[${productId}][rate]" class="odoo-table-input text-end rate-input" step="0.01" min="0" required value="${rateVal.toFixed(2)}">
+                    </td>
+                    <td>
+                        <input type="number" name="items[${productId}][amount]" class="odoo-table-input text-end amount-input" step="0.01" readonly value="${(qtyVal * rateVal).toFixed(2)}" style="background-color: #f8fafc;">
+                    </td>
+                    <!-- Discount Columns -->
+                    <td class="discount-column">
+                        <input type="number" name="items[${productId}][discount_percent]" class="odoo-table-input text-end disc-percent-input" step="0.01" min="0" max="100" value="0.00">
+                    </td>
+                    <td class="discount-column">
+                        <input type="number" name="items[${productId}][discount_amount]" class="odoo-table-input text-end disc-amount-input" step="0.01" readonly value="0.00" style="background-color: #f8fafc;">
+                    </td>
+                    <!-- Tax Columns -->
+                    <td class="tax-column">
+                        <input type="number" name="items[${productId}][tax_percent]" class="odoo-table-input text-end tax-percent-input" step="0.01" min="0" value="0.00">
+                        <input type="hidden" name="items[${productId}][cgst_percent]" class="cgst-percent-input" value="0.00">
+                        <input type="hidden" name="items[${productId}][sgst_percent]" class="sgst-percent-input" value="0.00">
+                        <input type="hidden" name="items[${productId}][igst_percent]" class="igst-percent-input" value="0.00">
+                        <input type="hidden" name="items[${productId}][cgst_amount]" class="cgst-amount-input" value="0.00">
+                        <input type="hidden" name="items[${productId}][sgst_amount]" class="sgst-amount-input" value="0.00">
+                        <input type="hidden" name="items[${productId}][igst_amount]" class="igst-amount-input" value="0.00">
+                    </td>
+                    <td class="tax-column">
+                        <input type="number" name="items[${productId}][tax_amount]" class="odoo-table-input text-end tax-amount-input" step="0.01" readonly value="0.00" style="background-color: #f8fafc;">
+                    </td>
+                    <td>
+                        <input type="number" name="items[${productId}][total_amount]" class="odoo-table-input text-end total-amount-input" step="0.01" readonly value="${(qtyVal * rateVal).toFixed(2)}" style="background-color: #f8fafc;">
+                    </td>
                 </tr>`);
             });
 
-            $('#po-grand-total').html(grandTotal > 0 ? `<span class="text-success">${currency} ${grandTotal.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>` : '&mdash;');
+            adjustModalLayout();
         }
 
-        function submitCreatePO() {
-            const vendorId = $('.supplier-select-radio:checked').attr('data-vendor-id');
-            const vendorName = $('.supplier-select-radio:checked').attr('data-vendor-name');
-            const items = $('.item-select-cb:checked');
-            const alertEl = $('#po-alert');
-            alertEl.addClass('d-none').text('');
+        // Modal Layout and Calculation Engines
+        function adjustModalLayout() {
+            const discType = $('#po-discount-type').val();
+            const taxType = $('#po-tax-type').val();
 
-            if (!vendorId) {
-                alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> Please select a supplier using the radio button in the column header.');
-                return;
-            }
-            if (!items.length) {
-                alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> Please select at least one item.');
-                return;
+            // 1. Discount option changes
+            if (discType === 'item_wise') {
+                $('#poItemsTableModal .discount-column').show();
+                $('#summaryDiscountRowModal').show();
+                $('#summaryGrossRowModal').show();
+                $('#summaryDiscountModal').prop('readonly', true).css('background-color', '#f8fafc');
+            } else if (discType === 'order_wise') {
+                $('#poItemsTableModal .discount-column').hide();
+                $('#poItemsTableModal .disc-percent-input').val('0.00');
+                $('#poItemsTableModal .disc-amount-input').val('0.00');
+                $('#summaryDiscountRowModal').show();
+                $('#summaryGrossRowModal').show();
+                $('#summaryDiscountModal').prop('readonly', false).css('background-color', '#ffffff');
+            } else {
+                // without_discount
+                $('#poItemsTableModal .discount-column').hide();
+                $('#poItemsTableModal .disc-percent-input').val('0.00');
+                $('#poItemsTableModal .disc-amount-input').val('0.00');
+                $('#summaryDiscountRowModal').hide();
+                $('#summaryGrossRowModal').hide();
+                $('#summaryDiscountModal').val('0.00');
             }
 
-            // UI-only toast (DB integration pending)
-            bootstrap.Modal.getInstance(document.getElementById('createPoModal'))?.hide();
-            const toast = document.createElement('div');
-            toast.className = 'alert alert-success shadow-lg border-0 d-flex align-items-center gap-3 rounded-3 py-3 px-4';
-            toast.style.cssText = 'position:fixed;bottom:80px;right:24px;z-index:9999;min-width:340px;';
-            toast.innerHTML = `<i class="feather-check-circle fs-20 text-success"></i><div><div class="fw-bold text-dark">PO Ready!</div><div class="fs-12 text-muted">${items.length} item(s) for <strong>${vendorName}</strong> — DB integration coming soon.</div></div>`;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4500);
+            // 2. Tax option changes
+            if (taxType === 'item_wise_tax') {
+                $('#poItemsTableModal .tax-column').show();
+                $('#orderTaxPercentRowModal').hide().find('#orderTaxPercentModal').val('0.00');
+                $('#summaryTaxRowModal').show();
+                $('#gstTypeContainerModal').show();
+            } else if (taxType === 'order_wise_tax') {
+                $('#poItemsTableModal .tax-column').hide();
+                $('#poItemsTableModal .tax-percent-input, #poItemsTableModal .tax-amount-input').val('0.00');
+                $('#poItemsTableModal .cgst-percent-input, #poItemsTableModal .sgst-percent-input, #poItemsTableModal .igst-percent-input').val('0.00');
+                $('#poItemsTableModal .cgst-amount-input, #poItemsTableModal .sgst-amount-input, #poItemsTableModal .igst-amount-input').val('0.00');
+                $('#orderTaxPercentRowModal').show();
+                $('#orderTaxPercentModal').prop('readonly', false).css('background-color', '#ffffff');
+                $('#summaryTaxRowModal').show();
+                $('#gstTypeContainerModal').show();
+            } else {
+                // without_tax
+                $('#poItemsTableModal .tax-column').hide();
+                $('#poItemsTableModal .tax-percent-input, #poItemsTableModal .tax-amount-input').val('0.00');
+                $('#poItemsTableModal .cgst-percent-input, #poItemsTableModal .sgst-percent-input, #poItemsTableModal .igst-percent-input').val('0.00');
+                $('#poItemsTableModal .cgst-amount-input, #poItemsTableModal .sgst-amount-input, #poItemsTableModal .igst-amount-input').val('0.00');
+                $('#orderTaxPercentRowModal').hide().find('#orderTaxPercentModal').val('0.00');
+                $('#summaryTaxRowModal').hide();
+                $('#gstTypeContainerModal').hide();
+                $('#summaryCgstModal, #summarySgstModal, #summaryIgstModal, #summaryTaxModal').val('0.00');
+            }
+
+            calculateAllModal();
+        }
+
+        function calculateAllModal() {
+            const discType = $('#po-discount-type').val();
+            const taxType = $('#po-tax-type').val();
+            const gstType = $('#po-gst-type').val();
+            
+            let subtotal = 0.00;
+            let totalItemDiscount = 0.00;
+            let totalItemTax = 0.00;
+
+            let totalCgst = 0.00;
+            let totalSgst = 0.00;
+            let totalIgst = 0.00;
+
+            $('#poItemsTableModal tbody tr.item-row').each(function() {
+                const $row = $(this);
+                const qty = parseFloat($row.find('.qty-input').val()) || 0;
+                const rate = parseFloat($row.find('.rate-input').val()) || 0;
+                
+                const amount = qty * rate;
+                $row.find('.amount-input').val(amount.toFixed(2));
+                subtotal += amount;
+
+                // Row Discount calculations
+                let rowDiscount = 0.00;
+                if (discType === 'item_wise') {
+                    const discPercent = parseFloat($row.find('.disc-percent-input').val()) || 0;
+                    rowDiscount = amount * (discPercent / 100);
+                    $row.find('.disc-amount-input').val(rowDiscount.toFixed(2));
+                    totalItemDiscount += rowDiscount;
+                } else {
+                    $row.find('.disc-amount-input').val('0.00');
+                }
+
+                const taxableAmount = amount - rowDiscount;
+
+                // Row Tax calculations
+                let rowTax = 0.00;
+                if (taxType === 'item_wise_tax') {
+                    const taxPercent = parseFloat($row.find('.tax-percent-input').val()) || 0;
+                    
+                    let cgstPct = 0.00;
+                    let sgstPct = 0.00;
+                    let igstPct = 0.00;
+
+                    if (gstType === 'cgst_sgst') {
+                        cgstPct = taxPercent / 2;
+                        sgstPct = taxPercent / 2;
+                        igstPct = 0;
+                    } else {
+                        cgstPct = 0;
+                        sgstPct = 0;
+                        igstPct = taxPercent;
+                    }
+
+                    $row.find('.cgst-percent-input').val(cgstPct.toFixed(2));
+                    $row.find('.sgst-percent-input').val(sgstPct.toFixed(2));
+                    $row.find('.igst-percent-input').val(igstPct.toFixed(2));
+
+                    const cgstAmt = taxableAmount * (cgstPct / 100);
+                    const sgstAmt = taxableAmount * (sgstPct / 100);
+                    const igstAmt = taxableAmount * (igstPct / 100);
+
+                    $row.find('.cgst-amount-input').val(cgstAmt.toFixed(2));
+                    $row.find('.sgst-amount-input').val(sgstAmt.toFixed(2));
+                    $row.find('.igst-amount-input').val(igstAmt.toFixed(2));
+
+                    totalCgst += cgstAmt;
+                    totalSgst += sgstAmt;
+                    totalIgst += igstAmt;
+
+                    rowTax = cgstAmt + sgstAmt + igstAmt;
+                    $row.find('.tax-amount-input').val(rowTax.toFixed(2));
+                    totalItemTax += rowTax;
+                } else {
+                    $row.find('.tax-amount-input').val('0.00');
+                    $row.find('.cgst-percent-input, .sgst-percent-input, .igst-percent-input').val('0.00');
+                    $row.find('.cgst-amount-input, .sgst-amount-input, .igst-amount-input').val('0.00');
+                }
+
+                const rowTotal = taxableAmount + rowTax;
+                $row.find('.total-amount-input').val(rowTotal.toFixed(2));
+            });
+
+            // Update subtotal
+            $('#summarySubtotalModal').val(subtotal.toFixed(2));
+            $('#summarySubtotalTextModal').val(subtotal.toFixed(2));
+
+            // Resolve discount
+            let finalDiscount = 0.00;
+            if (discType === 'item_wise') {
+                finalDiscount = totalItemDiscount;
+                $('#summaryDiscountModal').val(finalDiscount.toFixed(2));
+            } else if (discType === 'order_wise') {
+                finalDiscount = parseFloat($('#summaryDiscountModal').val()) || 0.00;
+            } else {
+                finalDiscount = 0.00;
+                $('#summaryDiscountModal').val('0.00');
+            }
+
+            const grossTotal = subtotal - finalDiscount;
+            $('#summaryGrossTextModal').val(grossTotal.toFixed(2));
+
+            // Resolve tax totals
+            let finalTax = 0.00;
+            if (taxType === 'item_wise_tax') {
+                finalTax = totalItemTax;
+                $('#summaryCgstModal').val(totalCgst.toFixed(2));
+                $('#summarySgstModal').val(totalSgst.toFixed(2));
+                $('#summaryIgstModal').val(totalIgst.toFixed(2));
+                
+                $('#summaryTaxTextModal').val(finalTax.toFixed(2));
+            } else if (taxType === 'order_wise_tax') {
+                const orderTaxPercent = parseFloat($('#orderTaxPercentModal').val()) || 0;
+
+                let cgstPct = 0;
+                let sgstPct = 0;
+                let igstPct = 0;
+
+                if (gstType === 'cgst_sgst') {
+                    cgstPct = orderTaxPercent / 2;
+                    sgstPct = orderTaxPercent / 2;
+                    igstPct = 0;
+                } else {
+                    cgstPct = 0;
+                    sgstPct = 0;
+                    igstPct = orderTaxPercent;
+                }
+
+                const cgstAmt = grossTotal * (cgstPct / 100);
+                const sgstAmt = grossTotal * (sgstPct / 100);
+                const igstAmt = grossTotal * (igstPct / 100);
+
+                finalTax = cgstAmt + sgstAmt + igstAmt;
+
+                $('#summaryCgstModal').val(cgstAmt.toFixed(2));
+                $('#summarySgstModal').val(sgstAmt.toFixed(2));
+                $('#summaryIgstModal').val(igstAmt.toFixed(2));
+                
+                $('#summaryTaxTextModal').val(finalTax.toFixed(2));
+            } else {
+                $('#summaryCgstModal').val('0.00');
+                $('#summarySgstModal').val('0.00');
+                $('#summaryIgstModal').val('0.00');
+                $('#summaryTaxTextModal').val('0.00');
+            }
+
+            $('#summaryTaxModal').val(finalTax.toFixed(2));
+
+            const grandTotal = grossTotal + finalTax;
+            $('#summaryGrandtotalModal').val(grandTotal.toFixed(2));
+            $('#summaryGrandtotalTextModal').val(grandTotal.toFixed(2));
         }
     </script>
 @endpush

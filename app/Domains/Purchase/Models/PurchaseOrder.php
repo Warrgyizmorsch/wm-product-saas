@@ -20,9 +20,11 @@ class PurchaseOrder extends BaseModel
         'tenant_id',
         'purchase_order_number',
         'purchase_requisition_id',
+        'source_type',
         'vendor_id',
         'location',
         'reference',
+        'supplier_quotation_number',
         'date',
         'delivery_date',
         'discount_type',
@@ -78,5 +80,33 @@ class PurchaseOrder extends BaseModel
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(\App\Domains\Inventory\Models\Warehouse::class, 'location', 'name');
+    }
+
+    public function getSupplierQuotationNumberAttribute(): ?string
+    {
+        if (!empty($this->attributes['supplier_quotation_number'])) {
+            return $this->attributes['supplier_quotation_number'];
+        }
+
+        if ($this->reference && preg_match('/Quote (?:No|Ref):\s*([^\s\|]+)/i', $this->reference, $matches)) {
+            return trim($matches[1]);
+        }
+
+        if ($this->source_type === 'rfq' && $this->reference) {
+            if (preg_match('/RFQ:\s*([^\s\|]+)/i', $this->reference, $rfqMatches)) {
+                $rfqNumber = trim($rfqMatches[1]);
+                $rfq = PurchaseRfq::where('tenant_id', $this->tenant_id)
+                    ->where('rfq_number', $rfqNumber)
+                    ->first();
+                if ($rfq) {
+                    $vendorRfq = PurchaseRfqVendor::where('purchase_rfq_id', $rfq->id)
+                        ->where('vendor_id', $this->vendor_id)
+                        ->first();
+                    return $vendorRfq?->quotation_number;
+                }
+            }
+        }
+
+        return null;
     }
 }
