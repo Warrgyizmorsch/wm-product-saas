@@ -111,6 +111,8 @@
 
                             <x-ui.odoo-form-ui type="input" label="Reference Document" name="reference" placeholder="e.g. Contract No..." value="{{ old('reference', $order->reference) }}" />
 
+                            <x-ui.odoo-form-ui type="input" label="Supplier Quotation No." name="supplier_quotation_number" placeholder="e.g. QU-9876..." value="{{ old('supplier_quotation_number', $order->supplier_quotation_number) }}" />
+
                             <x-ui.odoo-form-ui type="select" label="Load from PR (Indent)" name="purchase_requisition_id" id="requisitionSelect">
                                 <option value="">-- Direct PO (No PR link) --</option>
                                 @foreach($requisitions as $pr)

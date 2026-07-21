@@ -18,7 +18,6 @@ class PurchaseRfqItem extends Model
     protected $fillable = [
         'purchase_rfq_id',
         'product_id',
-        'warehouse_id',
         'quantity',
         'estimated_cost',
     ];
@@ -26,7 +25,6 @@ class PurchaseRfqItem extends Model
     protected $casts = [
         'purchase_rfq_id' => 'integer',
         'product_id' => 'integer',
-        'warehouse_id' => 'integer',
         'quantity' => 'decimal:4',
         'estimated_cost' => 'decimal:2',
     ];
@@ -39,11 +37,6 @@ class PurchaseRfqItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'product_id');
-    }
-
-    public function warehouse(): BelongsTo
-    {
-        return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 
     protected static function booted(): void

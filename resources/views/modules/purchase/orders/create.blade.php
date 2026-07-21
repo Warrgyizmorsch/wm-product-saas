@@ -108,7 +108,9 @@
 
                             <x-ui.odoo-form-ui type="input" label="Purchase Order No." name="po_number_dummy" value="[Auto-Generated]" readonly="true" />
 
-                            <x-ui.odoo-form-ui type="input" label="Reference Document" name="reference" placeholder="e.g. Contract No, Quote Ref..." :value="old('reference')" />
+                            <x-ui.odoo-form-ui type="input" label="Reference Document" name="reference" placeholder="e.g. Contract No, RFQ Ref..." :value="old('reference')" />
+
+                            <x-ui.odoo-form-ui type="input" label="Supplier Quotation No." name="supplier_quotation_number" placeholder="e.g. QU-9876..." :value="old('supplier_quotation_number')" />
 
                             <x-ui.odoo-form-ui type="select" label="Load from PR (Indent)" name="purchase_requisition_id" id="requisitionSelect">
                                 <option value="">-- Direct PO (No PR link) --</option>
