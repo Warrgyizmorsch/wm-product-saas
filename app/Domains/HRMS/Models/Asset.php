@@ -12,6 +12,7 @@ class Asset extends BaseModel
     protected $fillable = [
         'company_id',
         'asset_category_id',
+        'asset_item_id',
         'asset_code',
         'name',
         'brand',
@@ -48,6 +49,14 @@ class Asset extends BaseModel
     public function category(): BelongsTo
     {
         return $this->belongsTo(AssetCategory::class, 'asset_category_id');
+    }
+
+    /**
+     * Get the item type model of the asset.
+     */
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(AssetItem::class, 'asset_item_id');
     }
 
     /**

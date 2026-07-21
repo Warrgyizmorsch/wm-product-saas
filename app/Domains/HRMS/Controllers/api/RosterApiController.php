@@ -434,24 +434,76 @@ class RosterApiController extends Controller
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'date'        => 'required|date',
-            'shift_id'    => 'nullable|exists:production_shifts,id',
+            'shift_id'    => 'nullable',
+            'value'       => 'nullable|string',
         ]);
 
+        $employeeId = $validated['employee_id'];
+        $date = $validated['date'];
+        $value = $validated['value'] ?? null;
+
+        if ($value === null) {
+            $value = isset($validated['shift_id']) ? (string)$validated['shift_id'] : 'default';
+        }
+
+        if ($value === 'default' || $value === '') {
+            ShiftRoster::where([
+                'employee_id' => $employeeId,
+                'date' => $date,
+            ])->delete();
+
+            return $this->sendSuccess(null, 'Shift roster cell reset to default successfully');
+        }
+
+        $shiftId = $value === 'off' ? null : (int)$value;
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
 
         $roster = ShiftRoster::updateOrCreate(
             [
                 'tenant_id'   => $tenantId,
-                'employee_id' => $validated['employee_id'],
-                'date'        => $validated['date'],
+                'employee_id' => $employeeId,
+                'date'        => $date,
             ],
             [
-                'shift_id' => $validated['shift_id'] ?? null,
+                'shift_id' => $shiftId,
                 'status'   => 'scheduled',
             ]
         );
 
         return $this->sendSuccess($roster, 'Shift roster cell updated successfully');
+    }
+
+    public function updateWeeklyPattern(Request $request): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'day_of_week' => 'required|integer|between:0,6',
+            'value'       => 'nullable|string',
+        ]);
+
+        $employee = Employee::findOrFail($validated['employee_id']);
+        $dayOfWeek = (int)$validated['day_of_week'];
+        $val = $validated['value'] ?? null;
+
+        $pattern = $employee->weekly_pattern ?: [];
+        
+        if ($val === '' || $val === null || $val === 'default') {
+            unset($pattern[$dayOfWeek]);
+        } else {
+            $pattern[$dayOfWeek] = $val === 'off' ? 'off' : (int)$val;
+        }
+
+        ksort($pattern);
+
+        $employee->update([
+            'weekly_pattern' => $pattern
+        ]);
+
+        return $this->sendSuccess($pattern, 'Weekly pattern updated successfully');
     }
 
     public function clear(Request $request): JsonResponse

@@ -171,6 +171,7 @@ Route::prefix('api/hrms/roster')
         Route::get('/calendar', [RosterApiController::class, 'matrix'])->name('calendar');
         Route::post('/assign', [RosterApiController::class, 'assign'])->name('assign');
         Route::put('/cell', [RosterApiController::class, 'updateCell'])->name('cell.update');
+        Route::put('/weekly-pattern', [RosterApiController::class, 'updateWeeklyPattern'])->name('weekly-pattern.update');
         Route::post('/clear', [RosterApiController::class, 'clear'])->name('clear');
     });
 

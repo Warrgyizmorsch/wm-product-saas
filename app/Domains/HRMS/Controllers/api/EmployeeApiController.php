@@ -686,6 +686,8 @@ class EmployeeApiController extends Controller
             'emergency_contact_number'    => ['nullable', 'string', 'max:50'],
             'emergency_contact_relation'  => ['nullable', 'string', 'max:100'],
             'status'                      => ['required'],
+            'weekly_pattern'              => ['nullable', 'array'],
+            'weekly_pattern.*'            => ['nullable', 'string'],
         ]);
     }
 

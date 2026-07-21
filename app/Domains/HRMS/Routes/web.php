@@ -53,6 +53,9 @@ Route::prefix('hrms')
             Route::get('/', [RosterController::class, 'index'])->name('roster.index');
             Route::post('/assign', [RosterController::class, 'assign'])->name('roster.assign');
             Route::post('/update-cell', [RosterController::class, 'updateCell'])->name('roster.update-cell');
+            Route::post('/update-weekly-pattern', [RosterController::class, 'updateWeeklyPattern'])->name('roster.update-weekly-pattern');
+            Route::post('/weekly/assign', [RosterController::class, 'assignWeekly'])->name('roster.assign-weekly');
+            Route::delete('/weekly/clear', [RosterController::class, 'clearWeekly'])->name('roster.clear-weekly');
             Route::delete('/clear', [RosterController::class, 'clear'])->name('roster.clear');
             Route::post('/shift/store', [RosterController::class, 'storeShift'])->name('shift.store');
             Route::post('/shift/update/{shift}', [RosterController::class, 'updateShift'])->name('shift.update');
@@ -155,12 +158,17 @@ Route::prefix('hrms')
             Route::post('/category/update/{assetCategory}', [AssetController::class, 'updateCategory'])->name('assets.category.update');
             Route::delete('/category/delete/{assetCategory}', [AssetController::class, 'destroyCategory'])->name('assets.category.destroy');
             
+            Route::post('/item/store', [AssetController::class, 'storeItem'])->name('assets.item.store');
+            Route::post('/item/update/{assetItem}', [AssetController::class, 'updateItem'])->name('assets.item.update');
+            Route::delete('/item/delete/{assetItem}', [AssetController::class, 'destroyItem'])->name('assets.item.destroy');
+            
             Route::post('/{asset}/allocate', [AssetController::class, 'allocate'])->name('assets.allocate');
             Route::post('/{asset}/return', [AssetController::class, 'returnAsset'])->name('assets.return');
             
             Route::post('/requests/store', [AssetController::class, 'storeRequest'])->name('assets.requests.store');
             Route::post('/requests/{assetRequest}/reject', [AssetController::class, 'rejectRequest'])->name('assets.requests.reject');
             Route::post('/requests/{assetRequest}/allocate-direct', [AssetController::class, 'allocateDirect'])->name('assets.requests.allocate-direct');
+            Route::post('/requests/{assetRequest}/allocate', [AssetController::class, 'allocateRequest'])->name('assets.requests.allocate');
             Route::post('/requests/bulk-allocate', [AssetController::class, 'bulkAllocate'])->name('assets.requests.bulk-allocate');
             Route::post('/requests/bulk-reject', [AssetController::class, 'bulkReject'])->name('assets.requests.bulk-reject');
         });

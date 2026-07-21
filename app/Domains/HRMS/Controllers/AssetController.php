@@ -4,6 +4,7 @@ namespace App\Domains\HRMS\Controllers;
 
 use App\Domains\HRMS\Models\Asset;
 use App\Domains\HRMS\Models\AssetCategory;
+use App\Domains\HRMS\Models\AssetItem;
 use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\AssetRequest;
@@ -24,7 +25,7 @@ class AssetController extends Controller
 
         // 1. Asset Registry Query
         $assetsQuery = Asset::query()
-            ->with(['company', 'category', 'assignedEmployee']);
+            ->with(['company', 'category', 'item', 'assignedEmployee']);
 
         if ($request->filled('registry_search')) {
             $search = $request->input('registry_search');
@@ -38,6 +39,10 @@ class AssetController extends Controller
 
         if ($request->filled('registry_category_id')) {
             $assetsQuery->where('asset_category_id', $request->input('registry_category_id'));
+        }
+
+        if ($request->filled('registry_item_id')) {
+            $assetsQuery->where('asset_item_id', $request->input('registry_item_id'));
         }
 
         if ($request->filled('registry_status')) {
@@ -64,8 +69,9 @@ class AssetController extends Controller
         $assets = $assetsQuery->paginate(10)
             ->withQueryString();
 
-        // 2. Categories Dropdown (Unfiltered for modals)
+        // 2. Categories & Items Dropdowns (Unfiltered for modals)
         $categories = AssetCategory::query()->orderBy('name')->get();
+        $items = AssetItem::query()->with('category')->orderBy('name')->get();
 
         // 3. Filtered Categories for Categories Tab list
         $categoriesQuery = AssetCategory::query();
@@ -94,13 +100,44 @@ class AssetController extends Controller
         $filteredCategories = $categoriesQuery->paginate(10)
             ->withQueryString();
 
+        // 3b. Filtered Items for Items Tab list
+        $itemsQuery = AssetItem::query()->with(['company', 'category']);
+
+        if ($request->filled('item_search')) {
+            $search = $request->input('item_search');
+            $itemsQuery->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('item_category_id')) {
+            $itemsQuery->where('asset_category_id', $request->input('item_category_id'));
+        }
+
+        if ($request->filled('item_company_id')) {
+            $itemsQuery->where('company_id', $request->input('item_company_id'));
+        }
+
+        $itemSort = $request->input('item_sort', 'name_asc');
+        if ($itemSort === 'name_desc') {
+            $itemsQuery->orderBy('name', 'desc');
+        } elseif ($itemSort === 'newest') {
+            $itemsQuery->orderBy('created_at', 'desc');
+        } else {
+            $itemsQuery->orderBy('name', 'asc');
+        }
+
+        $filteredItems = $itemsQuery->paginate(10)
+            ->withQueryString();
+
         // 4. Other collections
         $companies = Company::query()->where('status', true)->orderBy('company_name')->get();
         $employees = Employee::query()->where('status', true)->orderBy('full_name')->get();
         
         // 5. Requests Search & Filter
         $requestsQuery = AssetRequest::query()
-            ->with(['company', 'employee', 'category', 'allocatedAsset', 'requestedAsset']);
+            ->with(['company', 'employee', 'category', 'item', 'allocatedAsset', 'requestedAsset']);
 
         if ($request->filled('request_search')) {
             $search = $request->input('request_search');
@@ -115,6 +152,10 @@ class AssetController extends Controller
 
         if ($request->filled('request_category_id')) {
             $requestsQuery->where('asset_category_id', $request->input('request_category_id'));
+        }
+
+        if ($request->filled('request_item_id')) {
+            $requestsQuery->where('asset_item_id', $request->input('request_item_id'));
         }
 
         if ($request->filled('request_company_id')) {
@@ -150,7 +191,9 @@ class AssetController extends Controller
         return view('modules.hrms.assets.index', compact(
             'assets', 
             'categories', 
+            'items',
             'filteredCategories', 
+            'filteredItems',
             'companies', 
             'employees', 
             'requests', 
@@ -159,55 +202,112 @@ class AssetController extends Controller
         ));
     }
 
-    /**
-     * Store a newly created asset.
-     */
     public function store(Request $request): RedirectResponse
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
-        $validated = $request->validate([
-            'asset_category_id' => 'required|exists:asset_categories,id',
-            'asset_code' => 'required|string|max:255|unique:assets,asset_code',
-            'name' => 'required|string|max:255',
+        $rules = [
             'brand' => 'nullable|string|max:255',
             'model_number' => 'nullable|string|max:255',
-            'serial_number' => 'nullable|string|max:255',
             'purchase_date' => 'nullable|date',
             'purchase_cost' => 'nullable|numeric|min:0',
             'condition' => 'nullable|string|in:new,good,fair,damaged,scrapped',
             'notes' => 'nullable|string|max:1000',
-        ]);
+        ];
 
-        $category = AssetCategory::findOrFail($validated['asset_category_id']);
-        $validated['company_id'] = $category->company_id;
-        $validated['condition'] = $validated['condition'] ?? 'good';
+        if ($request->has('units')) {
+            $rules['asset_item_id'] = 'required|exists:asset_items,id';
+            $rules['units'] = 'required|array|min:1';
+            $rules['units.*.asset_code'] = 'required|string|max:255|unique:assets,asset_code';
+            $rules['units.*.serial_number'] = 'nullable|string|max:255';
+            $validated = $request->validate($rules);
+            
+            $item = AssetItem::findOrFail($validated['asset_item_id']);
+            $companyId = $item->company_id;
+            $categoryId = $item->asset_category_id;
+            $name = $item->name;
+        } else {
+            // Old single asset creation logic for compatibility
+            $rules['asset_category_id'] = 'required|exists:asset_categories,id';
+            $rules['asset_code'] = 'required|string|max:255|unique:assets,asset_code';
+            $rules['name'] = 'required|string|max:255';
+            $rules['serial_number'] = 'nullable|string|max:255';
+            $validated = $request->validate($rules);
+            
+            $category = AssetCategory::findOrFail($validated['asset_category_id']);
+            $companyId = $category->company_id;
+            $categoryId = $category->id;
+            $name = $validated['name'];
+            
+            // Auto-create or find matching AssetItem to keep data structure synchronized
+            $item = AssetItem::firstOrCreate(
+                [
+                    'company_id' => $companyId,
+                    'asset_category_id' => $categoryId,
+                    'name' => $name
+                ],
+                [
+                    'description' => 'Automatically created from single asset registration.'
+                ]
+            );
+            $validated['asset_item_id'] = $item->id;
+        }
 
-        // Determine status based on condition
+        $condition = $validated['condition'] ?? 'good';
         $status = 'available';
-        if ($validated['condition'] === 'damaged') {
+        if ($condition === 'damaged') {
             $status = 'maintenance';
-        } elseif ($validated['condition'] === 'scrapped') {
+        } elseif ($condition === 'scrapped') {
             $status = 'scrapped';
         }
-        $validated['status'] = $status;
-        
-        Asset::create($validated);
+
+        \DB::transaction(function () use ($validated, $companyId, $categoryId, $name, $status, $condition) {
+            if (isset($validated['units'])) {
+                foreach ($validated['units'] as $unit) {
+                    Asset::create([
+                        'company_id' => $companyId,
+                        'asset_category_id' => $categoryId,
+                        'asset_item_id' => $validated['asset_item_id'],
+                        'name' => $name,
+                        'brand' => $validated['brand'] ?? null,
+                        'model_number' => $validated['model_number'] ?? null,
+                        'purchase_date' => $validated['purchase_date'] ?? null,
+                        'purchase_cost' => $validated['purchase_cost'] ?? null,
+                        'condition' => $condition,
+                        'status' => $status,
+                        'notes' => $validated['notes'] ?? null,
+                        'asset_code' => $unit['asset_code'],
+                        'serial_number' => $unit['serial_number'] ?? null,
+                    ]);
+                }
+            } else {
+                Asset::create([
+                    'company_id' => $companyId,
+                    'asset_category_id' => $categoryId,
+                    'asset_item_id' => $validated['asset_item_id'],
+                    'name' => $name,
+                    'brand' => $validated['brand'] ?? null,
+                    'model_number' => $validated['model_number'] ?? null,
+                    'purchase_date' => $validated['purchase_date'] ?? null,
+                    'purchase_cost' => $validated['purchase_cost'] ?? null,
+                    'condition' => $condition,
+                    'status' => $status,
+                    'notes' => $validated['notes'] ?? null,
+                    'asset_code' => $validated['asset_code'],
+                    'serial_number' => $validated['serial_number'] ?? null,
+                ]);
+            }
+        });
  
         return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_logged'));
     }
 
-    /**
-     * Update the specified asset.
-     */
     public function update(Request $request, Asset $asset): RedirectResponse
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
-        $validated = $request->validate([
-            'asset_category_id' => 'required|exists:asset_categories,id',
+        $rules = [
             'asset_code' => ['required', 'string', 'max:255', Rule::unique('assets', 'asset_code')->ignore($asset->id)],
-            'name' => 'required|string|max:255',
             'brand' => 'nullable|string|max:255',
             'model_number' => 'nullable|string|max:255',
             'serial_number' => 'nullable|string|max:255',
@@ -215,10 +315,24 @@ class AssetController extends Controller
             'purchase_cost' => 'nullable|numeric|min:0',
             'condition' => 'required|string|in:new,good,fair,damaged,scrapped',
             'notes' => 'nullable|string|max:1000',
-        ]);
+        ];
 
-        $category = AssetCategory::findOrFail($validated['asset_category_id']);
-        $validated['company_id'] = $category->company_id;
+        if ($request->has('asset_item_id')) {
+            $rules['asset_item_id'] = 'required|exists:asset_items,id';
+            $validated = $request->validate($rules);
+            
+            $item = AssetItem::findOrFail($validated['asset_item_id']);
+            $validated['company_id'] = $item->company_id;
+            $validated['asset_category_id'] = $item->asset_category_id;
+            $validated['name'] = $item->name;
+        } else {
+            $rules['asset_category_id'] = 'required|exists:asset_categories,id';
+            $rules['name'] = 'required|string|max:255';
+            $validated = $request->validate($rules);
+            
+            $category = AssetCategory::findOrFail($validated['asset_category_id']);
+            $validated['company_id'] = $category->company_id;
+        }
 
         // Determine status based on condition (if not currently allocated)
         if ($asset->status !== 'allocated') {
@@ -427,56 +541,70 @@ class AssetController extends Controller
      */
     public function storeRequest(Request $request): RedirectResponse
     {
-        $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'reason' => 'required|string|max:1000',
-            'requested_asset_ids' => 'required|array|min:1',
-            'requested_asset_ids.*' => 'exists:assets,id',
-        ]);
-
-        $categoryIds = [];
-        if ($request->has('asset_category_ids')) {
-            $categoryIds = (array) $request->input('asset_category_ids');
-        } elseif ($request->has('asset_category_id')) {
-            $categoryIds = [$request->input('asset_category_id')];
-        }
-
-        if (empty($categoryIds)) {
-            return redirect()->back()->withErrors(['asset_category_ids' => 'The asset category field is required.']);
-        }
-
         $employee = Employee::findOrFail($request->input('employee_id'));
         $companyId = $employee->company_id;
         $requestDate = date('Y-m-d');
         $reason = $request->input('reason');
 
-        $requestedAssetIds = (array) $request->input('requested_asset_ids', []);
+        if ($request->has('asset_item_id')) {
+            $request->validate([
+                'employee_id' => 'required|exists:employees,id',
+                'asset_item_id' => 'required|exists:asset_items,id',
+                'quantity' => 'required|integer|min:1',
+                'reason' => 'required|string|max:1000',
+            ]);
 
-        if (count($requestedAssetIds) > 0) {
-            foreach ($requestedAssetIds as $assetId) {
-                $asset = Asset::find($assetId);
-                if ($asset) {
+            $item = AssetItem::findOrFail($request->input('asset_item_id'));
+
+            AssetRequest::create([
+                'company_id' => $companyId,
+                'employee_id' => $employee->id,
+                'asset_category_id' => $item->asset_category_id,
+                'asset_item_id' => $item->id,
+                'quantity' => $request->input('quantity', 1),
+                'reason' => $reason,
+                'request_date' => $requestDate,
+                'status' => 'pending',
+            ]);
+        } else {
+            // Old request compatibility
+            $request->validate([
+                'employee_id' => 'required|exists:employees,id',
+                'reason' => 'required|string|max:1000',
+            ]);
+
+            $requestedAssetIds = (array) $request->input('requested_asset_ids', []);
+            $categoryIds = (array) $request->input('asset_category_ids', $request->input('asset_category_id', []));
+
+            if (count($requestedAssetIds) > 0) {
+                foreach ($requestedAssetIds as $assetId) {
+                    $asset = Asset::find($assetId);
+                    if ($asset) {
+                        AssetRequest::create([
+                            'company_id' => $companyId,
+                            'employee_id' => $employee->id,
+                            'asset_category_id' => $asset->asset_category_id,
+                            'asset_item_id' => $asset->asset_item_id,
+                            'requested_asset_id' => $asset->id,
+                            'reason' => $reason,
+                            'request_date' => $requestDate,
+                            'status' => 'pending',
+                        ]);
+                    }
+                }
+            } else {
+                foreach ($categoryIds as $categoryId) {
+                    $item = AssetItem::where('asset_category_id', $categoryId)->first();
                     AssetRequest::create([
                         'company_id' => $companyId,
                         'employee_id' => $employee->id,
-                        'asset_category_id' => $asset->asset_category_id,
-                        'requested_asset_id' => $asset->id,
+                        'asset_category_id' => $categoryId,
+                        'asset_item_id' => $item ? $item->id : null,
                         'reason' => $reason,
                         'request_date' => $requestDate,
                         'status' => 'pending',
                     ]);
                 }
-            }
-        } else {
-            foreach ($categoryIds as $categoryId) {
-                AssetRequest::create([
-                    'company_id' => $companyId,
-                    'employee_id' => $employee->id,
-                    'asset_category_id' => $categoryId,
-                    'reason' => $reason,
-                    'request_date' => $requestDate,
-                    'status' => 'pending',
-                ]);
             }
         }
  
@@ -513,51 +641,180 @@ class AssetController extends Controller
             return redirect()->back()->with('error', __('hrms.assets.error_req_not_pending'));
         }
 
-        $asset = null;
-        if ($assetRequest->requested_asset_id) {
-            $asset = Asset::find($assetRequest->requested_asset_id);
-            if (!$asset || $asset->status !== 'available') {
-                return redirect()->back()->with('error', __('hrms.assets.error_spec_asset_not_avail'));
-            }
-        } else {
-            // Find first available asset of the requested category & company
-            $asset = Asset::query()
-                ->where('asset_category_id', $assetRequest->asset_category_id)
-                ->where('company_id', $assetRequest->company_id)
-                ->where('status', 'available')
-                ->first();
+        $quantity = $assetRequest->quantity ?? 1;
 
-            if (!$asset) {
-                return redirect()->back()->with('error', __('hrms.assets.error_no_avail_asset_cat'));
+        // Find available assets matching the requested item type & company
+        $assets = Asset::query()
+            ->where('asset_item_id', $assetRequest->asset_item_id)
+            ->where('company_id', $assetRequest->company_id)
+            ->where('status', 'available')
+            ->limit($quantity)
+            ->get();
+
+        if ($assets->count() < $quantity) {
+            return redirect()->back()->with('error', 'Not enough available assets of the requested item type.');
+        }
+
+        \DB::transaction(function () use ($assetRequest, $assets) {
+            $first = true;
+            foreach ($assets as $asset) {
+                $asset->update([
+                    'status' => 'allocated',
+                    'assigned_employee_id' => $assetRequest->employee_id,
+                    'allocated_at' => date('Y-m-d'),
+                    'expected_return_date' => null,
+                ]);
+
+                $asset->allocations()->create([
+                    'employee_id' => $assetRequest->employee_id,
+                    'allocated_at' => date('Y-m-d'),
+                    'allocation_condition' => $asset->condition,
+                    'notes' => $asset->notes,
+                ]);
+
+                if ($first) {
+                    $assetRequest->update([
+                        'allocated_asset_id' => $asset->id,
+                    ]);
+                    $first = false;
+                }
+            }
+
+            $assetCodes = $assets->pluck('asset_code')->implode(', ');
+            $assetRequest->update([
+                'status' => 'allocated',
+                'admin_notes' => "Directly allocated assets: {$assetCodes} on " . date('d M, Y'),
+            ]);
+        });
+
+        return redirect()->back()->with('success', __('hrms.assets.success_req_allocated_dir'));
+    }
+
+    /**
+     * Allocate specific asset units to fulfill an asset request.
+     */
+    public function allocateRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        if ($assetRequest->status !== 'pending') {
+            return redirect()->back()->with('error', 'Request is not pending.');
+        }
+
+        $validated = $request->validate([
+            'allocated_asset_ids' => 'required|array|min:1',
+            'allocated_asset_ids.*' => 'exists:assets,id',
+            'allocated_at' => 'required|date',
+            'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
+        ]);
+
+        $assets = Asset::whereIn('id', $validated['allocated_asset_ids'])->get();
+
+        foreach ($assets as $asset) {
+            if ($asset->status !== 'available') {
+                return redirect()->back()->with('error', "Asset {$asset->asset_code} is not available.");
+            }
+            if ($asset->asset_item_id != $assetRequest->asset_item_id) {
+                return redirect()->back()->with('error', "Asset {$asset->asset_code} does not match the requested item type.");
             }
         }
 
-        // Allocate the asset directly
-        $asset->update([
-            'status' => 'allocated',
-            'assigned_employee_id' => $assetRequest->employee_id,
-            'allocated_at' => date('Y-m-d'),
-            'expected_return_date' => null,
+        \DB::transaction(function () use ($assetRequest, $assets, $validated) {
+            $first = true;
+            foreach ($assets as $asset) {
+                $asset->update([
+                    'status' => 'allocated',
+                    'assigned_employee_id' => $assetRequest->employee_id,
+                    'allocated_at' => $validated['allocated_at'],
+                    'expected_return_date' => $validated['expected_return_date'],
+                ]);
+
+                $asset->allocations()->create([
+                    'employee_id' => $assetRequest->employee_id,
+                    'allocated_at' => $validated['allocated_at'],
+                    'allocation_condition' => $asset->condition,
+                    'notes' => 'Allocated via request #' . $assetRequest->id,
+                ]);
+
+                if ($first) {
+                    $assetRequest->update([
+                        'allocated_asset_id' => $asset->id,
+                    ]);
+                    $first = false;
+                }
+            }
+
+            $assetCodes = $assets->pluck('asset_code')->implode(', ');
+            $assetRequest->update([
+                'status' => 'allocated',
+                'admin_notes' => "Allocated assets: {$assetCodes} on " . date('d M, Y'),
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Assets successfully allocated.');
+    }
+
+    /**
+     * Store a newly created asset item master.
+     */
+    public function storeItem(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'asset_category_id' => 'required|exists:asset_categories,id',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
         ]);
 
-        $asset->allocations()->create([
-            'employee_id' => $assetRequest->employee_id,
-            'allocated_at' => date('Y-m-d'),
-            'allocation_condition' => $asset->condition,
-            'notes' => $asset->notes,
+        $category = AssetCategory::findOrFail($validated['asset_category_id']);
+        $validated['company_id'] = $category->company_id;
+
+        AssetItem::create($validated);
+
+        return redirect()->route('hrms.assets.index')->with('success', 'Asset item created successfully.');
+    }
+
+    /**
+     * Update the specified asset item.
+     */
+    public function updateItem(Request $request, AssetItem $assetItem): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'asset_category_id' => 'required|exists:asset_categories,id',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
         ]);
 
-        $assetRequest->update([
-            'status' => 'allocated',
-            'allocated_asset_id' => $asset->id,
-            'admin_notes' => __('hrms.assets.admin_notes_allocated_dir', [
-                'code' => $asset->asset_code,
-                'name' => $asset->name,
-                'date' => date('d M, Y')
-            ]),
-        ]);
+        $category = AssetCategory::findOrFail($validated['asset_category_id']);
+        $validated['company_id'] = $category->company_id;
 
-        return redirect()->back()->with('success', __('hrms.assets.success_req_allocated_dir'));
+        $assetItem->update($validated);
+
+        return redirect()->route('hrms.assets.index')->with('success', 'Asset item updated successfully.');
+    }
+
+    /**
+     * Remove the specified asset item.
+     */
+    public function destroyItem(AssetItem $assetItem): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        if ($assetItem->assets()->count() > 0) {
+            return redirect()->back()->with('error', 'Cannot delete item because it has registered assets.');
+        }
+
+        $requestCount = AssetRequest::where('asset_item_id', $assetItem->id)->count();
+        if ($requestCount > 0) {
+            return redirect()->back()->with('error', 'Cannot delete item because it has asset requests.');
+        }
+
+        $assetItem->delete();
+
+        return redirect()->route('hrms.assets.index')->with('success', 'Asset item deleted successfully.');
     }
 
     /**

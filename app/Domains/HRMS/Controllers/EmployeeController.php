@@ -269,6 +269,8 @@ class EmployeeController extends Controller
             'status' => ['required', Rule::in(['0', '1'])],
             'form_mode' => ['nullable', 'string'],
             'editing_employee_id' => ['nullable', 'integer'],
+            'weekly_pattern' => ['nullable', 'array'],
+            'weekly_pattern.*' => ['nullable', 'string'],
         ]);
     }
 

@@ -372,15 +372,33 @@
 
                                              <!-- Type-Specific Parameters -->
                                              @if($typeKey === 'late_arrival')
-                                                 <!-- Grace Period -->
-                                                 <div class="col-12">
-                                                     <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-3 m-0 rounded-3 text-dark fs-13 flex-nowrap">
-                                                         <i class="feather-info text-primary fs-16"></i>
-                                                         <span>{{ __('hrms.penalization.late_arrival_grace') }}</span>
-                                                         <input type="number" name="grace_period_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
-                                                         <span>{{ __('hrms.penalization.minutes_relative') }}</span>
-                                                     </div>
-                                                 </div>
+                                                  <!-- Grace Period -->
+                                                  <div class="col-12 d-flex flex-column gap-2">
+                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                          <div class="d-flex align-items-start gap-2">
+                                                              <i class="feather-info text-primary fs-16 mt-0.5"></i>
+                                                              <div>
+                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                      The grace period is set to 
+                                                                      <input type="number" name="grace_period_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                                      minutes relative to the scheduled shift start time.
+                                                                  </p>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                          <div class="d-flex align-items-start gap-2">
+                                                              <i class="feather-calendar text-primary fs-16 mt-0.5"></i>
+                                                              <div>
+                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                      An employee is allowed up to 
+                                                                      <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                                      late arrival occurrences per month within the grace period without triggering a penalty.
+                                                                  </p>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  </div>
 
                                                  <div class="col-12 border-top my-4 pt-4">
                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
@@ -415,22 +433,34 @@
                                                  </div>
                                              @endif
 
-                                             @if($typeKey === 'under_hours')
-                                                 <!-- Shift Deficit Parameters -->
-                                                 <div class="col-12 d-flex flex-column gap-2">
-                                                     <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-2.5 m-0 rounded-3 text-dark fs-13 flex-nowrap">
-                                                         <i class="feather-info text-primary fs-16"></i>
-                                                         <span>{{ __('hrms.penalization.shift_target_hours') }}</span>
-                                                         <input type="number" name="grace_period_hours" step="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? ($rule->grace_period_minutes / 60) : 8 }}" min="0" style="width: 70px; height: 32px; font-weight: 600;" required>
-                                                         <span>{{ __('hrms.penalization.hours') }}</span>
-                                                     </div>
-                                                     <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-2.5 m-0 rounded-3 text-dark fs-13 flex-nowrap">
-                                                         <i class="feather-calendar text-primary fs-16"></i>
-                                                         <span>{{ __('hrms.penalization.allowed_monthly_grace') }}</span>
-                                                         <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
-                                                         <span>{{ __('hrms.penalization.deficit_before_trigger') }}</span>
-                                                     </div>
-                                                 </div>
+                                              @if($typeKey === 'under_hours')
+                                                  <!-- Shift Deficit Parameters -->
+                                                  <div class="col-12 d-flex flex-column gap-2">
+                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                          <div class="d-flex align-items-start gap-2">
+                                                              <i class="feather-info text-primary fs-16 mt-0.5"></i>
+                                                              <div>
+                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                      {{ __('hrms.penalization.shift_target_hours') }}
+                                                                      <input type="number" name="grace_period_hours" step="0.5" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? ($rule->grace_period_minutes / 60) : 8 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                                      {{ __('hrms.penalization.hours') }}
+                                                                  </p>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                          <div class="d-flex align-items-start gap-2">
+                                                              <i class="feather-calendar text-primary fs-16 mt-0.5"></i>
+                                                              <div>
+                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                      {{ __('hrms.penalization.allowed_monthly_grace') }}
+                                                                      <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                                      {{ __('hrms.penalization.deficit_before_trigger') }}
+                                                                  </p>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  </div>
 
                                                  <div class="col-12 border-top my-4 pt-4">
                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
@@ -464,16 +494,22 @@
                                                  </div>
                                              @endif
 
-                                             @if($typeKey === 'missing_logs')
-                                                 <!-- Allowed Free Missing Log Counts (Per Month) -->
-                                                 <div class="col-12">
-                                                     <div class="alert bg-light border-0 d-flex align-items-center gap-2 p-3 m-0 rounded-3 text-dark fs-13 flex-nowrap">
-                                                         <i class="feather-info text-primary fs-16"></i>
-                                                         <span>{{ __('hrms.penalization.employees_allowed_grace') }}</span>
-                                                         <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 32px; font-weight: 600;" required>
-                                                         <span>{{ __('hrms.penalization.missing_before_trigger') }}</span>
-                                                     </div>
-                                                 </div>
+                                              @if($typeKey === 'missing_logs')
+                                                  <!-- Allowed Free Missing Log Counts (Per Month) -->
+                                                  <div class="col-12">
+                                                      <div class="alert bg-light border-0 p-3 m-0 rounded-3 text-dark fs-13">
+                                                          <div class="d-flex align-items-start gap-2">
+                                                              <i class="feather-info text-primary fs-16 mt-0.5"></i>
+                                                              <div>
+                                                                  <p class="mb-0 text-dark" style="line-height: 1.6;">
+                                                                      {{ __('hrms.penalization.employees_allowed_grace') }}
+                                                                      <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
+                                                                      {{ __('hrms.penalization.missing_before_trigger') }}
+                                                                  </p>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                  </div>
 
                                                  <div class="col-12 border-top my-4 pt-4">
                                                      <h6 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2" style="font-size: 14px; letter-spacing: 0.25px;">
@@ -527,6 +563,17 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            // Close Select2 dropdowns when any parent scrollable container scrolls
+            document.addEventListener('scroll', function(e) {
+                if (e.target && e.target.classList && e.target.classList.contains('table-responsive')) {
+                    $('.tier-action-select, .tier-leave-select').each(function() {
+                        if ($(this).hasClass('select2-hidden-accessible')) {
+                            $(this).select2('close');
+                        }
+                    });
+                }
+            }, true); // Use capture phase because scroll events do not bubble
+
             function buildPolicySelect2Options($select, $pane) {
                 let selectorType = $select.attr('data-select2-selector') || 'default';
                 let options = {
@@ -662,7 +709,7 @@
                 
                 row.find('.tier-action-select, .tier-leave-select').select2({
                     theme: 'bootstrap-5',
-                    dropdownParent: $('#late-arrival-tiers-table')
+                    dropdownParent: $(document.body)
                 });
 
                 tierIndex++;
@@ -757,7 +804,7 @@
                 
                 row.find('.tier-action-select, .tier-leave-select').select2({
                     theme: 'bootstrap-5',
-                    dropdownParent: $('#under-hours-tiers-table')
+                    dropdownParent: $(document.body)
                 });
 
                 deficitTierIndex++;
@@ -844,7 +891,7 @@
                 
                 row.find('.tier-action-select, .tier-leave-select').select2({
                     theme: 'bootstrap-5',
-                    dropdownParent: $('#missing-logs-tiers-table')
+                    dropdownParent: $(document.body)
                 });
 
                 missingTierIndex++;
@@ -944,7 +991,7 @@
                 } else {
                     valueInput.prop('readonly', false);
                     if (select.val() === 'leave_deduction' || select.val() === 'both_deductions') {
-                        leaveSelect.prop('required', true).prop('disabled', false);
+                        leaveSelect.prop('required', false).prop('disabled', false);
                         if (select2Container.length) select2Container.show();
                         else leaveSelect.show();
                     } else {

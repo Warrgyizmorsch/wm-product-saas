@@ -131,6 +131,7 @@ class PenalizationPolicyApiController extends Controller
 
         if ($request->rule_type === 'late_arrival') {
             $validationRules['grace_period_minutes']         = 'required|integer|min:0';
+            $validationRules['threshold_count']              = 'required|integer|min:0';
             $validationRules['penalty_tiers']                = 'required|array';
             $validationRules['penalty_tiers.*.min_occurrence'] = 'required|integer|min:1';
             $validationRules['penalty_tiers.*.max_occurrence'] = 'nullable|integer|min:1';
@@ -178,7 +179,7 @@ class PenalizationPolicyApiController extends Controller
                 }
             }
             $updateData['penalty_tiers']        = $tiers;
-            $updateData['threshold_count']      = 0;
+            $updateData['threshold_count']      = (int) ($request->threshold_count ?? 0);
             $updateData['penalty_action']       = 'salary_deduction';
             $updateData['leave_type_id']        = null;
             $updateData['penalty_value']       = 0.00;
