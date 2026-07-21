@@ -17,7 +17,6 @@ use App\Http\Controllers\Controller;
 use App\Domains\HRMS\Helpers\XlsxHelper;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -134,6 +133,27 @@ class EmployeeController extends Controller
         $validated = $this->validatePayload($request, $employee);
         $validated = $this->normalizeHierarchy($validated);
         $validated['status'] = $request->input('status', '1') === '1';
+
+        $newPlanId = !empty($validated['leave_plan_id']) ? (int)$validated['leave_plan_id'] : null;
+        if ($newPlanId !== null && (int)$oldPlanId !== $newPlanId) {
+            // Check if there are pending leave requests
+            $hasPending = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+                ->where('status', 'pending')
+                ->exists();
+            if ($hasPending) {
+                return redirect()->route('hrms.leaves.index', ['search' => $employee->full_name])
+                    ->with('error', 'Cannot change the leave plan for ' . $employee->full_name . '. Please approve or reject all pending leave requests for this employee first.');
+            }
+
+            // Check if there are pending leave encashment requests
+            $hasPendingEncashment = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
+                ->where('status', 'pending')
+                ->exists();
+            if ($hasPendingEncashment) {
+                return redirect()->route('hrms.leaves.index', ['search' => $employee->full_name, 'tab' => 'encashments'])
+                    ->with('error', 'Cannot change the leave plan for ' . $employee->full_name . '. Please approve or reject all pending leave encashment requests for this employee first.');
+            }
+        }
 
         if ($request->hasFile('photo')) {
             $validated['photo'] = $request->file('photo')->store('employees', 'public');
@@ -533,8 +553,26 @@ class EmployeeController extends Controller
 
                 $approvedSum = $query->sum('duration');
 
+                $encashQuery = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
+                    ->where('leave_type_id', $bal->leave_type_id)
+                    ->where('status', 'approved');
+
+                if ($currentCycleStart) {
+                    $encashQuery->where('created_at', '>=', $currentCycleStart);
+                }
+
+                $approvedEncashSum = $encashQuery->sum('requested_days');
+
+                $updates = [];
                 if (floatval($bal->used) !== floatval($approvedSum)) {
-                    $bal->update(['used' => $approvedSum]);
+                    $updates['used'] = round($approvedSum * 2) / 2;
+                }
+                if (floatval($bal->encashed ?? 0.0) !== floatval($approvedEncashSum)) {
+                    $updates['encashed'] = round($approvedEncashSum * 2) / 2;
+                }
+
+                if (!empty($updates)) {
+                    $bal->update($updates);
                 }
             }
         } catch (\Exception $e) {

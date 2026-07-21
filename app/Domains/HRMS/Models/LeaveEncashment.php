@@ -3,24 +3,29 @@
 namespace App\Domains\HRMS\Models;
 
 use App\Core\Database\BaseModel;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-class LeaveBalance extends BaseModel
+class LeaveEncashment extends BaseModel
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'tenant_id',
         'company_id',
         'employee_id',
         'leave_type_id',
-        'allocated',
-        'used',
-        'encashed'
+        'requested_days',
+        'status',
+        'reason',
+        'approved_by',
+        'approved_at',
     ];
 
     protected $casts = [
-        'allocated' => 'decimal:1',
-        'used' => 'decimal:1',
-        'encashed' => 'decimal:1'
+        'requested_days' => 'decimal:1',
+        'approved_at' => 'datetime',
     ];
 
     public function employee(): BelongsTo
@@ -33,8 +38,8 @@ class LeaveBalance extends BaseModel
         return $this->belongsTo(LeaveType::class);
     }
 
-    public function getRemainingAttribute(): float
+    public function approver(): BelongsTo
     {
-        return max(0.0, floatval($this->allocated) - floatval($this->used) - floatval($this->encashed ?? 0.0));
+        return $this->belongsTo(User::class, 'approved_by');
     }
 }
