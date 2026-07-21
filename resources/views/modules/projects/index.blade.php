@@ -251,7 +251,12 @@
                             <td class="fw-medium text-dark">{{ $project->customer?->name ?: '—' }}</td>
                             <td class="fw-medium text-dark">{{ $project->owner?->name ?: '—' }}</td>
                             <td>
-                                <span class="badge {{ in_array($project->priority, ['High', 'Critical']) ? 'bg-soft-danger text-danger' : 'bg-soft-secondary text-secondary' }} px-2 py-0.5 fs-11 fw-semibold">
+                                <span class="badge {{ match($project->priority) {
+                                    'Critical' => 'bg-soft-danger text-danger',
+                                    'High' => 'bg-soft-warning text-warning',
+                                    'Medium' => 'bg-soft-info text-info',
+                                    default => 'bg-soft-dark text-dark',
+                                } }} px-2 py-0.5 fs-11 fw-semibold">
                                     {{ __('projects.priorities.' . $project->priority) }}
                                 </span>
                             </td>
