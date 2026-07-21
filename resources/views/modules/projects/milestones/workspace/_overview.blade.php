@@ -14,25 +14,25 @@
 {{-- Quick statistics --}}
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-3">
-        <div class="border rounded-3 p-3 text-center h-100">
+        <div class="border rounded-3 p-3 text-center h-100 project-stat-card">
             <div class="fs-20 fw-bold text-dark">{{ $taskLists->count() }}</div>
             <div class="fs-11 text-uppercase text-muted fw-semibold">{{ __('projects.tasklists') }}</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="border rounded-3 p-3 text-center h-100">
+        <div class="border rounded-3 p-3 text-center h-100 project-stat-card">
             <div class="fs-20 fw-bold text-dark">{{ $overviewOpenTasks }}</div>
             <div class="fs-11 text-uppercase text-muted fw-semibold">{{ __('projects.workspace_open_tasks') }}</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="border rounded-3 p-3 text-center h-100">
+        <div class="border rounded-3 p-3 text-center h-100 project-stat-card">
             <div class="fs-20 fw-bold text-danger">{{ $overviewOverdueCount }}</div>
             <div class="fs-11 text-uppercase text-muted fw-semibold">{{ __('projects.kpi_overdue') }}</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
-        <div class="border rounded-3 p-3 text-center h-100">
+        <div class="border rounded-3 p-3 text-center h-100 project-stat-card">
             <div class="fs-20 fw-bold text-dark">{{ $milestone->completion_percentage }}%</div>
             <div class="fs-11 text-uppercase text-muted fw-semibold">{{ __('projects.completion_percentage') }}</div>
         </div>
@@ -42,7 +42,7 @@
 <div class="row g-4">
     {{-- Left column --}}
     <div class="col-lg-6">
-        <div class="border rounded-3 p-3 mb-4">
+        <div class="p-3 mb-4 project-content-card">
             <h6 class="fw-bold text-dark mb-3"><i class="feather-list me-2 text-primary"></i>{{ __('projects.workspace_tasklists_summary') }}</h6>
             @forelse ($taskLists as $summaryTaskList)
                 @php $summaryStats = $dashboard['task_lists'][$summaryTaskList->id] ?? ['total' => 0, 'done' => 0, 'percent' => 0]; @endphp
@@ -60,7 +60,7 @@
             @endforelse
         </div>
 
-        <div class="border rounded-3 p-3">
+        <div class="p-3 project-content-card">
             <h6 class="fw-bold text-dark mb-3"><i class="feather-arrow-up-right me-2 text-primary"></i>{{ __('projects.workspace_upcoming_work') }}</h6>
             @forelse ($upcomingTasks as $upcomingTask)
                 <div class="d-flex align-items-center justify-content-between gap-2 py-2 {{ !$loop->last ? 'border-bottom' : '' }}">
@@ -78,7 +78,7 @@
 
     {{-- Right column --}}
     <div class="col-lg-6">
-        <div class="border rounded-3 p-3 mb-4">
+        <div class="p-3 mb-4 project-content-card">
             <h6 class="fw-bold text-dark mb-3"><i class="feather-alert-triangle me-2 text-danger"></i>{{ __('projects.workspace_attention_required') }}</h6>
             @forelse ($attentionTasks as $attentionTask)
                 @php $reasonMeta = $attentionReasonMeta[$attentionTask->attention_reason]; @endphp
@@ -97,7 +97,7 @@
             @endforelse
         </div>
 
-        <div class="border rounded-3 p-3">
+        <div class="p-3 project-content-card">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <h6 class="fw-bold text-dark mb-0"><i class="feather-activity me-2 text-primary"></i>{{ __('projects.workspace_recent_activity') }}</h6>
                 <a href="javascript:void(0);" onclick="document.getElementById('tab-activity-tab').click();" class="fs-11 fw-semibold">{{ __('projects.view_all') }}</a>

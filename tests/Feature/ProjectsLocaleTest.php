@@ -122,4 +122,28 @@ class ProjectsLocaleTest extends TestCase
         $this->assertSame('Active', $project->fresh()->status);
         $this->assertSame('High', $project->fresh()->priority);
     }
+
+    /** @test */
+    public function project_show_page_renders_translated_cancelled_status_label(): void
+    {
+        $project = Project::create([
+            'tenant_id' => $this->tenant->id,
+            'project_code' => 'PRJ-0001',
+            'name' => 'ERP Development',
+            'owner_id' => $this->user->id,
+            'start_date' => now(),
+            'priority' => 'High',
+            'status' => 'Cancelled',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->withSession(['locale' => 'hi'])
+            ->get(route('projects.show', $project));
+
+        $response->assertOk();
+        $response->assertSee('रद्द'); // Cancelled (translated status)
+
+        $this->assertSame('Cancelled', $project->fresh()->status);
+    }
 }

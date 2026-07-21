@@ -109,6 +109,52 @@ class ProjectsAuthorizationTest extends TestCase
         ]);
     }
 
+    /**
+     * @test
+     * @dataProvider terminalCreationStatusProvider
+     */
+    public function project_cannot_be_created_directly_in_a_terminal_status(string $terminalStatus): void
+    {
+        $response = $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('projects.store'), $this->validProjectPayload(['status' => $terminalStatus]));
+
+        $response->assertSessionHasErrors('status');
+        $this->assertDatabaseMissing('projects', ['name' => 'ERP Development']);
+    }
+
+    public static function terminalCreationStatusProvider(): array
+    {
+        return [
+            'closed' => ['Closed'],
+            'cancelled' => ['Cancelled'],
+        ];
+    }
+
+    /**
+     * @test
+     * @dataProvider creatableStatusProvider
+     */
+    public function project_can_be_created_as_draft_or_active(string $creatableStatus): void
+    {
+        $response = $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('projects.store'), $this->validProjectPayload(['status' => $creatableStatus]));
+
+        $project = Project::withoutGlobalScopes()->where('name', 'ERP Development')->firstOrFail();
+
+        $response->assertRedirect(route('projects.show', $project));
+        $this->assertSame($creatableStatus, $project->status);
+    }
+
+    public static function creatableStatusProvider(): array
+    {
+        return [
+            'draft' => ['Draft'],
+            'active' => ['Active'],
+        ];
+    }
+
     /** @test */
     public function status_change_is_guarded_and_writes_an_activity_log(): void
     {
@@ -136,6 +182,71 @@ class ProjectsAuthorizationTest extends TestCase
         $this->assertDatabaseHas('project_activity_logs', [
             'project_id' => $project->id,
             'event_type' => 'project.status_changed',
+        ]);
+    }
+
+    /** @test */
+    public function cancelled_and_closed_transitions_are_enforced_identically_on_the_full_update_form(): void
+    {
+        $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('projects.store'), $this->validProjectPayload());
+
+        $project = Project::withoutGlobalScopes()->where('name', 'ERP Development')->firstOrFail();
+
+        // Draft -> Cancelled is allowed
+        $cancelled = $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('projects.update', $project), $this->validProjectPayload(['status' => 'Cancelled']));
+
+        $cancelled->assertRedirect(route('projects.show', $project));
+        $this->assertSame('Cancelled', $project->fresh()->status);
+        $this->assertDatabaseHas('project_activity_logs', [
+            'project_id' => $project->id,
+            'event_type' => 'project.status_changed',
+            'description' => "Status changed from 'Draft' to 'Cancelled'",
+        ]);
+
+        $log = ActivityLog::withoutGlobalScopes()
+            ->where('project_id', $project->id)
+            ->where('event_type', 'project.status_changed')
+            ->firstOrFail();
+
+        // Same metadata shape the inline-edit path writes for the identical action.
+        $this->assertSame(['old' => 'Draft', 'new' => 'Cancelled'], $log->metadata);
+
+        // Cancelled is terminal: no further transition is allowed
+        $blocked = $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('projects.update', $project), $this->validProjectPayload(['status' => 'Active']));
+
+        $blocked->assertSessionHasErrors('status');
+        $this->assertSame('Cancelled', $project->fresh()->status);
+    }
+
+    /** @test */
+    public function completed_project_can_be_closed_on_the_full_update_form(): void
+    {
+        $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->post(route('projects.store'), $this->validProjectPayload(['status' => 'Active']));
+
+        $project = Project::withoutGlobalScopes()->where('name', 'ERP Development')->firstOrFail();
+
+        $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('projects.update', $project), $this->validProjectPayload(['status' => 'Completed']));
+
+        $closed = $this->actingAs($this->tenantOwner)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->put(route('projects.update', $project), $this->validProjectPayload(['status' => 'Closed']));
+
+        $closed->assertRedirect(route('projects.show', $project));
+        $this->assertSame('Closed', $project->fresh()->status);
+        $this->assertDatabaseHas('project_activity_logs', [
+            'project_id' => $project->id,
+            'event_type' => 'project.status_changed',
+            'description' => "Status changed from 'Completed' to 'Closed'",
         ]);
     }
 

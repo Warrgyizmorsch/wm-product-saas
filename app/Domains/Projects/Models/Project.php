@@ -25,6 +25,7 @@ class Project extends BaseModel
     public const STATUS_ON_HOLD = 'On Hold';
     public const STATUS_COMPLETED = 'Completed';
     public const STATUS_CLOSED = 'Closed';
+    public const STATUS_CANCELLED = 'Cancelled';
 
     public const STATUSES = [
         self::STATUS_DRAFT,
@@ -32,20 +33,13 @@ class Project extends BaseModel
         self::STATUS_ON_HOLD,
         self::STATUS_COMPLETED,
         self::STATUS_CLOSED,
+        self::STATUS_CANCELLED,
     ];
 
     // A new project may only start as Draft or Active.
     public const CREATABLE_STATUSES = [
         self::STATUS_DRAFT,
         self::STATUS_ACTIVE,
-    ];
-
-    // Closed is only reachable via the dedicated closure workflow, not the edit form.
-    public const EDITABLE_STATUSES = [
-        self::STATUS_DRAFT,
-        self::STATUS_ACTIVE,
-        self::STATUS_ON_HOLD,
-        self::STATUS_COMPLETED,
     ];
 
     public const PRIORITY_LOW = 'Low';

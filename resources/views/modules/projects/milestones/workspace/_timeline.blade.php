@@ -1,4 +1,4 @@
-<div class="text-center py-5">
+<div class="text-center py-5 project-content-card">
     <div class="avatar-text avatar-lg bg-soft-secondary text-secondary mx-auto mb-3">
         <i class="feather-calendar fs-2"></i>
     </div>

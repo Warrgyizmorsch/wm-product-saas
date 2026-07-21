@@ -52,5 +52,7 @@ class DatabaseSeeder extends Seeder
             HrmsDemoSeeder::class,
             AccountingChartOfAccountsSeeder::class,
         ]);
+
+        $this->callWith(ProjectsDemoSeeder::class, ['options' => ['wipe' => true]]);
     }
 }

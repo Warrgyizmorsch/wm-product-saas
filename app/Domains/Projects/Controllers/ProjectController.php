@@ -111,6 +111,7 @@ class ProjectController extends Controller
             'members'             => $members,
             'canManageMembers'    => $canManageMembers,
             'canUpdateProject'    => $canUpdateProject,
+            'statusTransitions'   => $canUpdateProject ? $this->projects->availableStatusTransitions($project) : [],
             'customers'           => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
             'users'               => $canUpdateProject ? User::query()->orderBy('name')->get() : collect(),
             'milestones'          => $milestones,
@@ -256,16 +257,8 @@ class ProjectController extends Controller
                 'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'priority', $value),
             ],
             'status' => [
-                'rules'   => ['required', Rule::in(Project::EDITABLE_STATUSES)],
-                'handler' => function (Project $project, $value) {
-                    if ($value !== $project->status && !$this->projects->canTransition($project->status, $value)) {
-                        throw ValidationException::withMessages([
-                            'value' => "A project cannot move from '{$project->status}' to '{$value}'.",
-                        ]);
-                    }
-
-                    return $this->projects->updateField($project, 'status', $value);
-                },
+                'rules'   => ['required', Rule::in(Project::STATUSES)],
+                'handler' => fn (Project $project, $value) => $this->projects->changeStatus($project, $value, 'value')->status,
             ],
             'customer_id' => [
                 'rules'   => ['nullable', 'integer', Rule::exists('customers', 'id')->where('tenant_id', require_tenant_id())],

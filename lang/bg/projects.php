@@ -63,6 +63,7 @@ return [
         'On Hold' => 'На изчакване',
         'Completed' => 'Завършен',
         'Closed' => 'Затворен',
+        'Cancelled' => 'Отменен',
     ],
     'priorities' => [
         'Low' => 'Нисък',

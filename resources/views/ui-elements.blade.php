@@ -51,6 +51,7 @@
     @php
         $mainTabs = [
             ['id' => 'tab-odoo-forms', 'label' => 'Odoo Form UI & Inputs', 'active' => true, 'icon' => 'feather-layout'],
+            ['id' => 'tab-projects-ui', 'label' => 'Projects & Tasks UI', 'active' => false, 'icon' => 'feather-briefcase'],
             ['id' => 'tab-buttons-badges', 'label' => 'Buttons & Badges', 'active' => false, 'icon' => 'feather-box'],
             ['id' => 'tab-overlays', 'label' => 'Overlays & Toasts', 'active' => false, 'icon' => 'feather-layers'],
             ['id' => 'tab-tables', 'label' => 'Tables & Filters', 'active' => false, 'icon' => 'feather-database'],
@@ -577,6 +578,11 @@
                     </div>
                 </div>
             </x-ui.card>
+        </div>
+
+        <!-- Tab 6: Projects & Tasks UI Kit (Duralux Inspired) -->
+        <div class="tab-pane fade" id="tab-projects-ui" role="tabpanel" aria-labelledby="tab-projects-ui-tab">
+            @include('ui-elements._projects')
         </div>
 
     </div>

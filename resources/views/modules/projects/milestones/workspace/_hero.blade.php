@@ -45,7 +45,7 @@
         : collect();
 @endphp
 
-<div class="border rounded-3 p-3 p-md-4 mb-4 bg-white">
+<div class="project-content-card p-3 p-md-4 mb-4">
     {{-- Band A: identity + actions --}}
     <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
         <div class="d-flex align-items-start gap-2">
