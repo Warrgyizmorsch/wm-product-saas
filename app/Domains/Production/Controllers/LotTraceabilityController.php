@@ -32,9 +32,10 @@ class LotTraceabilityController extends Controller
         $tenantId = require_tenant_id();
         $data     = $request->validated();
 
-        $type = $request->input('type');
-        $code = trim($request->input('code'));
-        $id   = null;
+        $type      = $request->input('type');
+        $code      = trim($request->input('code'));
+        $direction = $request->input('direction', 'both');
+        $id        = null;
 
         if ($type === 'batch') {
             $batch = ProductionBatch::where('tenant_id', $tenantId)->where('batch_number', $code)->first();
@@ -59,13 +60,18 @@ class LotTraceabilityController extends Controller
                 ->with('error', "Could not find any {$type} with code [{$code}].");
         }
 
-        $genealogy = $this->traceService->buildGenealogy($tenantId, $type, $id);
+        $genealogy = match ($direction) {
+            'forward'  => $this->traceService->forwardTrace($tenantId, $type, $id),
+            'backward' => $this->traceService->backwardTrace($tenantId, $type, $id),
+            default    => $this->traceService->buildGenealogy($tenantId, $type, $id),
+        };
 
         return view('modules.production.mes.operator.traceability', [
-            'nodes'        => $genealogy['nodes'],
-            'edges'        => $genealogy['edges'],
-            'searchedType' => $type,
-            'searchedCode' => $code,
+            'nodes'             => $genealogy['nodes'],
+            'edges'             => $genealogy['edges'],
+            'searchedType'      => $type,
+            'searchedCode'      => $code,
+            'searchedDirection' => $direction,
         ]);
     }
 

@@ -18,11 +18,25 @@ class NcrService
      */
     public function createNcr(int $tenantId, array $data): ProductionNcr
     {
-        return ProductionNcr::create(array_merge($data, [
-            'tenant_id' => $tenantId,
+        $ncr = ProductionNcr::create(array_merge($data, [
+            'tenant_id'  => $tenantId,
             'ncr_number' => 'NCR-'.strtoupper(uniqid()),
-            'status' => 'open',
+            'status'     => 'open',
         ]));
+
+        $this->eventService->writeEvent($tenantId, [
+            'production_order_id'            => $ncr->production_order_id,
+            'production_order_operation_id'  => $ncr->production_order_operation_id,
+            'machine_id'                     => $ncr->machine_id,
+            'operator_id'                    => $ncr->operator_id,
+            'event_type'                     => 'NCR Logged',
+            'title'                          => 'Quality Defect Logged (NCR)',
+            'description'                    => "Non-conformance report {$ncr->ncr_number} has been logged.",
+            'severity'                       => 'warning',
+            'event_source'                   => 'NcrService',
+        ]);
+
+        return $ncr;
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Domains\Production\Models\ProductionOrderRequest;
 use App\Domains\Production\Models\ProductionOrderReservation;
 use App\Domains\Production\Requests\StoreProductionOrderRequest;
 use App\Domains\Production\Requests\UpdateProductionOrderRequest;
+use App\Domains\Production\Services\ProductionCostAdjustmentService;
 use App\Domains\Production\Services\ProductionCostVarianceService;
 use App\Domains\Production\Services\ProductionExecutionService;
 use App\Domains\Production\Services\ProductionMaterialService;
@@ -26,7 +27,8 @@ class ProductionOrderController extends Controller
         private readonly ProductionOrderService $orderService,
         private readonly ProductionMaterialService $materialService,
         private readonly ProductionExecutionService $executionService,
-        private readonly ProductionCostVarianceService $costService
+        private readonly ProductionCostVarianceService $costService,
+        private readonly ProductionCostAdjustmentService $adjustmentService
     ) {}
 
     public function index(Request $request)
@@ -145,6 +147,7 @@ class ProductionOrderController extends Controller
             'scraps.operation', 'scraps.product', 'scraps.user',
             'reworks.operation', 'reworks.user',
             'wips.currentRoutingOperation', 'wips.currentWorkCenter', 'wips.transactions.fromOperation', 'wips.transactions.toOperation',
+            'requisitionSlips.items.product', 'requisitionSlips.items.uom', 'requisitionSlips.purchaseRequisitions.items',
         ])->findOrFail($id);
 
         Gate::authorize('view', $order);
@@ -165,9 +168,57 @@ class ProductionOrderController extends Controller
 
         // Get variance analysis calculations
         $costs = $this->costService->getCostAnalysis($order);
+
+        // Cost Adjustments & Final Costing Summary
+        $costAdjustments = $order->costAdjustments()
+            ->with(['creator', 'updater'])
+            ->latest('adjustment_date')
+            ->paginate(10, ['*'], 'adjustments_page');
+
+        $dailyManualAdjustments = $this->adjustmentService->getDailyAdjustments($order);
+        $dailyHistory = $this->costService->getDailyCostHistory($order, $dailyManualAdjustments);
+        $finalCostingSummary = $this->adjustmentService->getFinalCostingSummary($order, $costs);
+
+        $costComponents = \App\Domains\Production\Models\ProductionCostAdjustment::getCostComponents();
+        $categories = \App\Domains\Production\Models\ProductionCostAdjustment::getCategories();
         $warehouses = Warehouse::where('tenant_id', $order->tenant_id)->orderByDesc('is_default')->orderBy('name')->get();
 
-        return view('modules.production.orders.show', compact('order', 'costs', 'warehouses'));
+        return view('modules.production.orders.show', compact(
+            'order', 'costs', 'dailyHistory', 'costAdjustments', 'finalCostingSummary',
+            'costComponents', 'categories', 'warehouses'
+        ));
+    }
+
+    public function requestAdditionalMaterial(Request $request, int $id)
+    {
+        $order = ProductionOrder::findOrFail($id);
+        Gate::authorize('issue', $order);
+
+        if ($order->isCompleted() || $order->isClosed() || $order->isCancelled()) {
+            return redirect()->back()->with('error', 'Cannot request additional material for a completed, closed, or cancelled order.');
+        }
+
+        $validated = $request->validate([
+            'items'              => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.quantity'   => 'required|numeric|gt:0',
+            'items.*.notes'      => 'nullable|string|max:255',
+            'notes'              => 'nullable|string|max:500',
+        ]);
+
+        try {
+            $slip = $this->orderService->createAdHocRequisitionSlip(
+                $order,
+                $validated['items'],
+                auth()->id(),
+                $validated['notes'] ?? null
+            );
+
+            return redirect()->route('production.material-requests.show', $slip->id)
+                ->with('success', "Ad-hoc Material Requisition {$slip->requisition_number} successfully created for Order {$order->order_number}.");
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 
     public function edit(int $id)
@@ -478,5 +529,101 @@ class ProductionOrderController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
+    }
+
+    public function bulkAction(Request $request)
+    {
+        $action = $request->input('action');
+        $ids = $request->input('ids');
+
+        if (empty($ids) || !is_array($ids)) {
+            return redirect()
+                ->back()
+                ->with('error', 'No Production Orders selected.');
+        }
+
+        $tenantId = require_tenant_id();
+        $orders = ProductionOrder::whereIn('id', $ids)
+            ->where('tenant_id', $tenantId)
+            ->get();
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        switch ($action) {
+            case 'release':
+                foreach ($orders as $order) {
+                    if ($order->isDraft() && auth()->user()->can('update', $order)) {
+                        try {
+                            $this->orderService->releaseOrder($order->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "released";
+                break;
+
+            case 'complete':
+                foreach ($orders as $order) {
+                    if (($order->isInProgress() || $order->isReleased()) && auth()->user()->can('update', $order)) {
+                        try {
+                            $this->orderService->completeOrder($order->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "completed";
+                break;
+
+            case 'cancel':
+                foreach ($orders as $order) {
+                    if (($order->isDraft() || $order->isReleased()) && auth()->user()->can('update', $order)) {
+                        try {
+                            $this->orderService->cancelOrder($order->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "cancelled";
+                break;
+
+            case 'delete':
+                foreach ($orders as $order) {
+                    if (($order->isDraft() || $order->isCancelled()) && auth()->user()->can('delete', $order)) {
+                        try {
+                            $order->delete();
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "deleted";
+                break;
+
+            default:
+                return redirect()->back()->with('error', 'Invalid bulk action requested.');
+        }
+
+        $message = "Successfully {$messagePrefix} {$successCount} production order(s).";
+        if ($failedCount > 0) {
+            $message .= " ({$failedCount} order(s) skipped due to state or permissions).";
+        }
+
+        return redirect()->back()->with($successCount > 0 ? 'success' : 'error', $message);
     }
 }

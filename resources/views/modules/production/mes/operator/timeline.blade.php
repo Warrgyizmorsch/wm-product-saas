@@ -96,8 +96,6 @@
             </form>
         </div>
     </div>
-        <i class="feather-activity me-2"></i>Manufacturing Audit Logs Stream
-    </h5>
 
     @if($events->count() > 0)
         <div class="position-relative ps-4 border-start border-2 border-light ms-3">

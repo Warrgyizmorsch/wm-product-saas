@@ -886,6 +886,19 @@ a.btn:hover, a.btn:focus, a.btn:active { text-decoration: none !important; }
     margin-bottom: 24px;
     display: flex;
     gap: 24px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.erp-tabs-nav::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+    width: 0;
+    height: 0;
 }
 
 .erp-tabs-link {
@@ -897,6 +910,8 @@ a.btn:hover, a.btn:focus, a.btn:active { text-decoration: none !important; }
     border-bottom: 3px solid transparent;
     cursor: pointer;
     transition: all 0.15s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .erp-tabs-link.active {

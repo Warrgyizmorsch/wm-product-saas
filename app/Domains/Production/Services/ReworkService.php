@@ -46,6 +46,15 @@ class ReworkService
                 ]);
             }
 
+            $this->eventService->writeEvent($tenantId, [
+                'production_order_id' => $rework->original_production_order_id,
+                'event_type'          => 'REWORK_CREATED',
+                'title'               => 'Rework Order Created',
+                'description'         => "Rework Order {$rework->rework_number} created for NCR #{$ncrId}.",
+                'severity'            => 'warning',
+                'event_source'        => 'ReworkService',
+            ]);
+
             return $rework;
         });
     }

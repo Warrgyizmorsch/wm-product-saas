@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Create Production Order | SaaS ERP')
-@section('page-title', 'Create Direct Production Order')
-@section('breadcrumb', 'Create Order')
+@section('title', __('production.create_production_order') . ' | SaaS ERP')
+@section('page-title', __('production.create_direct_order'))
+@section('breadcrumb', __('production.create_production_order'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -62,13 +62,13 @@
                     method: 'GET',
                     data: { product_id: productId },
                     success: function (response) {
-                        var bomHtml = '<option value="">Auto-select (Latest Approved BOM)</option>';
+                        var bomHtml = '<option value="">' + @js(__('production.auto_select_bom')) + '</option>';
                         (response.boms || []).forEach(function (bom) {
                             bomHtml += '<option value="' + bom.id + '">' + bom.bom_number + ' — ' + (bom.bom_name || '') + ' (v' + bom.version + ')</option>';
                         });
                         $('#bom_select').html(bomHtml).trigger('change');
 
-                        var rtHtml = '<option value="">Auto-select (Default Active Routing)</option>';
+                        var rtHtml = '<option value="">' + @js(__('production.auto_select_routing')) + '</option>';
                         (response.routings || []).forEach(function (rt) {
                             rtHtml += '<option value="' + rt.id + '">' + rt.routing_number + ' — ' + rt.name + ' (v' + rt.version + ')</option>';
                         });
@@ -156,18 +156,18 @@
                 <!-- Header with Close Button -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
                     <div>
-                        <h4 class="fw-bold text-dark mb-0">New Production Order</h4>
-                        <small class="text-muted fs-12">BOM and Routing versions are frozen automatically once the order is released.</small>
+                        <h4 class="fw-bold text-dark mb-0">{{ __('production.new_production_order') }}</h4>
+                        <small class="text-muted fs-12">{{ __('production.bom_routing_frozen_notice') }}</small>
                     </div>
-                    <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-light border">Cancel</a>
+                    <a href="{{ route('production.orders.index') }}" class="btn btn-sm btn-light border">{{ __('production.cancel') }}</a>
                 </div>
 
                 <div class="row g-4 fs-13 text-dark">
                     <!-- Left Column -->
                     <div class="col-md-6 border-end">
                         @if(!isset($salesOrder) || !$salesOrder)
-                            <x-ui.odoo-form-ui type="select" label="Sales Order Request" name="production_order_request_id" id="production_order_request_select">
-                                <option value="">Select Draft Sales Request...</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('production.sales_order_request')" name="production_order_request_id" id="production_order_request_select">
+                                <option value="">{{ __('production.select_sales_request') }}</option>
                                 @foreach($productionOrderRequests as $request)
                                     @php
                                         $deliveryItem = $request->materialRequirementItem;
@@ -200,8 +200,8 @@
 
                             <x-ui.odoo-form-ui type="input" label="Sales Order" name="sales_order_number" :value="$salesOrder->sales_order_number" readonly="true" style="font-weight: bold; background-color: #f8f9fa;" />
 
-                            <x-ui.odoo-form-ui type="select" label="Target Product (from Sales Order)" name="product_id" id="product_select" :required="true">
-                                <option value="">Select Target Product...</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('production.target_product_so')" name="product_id" id="product_select" :required="true">
+                                <option value="">{{ __('production.select_target_product') }}</option>
                                 @foreach($salesOrderItems as $item)
                                     @if($item->product)
                                         <option value="{{ $item->product->id }}" data-qty="{{ $item->quantity }}" data-so-item-id="{{ $item->id }}" @selected(old('product_id') == $item->product->id)>
@@ -214,8 +214,8 @@
                             <input type="hidden" name="sales_order_id" id="sales_order_id" value="{{ old('sales_order_id') }}">
                             <input type="hidden" name="sales_order_item_id" id="sales_order_item_id" value="{{ old('sales_order_item_id') }}">
 
-                            <x-ui.odoo-form-ui type="select" label="Target Product" name="product_id" id="product_select" :required="true">
-                                <option value="">Select Finished Good or Semi-Finished Product...</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('production.target_product')" name="product_id" id="product_select" :required="true">
+                                <option value="">{{ __('production.select_finished_good') }}</option>
                                 @foreach($products as $product)
                                     <option value="{{ $product->id }}" @selected(old('product_id') == $product->id)>
                                         {{ $product->name }} ({{ $product->sku }})
@@ -224,8 +224,8 @@
                             </x-ui.odoo-form-ui>
                         @endif
 
-                        <x-ui.odoo-form-ui type="select" label="Bill of Materials" name="bom_id" id="bom_select">
-                            <option value="">Auto-select (Latest Approved BOM)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.bill_of_materials')" name="bom_id" id="bom_select">
+                            <option value="">{{ __('production.auto_select_bom') }}</option>
                             @foreach($boms ?? [] as $bom)
                                 <option value="{{ $bom->id }}" @selected(old('bom_id') == $bom->id)>
                                     {{ $bom->bom_number }} — {{ $bom->bom_name }} (v{{ $bom->version }})
@@ -233,8 +233,8 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="select" label="Process Routing" name="routing_id" id="routing_select">
-                            <option value="">Auto-select (Default Active Routing)</option>
+                        <x-ui.odoo-form-ui type="select" :label="__('production.process_routing')" name="routing_id" id="routing_select">
+                            <option value="">{{ __('production.auto_select_routing') }}</option>
                             @foreach($routings ?? [] as $rt)
                                 <option value="{{ $rt->id }}" @selected(old('routing_id') == $rt->id)>
                                     {{ $rt->routing_number }} — {{ $rt->name }} (v{{ $rt->version }})
@@ -245,13 +245,13 @@
 
                     <!-- Right Column -->
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Qty to Manufacture" name="quantity_ordered" inputType="number" placeholder="e.g. 10.0000" :value="old('quantity_ordered', '1.0000')" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.qty_to_manufacture')" name="quantity_ordered" inputType="number" placeholder="e.g. 10.0000" :value="old('quantity_ordered', '1.0000')" :required="true" />
 
-                        <x-ui.odoo-form-ui type="input" label="Start Date" name="start_date" inputType="date" :value="old('start_date', date('Y-m-d'))" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.start_date')" name="start_date" inputType="date" :value="old('start_date', date('Y-m-d'))" :required="true" />
                         
-                        <x-ui.odoo-form-ui type="input" label="End Date" name="end_date" inputType="date" :value="old('end_date', date('Y-m-d', strtotime('+3 days')))" :required="true" />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.end_date')" name="end_date" inputType="date" :value="old('end_date', date('Y-m-d', strtotime('+3 days')))" :required="true" />
 
-                        <x-ui.odoo-form-ui type="textarea" label="Remarks" name="description" placeholder="Enter special manufacturing instructions, operator notes, or customer references..." rows="4">{{ old('description') }}</x-ui.odoo-form-ui>
+                        <x-ui.odoo-form-ui type="textarea" :label="__('production.remarks')" name="description" :placeholder="__('production.remarks_placeholder')" rows="4">{{ old('description') }}</x-ui.odoo-form-ui>
                     </div>
                 </div>
 
@@ -259,24 +259,24 @@
                 <div class="card border mt-4 d-none" id="bom-preview-container">
                     <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
                         <h6 class="fw-bold text-dark mb-0">
-                            <i class="feather-box me-2 text-primary"></i>BOM Components &amp; Availability Preview
+                            <i class="feather-box me-2 text-primary"></i>{{ __('production.bom_components_preview') }}
                         </h6>
-                        <span class="fs-12 text-muted">Stock Warehouse: <strong id="bom-preview-warehouse">—</strong></span>
+                        <span class="fs-12 text-muted">{{ __('production.stock_warehouse') }}: <strong id="bom-preview-warehouse">—</strong></span>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-bordered table-striped table-hover align-middle mb-0 fs-13">
                             <thead class="bg-soft-light text-uppercase fs-11 fw-semibold text-muted">
                                 <tr>
-                                    <th style="width: 5%">Sr.No</th>
-                                    <th style="width: 25%">Component Name</th>
-                                    <th style="width: 12%">Type</th>
-                                    <th class="text-center" style="width: 10%">Qty Required</th>
-                                    <th class="text-center" style="width: 10%">Available Qty</th>
-                                    <th class="text-center" style="width: 12%">For Production Qty</th>
-                                    <th class="text-center" style="width: 7%">UOM</th>
-                                    <th class="text-center" style="width: 8%">Rate/Unit</th>
-                                    <th class="text-center" style="width: 11%">Total Amount</th>
-                                    <th>Notes</th>
+                                    <th style="width: 5%">{{ __('production.sr_no') }}</th>
+                                    <th style="width: 25%">{{ __('production.component_name') }}</th>
+                                    <th style="width: 12%">{{ __('production.type') }}</th>
+                                    <th class="text-center" style="width: 10%">{{ __('production.qty_required') }}</th>
+                                    <th class="text-center" style="width: 10%">{{ __('production.available_qty') }}</th>
+                                    <th class="text-center" style="width: 12%">{{ __('production.for_production_qty') }}</th>
+                                    <th class="text-center" style="width: 7%">{{ __('production.uom') }}</th>
+                                    <th class="text-center" style="width: 8%">{{ __('production.rate_unit') }}</th>
+                                    <th class="text-center" style="width: 11%">{{ __('production.total_amount') }}</th>
+                                    <th>{{ __('production.notes') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="bom-preview-table-body" class="text-dark">
@@ -289,9 +289,9 @@
                 {{-- Footer Actions --}}
                 <div class="d-flex gap-2 pt-3 border-top mt-4">
                     <button type="submit" class="btn btn-primary px-4">
-                        <i class="feather-check-circle me-2"></i>Create Production Order
+                        <i class="feather-check-circle me-2"></i>{{ __('production.create_production_order') }}
                     </button>
-                    <a href="{{ route('production.orders.index') }}" class="btn btn-secondary px-4">Cancel</a>
+                    <a href="{{ route('production.orders.index') }}" class="btn btn-secondary px-4">{{ __('production.cancel') }}</a>
                 </div>
             </x-ui.odoo-form-ui>
         </form>

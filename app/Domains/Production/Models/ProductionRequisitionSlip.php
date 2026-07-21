@@ -29,4 +29,10 @@ class ProductionRequisitionSlip extends BaseModel
     {
         return $this->hasMany(ProductionRequisitionSlipItem::class, 'production_requisition_slip_id');
     }
+
+    public function purchaseRequisitions(): HasMany
+    {
+        return $this->hasMany(\App\Domains\Purchase\Models\PurchaseRequisition::class, 'source_id')
+            ->where('source_type', 'material_request');
+    }
 }
