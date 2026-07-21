@@ -20,7 +20,18 @@ class PurchaseRfqController extends Controller
     public function index(Request $request)
     {
         $tenantId = require_tenant_id();
-        $query = PurchaseRfq::where('tenant_id', $tenantId)->with(['rfqVendors.vendor', 'requisition']);
+        $user = auth()->user();
+        $isAdmin = in_array($user->role ?? '', ['admin', 'super_admin', 'tenant_owner', 'company_admin']);
+
+        $query = PurchaseRfq::where('tenant_id', $tenantId)
+            ->with(['rfqVendors.vendor', 'rfqVendors.rates', 'requisition', 'creator', 'items.product']);
+
+        // User Scope / Filter
+        if (! $isAdmin) {
+            $query->where('created_by', $user->id);
+        } elseif ($request->filled('created_by')) {
+            $query->where('created_by', $request->input('created_by'));
+        }
 
         if ($request->filled('search')) {
             $search = '%' . $request->input('search') . '%';
@@ -28,12 +39,22 @@ class PurchaseRfqController extends Controller
                 $q->where('rfq_number', 'like', $search)
                   ->orWhereHas('rfqVendors.vendor', function ($v) use ($search) {
                       $v->where('name', 'like', $search);
+                  })
+                  ->orWhereHas('creator', function ($c) use ($search) {
+                      $c->where('name', 'like', $search);
                   });
             });
         }
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('rfq_date', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('rfq_date', '<=', $request->input('date_to'));
         }
 
         $sortBy = $request->input('sort_by', 'id');
@@ -46,9 +67,106 @@ class PurchaseRfqController extends Controller
             $query->orderBy('id', 'desc');
         }
 
+        // ── Calculate Total Savings across ALL matching records (Unpaginated Full Set) ──
+        $allFilteredRfqs = (clone $query)->get();
+        $totalFilteredCount = $allFilteredRfqs->count();
+        $totalFilteredSavings = 0;
+        $totalFilteredSpend = 0;
+
+        $rfqNumbers = $allFilteredRfqs->pluck('rfq_number')->filter()->toArray();
+        $matchingPos = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+            ->where('source_type', 'rfq')
+            ->where(function ($q) use ($rfqNumbers) {
+                foreach ($rfqNumbers as $rfqNum) {
+                    $q->orWhere('reference', 'like', '%' . $rfqNum . '%');
+                }
+            })
+            ->with(['items'])
+            ->get();
+
+        $poByRfqMap = [];
+        foreach ($matchingPos as $po) {
+            if ($po->reference && preg_match('/RFQ:\s*([^\s\|]+)/i', $po->reference, $matches)) {
+                $num = trim($matches[1]);
+                $poByRfqMap[$num] = $po;
+            } else {
+                $num = str_replace('RFQ: ', '', $po->reference);
+                $poByRfqMap[$num] = $po;
+            }
+        }
+
+        $calcRfqSavings = function ($rfq) use ($poByRfqMap) {
+            $rfqNum = $rfq->rfq_number;
+            $po = $poByRfqMap[$rfqNum] ?? null;
+            if (! $po) {
+                return ['savings' => 0, 'spend' => 0, 'percent' => 0, 'po_number' => null];
+            }
+
+            $poTotal = (float) $po->grand_total;
+            $poHighestTotal = 0;
+            $poSavings = 0;
+
+            foreach ($po->items as $item) {
+                $qty = (float) $item->quantity;
+                $poRate = (float) $item->rate;
+
+                $highestRate = $poRate;
+                $allVendorRates = [];
+                foreach ($rfq->rfqVendors as $rv) {
+                    foreach ($rv->rates as $vRate) {
+                        if ((int)$vRate->product_id === (int)$item->product_id && (float)$vRate->rate > 0) {
+                            $allVendorRates[] = (float)$vRate->rate;
+                        }
+                    }
+                }
+                if (! empty($allVendorRates)) {
+                    $highestRate = max($allVendorRates);
+                }
+
+                if ($highestRate <= $poRate && $item->product?->estimated_cost > $poRate) {
+                    $highestRate = (float) $item->product->estimated_cost;
+                }
+
+                $itemHighestTotal = $highestRate * $qty;
+                $poHighestTotal += $itemHighestTotal;
+                $poSavings += max(0, $itemHighestTotal - ($poRate * $qty));
+            }
+
+            $percent = $poHighestTotal > 0 ? ($poSavings / $poHighestTotal) * 100 : 0;
+            return [
+                'savings' => $poSavings,
+                'spend' => $poTotal,
+                'percent' => round($percent, 2),
+                'po_number' => $po->purchase_order_number,
+            ];
+        };
+
+        foreach ($allFilteredRfqs as $rItem) {
+            $sData = $calcRfqSavings($rItem);
+            $totalFilteredSavings += $sData['savings'];
+            $totalFilteredSpend += $sData['spend'];
+        }
+
+        // Paginate the main RFQ list
         $rfqs = $query->paginate(10)->withQueryString();
 
-        return view('modules.purchase.rfqs.index', compact('rfqs'));
+        foreach ($rfqs as $rfqItem) {
+            $sData = $calcRfqSavings($rfqItem);
+            $rfqItem->savings_amount = $sData['savings'];
+            $rfqItem->savings_percent = $sData['percent'];
+            $rfqItem->po_number = $sData['po_number'];
+        }
+
+        $allPurchasers = \App\Models\User::where('tenant_id', $tenantId)->get(['id', 'name']);
+
+        return view('modules.purchase.rfqs.index', compact(
+            'rfqs',
+            'isAdmin',
+            'allPurchasers',
+            'totalFilteredCount',
+            'totalFilteredSavings',
+            'totalFilteredSpend'
+        ));
     }
 
     public function create(Request $request)
@@ -373,8 +491,7 @@ class PurchaseRfqController extends Controller
                 'status' => 'Received',
             ]);
 
-            // Save / Update Rates
-            $rfqVendor->rates()->delete();
+            // Save new Rate Submission (append to historical rate log)
             foreach ($request->input('rates') as $quote) {
                 PurchaseRfqVendorRate::create([
                     'tenant_id' => $rfqVendor->tenant_id,
@@ -436,11 +553,10 @@ class PurchaseRfqController extends Controller
                             continue;
                         }
 
-                        PurchaseRfqVendorRate::updateOrCreate([
+                        PurchaseRfqVendorRate::create([
                             'tenant_id' => $rfqVendor->tenant_id,
                             'purchase_rfq_vendor_id' => $rfqVendor->id,
                             'product_id' => $productId,
-                        ], [
                             'rate' => $quoteData['rate'],
                             'quantity' => $quoteData['quantity'] ?? 0.00,
                             'delivery_date' => $quoteData['delivery_date'] ?? null,
@@ -465,6 +581,11 @@ class PurchaseRfqController extends Controller
     {
         $tenantId = require_tenant_id();
         $rfq = PurchaseRfq::where('tenant_id', $tenantId)->findOrFail($id);
+
+        if ($rfq->status === 'Confirmed') {
+            return redirect()->route('purchase.rfqs.show', $id)
+                ->with('error', 'A Purchase Order has already been created from this RFQ (Status is Confirmed). Duplicate PO creation is not allowed.');
+        }
 
         $validated = $request->validate([
             'vendor_id' => 'required|integer|exists:vendors,id',
@@ -532,7 +653,7 @@ class PurchaseRfqController extends Controller
                 'source_type' => 'rfq',
                 'vendor_id' => $validated['vendor_id'],
                 'location' => $validated['location'],
-                'reference' => $validated['reference'] ?? "RFQ: {$rfq->rfq_number}",
+                'reference' => $validated['reference'] ?? $rfq->rfq_number,
                 'supplier_quotation_number' => $quoteNo,
                 'date' => $validated['date'],
                 'delivery_date' => $validated['delivery_date'] ?? null,
@@ -580,5 +701,299 @@ class PurchaseRfqController extends Controller
             return redirect()->route('purchase.rfqs.index')
                 ->with('success', "Purchase Order {$poNumber} created from RFQ successfully.");
         });
+    }
+
+    public function savingsDashboard(Request $request)
+    {
+        $tenantId = require_tenant_id();
+        $user = auth()->user();
+
+        // Check if user is Admin / Super Admin / Tenant Owner
+        $isAdmin = in_array($user->role ?? '', ['admin', 'super_admin', 'tenant_owner', 'company_admin']);
+
+        // Query Purchase Orders sourced from RFQ
+        $poQuery = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+            ->where('source_type', 'rfq')
+            ->with(['vendor', 'creator', 'items.product', 'requisition']);
+
+        // Role-based scoping: non-admins only see their own POs
+        if (! $isAdmin) {
+            $poQuery->where('created_by', $user->id);
+        } elseif ($request->filled('purchaser_id')) {
+            $poQuery->where('created_by', $request->input('purchaser_id'));
+        }
+
+        // Apply Filters
+        if ($request->filled('date_from')) {
+            $poQuery->whereDate('date', '>=', $request->input('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $poQuery->whereDate('date', '<=', $request->input('date_to'));
+        }
+        if ($request->filled('vendor_id')) {
+            $poQuery->where('vendor_id', $request->input('vendor_id'));
+        }
+        if ($request->filled('po_number')) {
+            $poQuery->where('purchase_order_number', 'like', '%' . $request->input('po_number') . '%');
+        }
+        if ($request->filled('rfq_number')) {
+            $searchRfq = $request->input('rfq_number');
+            $poQuery->where('reference', 'like', '%' . $searchRfq . '%');
+        }
+        if ($request->filled('product_id')) {
+            $productId = $request->input('product_id');
+            $poQuery->whereHas('items', function ($q) use ($productId) {
+                $q->where('product_id', $productId);
+            });
+        }
+        if ($request->filled('department')) {
+            $dept = $request->input('department');
+            $poQuery->whereHas('requisition', function ($q) use ($dept) {
+                $q->where('department', 'like', '%' . $dept . '%');
+            });
+        }
+
+        $allOrders = $poQuery->orderBy('id', 'desc')->get();
+
+        // ── Data Processing & Calculations ──
+        $processedOrders = [];
+        $totalSavings = 0;
+        $totalSpend = 0;
+        $highestSingleSavings = 0;
+        $bestPurchaserName = 'N/A';
+        $purchaserSavings = [];
+        $deptSavings = [];
+        $vendorStats = [];
+        $monthlySavings = array_fill(1, 12, 0);
+
+        foreach ($allOrders as $order) {
+            $poTotal = (float) $order->grand_total;
+            $totalSpend += $poTotal;
+
+            $rfqNumber = $order->reference ? str_replace('RFQ: ', '', $order->reference) : null;
+
+            $rfq = null;
+            if ($rfqNumber) {
+                $rfq = PurchaseRfq::where('tenant_id', $tenantId)
+                    ->where('rfq_number', $rfqNumber)
+                    ->with('rfqVendors.rates')
+                    ->first();
+            }
+
+            $poHighestQuoteTotal = 0;
+            $poSavings = 0;
+
+            foreach ($order->items as $item) {
+                $qty = (float) $item->quantity;
+                $poRate = (float) $item->rate;
+
+                // Find highest quoted rate across all vendor rate submissions for this item in RFQ
+                $highestRate = $poRate;
+                if ($rfq) {
+                    $allVendorRates = [];
+                    foreach ($rfq->rfqVendors as $rv) {
+                        foreach ($rv->rates as $vRate) {
+                            if ((int)$vRate->product_id === (int)$item->product_id && (float)$vRate->rate > 0) {
+                                $allVendorRates[] = (float)$vRate->rate;
+                            }
+                        }
+                    }
+                    if (! empty($allVendorRates)) {
+                        $highestRate = max($allVendorRates);
+                    }
+                }
+
+                if ($highestRate <= $poRate && $item->product?->estimated_cost > $poRate) {
+                    $highestRate = (float) $item->product->estimated_cost;
+                }
+
+                $itemHighestTotal = $highestRate * $qty;
+                $poHighestQuoteTotal += $itemHighestTotal;
+                $itemSavings = max(0, $itemHighestTotal - ($poRate * $qty));
+                $poSavings += $itemSavings;
+            }
+
+            $totalSavings += $poSavings;
+            if ($poSavings > $highestSingleSavings) {
+                $highestSingleSavings = $poSavings;
+            }
+
+            $savingPercent = $poHighestQuoteTotal > 0 ? ($poSavings / $poHighestQuoteTotal) * 100 : 0;
+
+            // Group by Purchaser
+            $creatorId = $order->created_by ?: 0;
+            $creatorName = $order->creator?->name ?? 'System User';
+            if (! isset($purchaserSavings[$creatorId])) {
+                $purchaserSavings[$creatorId] = [
+                    'id' => $creatorId,
+                    'name' => $creatorName,
+                    'po_count' => 0,
+                    'total_spend' => 0,
+                    'total_savings' => 0,
+                ];
+            }
+            $purchaserSavings[$creatorId]['po_count']++;
+            $purchaserSavings[$creatorId]['total_spend'] += $poTotal;
+            $purchaserSavings[$creatorId]['total_savings'] += $poSavings;
+
+            // Group by Department
+            $deptName = $order->requisition?->department ?? 'General Procurement';
+            if (! isset($deptSavings[$deptName])) {
+                $deptSavings[$deptName] = [
+                    'department' => $deptName,
+                    'total_spend' => 0,
+                    'total_savings' => 0,
+                ];
+            }
+            $deptSavings[$deptName]['total_spend'] += $poTotal;
+            $deptSavings[$deptName]['total_savings'] += $poSavings;
+
+            // Group by Vendor
+            $vId = $order->vendor_id;
+            $vName = $order->vendor?->name ?? 'Unknown Vendor';
+            if (! isset($vendorStats[$vId])) {
+                $vendorStats[$vId] = [
+                    'vendor_id' => $vId,
+                    'name' => $vName,
+                    'rfqs_won' => 0,
+                    'total_spend' => 0,
+                    'total_savings' => 0,
+                ];
+            }
+            $vendorStats[$vId]['rfqs_won']++;
+            $vendorStats[$vId]['total_spend'] += $poTotal;
+            $vendorStats[$vId]['total_savings'] += $poSavings;
+
+            // Monthly breakdown
+            $monthNum = (int) ($order->date ? $order->date->format('n') : now()->format('n'));
+            $monthlySavings[$monthNum] += $poSavings;
+
+            $processedOrders[] = [
+                'id' => $order->id,
+                'order' => $order,
+                'po_number' => $order->purchase_order_number,
+                'rfq_number' => $rfqNumber ?: ($rfq?->rfq_number ?? '—'),
+                'supplier_quotation_number' => $order->supplier_quotation_number ?: '—',
+                'purchaser_name' => $creatorName,
+                'vendor_name' => $vName,
+                'po_amount' => $poTotal,
+                'highest_quote_amount' => $poHighestQuoteTotal,
+                'savings_amount' => $poSavings,
+                'savings_percent' => round($savingPercent, 2),
+                'status' => $order->status,
+                'date' => $order->date ? $order->date->format('d-M-Y') : '—',
+            ];
+        }
+
+        // Leaderboard sorting
+        uasort($purchaserSavings, fn($a, $b) => $b['total_savings'] <=> $a['total_savings']);
+        $topPurchaser = reset($purchaserSavings);
+        if ($topPurchaser && $topPurchaser['total_savings'] > 0) {
+            $bestPurchaserName = $topPurchaser['name'];
+        }
+
+        uasort($vendorStats, fn($a, $b) => $b['total_savings'] <=> $a['total_savings']);
+        uasort($deptSavings, fn($a, $b) => $b['total_savings'] <=> $a['total_savings']);
+
+        $avgSavingPercent = ($totalSpend + $totalSavings) > 0 ? ($totalSavings / ($totalSpend + $totalSavings)) * 100 : 0;
+
+        // Fetch filter dropdown lists
+        $allPurchasers = \App\Models\User::where('tenant_id', $tenantId)->get(['id', 'name']);
+        $allVendors = \App\Domains\Inventory\Models\Vendor::where('tenant_id', $tenantId)->get(['id', 'name']);
+        $allProducts = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->get(['id', 'name', 'sku']);
+
+        return view('modules.purchase.rfqs.savings-dashboard', compact(
+            'isAdmin',
+            'processedOrders',
+            'totalSavings',
+            'totalSpend',
+            'highestSingleSavings',
+            'bestPurchaserName',
+            'avgSavingPercent',
+            'purchaserSavings',
+            'deptSavings',
+            'vendorStats',
+            'monthlySavings',
+            'allPurchasers',
+            'allVendors',
+            'allProducts'
+        ));
+    }
+
+    public function poSavingsDetails(int $orderId)
+    {
+        $tenantId = require_tenant_id();
+        $order = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+            ->with(['vendor', 'creator', 'items.product', 'requisition'])
+            ->findOrFail($orderId);
+
+        $rfqNumber = $order->reference ? str_replace('RFQ: ', '', $order->reference) : null;
+
+        $rfq = null;
+        if ($rfqNumber) {
+            $rfq = PurchaseRfq::where('tenant_id', $tenantId)
+                ->where('rfq_number', $rfqNumber)
+                ->with('rfqVendors.rates')
+                ->first();
+        }
+
+        $itemDetails = [];
+        $totalHighest = 0;
+        $totalSelected = 0;
+
+        foreach ($order->items as $item) {
+            $qty = (float) $item->quantity;
+            $selectedRate = (float) $item->rate;
+            $selectedTotal = (float) $item->total_amount;
+
+            $highestRate = $selectedRate;
+            if ($rfq) {
+                $allVendorRates = [];
+                foreach ($rfq->rfqVendors as $rv) {
+                    foreach ($rv->rates as $vRate) {
+                        if ((int)$vRate->product_id === (int)$item->product_id && (float)$vRate->rate > 0) {
+                            $allVendorRates[] = (float)$vRate->rate;
+                        }
+                    }
+                }
+                if (! empty($allVendorRates)) {
+                    $highestRate = max($allVendorRates);
+                }
+            }
+
+            $itemHighestTotal = $highestRate * $qty;
+            $itemSavings = max(0, $itemHighestTotal - $selectedTotal);
+
+            $totalHighest += $itemHighestTotal;
+            $totalSelected += $selectedTotal;
+
+            $itemDetails[] = [
+                'product_name' => $item->product?->name ?? 'Item #' . $item->product_id,
+                'sku' => $item->product?->sku ?? '—',
+                'highest_rate' => $highestRate,
+                'selected_rate' => $selectedRate,
+                'quantity' => $qty,
+                'savings' => $itemSavings,
+            ];
+        }
+
+        $netSavings = max(0, $totalHighest - $totalSelected);
+        $savingsPercent = $totalHighest > 0 ? ($netSavings / $totalHighest) * 100 : 0;
+
+        return response()->json([
+            'success' => true,
+            'po_number' => $order->purchase_order_number,
+            'rfq_number' => $rfqNumber ?: '—',
+            'supplier_quotation_number' => $order->supplier_quotation_number ?: '—',
+            'vendor_name' => $order->vendor?->name ?? '—',
+            'purchaser_name' => $order->creator?->name ?? 'System',
+            'approved_by' => $order->creator?->name ?? 'System Admin',
+            'total_amount' => $order->grand_total,
+            'highest_quote_total' => $totalHighest,
+            'net_savings' => $netSavings,
+            'savings_percent' => round($savingsPercent, 2),
+            'created_date' => $order->date ? $order->date->format('d M Y') : '—',
+            'items' => $itemDetails,
+        ]);
     }
 }

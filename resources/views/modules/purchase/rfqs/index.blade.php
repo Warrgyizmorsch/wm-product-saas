@@ -15,11 +15,13 @@
 @section('content')
 
     @php
+        $currency = tenant()?->settings['currency'] ?? 'INR';
+        $currencySymbol = ($currency === 'INR') ? '₹' : $currency . ' ';
         $sortBy = request('sort_by', 'rfq_date');
         $sortOrder = request('sort_order', 'desc');
     @endphp
 
-    <div class="erp-single-panel">
+    <div class="erp-single-panel text-dark">
         <!-- Toast Notifications -->
         @if (session('success'))
             <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
@@ -28,10 +30,65 @@
             <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
         @endif
 
-        <!-- Toolbar: Sort, Filters -->
-        <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">RFQs List</h5>
-            <div class="d-flex gap-2 ms-auto">
+        <!-- TOP SUMMARY KPI CARDS (Always visible at top without scrolling) -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-white" style="border-left: 4px solid #3b82f6 !important;">
+                    <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Total Filtered RFQs</span>
+                            <h4 class="fw-bold text-dark mb-0 mt-1 fs-18">{{ $totalFilteredCount }}</h4>
+                            <span class="fs-11 text-muted">All Matching Records</span>
+                        </div>
+                        <div class="avatar-text bg-soft-primary text-primary rounded-circle" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+                            <i class="feather-layers fs-18"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-white" style="border-left: 4px solid #06b6d4 !important;">
+                    <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Filtered Spend</span>
+                            <h4 class="fw-bold text-dark mb-0 mt-1 fs-18">{{ $currencySymbol }}{{ number_format($totalFilteredSpend, 2) }}</h4>
+                            <span class="fs-11 text-muted">Total RFQ Purchase Value</span>
+                        </div>
+                        <div class="avatar-text bg-soft-info text-info rounded-circle" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+                            <i class="feather-shopping-bag fs-18"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-white" style="border-left: 4px solid #10b981 !important;">
+                    <div class="card-body p-3 d-flex align-items-center justify-content-between">
+                        <div>
+                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Total Savings Achieved</span>
+                            <h4 class="fw-bold text-success mb-0 mt-1 fs-18">+{{ $currencySymbol }}{{ number_format($totalFilteredSavings, 2) }}</h4>
+                            <span class="fs-11 text-muted">Net Saved Across All {{ $totalFilteredCount }} RFQs</span>
+                        </div>
+                        <div class="avatar-text bg-soft-success text-success rounded-circle" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+                            <i class="feather-trending-up fs-18"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toolbar: Search, Sort, Filters -->
+        <div class="d-flex align-items-center mb-3 flex-wrap gap-2">
+            <h5 class="fw-bold text-dark mb-0 me-3">RFQs List</h5>
+            
+            <div class="d-flex gap-2 ms-auto align-items-center flex-wrap">
+                <!-- Quick Search -->
+                <form method="GET" action="{{ route('purchase.rfqs.index') }}" class="d-flex gap-2">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search RFQ, vendor, purchaser..." value="{{ request('search') }}" style="width:220px;">
+                    <button type="submit" class="btn btn-sm btn-outline-primary"><i class="feather-search"></i></button>
+                </form>
+
                 <!-- Custom Sort Component -->
                 <x-ui.sort-dropdown :label="__('crm.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'rfq_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'rfq_date' && $sortOrder === 'desc' ? 'active' : '' }}">
@@ -51,7 +108,7 @@
                     <x-ui.filter :label="__('ui.filter')" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                         
-                        <div class="mb-3">
+                        <div class="mb-2">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
                             <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">All Statuses</option>
@@ -61,6 +118,28 @@
                                 <option value="Confirmed" {{ request('status') === 'Confirmed' ? 'selected' : '' }}>Confirmed</option>
                                 <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>Cancelled</option>
                             </x-ui.odoo-form-ui>
+                        </div>
+
+                        @if(isset($isAdmin) && $isAdmin)
+                            <div class="mb-2">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Purchaser (Created By)</label>
+                                <select name="created_by" class="form-select form-select-sm">
+                                    <option value="">All Purchasers</option>
+                                    @foreach($allPurchasers as $u)
+                                        <option value="{{ $u->id }}" {{ request('created_by') == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+
+                        <div class="mb-2">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">From Date</label>
+                            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">To Date</label>
+                            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
@@ -81,9 +160,11 @@
                             <input type="checkbox" class="form-check-input">
                         </th>
                         <th>RFQ Number</th>
+                        <th>Purchaser</th>
                         <th>Vendors / Suppliers</th>
                         <th>RFQ Date</th>
                         <th>Linked Requisition</th>
+                        <th class="text-end">Savings Achieved</th>
                         <th>Status</th>
                         <th class="text-end pe-4">Actions</th>
                     </tr>
@@ -100,10 +181,15 @@
                                 </a>
                             </td>
                             <td>
+                                <span class="fw-semibold text-dark fs-12">
+                                    <i class="feather-user me-1 text-muted fs-11"></i>{{ $rfq->creator?->name ?? 'System' }}
+                                </span>
+                            </td>
+                            <td>
                                 <div class="d-flex flex-column gap-1">
                                     @foreach($rfq->rfqVendors as $rv)
-                                        <div class="fw-semibold text-dark">
-                                            <i class="feather-user text-muted me-1 fs-12"></i>{{ $rv->vendor?->name ?? '—' }}
+                                        <div class="fw-semibold text-dark fs-12">
+                                            <i class="feather-truck text-muted me-1 fs-11"></i>{{ $rv->vendor?->name ?? '—' }}
                                             @if($rv->status === 'Received')
                                                 <span class="badge bg-soft-success text-success fs-10 ms-1 font-monospace">Quoted</span>
                                             @endif
@@ -121,6 +207,15 @@
                                     </a>
                                 @else
                                     <span class="text-muted fs-12">Direct / Manual</span>
+                                @endif
+                            </td>
+                            <td class="text-end font-monospace">
+                                @if(isset($rfq->savings_amount) && $rfq->savings_amount > 0)
+                                    <span class="badge bg-soft-success text-success font-monospace fs-11 px-2 py-1">
+                                        +{{ $currencySymbol }}{{ number_format($rfq->savings_amount, 2) }} ({{ $rfq->savings_percent }}%)
+                                    </span>
+                                @else
+                                    <span class="text-muted fs-11">—</span>
                                 @endif
                             </td>
                             <td>
@@ -184,7 +279,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="feather-list fs-1 d-block mb-3 text-light"></i>
                                 No Request for Quotations found.
                             </td>

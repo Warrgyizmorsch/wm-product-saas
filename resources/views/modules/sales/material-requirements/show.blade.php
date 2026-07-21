@@ -40,7 +40,8 @@
     @endphp
 
     {{-- ─── Odoo-style Sheet ─── --}}
-    <x-ui.odoo-form-ui type="sheet" class="p-0">
+    <div class="erp-single-panel bg-white p-4 shadow-sm rounded border-0 text-dark">
+        <x-ui.odoo-form-ui type="sheet" class="p-0">
 
         {{-- Status Bar --}}
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 px-4 pt-4 pb-3 border-bottom">
@@ -535,6 +536,7 @@
             </div>
         </x-ui.modal>
     @endif
+    </div>
 
 @endsection
 

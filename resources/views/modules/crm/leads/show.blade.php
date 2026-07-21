@@ -284,7 +284,7 @@
                                                 <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline m-0 p-0">
                                                     @csrf
                                                     <button type="submit" class="btn btn-xs btn-success text-white fw-bold px-2 py-0.5 d-inline-flex align-items-center shadow-sm text-uppercase" style="font-size: 10px; border-radius: 3px; background-color: #16a34a; border-color: #16a34a; white-space: nowrap; line-height: 1.4;">
-                                                        <i class="feather-shuffle me-1 fs-9"></i> {{ __('crm.convert_to_sales_order') }}
+                                                        <i class="feather-shuffle me-1 fs-9"></i> {{ __('crm.convert_to_quotation') }}
                                                     </button>
                                                 </form>
                                             @endif

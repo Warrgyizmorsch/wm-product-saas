@@ -422,6 +422,133 @@
                 </div>
 
             </div>
+
+            <!-- Advance Payments & Accounting Section -->
+            @if($order->status === 'Approved')
+                <div class="card border-0 shadow-sm bg-white mb-4 d-print-none">
+                    <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-dollar-sign text-success me-2"></i>Vendor Advance Payments & Accounting</h6>
+                            <small class="text-muted fs-11">Record advance payments made to supplier against this Purchase Order</small>
+                        </div>
+                        @if($order->balance_due > 0)
+                            <button type="button" class="btn btn-sm btn-primary py-1.5 px-3 fs-12 fw-semibold" data-bs-toggle="modal" data-bs-target="#advancePaymentModal" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
+                                <i class="feather-plus-circle me-1.5"></i>Register Advance Payment
+                            </button>
+                        @endif
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3 mb-3 text-dark">
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light-50">
+                                    <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Total PO Amount</span>
+                                    <h4 class="fw-bold text-dark mb-0">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</h4>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light-50">
+                                    <span class="fs-11 text-uppercase text-success fw-bold d-block mb-1">Advance Paid (Posted to Accounting)</span>
+                                    <h4 class="fw-bold text-success mb-0">{{ $currencySymbol }}{{ number_format($order->total_advance_paid, 2) }}</h4>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light-50">
+                                    <span class="fs-11 text-uppercase text-primary fw-bold d-block mb-1">Balance Due</span>
+                                    <h4 class="fw-bold text-primary mb-0">{{ $currencySymbol }}{{ number_format($order->balance_due, 2) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if($order->advancePayments->count() > 0)
+                            <div class="table-responsive rounded border mt-3">
+                                <table class="table table-bordered table-sm align-middle fs-13 text-dark mb-0">
+                                    <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
+                                        <tr>
+                                            <th class="ps-3">Payment No</th>
+                                            <th>Date</th>
+                                            <th>Method</th>
+                                            <th>Reference No</th>
+                                            <th class="text-end pe-3">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($order->advancePayments as $adv)
+                                            <tr>
+                                                <td class="ps-3 fw-bold text-primary">{{ $adv->payment_number }}</td>
+                                                <td>{{ $adv->payment_date ? $adv->payment_date->format('d-M-Y') : '—' }}</td>
+                                                <td><span class="badge bg-soft-info text-info fs-11 fw-semibold">{{ $adv->payment_method }}</span></td>
+                                                <td class="font-monospace">{{ $adv->reference_number ?: 'N/A' }}</td>
+                                                <td class="text-end pe-3 font-monospace fw-bold text-success">{{ $currencySymbol }}{{ number_format($adv->amount, 2) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="text-center py-3 text-muted fs-12">
+                                <i class="feather-info me-1"></i>No advance payments registered for this order yet.
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Register Advance Payment Modal -->
+                <x-ui.modal id="advancePaymentModal" title="Register Vendor Advance Payment" size="lg">
+                    <form action="{{ route('purchase.orders.advance-payments.store') }}" method="POST" class="odoo-sheet">
+                        @csrf
+                        <input type="hidden" name="purchase_order_id" value="{{ $order->id }}">
+                        <input type="hidden" name="vendor_id" value="{{ $order->vendor_id }}">
+
+                        <div class="p-3">
+                            <div class="alert alert-info py-2 px-3 fs-12 mb-3">
+                                <i class="feather-info me-1"></i>
+                                Registering this payment will post a double-entry Journal Entry to <strong>Vendor Advance (1200)</strong> and <strong>Bank (1010)</strong> via Black-Box Accounting Engine.
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Vendor" name="vendor_display" value="{{ $order->vendor?->name }}" readonly="true" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="PO Number" name="po_display" value="{{ $order->purchase_order_number }}" readonly="true" />
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" inputType="number" label="Advance Amount" name="amount" id="advance_amount" value="{{ min($order->balance_due, $order->grand_total) }}" step="0.01" min="0.01" max="{{ $order->balance_due }}" required="true" placeholder="Enter amount..." />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="select" label="Payment Method" name="payment_method" id="payment_method" required="true">
+                                        <option value="Bank Transfer" selected>Bank Transfer (NEFT/RTGS)</option>
+                                        <option value="Cheque">Cheque</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="UPI">UPI</option>
+                                    </x-ui.odoo-form-ui>
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" inputType="date" label="Payment Date" name="payment_date" id="payment_date" value="{{ date('Y-m-d') }}" required="true" />
+                                </div>
+                                <div class="col-md-6">
+                                    <x-ui.odoo-form-ui type="input" label="Reference / Transaction No" name="reference_number" id="reference_number" placeholder="e.g. UTR123456789" />
+                                </div>
+                            </div>
+
+                            <x-ui.odoo-form-ui type="textarea" label="Payment Notes / Remarks" name="notes" placeholder="Enter payment notes..." rows="2" />
+                        </div>
+
+                        <div class="modal-footer border-top px-3 py-2 bg-light d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-sm btn-primary fw-semibold" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
+                                <i class="feather-check me-1"></i>Post Advance Payment
+                            </button>
+                        </div>
+                    </form>
+                </x-ui.modal>
+            @endif
         </div>
     </div>
 @endsection

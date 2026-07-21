@@ -46,7 +46,16 @@
                 ['label' => 'Dispatch Orders', 'route' => 'sales.dispatches.index'],
             ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],
-            ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => ['Suppliers', ['label' => __('ui.purchase_requests'), 'route' => 'purchase.requisitions.index'], ['label' => 'RFQs', 'route' => 'purchase.rfqs.index'], ['label' => 'Purchase Orders', 'route' => 'purchase.orders.index'], 'Bills']],
+            ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => [
+                ['label' => __('ui.purchase_requests'), 'route' => 'purchase.requisitions.index'],
+                ['label' => 'RFQs', 'route' => 'purchase.rfqs.index'],
+                ['label' => 'Savings Dashboard', 'route' => 'purchase.rfqs.savings'],
+                ['label' => 'Purchase Orders', 'route' => 'purchase.orders.index'],
+                ['label' => 'Pending GRNs', 'route' => 'purchase.grns.pending'],
+                ['label' => 'All Goods Receipts', 'route' => 'purchase.grns.index'],
+                ['label' => 'Vendor Bills', 'route' => 'purchase.bills.index'],
+                ['label' => 'Vendor Payments', 'route' => 'purchase.payments.index'],
+            ]],
         ],
         __('ui.production') => [
             ['label' => __('production.production_engineering'), 'icon' => 'feather-cpu', 'url' => '#', 'children' => [

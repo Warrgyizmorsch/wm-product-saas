@@ -62,6 +62,41 @@ class PurchaseOrder extends BaseModel
         return $this->hasMany(PurchaseOrderItem::class, 'purchase_order_id');
     }
 
+    public function goodsReceiptNotes(): HasMany
+    {
+        return $this->hasMany(GoodsReceiptNote::class, 'purchase_order_id');
+    }
+
+    public function advancePayments(): HasMany
+    {
+        return $this->hasMany(PurchaseAdvancePayment::class, 'purchase_order_id')->where('status', 'Posted');
+    }
+
+    public function getTotalAdvancePaidAttribute(): float
+    {
+        return (float) $this->advancePayments->sum('amount');
+    }
+
+    public function getBalanceDueAttribute(): float
+    {
+        return max(0.0, (float)$this->grand_total - $this->total_advance_paid);
+    }
+
+    public function getOrderedQtyAttribute(): float
+    {
+        return (float) $this->items->sum('quantity');
+    }
+
+    public function getReceivedQtyAttribute(): float
+    {
+        return (float) $this->items->sum('received_qty');
+    }
+
+    public function getRemainingQtyAttribute(): float
+    {
+        return max(0.0, $this->ordered_qty - $this->received_qty);
+    }
+
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class, 'vendor_id');
