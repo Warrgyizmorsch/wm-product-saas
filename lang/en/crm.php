@@ -107,6 +107,7 @@ return [
     'product' => 'Product',
     'select_product' => 'Select Product...',
     'add_new_product' => '+ Add New Product',
+    'expected_amount' => 'Expected Revenue',
     'expected_amount_placeholder' => 'Expected Revenue (₹)',
     'expected_sale' => 'Expected Sale',
     'requirements' => 'Requirements',
@@ -324,7 +325,7 @@ return [
     'confirm_delete_log' => 'Are you sure you want to delete this log?',
     'quotation_statuses' => [
         'Draft' => 'Draft',
-        'Pending Approval' => 'Pending Approval',
+        'Pending Approval' => 'Sent for Approval',
         'Approved' => 'Approved',
         'Quotation Sent' => 'Quotation Sent',
         'Accepted' => 'Accepted',

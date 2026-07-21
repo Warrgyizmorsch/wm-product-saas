@@ -107,6 +107,7 @@ return [
     'product' => 'उत्पाद',
     'select_product' => 'उत्पाद चुनें...',
     'add_new_product' => '+ नया उत्पाद जोड़ें',
+    'expected_amount' => 'अपेक्षित राजस्व',
     'expected_amount_placeholder' => 'अपेक्षित राजस्व (₹)',
     'expected_sale' => 'अपेक्षित बिक्री',
     'requirements' => 'आवश्यकताएं',
@@ -324,7 +325,7 @@ return [
     'confirm_delete_log' => 'क्या आप वाकई इस लॉग को हटाना चाहते हैं?',
     'quotation_statuses' => [
         'Draft' => 'ड्राफ्ट',
-        'Pending Approval' => 'अनुमोदन लंबित',
+        'Pending Approval' => 'अनुमोदन के लिए भेजा गया (Sent for Approval)',
         'Approved' => 'स्वीकृत',
         'Quotation Sent' => 'कोटेशन भेजा गया',
         'Accepted' => 'स्वीकृत',

@@ -107,6 +107,7 @@ return [
     'product' => 'Продукт',
     'select_product' => 'Избор на продукт...',
     'add_new_product' => '+ Добавяне на нов продукт',
+    'expected_amount' => 'Очаквани приходи',
     'expected_amount_placeholder' => 'Очаквани приходи (₹)',
     'expected_sale' => 'Очаквана продажба',
     'requirements' => 'Изисквания',
@@ -324,8 +325,8 @@ return [
     'confirm_delete_log' => 'Наистина ли искате да изтриете този лог?',
     'quotation_statuses' => [
         'Draft' => 'Чернова',
-        'Pending Approval' => 'Чака одобрение',
-        'Approved' => 'Одобрена',
+        'Pending Approval' => 'Изпратено за одобрение (Sent for Approval)',
+        'Approved' => 'Одобрено',
         'Quotation Sent' => 'Изпратена оферта',
         'Accepted' => 'Приета',
         'Rejected' => 'Отхвърлена',

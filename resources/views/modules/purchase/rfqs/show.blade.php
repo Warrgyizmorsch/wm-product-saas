@@ -36,6 +36,179 @@
     </div>
 @endsection
 
+@push('styles')
+    <style>
+        .so-status-pipeline {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #cbd5e1;
+            background-color: #f1f5f9;
+        }
+        .so-status-pipeline .pipeline-step {
+            position: relative;
+            padding: 6px 14px 6px 24px;
+            background-color: #f1f5f9;
+            color: #64748b;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: none;
+            outline: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+        }
+        .so-status-pipeline .pipeline-step:first-child {
+            padding-left: 14px;
+            border-top-left-radius: 3px;
+            border-bottom-left-radius: 3px;
+        }
+        .so-status-pipeline .pipeline-step:last-child {
+            padding-right: 14px;
+            border-top-right-radius: 3px;
+            border-bottom-right-radius: 3px;
+        }
+        .so-status-pipeline .pipeline-step::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: -10px;
+            width: 0;
+            height: 0;
+            border-top: 14px solid transparent;
+            border-bottom: 14px solid transparent;
+            border-left: 10px solid #f1f5f9;
+            z-index: 10;
+            transition: all 0.2s ease;
+        }
+        .so-status-pipeline .pipeline-step::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 0;
+            border-top: 14px solid transparent;
+            border-bottom: 14px solid transparent;
+            border-left: 10px solid #ffffff;
+            z-index: 5;
+        }
+        .so-status-pipeline .pipeline-step:first-child::before {
+            display: none;
+        }
+        .so-status-pipeline .pipeline-step.active {
+            background-color: #3454d1;
+            color: #ffffff;
+        }
+        .so-status-pipeline .pipeline-step.active::after {
+            border-left-color: #3454d1;
+        }
+        .so-status-pipeline .pipeline-step.completed {
+            background-color: #cbd5e1;
+            color: #475569;
+        }
+        .so-status-pipeline .pipeline-step.completed::after {
+            border-left-color: #cbd5e1;
+        }
+
+        /* Scrollbar Hide Utility */
+        .so-status-pipeline::-webkit-scrollbar,
+        #mobileVendorPills::-webkit-scrollbar {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+        }
+        .so-status-pipeline,
+        #mobileVendorPills {
+            -ms-overflow-style: none !important;
+            scrollbar-width: none !important;
+        }
+
+        /* Mobile & Responsive UI Enhancements */
+        @media (max-width: 991.98px) {
+            .so-status-pipeline {
+                max-width: 100%;
+                overflow-x: auto !important;
+                white-space: nowrap !important;
+                -webkit-overflow-scrolling: touch;
+                margin-top: 4px;
+                margin-bottom: 4px;
+                display: flex !important;
+                flex-wrap: nowrap !important;
+            }
+            .so-status-pipeline .pipeline-step {
+                padding: 4px 8px 4px 18px !important;
+                font-size: 8.5px !important;
+                letter-spacing: 0px !important;
+                flex-shrink: 0 !important;
+            }
+            .so-status-pipeline .pipeline-step:first-child {
+                padding-left: 10px !important;
+            }
+            .so-status-pipeline .pipeline-step:last-child {
+                padding-right: 10px !important;
+            }
+            .so-status-pipeline .pipeline-step::after {
+                right: -8px !important;
+                border-top: 11px solid transparent !important;
+                border-bottom: 11px solid transparent !important;
+                border-left: 8px solid #f1f5f9 !important;
+            }
+            .so-status-pipeline .pipeline-step::before {
+                border-top: 11px solid transparent !important;
+                border-bottom: 11px solid transparent !important;
+                border-left: 8px solid #ffffff !important;
+            }
+            .so-status-pipeline .pipeline-step.active::after {
+                border-left-color: var(--bs-primary, #3454d1) !important;
+            }
+            .so-status-pipeline .pipeline-step.completed::after {
+                border-left-color: #cbd5e1 !important;
+            }
+
+            .odoo-sheet {
+                padding: 16px !important;
+            }
+            .rfq-matrix-table {
+                font-size: 11px !important;
+            }
+            #po-action-bar {
+                padding: 10px 14px !important;
+            }
+            #po-action-bar .btn {
+                padding: 4px 10px !important;
+                font-size: 11px !important;
+            }
+        }
+
+        #mobileVendorPills .nav-link {
+            background-color: #f8fafc;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            transition: all 0.2s ease;
+        }
+        #mobileVendorPills .nav-link.active {
+            background-color: var(--bs-primary, #714B67) !important;
+            border-color: var(--bs-primary, #714B67) !important;
+            color: #ffffff !important;
+        }
+
+        .table-responsive {
+            -webkit-overflow-scrolling: touch;
+            overflow-x: auto;
+        }
+        .rfq-matrix-table th, .rfq-matrix-table td {
+            border: 1px solid #e9ecef !important;
+        }
+        .rfq-matrix-table td {
+            background-color: #ffffff !important;
+        }
+    </style>
+@endpush
+
 @section('content')
     @php
         $currency = tenant()?->settings['currency'] ?? 'INR';
@@ -50,11 +223,23 @@
                 <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
             @endif
 
-            <!-- Stage Header (Odoo Style) -->
-            <div class="card border-0 shadow-sm mb-4 bg-white">
-                <div class="card-body py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="d-flex align-items-center">
-                        <span class="fs-18 fw-bold text-dark me-3">{{ $rfq->rfq_number }}</span>
+            @if($rfq->status === 'Confirmed')
+                <div class="alert alert-success d-flex align-items-center mb-4 border-0 shadow-sm">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="feather-check-circle fs-18 text-success"></i>
+                        <div>
+                            <strong class="text-dark">Purchase Order Created (RFQ Confirmed)</strong>
+                            <div class="fs-12 text-muted">A Purchase Order has already been generated from this RFQ. Double PO creation is blocked.</div>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            <!-- Main Single RFQ Card -->
+            <div class="card border-0 shadow-sm bg-white mb-4 print-area odoo-sheet">
+                <div class="card-header bg-white border-bottom py-0 px-4 d-print-none d-flex justify-content-between align-items-center flex-wrap gap-2" style="min-height: 52px;">
+                    <div class="d-flex align-items-center py-2">
+                        <h5 class="fw-bold text-dark mb-0 me-3 fs-16">{{ $rfq->rfq_number }}</h5>
                         @php
                             $badgeClass = match($rfq->status) {
                                 'Draft' => 'bg-soft-secondary text-secondary',
@@ -65,25 +250,43 @@
                                 default => 'bg-soft-dark text-dark',
                             };
                         @endphp
-                        <span class="badge {{ $badgeClass }} px-3 py-1 fw-bold fs-12">{{ $rfq->status }}</span>
+                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $rfq->status }}</span>
                     </div>
 
-                    <!-- Steps Timeline -->
-                    <div class="d-flex align-items-center gap-1 fs-12 font-monospace">
-                        <span class="px-2 py-1 rounded {{ $rfq->status === 'Draft' ? 'bg-primary text-white fw-bold' : 'text-muted' }}">Draft</span>
-                        <i class="feather-chevron-right text-muted"></i>
-                        <span class="px-2 py-1 rounded {{ $rfq->status === 'Sent' ? 'bg-info text-white fw-bold' : 'text-muted' }}">Sent</span>
-                        <i class="feather-chevron-right text-muted"></i>
-                        <span class="px-2 py-1 rounded {{ $rfq->status === 'Received' ? 'bg-warning text-white fw-bold' : 'text-muted' }}">Rates Received</span>
-                        <i class="feather-chevron-right text-muted"></i>
-                        <span class="px-2 py-1 rounded {{ $rfq->status === 'Confirmed' ? 'bg-success text-white fw-bold' : 'text-muted' }}">Confirmed</span>
+                    <!-- Custom Chevron Status Pipeline -->
+                    <div class="so-status-pipeline my-2 d-print-none">
+                        @php
+                            $statuses = [
+                                'Draft' => 'Draft',
+                                'Sent' => 'Sent',
+                                'Received' => 'Rates Received',
+                                'Confirmed' => 'Confirmed'
+                            ];
+                            if ($rfq->status === 'Cancelled') {
+                                $statuses['Cancelled'] = 'Cancelled';
+                            }
+                            $keys = array_keys($statuses);
+                            $currentIndex = array_search($rfq->status, $keys);
+                        @endphp
+                        @foreach($statuses as $key => $label)
+                            @php
+                                $stepIndex = array_search($key, $keys);
+                                $stepClass = '';
+                                if ($rfq->status === $key) {
+                                    $stepClass = 'active';
+                                } elseif ($currentIndex !== false && $stepIndex < $currentIndex) {
+                                    $stepClass = 'completed';
+                                }
+                            @endphp
+                            <span class="pipeline-step {{ $stepClass }}">
+                                {{ $label }}
+                            </span>
+                        @endforeach
                     </div>
                 </div>
-            </div>
 
-            <!-- Main RFQ Form Sheet -->
-            <div class="card border-0 shadow-sm p-4 p-md-5 bg-white mb-4 odoo-sheet">
-                <div class="row g-4 fs-13 pb-4 border-bottom">
+                <div class="card-body p-4 p-md-5">
+                    <div class="row g-4 fs-13 pb-4 border-bottom">
                     <div class="col-md-6 border-end">
                         <h6 class="fw-bold text-primary mb-3">RFQ General Details</h6>
                         <x-ui.odoo-form-ui type="input" label="RFQ Date" name="rfq_date" :value="$rfq->rfq_date ? $rfq->rfq_date->format('d-M-Y') : '—'" readonly="true" />
@@ -127,7 +330,133 @@
                                 background-color: #ffffff !important;
                             }
                         </style>
-                        <div class="table-responsive rounded">
+
+                        <!-- ===================== MOBILE VENDOR CARDS VIEW (No Horizontal Scroll) ===================== -->
+                        <div class="d-block d-md-none mb-4">
+                            <!-- Vendor Navigation Pills -->
+                            <div class="nav nav-pills nav-justified gap-2 mb-3 overflow-auto flex-nowrap pb-2" id="mobileVendorPills" role="tablist" style="-webkit-overflow-scrolling: touch;">
+                                @foreach($rfq->rfqVendors as $vIdx => $rv)
+                                    <button class="nav-link {{ $vIdx === 0 ? 'active' : '' }} fw-bold fs-12 px-3 py-2 text-nowrap rounded-3 shadow-sm"
+                                            id="mob-vtab-{{ $rv->id }}"
+                                            data-bs-toggle="pill"
+                                            data-bs-target="#mob-vpane-{{ $rv->id }}"
+                                            type="button" role="tab">
+                                        <i class="feather-user me-1"></i>{{ $rv->vendor?->name }}
+                                    </button>
+                                @endforeach
+                            </div>
+
+                            <!-- Vendor Tab Content Sheets -->
+                            <div class="tab-content" id="mobileVendorTabContent">
+                                @foreach($rfq->rfqVendors as $vIdx => $rv)
+                                    @php
+                                        $rvDelivDate = $rv->delivery_date
+                                            ? $rv->delivery_date->format('Y-m-d')
+                                            : ($rv->rates->whereNotNull('delivery_date')->first()?->delivery_date
+                                                ? \Carbon\Carbon::parse($rv->rates->whereNotNull('delivery_date')->first()->delivery_date)->format('Y-m-d')
+                                                : '');
+                                    @endphp
+                                    <div class="tab-pane fade {{ $vIdx === 0 ? 'show active' : '' }}" id="mob-vpane-{{ $rv->id }}" role="tabpanel">
+                                        <div class="card border shadow-sm mb-3">
+                                            <div class="card-header bg-soft-primary d-flex align-items-center justify-content-between py-2.5 px-3 border-bottom">
+                                                <div class="form-check d-flex align-items-center gap-2 mb-0">
+                                                    <input type="radio"
+                                                        class="form-check-input mob-supplier-radio"
+                                                        name="mob_po_vendor"
+                                                        id="mob_vendor_radio_{{ $rv->id }}"
+                                                        value="{{ $rv->id }}"
+                                                        data-target-radio="#vendor_radio_{{ $rv->id }}"
+                                                    >
+                                                    <label class="form-check-label fw-bold text-primary fs-13" for="mob_vendor_radio_{{ $rv->id }}">
+                                                        {{ $rv->vendor?->name }}
+                                                    </label>
+                                                </div>
+                                                <div>
+                                                    @if($rv->status === 'Received')
+                                                        <span class="badge bg-soft-success text-success fs-10 fw-bold"><i class="feather-check-circle me-1"></i>Submitted</span>
+                                                    @else
+                                                        <span class="badge bg-soft-secondary text-secondary fs-10 fw-bold"><i class="feather-clock me-1"></i>Pending</span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="card-body p-3">
+                                                <div class="d-flex gap-2 mb-3">
+                                                    <button type="button" class="btn btn-xs btn-outline-primary copy-portal-btn flex-fill fw-semibold py-1.5" data-link="{{ route('purchase.rfqs.portal', $rv->token) }}">
+                                                        <i class="feather-copy me-1"></i>Copy Portal Link
+                                                    </button>
+                                                    <a href="{{ route('purchase.rfqs.portal', $rv->token) }}" target="_blank" class="btn btn-xs btn-outline-secondary flex-fill text-center fw-semibold py-1.5">
+                                                        <i class="feather-external-link me-1"></i>Open Portal
+                                                    </a>
+                                                </div>
+
+                                                <!-- Vendor Level Header Fields -->
+                                                <div class="row g-2 mb-3 p-2.5 bg-light rounded border fs-12">
+                                                    <div class="col-6">
+                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-file-text me-1"></i>Quotation No.</label>
+                                                        <input type="text" class="odoo-form-control matrix-sync-input" data-sync="#dt_quote_no_{{ $rv->id }}" value="{{ $rv->quotation_number }}" placeholder="Ref Code">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-credit-card me-1"></i>Payment Type</label>
+                                                        <select class="odoo-table-select matrix-sync-input" data-sync="#dt_payment_{{ $rv->id }}">
+                                                            <option value="">Select...</option>
+                                                            <option value="Cash" @selected($rv->payment_type === 'Cash')>Cash</option>
+                                                            <option value="Net 30" @selected($rv->payment_type === 'Net 30')>Net 30</option>
+                                                            <option value="Net 60" @selected($rv->payment_type === 'Net 60')>Net 60</option>
+                                                            <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>50% Advance, 50% Delivery</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-12 mt-2">
+                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-info me-1"></i>Terms & Conditions</label>
+                                                        <input type="text" class="odoo-form-control matrix-sync-input" data-sync="#dt_terms_{{ $rv->id }}" value="{{ $rv->terms_conditions }}" placeholder="T&C remarks">
+                                                    </div>
+                                                </div>
+
+                                                <!-- Items Rate Cards -->
+                                                <h6 class="fw-bold text-dark fs-12 mb-2 border-bottom pb-1.5"><i class="feather-layers text-primary me-1.5"></i>Items Rates</h6>
+                                                @foreach($rfq->items as $itemIdx => $item)
+                                                    @php
+                                                        $quote = $rv->rates->firstWhere('product_id', $item->product_id);
+                                                        $quotedRate = $quote ? (float)$quote->rate : '';
+                                                        $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
+                                                        $quotedDeliv = $quote && $quote->delivery_date ? $quote->delivery_date->format('Y-m-d') : '';
+                                                        $quotedValid = $quote && $quote->validity_date ? $quote->validity_date->format('Y-m-d') : '';
+                                                        $totalCost = ((float)$quotedRate) * ((float)$quotedQty);
+                                                    @endphp
+                                                    <div class="p-2.5 mb-2.5 border rounded bg-white fs-12 shadow-xs">
+                                                        <div class="fw-bold text-dark mb-1"><i class="feather-package text-primary me-1"></i>{{ $itemIdx + 1 }}. {{ $item->product?->name }}</div>
+                                                        <div class="text-muted fs-11 mb-2">Req Qty: <strong class="text-dark">{{ (float)$item->quantity }} {{ $item->product?->uom?->name ?? 'Pcs' }}</strong></div>
+
+                                                        <div class="row g-2">
+                                                            <div class="col-6">
+                                                                <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-dollar-sign me-0.5"></i>Rate/Unit ({{ $currency }})</label>
+                                                                <input type="number" step="0.01" min="0" class="odoo-table-input mob-rate-input matrix-sync-input font-monospace" data-sync="#dt_rate_{{ $rv->id }}_{{ $item->product_id }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" value="{{ $quotedRate }}" placeholder="0.00">
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-box me-0.5"></i>Quoted Qty</label>
+                                                                <input type="number" step="0.0001" min="0" class="odoo-table-input mob-qty-input matrix-sync-input font-monospace" data-sync="#dt_qty_{{ $rv->id }}_{{ $item->product_id }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" value="{{ $quotedQty }}" placeholder="0.00">
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-calendar me-0.5"></i>Deliv Date</label>
+                                                                <input type="date" class="odoo-table-input matrix-sync-input" data-sync="#dt_deliv_{{ $rv->id }}_{{ $item->product_id }}" value="{{ $quotedDeliv }}">
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-trending-up me-0.5"></i>Total ({{ $currency }})</label>
+                                                                <div class="odoo-table-input bg-soft-success fw-bold text-success text-end font-monospace mob-total-val" id="mob_total_{{ $rv->id }}_{{ $item->product_id }}">
+                                                                    {{ number_format($totalCost, 2, '.', '') }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        <!-- DESKTOP COMPARISON MATRIX TABLE -->
+                        <div class="d-none d-md-block table-responsive rounded">
                             <table class="odoo-table rfq-matrix-table align-middle fs-12 text-dark mb-0" style="min-width: 1000px; width: 100%;">
                                 <thead class="table-light">
                                     <tr>
@@ -142,7 +471,13 @@
                                         <!-- Loop each Vendor column -->
                                         @foreach($rfq->rfqVendors as $rv)
                                             <th class="text-center bg-soft-primary border-start font-weight-bold" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                {{-- Supplier select radio --}}
+                                                @php
+                                                    $rvDelivDate = $rv->delivery_date
+                                                        ? $rv->delivery_date->format('Y-m-d')
+                                                        : ($rv->rates->whereNotNull('delivery_date')->first()?->delivery_date
+                                                            ? \Carbon\Carbon::parse($rv->rates->whereNotNull('delivery_date')->first()->delivery_date)->format('Y-m-d')
+                                                            : '');
+                                                @endphp
                                                 <div class="form-check d-flex align-items-center justify-content-center gap-1 mb-1">
                                                     <input type="radio"
                                                         class="form-check-input supplier-select-radio flex-shrink-0"
@@ -153,6 +488,8 @@
                                                         data-db-vendor-id="{{ $rv->vendor_id }}"
                                                         data-vendor-name="{{ $rv->vendor?->name }}"
                                                         data-quotation-number="{{ $rv->quotation_number }}"
+                                                        data-delivery-date="{{ $rvDelivDate }}"
+                                                        data-terms-conditions="{{ e($rv->terms_conditions) }}"
                                                     >
                                                     <label class="form-check-label fw-bold text-primary fs-12 text-truncate c-pointer" for="vendor_radio_{{ $rv->id }}" style="max-width:160px;">
                                                         {{ $rv->vendor?->name }}
@@ -210,14 +547,13 @@
                                                 {{ (float)$item->quantity }} <span class="text-muted small">({{ $item->product?->uom?->name ?? 'Pcs' }})</span>
                                             </td>
                                             <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Rate/Unit ({{ $currency }}):</td>
-                                            
-                                            @foreach($rfq->rfqVendors as $rv)
+                                                                                      @foreach($rfq->rfqVendors as $rv)
                                                 @php
                                                     $quote = $rv->rates->firstWhere('product_id', $item->product_id);
                                                     $quotedRate = $quote ? (float)$quote->rate : '';
                                                 @endphp
                                                 <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][rate]" class="vendor-rate-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.01" min="0" value="{{ $quotedRate }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
+                                                    <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][rate]" id="dt_rate_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-rate-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.01" min="0" value="{{ $quotedRate }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
                                                 </td>
                                             @endforeach
                                         </tr>
@@ -231,7 +567,7 @@
                                                     $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
                                                 @endphp
                                                 <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][quantity]" class="vendor-qty-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.0001" min="0" value="{{ $quotedQty }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
+                                                    <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][quantity]" id="dt_qty_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-qty-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.0001" min="0" value="{{ $quotedQty }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
                                                 </td>
                                             @endforeach
                                         </tr>
@@ -261,7 +597,7 @@
                                                     $quotedDeliv = $quote && $quote->delivery_date ? $quote->delivery_date->format('Y-m-d') : '';
                                                 @endphp
                                                 <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <input type="date" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][delivery_date]" class="odoo-table-input py-1" style="font-size: 11px; background-color: transparent;" value="{{ $quotedDeliv }}">
+                                                    <input type="date" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][delivery_date]" id="dt_deliv_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-deliv-input odoo-table-input py-1" style="font-size: 11px; background-color: transparent;" value="{{ $quotedDeliv }}" data-vendor="{{ $rv->id }}">
                                                 </td>
                                             @endforeach
                                         </tr>
@@ -275,7 +611,7 @@
                                                     $quotedValid = $quote && $quote->validity_date ? $quote->validity_date->format('Y-m-d') : '';
                                                 @endphp
                                                 <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <input type="date" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][validity_date]" class="odoo-table-input py-1" style="font-size: 11px; background-color: transparent;" value="{{ $quotedValid }}">
+                                                    <input type="date" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][validity_date]" id="dt_valid_{{ $rv->id }}_{{ $item->product_id }}" class="odoo-table-input py-1" style="font-size: 11px; background-color: transparent;" value="{{ $quotedValid }}">
                                                 </td>
                                             @endforeach
                                         </tr>
@@ -287,7 +623,7 @@
                                         @foreach($rfq->rfqVendors as $rv)
                                             <td class="text-center border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
                                                 <input type="hidden" name="vendors[{{ $rv->id }}][id]" value="{{ $rv->id }}">
-                                                <select name="vendors[{{ $rv->id }}][payment_type]" class="odoo-table-select py-0.5" style="font-size: 11px; background-color: transparent;">
+                                                <select name="vendors[{{ $rv->id }}][payment_type]" id="dt_payment_{{ $rv->id }}" class="odoo-table-select py-0.5" style="font-size: 11px; background-color: transparent;">
                                                     <option value="">Select...</option>
                                                     <option value="Cash" @selected($rv->payment_type === 'Cash')>Cash</option>
                                                     <option value="Net 30" @selected($rv->payment_type === 'Net 30')>Net 30</option>
@@ -301,7 +637,7 @@
                                         <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">Quotation No.</td>
                                         @foreach($rfq->rfqVendors as $rv)
                                             <td class="text-center border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                <input type="text" name="vendors[{{ $rv->id }}][quotation_number]" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;" value="{{ $rv->quotation_number }}" placeholder="Ref Code">
+                                                <input type="text" name="vendors[{{ $rv->id }}][quotation_number]" id="dt_quote_no_{{ $rv->id }}" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;" value="{{ $rv->quotation_number }}" placeholder="Ref Code">
                                             </td>
                                         @endforeach
                                     </tr>
@@ -309,10 +645,10 @@
                                         <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">Terms & Conditions</td>
                                         @foreach($rfq->rfqVendors as $rv)
                                             <td class="text-center border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                <input type="text" name="vendors[{{ $rv->id }}][terms_conditions]" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;" value="{{ $rv->terms_conditions }}" placeholder="T&C remarks">
+                                                <input type="text" name="vendors[{{ $rv->id }}][terms_conditions]" id="dt_terms_{{ $rv->id }}" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;" value="{{ $rv->terms_conditions }}" placeholder="T&C remarks">
                                             </td>
                                         @endforeach
-                                    </tr>
+                                    </tr>/tr>
                                     <tr>
                                         <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">Attach File</td>
                                         @foreach($rfq->rfqVendors as $rv)
@@ -340,9 +676,12 @@
                 </form>
             </div>
         </div>
+            </div>
+        </div>
     </div>
 
     {{-- ===================== Fixed Bottom PO Action Bar ===================== --}}
+    @if($rfq->status !== 'Confirmed')
     <div id="po-action-bar"
          style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:1040;
                 background:linear-gradient(135deg,#1a7a4a 0%,#00a76f 100%);
@@ -380,6 +719,7 @@
             </div>
         </div>
     </div>
+    @endif
 
     {{-- ===================== Create PO Modal ===================== --}}
     <x-ui.modal id="createPoModal" title="Create Purchase Order" size="xl" :centered="true" :showFooter="true" formAction="{{ route('purchase.rfqs.create-po', $rfq->id) }}" formMethod="POST">
@@ -399,9 +739,12 @@
                 </div>
             </div>
 
+            <input type="hidden" name="reference" id="po-reference" value="{{ $rfq->rfq_number }}">
+            <input type="hidden" name="supplier_quotation_number" id="po-supplier-quotation-number" value="">
+
             <div class="row g-3 mb-3">
                 {{-- Location / Warehouse --}}
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <x-ui.odoo-form-ui type="select" label="Location / Warehouse" name="location" id="po-location" required="true">
                         <option value="">Select Warehouse...</option>
                         @foreach($warehouses as $w)
@@ -410,23 +753,12 @@
                     </x-ui.odoo-form-ui>
                 </div>
                 {{-- PO Date --}}
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" inputType="date" label="PO Date" name="date" id="po-date" :value="now()->format('Y-m-d')" required="true" />
                 </div>
-            </div>
-
-            <div class="row g-3 mb-3">
                 {{-- Delivery Date --}}
                 <div class="col-md-4">
                     <x-ui.odoo-form-ui type="input" inputType="date" label="Delivery Date" name="delivery_date" id="po-delivery-date" />
-                </div>
-                {{-- Reference --}}
-                <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" label="Reference Document" name="reference" id="po-reference" :value="'RFQ: ' . $rfq->rfq_number" />
-                </div>
-                {{-- Supplier Quotation No --}}
-                <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" label="Supplier Quotation No." name="supplier_quotation_number" id="po-supplier-quotation-number" placeholder="e.g. QU-9876..." />
                 </div>
             </div>
 
@@ -595,7 +927,26 @@
                 const qtyVal = parseFloat($(`.vendor-qty-input[data-vendor="${vendorId}"][data-product="${productId}"]`).val()) || 0;
                 const total = rateVal * qtyVal;
                 $(`#total_${vendorId}_${productId}`).text(total.toFixed(2));
+                $(`#mob_total_${vendorId}_${productId}`).text(total.toFixed(2));
                 syncPoPreview();
+            });
+
+            // ---- Mobile Sync Handlers ----
+            $(document).on('change', '.mob-supplier-radio', function() {
+                const targetRadio = $(this).data('target-radio');
+                if (targetRadio) {
+                    $(targetRadio).prop('checked', true).trigger('change');
+                }
+            });
+
+            $(document).on('input change', '.matrix-sync-input', function() {
+                const target = $(this).data('sync');
+                if (target) {
+                    $(target).val($(this).val());
+                    if ($(this).hasClass('mob-rate-input') || $(this).hasClass('mob-qty-input')) {
+                        $(target).trigger('input');
+                    }
+                }
             });
 
             // ---- Select-all checkbox ----
@@ -692,12 +1043,34 @@
             const vendorId   = vendorRadio.attr('data-vendor-id')   || '';
             const vendorName = vendorRadio.attr('data-vendor-name') || 'None selected';
             const quoteNo    = vendorRadio.attr('data-quotation-number') || '';
+            let delivDate = vendorRadio.attr('data-delivery-date') || '';
+            if (vendorId) {
+                const matrixDeliv = $(`.vendor-deliv-input[data-vendor="${vendorId}"]`).filter(function() { return $(this).val(); }).first().val();
+                if (matrixDeliv) {
+                    delivDate = matrixDeliv;
+                }
+            }
+            const termsCond = vendorRadio.attr('data-terms-conditions') || '';
             const currency   = '{{ $currency }}';
 
             $('#po-supplier-name').text(vendorName);
 
-            $('#po-reference').val("RFQ: {{ $rfq->rfq_number }}");
+            $('#po-reference').val("{{ $rfq->rfq_number }}");
             $('#po-supplier-quotation-number').val(quoteNo);
+
+            if (delivDate) {
+                $('#po-delivery-date').val(delivDate);
+            }
+            if (termsCond) {
+                let editorEl = document.getElementById('po-notes');
+                if (typeof Quill !== 'undefined' && editorEl) {
+                    let qInstance = Quill.find(editorEl);
+                    if (qInstance) {
+                        qInstance.root.innerHTML = termsCond;
+                    }
+                }
+                $('#po-notes_input').val(termsCond);
+            }
 
             const tbody = $('#po-preview-tbody');
             const checked = $('.item-select-cb:checked');

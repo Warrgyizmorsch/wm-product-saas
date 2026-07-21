@@ -19,6 +19,7 @@ class PurchaseOrderItem extends Model
         'purchase_order_id',
         'product_id',
         'quantity',
+        'received_qty',
         'rate',
         'amount',
         'discount_percent',
@@ -38,6 +39,7 @@ class PurchaseOrderItem extends Model
         'purchase_order_id' => 'integer',
         'product_id' => 'integer',
         'quantity' => 'decimal:4',
+        'received_qty' => 'decimal:4',
         'rate' => 'decimal:2',
         'amount' => 'decimal:2',
         'discount_percent' => 'decimal:2',
@@ -52,6 +54,11 @@ class PurchaseOrderItem extends Model
         'tax_amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
     ];
+
+    public function getRemainingQtyAttribute(): float
+    {
+        return max(0.0, (float)$this->quantity - (float)($this->received_qty ?? 0));
+    }
 
     public function order(): BelongsTo
     {
