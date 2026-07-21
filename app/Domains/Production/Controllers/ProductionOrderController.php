@@ -530,4 +530,100 @@ class ProductionOrderController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
+
+    public function bulkAction(Request $request)
+    {
+        $action = $request->input('action');
+        $ids = $request->input('ids');
+
+        if (empty($ids) || !is_array($ids)) {
+            return redirect()
+                ->back()
+                ->with('error', 'No Production Orders selected.');
+        }
+
+        $tenantId = require_tenant_id();
+        $orders = ProductionOrder::whereIn('id', $ids)
+            ->where('tenant_id', $tenantId)
+            ->get();
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        switch ($action) {
+            case 'release':
+                foreach ($orders as $order) {
+                    if ($order->isDraft() && auth()->user()->can('update', $order)) {
+                        try {
+                            $this->orderService->releaseOrder($order->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "released";
+                break;
+
+            case 'complete':
+                foreach ($orders as $order) {
+                    if (($order->isInProgress() || $order->isReleased()) && auth()->user()->can('update', $order)) {
+                        try {
+                            $this->orderService->completeOrder($order->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "completed";
+                break;
+
+            case 'cancel':
+                foreach ($orders as $order) {
+                    if (($order->isDraft() || $order->isReleased()) && auth()->user()->can('update', $order)) {
+                        try {
+                            $this->orderService->cancelOrder($order->id, auth()->id() ?: 1);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "cancelled";
+                break;
+
+            case 'delete':
+                foreach ($orders as $order) {
+                    if (($order->isDraft() || $order->isCancelled()) && auth()->user()->can('delete', $order)) {
+                        try {
+                            $order->delete();
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                        }
+                    } else {
+                        $failedCount++;
+                    }
+                }
+                $messagePrefix = "deleted";
+                break;
+
+            default:
+                return redirect()->back()->with('error', 'Invalid bulk action requested.');
+        }
+
+        $message = "Successfully {$messagePrefix} {$successCount} production order(s).";
+        if ($failedCount > 0) {
+            $message .= " ({$failedCount} order(s) skipped due to state or permissions).";
+        }
+
+        return redirect()->back()->with($successCount > 0 ? 'success' : 'error', $message);
+    }
 }

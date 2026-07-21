@@ -109,6 +109,7 @@ Route::prefix('production')
 
         // ── Production Orders ─────────────────────────────────────────────────
         Route::post('plans/{plan}/create-order', [ProductionOrderController::class, 'createFromPlan'])->name('plans.create-order');
+        Route::post('orders/bulk-action', [ProductionOrderController::class, 'bulkAction'])->name('orders.bulk-action');
         Route::post('orders/{order}/release', [ProductionOrderController::class, 'release'])->name('orders.release');
         Route::post('orders/{order}/issue', [ProductionOrderController::class, 'issueMaterial'])->name('orders.issue');
         Route::post('orders/{order}/return', [ProductionOrderController::class, 'returnMaterial'])->name('orders.return');
