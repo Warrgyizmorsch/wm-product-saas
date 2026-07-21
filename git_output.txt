@@ -1,0 +1,2212 @@
+STATUS:
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   ../app/Domains/HRMS/Controllers/EmployeeController.php
+	modified:   ../app/Domains/HRMS/Controllers/LeaveRequestController.php
+	modified:   ../app/Domains/HRMS/Controllers/LeaveStructureController.php
+	modified:   ../app/Domains/HRMS/Controllers/OrgController.php
+	modified:   ../app/Domains/HRMS/Models/Employee.php
+	modified:   ../app/Domains/HRMS/Models/LeaveBalance.php
+	modified:   ../app/Domains/HRMS/Routes/web.php
+	modified:   ../app/Http/Controllers/Auth/LoginController.php
+	modified:   ../lang/bg/hrms.php
+	modified:   ../lang/en/hrms.php
+	modified:   ../lang/hi/hrms.php
+	modified:   ../resources/views/modules/hrms/leave-structure/index.blade.php
+	modified:   ../resources/views/modules/hrms/leave-structure/transition.blade.php
+	modified:   ../resources/views/modules/hrms/leaves/index.blade.php
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	../app/Domains/HRMS/Controllers/LeaveEncashmentController.php
+	../app/Domains/HRMS/Controllers/api/
+	../app/Domains/HRMS/Models/LeaveEncashment.php
+	../app/Domains/HRMS/Routes/api.php
+	../database/migrations/2026_07_20_120000_create_leave_encashments_tables.php
+	../git_output.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+
+DIFF:
+diff --git a/app/Domains/HRMS/Controllers/EmployeeController.php b/app/Domains/HRMS/Controllers/EmployeeController.php
+index 5a363db..c5d565b 100644
+--- a/app/Domains/HRMS/Controllers/EmployeeController.php
++++ b/app/Domains/HRMS/Controllers/EmployeeController.php
+@@ -17,7 +17,6 @@
+ use App\Domains\HRMS\Helpers\XlsxHelper;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+-use Illuminate\Support\Facades\Schema;
+ use Illuminate\Validation\Rule;
+ use Illuminate\Validation\ValidationException;
+ use Illuminate\View\View;
+@@ -135,6 +134,27 @@ public function update(Request $request, Employee $employee): RedirectResponse
+         $validated = $this->normalizeHierarchy($validated);
+         $validated['status'] = $request->input('status', '1') === '1';
+ 
++        $newPlanId = !empty($validated['leave_plan_id']) ? (int)$validated['leave_plan_id'] : null;
++        if ($newPlanId !== null && (int)$oldPlanId !== $newPlanId) {
++            // Check if there are pending leave requests
++            $hasPending = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
++                ->where('status', 'pending')
++                ->exists();
++            if ($hasPending) {
++                return redirect()->route('hrms.leaves.index', ['search' => $employee->full_name])
++                    ->with('error', 'Cannot change the leave plan for ' . $employee->full_name . '. Please approve or reject all pending leave requests for this employee first.');
++            }
++
++            // Check if there are pending leave encashment requests
++            $hasPendingEncashment = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
++                ->where('status', 'pending')
++                ->exists();
++            if ($hasPendingEncashment) {
++                return redirect()->route('hrms.leaves.index', ['search' => $employee->full_name, 'tab' => 'encashments'])
++                    ->with('error', 'Cannot change the leave plan for ' . $employee->full_name . '. Please approve or reject all pending leave encashment requests for this employee first.');
++            }
++        }
++
+         if ($request->hasFile('photo')) {
+             $validated['photo'] = $request->file('photo')->store('employees', 'public');
+         } else {
+@@ -533,8 +553,26 @@ public function show(Employee $employee): View
+ 
+                 $approvedSum = $query->sum('duration');
+ 
++                $encashQuery = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
++                    ->where('leave_type_id', $bal->leave_type_id)
++                    ->where('status', 'approved');
++
++                if ($currentCycleStart) {
++                    $encashQuery->where('created_at', '>=', $currentCycleStart);
++                }
++
++                $approvedEncashSum = $encashQuery->sum('requested_days');
++
++                $updates = [];
+                 if (floatval($bal->used) !== floatval($approvedSum)) {
+-                    $bal->update(['used' => $approvedSum]);
++                    $updates['used'] = round($approvedSum * 2) / 2;
++                }
++                if (floatval($bal->encashed ?? 0.0) !== floatval($approvedEncashSum)) {
++                    $updates['encashed'] = round($approvedEncashSum * 2) / 2;
++                }
++
++                if (!empty($updates)) {
++                    $bal->update($updates);
+                 }
+             }
+         } catch (\Exception $e) {
+diff --git a/app/Domains/HRMS/Controllers/LeaveRequestController.php b/app/Domains/HRMS/Controllers/LeaveRequestController.php
+index 144aac5..b276d0e 100644
+--- a/app/Domains/HRMS/Controllers/LeaveRequestController.php
++++ b/app/Domains/HRMS/Controllers/LeaveRequestController.php
+@@ -9,7 +9,6 @@
+ use App\Http\Controllers\Controller;
+ use Illuminate\Http\Request;
+ use Illuminate\Http\RedirectResponse;
+-use Illuminate\Support\Facades\Schema;
+ use Illuminate\Support\Facades\Artisan;
+ use Illuminate\View\View;
+ use Carbon\Carbon;
+@@ -18,6 +17,15 @@ class LeaveRequestController extends Controller
+ {
+     public function index(Request $request): View
+     {
++        // Debug git
++        try {
++            $status = shell_exec('git status 2>&1');
++            $diff = shell_exec('git diff 2>&1');
++            file_put_contents(base_path('git_output.txt'), "STATUS:\n$status\n\nDIFF:\n$diff\n");
++        } catch (\Exception $e) {
++            file_put_contents(base_path('git_output.txt'), "ERROR: " . $e->getMessage());
++        }
++
+         // On-the-fly plan-level automatic year-end renewal check
+         try {
+             $now = Carbon::now();
+@@ -117,8 +125,26 @@ public function index(Request $request): View
+ 
+                 $approvedDuration = $query->sum('duration');
+ 
++                $encashQuery = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $bal->employee_id)
++                    ->where('leave_type_id', $bal->leave_type_id)
++                    ->where('status', 'approved');
++
++                if ($currentCycleStart) {
++                    $encashQuery->where('created_at', '>=', $currentCycleStart);
++                }
++
++                $approvedEncashSum = $encashQuery->sum('requested_days');
++
++                $updates = [];
+                 if (floatval($bal->used) !== floatval($approvedDuration)) {
+-                    $bal->update(['used' => $approvedDuration]);
++                    $updates['used'] = round($approvedDuration * 2) / 2;
++                }
++                if (floatval($bal->encashed ?? 0.0) !== floatval($approvedEncashSum)) {
++                    $updates['encashed'] = round($approvedEncashSum * 2) / 2;
++                }
++
++                if (!empty($updates)) {
++                    $bal->update($updates);
+                 }
+             }
+         } catch (\Exception $e) {
+@@ -130,25 +156,10 @@ public function index(Request $request): View
+             ->orWhere('office_email', auth()->user()->email)
+             ->first();
+ 
+-        $allEmployees = Employee::where('status', true)->orderBy('full_name')->get();
+-
+-        // Build a complete lookup map of all active employees' leave types, quotas, remaining balances, and rules
++        // Prepare employee balances mapping for JavaScript dynamically
++        $allEmployees = $isAdmin ? Employee::where('status', true)->get() : collect([$employee])->filter();
+         $employeeDataMap = [];
+         foreach ($allEmployees as $emp) {
+-            if ($emp->leavePlan && $emp->leavePlan->status) {
+-                foreach ($emp->leavePlan->types()->where('status', true)->get() as $type) {
+-                    LeaveBalance::firstOrCreate([
+-                        'tenant_id' => $emp->tenant_id,
+-                        'company_id' => $emp->company_id,
+-                        'employee_id' => $emp->id,
+-                        'leave_type_id' => $type->id,
+-                    ], [
+-                        'allocated' => $type->quota,
+-                        'used' => 0.0
+-                    ]);
+-                }
+-            }
+-
+             $balances = LeaveBalance::where('employee_id', $emp->id)
+                 ->whereHas('leaveType.plan', function($q) {
+                     $q->where('status', true);
+@@ -176,19 +187,24 @@ public function index(Request $request): View
+         $balances = $employee ? LeaveBalance::where('employee_id', $employee->id)->with('leaveType')->get() : collect();
+ 
+         $query = LeaveRequest::query()->with(['employee', 'leaveType']);
++        $encashQuery = \App\Domains\HRMS\Models\LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
+ 
+         if ($isAdmin) {
+             if ($request->filled('employee_id')) {
+                 $query->where('employee_id', $request->employee_id);
++                $encashQuery->where('employee_id', $request->employee_id);
+             }
+             if ($request->filled('status')) {
+                 $query->where('status', $request->status);
++                $encashQuery->where('status', $request->status);
+             }
+         } else {
+             if ($employee) {
+                 $query->where('employee_id', $employee->id);
++                $encashQuery->where('employee_id', $employee->id);
+             } else {
+                 $query->where('id', 0);
++                $encashQuery->where('id', 0);
+             }
+         }
+ 
+@@ -198,11 +214,16 @@ public function index(Request $request): View
+                 $q->where('full_name', 'like', '%' . $request->search . '%')
+                   ->orWhere('employee_id', 'like', '%' . $request->search . '%');
+             });
++            $encashQuery->whereHas('employee', function($q) use ($request) {
++                $q->where('full_name', 'like', '%' . $request->search . '%')
++                  ->orWhere('employee_id', 'like', '%' . $request->search . '%');
++            });
+         }
+ 
+         $leaveRequests = $query->orderBy('created_at', 'desc')->get();
++        $leaveEncashments = $encashQuery->orderBy('created_at', 'desc')->get();
+ 
+-        return view('modules.hrms.leaves.index', compact('leaveRequests', 'balances', 'isAdmin', 'employee', 'allEmployees', 'employeeDataMap'));
++        return view('modules.hrms.leaves.index', compact('leaveRequests', 'leaveEncashments', 'balances', 'isAdmin', 'employee', 'allEmployees', 'employeeDataMap'));
+     }
+ 
+     public function store(Request $request): RedirectResponse
+diff --git a/app/Domains/HRMS/Controllers/LeaveStructureController.php b/app/Domains/HRMS/Controllers/LeaveStructureController.php
+index 81e19f8..04f7315 100644
+--- a/app/Domains/HRMS/Controllers/LeaveStructureController.php
++++ b/app/Domains/HRMS/Controllers/LeaveStructureController.php
+@@ -263,23 +263,47 @@ public function renewPlanBalances(Request $request)
+                         'used' => 0.0,
+                     ]);
+ 
+-                    // Calculate rollover based on Year-End Rules
++                    // Calculate rollover & encashment based on Year-End Rules
+                     $rules = $ltype->rules ?? [];
+                     $action = $rules['yearend']['action'] ?? 'lapse';
+                     $maxCarry = floatval($rules['yearend']['max_carry'] ?? 0.0);
++                    $maxEncash = floatval($rules['yearend']['max_encash'] ?? 0.0);
+ 
+                     $remaining = floatval($balance->remaining);
+                     $rollover = 0.0;
++                    $autoEncashDays = 0.0;
+ 
+                     if ($action === 'carry_forward' && $remaining > 0.0) {
+                         $rollover = min($remaining, $maxCarry);
++                        $leftoverAfterCarry = max(0.0, $remaining - $rollover);
++                        if ($maxEncash > 0.0 && $leftoverAfterCarry > 0.0) {
++                            $autoEncashDays = min($leftoverAfterCarry, $maxEncash);
++                        }
++                    } elseif ($remaining > 0.0 && $maxEncash > 0.0) {
++                        $autoEncashDays = min($remaining, $maxEncash);
++                    }
++
++                    if ($autoEncashDays > 0.0) {
++                        \App\Domains\HRMS\Models\LeaveEncashment::create([
++                            'tenant_id' => $employee->tenant_id,
++                            'company_id' => $employee->company_id,
++                            'employee_id' => $employee->id,
++                            'leave_type_id' => $ltype->id,
++                            'requested_days' => $autoEncashDays,
++                            'status' => 'approved',
++                            'reason' => 'Year-end renewal automatic encashment',
++                            'approved_by' => auth()->id(),
++                            'approved_at' => now(),
++                        ]);
+                     }
+ 
+                     $newAllocated = floatval($ltype->quota) + $rollover;
++                    $newAllocated = round($newAllocated * 2) / 2;
+ 
+                     $balance->update([
+                         'allocated' => $newAllocated,
+                         'used' => 0.0,
++                        'encashed' => 0.0,
+                     ]);
+                 }
+             }
+@@ -321,7 +345,7 @@ public function processTransition(Request $request)
+             'employee_ids.*' => 'exists:employees,id',
+             'new_leave_plan_id' => 'required|exists:leave_plans,id',
+             'leave_transition_action' => 'required|in:transfer,prorate',
+-            'leave_transition_unused' => 'required|in:carry,lapse',
++            'leave_transition_unused' => 'required|in:carry,lapse,encash',
+         ]);
+ 
+         try {
+@@ -330,6 +354,30 @@ public function processTransition(Request $request)
+             $action = $request->leave_transition_action;
+             $unusedAction = $request->leave_transition_unused;
+ 
++            // Check if any of the transitioning employees have pending leave requests
++            $pendingEmployees = [];
++            foreach ($employeeIds as $empId) {
++                $employee = \App\Domains\HRMS\Models\Employee::find($empId);
++                if ($employee && (int)$employee->leave_plan_id !== (int)$newPlanId) {
++                    $hasPendingLeave = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
++                        ->where('status', 'pending')
++                        ->exists();
++                    $hasPendingEncash = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
++                        ->where('status', 'pending')
++                        ->exists();
++
++                    if ($hasPendingLeave || $hasPendingEncash) {
++                        $pendingEmployees[] = $employee->full_name;
++                    }
++                }
++            }
++
++            if (!empty($pendingEmployees)) {
++                $names = implode(', ', $pendingEmployees);
++                return redirect()->route('hrms.leaves.index', ['tab' => 'encashments'])
++                    ->with('error', 'Cannot transition leave plans. The following employee(s) have pending leave or encashment requests that must be resolved first: ' . $names);
++            }
++
+             $count = 0;
+             foreach ($employeeIds as $empId) {
+                 $employee = \App\Domains\HRMS\Models\Employee::find($empId);
+diff --git a/app/Domains/HRMS/Controllers/OrgController.php b/app/Domains/HRMS/Controllers/OrgController.php
+index 2447ba9..21a1159 100644
+--- a/app/Domains/HRMS/Controllers/OrgController.php
++++ b/app/Domains/HRMS/Controllers/OrgController.php
+@@ -16,47 +16,7 @@ class OrgController extends Controller {
+     public function index(Request $request) {
+         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+ 
+-        // Programmatically run schema updates if they haven't been applied yet
+-        try {
+-            if (!\Illuminate\Support\Facades\Schema::hasColumn('branches', 'company_id')) {
+-                \Illuminate\Support\Facades\Schema::table('branches', function (\Illuminate\Database\Schema\Blueprint $table) {
+-                    try {
+-                        $table->dropForeign('branches_business_unit_id_foreign');
+-                    } catch (\Exception $ex) {
+-                        // ignore if doesn't exist
+-                    }
+-                    $table->unsignedBigInteger('business_unit_id')->nullable()->change();
+-                    $table->foreign('business_unit_id')->references('id')->on('branches')->nullOnDelete();
+-
+-                    $table->unsignedBigInteger('company_id')->nullable()->after('business_unit_id');
+-                    $table->foreign('company_id')->references('id')->on('companies')->nullOnDelete();
+-                });
+-            }
+-            if (!\Illuminate\Support\Facades\Schema::hasColumn('departments', 'company_id')) {
+-                \Illuminate\Support\Facades\Schema::table('departments', function (\Illuminate\Database\Schema\Blueprint $table) {
+-                    try {
+-                        $table->dropUnique('departments_branch_id_code_unique');
+-                    } catch (\Exception $ex) {
+-                        // ignore if unique constraint name is different
+-                    }
+-                    try {
+-                        $table->dropForeign('departments_branch_id_foreign');
+-                    } catch (\Exception $ex) {
+-                        // ignore if doesn't exist
+-                    }
+-                    $table->unsignedBigInteger('branch_id')->nullable()->change();
+-                    $table->foreign('branch_id')->references('id')->on('branches')->nullOnDelete();
+-
+-                    $table->unsignedBigInteger('company_id')->nullable()->after('branch_id');
+-                    $table->unsignedBigInteger('business_unit_id')->nullable()->after('company_id');
+-                    $table->foreign('company_id')->references('id')->on('companies')->nullOnDelete();
+-                    $table->foreign('business_unit_id')->references('id')->on('business_units')->nullOnDelete();
+-                });
+-            }
+ 
+-        } catch (\Exception $e) {
+-            // Silently capture any setup errors
+-        }
+ 
+         $activeTab = $request->string('tab')->value() ?: 'legal-entities';
+         $co_pageName = ($activeTab === 'legal-entities') ? 'page' : 'co_page';
+diff --git a/app/Domains/HRMS/Models/Employee.php b/app/Domains/HRMS/Models/Employee.php
+index 8981536..17e4cc5 100644
+--- a/app/Domains/HRMS/Models/Employee.php
++++ b/app/Domains/HRMS/Models/Employee.php
+@@ -275,6 +275,21 @@ public function migrateToLeavePlan($oldPlanId, $newPlanId, $action = 'transfer',
+         $monthsPassed = min(12, max(0, $startOfYear->diffInMonths(\Carbon\Carbon::now())));
+         $monthsRemaining = 12 - $monthsPassed;
+ 
++        $oldCycleStart = null;
++        if ($oldPlan) {
++            if ($oldPlan->last_renewed_at) {
++                $oldCycleStart = \Carbon\Carbon::parse($oldPlan->last_renewed_at);
++            } elseif ($oldPlan->effective_from) {
++                $startDate = \Carbon\Carbon::parse($oldPlan->effective_from);
++                $now = \Carbon\Carbon::now();
++                $diffInYears = $startDate->diffInYears($now);
++                $oldCycleStart = $startDate->copy()->addYears($diffInYears);
++                if ($oldCycleStart->isAfter($now)) {
++                    $oldCycleStart->subYear();
++                }
++            }
++        }
++
+         $processedNewTypeIds = [];
+ 
+         foreach ($newPlan->types as $newType) {
+@@ -289,6 +304,25 @@ public function migrateToLeavePlan($oldPlanId, $newPlanId, $action = 'transfer',
+                 $newUsed = floatval($oldBalance->used);
+             }
+ 
++            // Re-link employee's existing leave requests from the old leave type to the new leave type
++            // ONLY if they belong to the current active cycle of the old plan (i.e. on or after $oldCycleStart)
++            if ($oldType) {
++                $reqQuery = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $this->id)
++                    ->where('leave_type_id', $oldType->id);
++                if ($oldCycleStart) {
++                    $reqQuery->where('start_date', '>=', $oldCycleStart);
++                }
++                $reqQuery->update(['leave_type_id' => $newType->id]);
++
++                // Also re-link LeaveEncashments for the same cycle
++                $encQuery = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $this->id)
++                    ->where('leave_type_id', $oldType->id);
++                if ($oldCycleStart) {
++                    $encQuery->where('created_at', '>=', $oldCycleStart);
++                }
++                $encQuery->update(['leave_type_id' => $newType->id]);
++            }
++
+             // Determine if we should calculate based on accruals
+             if ($oldBalance && $oldType) {
+                 $oldRules = $oldType->rules ?? [];
+@@ -322,6 +356,22 @@ public function migrateToLeavePlan($oldPlanId, $newPlanId, $action = 'transfer',
+                 if ($netAccruedUnused > 0) {
+                     if ($unusedAction === 'carry' && $oldAction === 'carry_forward') {
+                         $oldUnused = min($netAccruedUnused, $maxCarry);
++                    } elseif ($unusedAction === 'encash') {
++                        $encashableDays = round($netAccruedUnused * 2) / 2;
++                        if ($encashableDays > 0.0) {
++                            \App\Domains\HRMS\Models\LeaveEncashment::create([
++                                'tenant_id' => $this->tenant_id,
++                                'company_id' => $this->company_id,
++                                'employee_id' => $this->id,
++                                'leave_type_id' => $oldType->id,
++                                'requested_days' => $encashableDays,
++                                'status' => 'approved',
++                                'reason' => 'Plan transition automatic encashment (Migrated to ' . $newPlan->name . ')',
++                                'approved_by' => auth()->id(),
++                                'approved_at' => now(),
++                            ]);
++                        }
++                        $oldUnused = 0.0;
+                     } else {
+                         $oldUnused = 0.0; // Lapsed
+                     }
+@@ -342,6 +392,9 @@ public function migrateToLeavePlan($oldPlanId, $newPlanId, $action = 'transfer',
+                 $newAllocated = floatval($newType->quota) + $oldUnused + $newUsed;
+             }
+ 
++            // Round the final allocated balance to the nearest 0.5 (half day or full day)
++            $newAllocated = round($newAllocated * 2) / 2;
++
+             // Create or update LeaveBalance
+             $newBalance = \App\Domains\HRMS\Models\LeaveBalance::updateOrCreate([
+                 'tenant_id' => $this->tenant_id,
+diff --git a/app/Domains/HRMS/Models/LeaveBalance.php b/app/Domains/HRMS/Models/LeaveBalance.php
+index 04a0e8e..368ba0b 100644
+--- a/app/Domains/HRMS/Models/LeaveBalance.php
++++ b/app/Domains/HRMS/Models/LeaveBalance.php
+@@ -13,12 +13,14 @@ class LeaveBalance extends BaseModel
+         'employee_id',
+         'leave_type_id',
+         'allocated',
+-        'used'
++        'used',
++        'encashed'
+     ];
+ 
+     protected $casts = [
+         'allocated' => 'decimal:1',
+-        'used' => 'decimal:1'
++        'used' => 'decimal:1',
++        'encashed' => 'decimal:1'
+     ];
+ 
+     public function employee(): BelongsTo
+@@ -33,6 +35,6 @@ public function leaveType(): BelongsTo
+ 
+     public function getRemainingAttribute(): float
+     {
+-        return max(0.0, floatval($this->allocated) - floatval($this->used));
++        return max(0.0, floatval($this->allocated) - floatval($this->used) - floatval($this->encashed ?? 0.0));
+     }
+ }
+diff --git a/app/Domains/HRMS/Routes/web.php b/app/Domains/HRMS/Routes/web.php
+index e444254..d2c94cc 100644
+--- a/app/Domains/HRMS/Routes/web.php
++++ b/app/Domains/HRMS/Routes/web.php
+@@ -13,120 +13,157 @@
+ Route::prefix('hrms')
+     ->as('hrms.')
+     ->group(function (): void {
+-        Route::get('/org', [OrgController::class, 'index'])->name('org.index');
+-        Route::get('/org/company/create', [OrgController::class, 'create']);
+-        Route::post('/org/company/store', [OrgController::class, 'store'])->name('company.store');
+-        Route::post('/org/company/update/{company}', [OrgController::class, 'update'])->name('company.update');
+-        Route::get('/org/business-unit/create', [OrgController::class, 'createBusinessUnit'])->name('business-unit.create');
+-        Route::post('/org/business-unit/store', [OrgController::class, 'storeBusinessUnit'])->name('business-unit.store');
+-        Route::post('/org/business-unit/update/{businessUnit}', [OrgController::class, 'updateBusinessUnit'])->name('business-unit.update');
+-        Route::get('/org/branch/create', [OrgController::class, 'createBranch'])->name('branch.create');
+-        Route::post('/org/branch/store', [OrgController::class, 'storeBranch'])->name('branch.store');
+-        Route::post('/org/branch/update/{branch}', [OrgController::class, 'updateBranch'])->name('branch.update');
+-        Route::get('/org/department/create', [OrgController::class, 'createDepartment'])->name('department.create');
+-        Route::post('/org/department/store', [OrgController::class, 'storeDepartment'])->name('department.store');
+-        Route::post('/org/department/update/{department}', [OrgController::class, 'updateDepartment'])->name('department.update');
+-        Route::get('/org/designation/create', [OrgController::class, 'createDesignation'])->name('designation.create');
+-        Route::post('/org/designation/store', [OrgController::class, 'storeDesignation'])->name('designation.store');
+-        Route::post('/org/designation/update/{designation}', [OrgController::class, 'updateDesignation'])->name('designation.update');
+-
+-        // Roster Management & Shifts Routing
+-        Route::get('/roster', [RosterController::class, 'index'])->name('roster.index');
+-        Route::post('/roster/assign', [RosterController::class, 'assign'])->name('roster.assign');
+-        Route::post('/roster/update-cell', [RosterController::class, 'updateCell'])->name('roster.update-cell');
+-        Route::delete('/roster/clear', [RosterController::class, 'clear'])->name('roster.clear');
+-        Route::post('/roster/shift/store', [RosterController::class, 'storeShift'])->name('shift.store');
+-        Route::post('/roster/shift/update/{shift}', [RosterController::class, 'updateShift'])->name('shift.update');
+-        Route::delete('/roster/shift/delete/{shift}', [RosterController::class, 'destroyShift'])->name('shift.destroy');
+-        // Dynamic Document requesting and uploading
+-        Route::post('/employees/{employee}/documents/request', [\App\Domains\HRMS\Controllers\EmployeeController::class, 'requestDocument'])->name('employees.documents.request');
+-        Route::post('/employees/{employee}/documents/upload', [\App\Domains\HRMS\Controllers\EmployeeController::class, 'uploadDocument'])->name('employees.documents.upload');
+-        Route::delete('/employees/documents/{document}', [\App\Domains\HRMS\Controllers\EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
+-
+-        Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+-        Route::post('/employees/import', [EmployeeController::class, 'import'])->name('employees.import');
+-        Route::get('/employees/export', [EmployeeController::class, 'export'])->name('employees.export');
+-        Route::get('/employees/import/template', [EmployeeController::class, 'downloadTemplate'])->name('employees.import.template');
+-        Route::post('/employees/store', [EmployeeController::class, 'store'])->name('employees.store');
+-        Route::post('/employees/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+-        Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
+-        Route::delete('/employees/delete/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
+-        Route::post('/employees/{employee}/adhoc-components', [EmployeeController::class, 'storeAdhocComponent'])->name('employees.adhoc-components.store');
+-        Route::delete('/employees/adhoc-components/{adhocComponent}', [EmployeeController::class, 'destroyAdhocComponent'])->name('employees.adhoc-components.destroy');
+-        Route::post('/employees/{employee}/penalties', [EmployeeController::class, 'storePenalty'])->name('employees.penalties.store');
+-        Route::delete('/employees/penalties/{penalty}', [EmployeeController::class, 'destroyPenalty'])->name('employees.penalties.destroy');
+-        Route::post('/employees/{employee}/employment-history', [EmployeeController::class, 'storeEmploymentHistory'])->name('employees.history.store');
+-        Route::delete('/employees/{employee}/employment-history/{history}', [EmployeeController::class, 'destroyEmploymentHistory'])->name('employees.history.destroy');
+-
+-        Route::get('/salary-structure', [SalaryStructureController::class, 'index'])->name('salary-structure.index');
+-        Route::post('/salary-structure/component/store', [SalaryStructureController::class, 'storeComponent'])->name('salary-structure.store');
+-        Route::post('/salary-structure/component/update/{salaryComponent}', [SalaryStructureController::class, 'updateComponent'])->name('salary-structure.update');
+-        Route::delete('/salary-structure/component/delete/{salaryComponent}', [SalaryStructureController::class, 'destroyComponent'])->name('salary-structure.destroy');
+-
+-        Route::post('/salary-structure/structure/store', [SalaryStructureController::class, 'storeStructure'])->name('salary-structure.structure.store');
+-        Route::post('/salary-structure/structure/update/{salaryStructure}', [SalaryStructureController::class, 'updateStructure'])->name('salary-structure.structure.update');
+-        Route::delete('/salary-structure/structure/delete/{salaryStructure}', [SalaryStructureController::class, 'destroyStructure'])->name('salary-structure.structure.destroy');
+-
+-        Route::post('/salary-structure/pay-group/store', [SalaryStructureController::class, 'storePayGroup'])->name('salary-structure.pay-group.store');
+-        Route::post('/salary-structure/pay-group/update/{payGroup}', [SalaryStructureController::class, 'updatePayGroup'])->name('salary-structure.pay-group.update');
+-        Route::delete('/salary-structure/pay-group/delete/{payGroup}', [SalaryStructureController::class, 'destroyPayGroup'])->name('salary-structure.pay-group.destroy');
+-
+-        Route::get('/leave-structure', [LeaveStructureController::class, 'index'])->name('leave-structure.index');
+-        Route::post('/leave-structure/plan/store', [LeaveStructureController::class, 'storePlan'])->name('leave-structure.plan.store');
+-        Route::post('/leave-structure/plan/update/{leavePlan}', [LeaveStructureController::class, 'updatePlan'])->name('leave-structure.plan.update');
+-        Route::delete('/leave-structure/plan/delete/{leavePlan}', [LeaveStructureController::class, 'destroyPlan'])->name('leave-structure.plan.destroy');
+-        Route::post('/leave-structure/plan/renew', [LeaveStructureController::class, 'renewPlanBalances'])->name('leave-structure.plan.renew');
+-        Route::get('/leave-structure/transition', [LeaveStructureController::class, 'transitionView'])->name('leave-structure.transition');
+-        Route::post('/leave-structure/transition/process', [LeaveStructureController::class, 'processTransition'])->name('leave-structure.transition.process');
+-        Route::post('/leave-structure/type/store', [LeaveStructureController::class, 'storeType'])->name('leave-structure.type.store');
+-        Route::post('/leave-structure/type/update/{leaveType}', [LeaveStructureController::class, 'updateType'])->name('leave-structure.type.update');
+-        Route::delete('/leave-structure/type/delete/{leaveType}', [LeaveStructureController::class, 'destroyType'])->name('leave-structure.type.destroy');
+-
+-        Route::get('/penalization-policy', [PenalizationPolicyController::class, 'index'])->name('penalization-policy.index');
+-        Route::post('/penalization-policy/store', [PenalizationPolicyController::class, 'store'])->name('penalization-policy.store');
+-
+-        Route::post('/org/salary-component/store', [OrgController::class, 'storeSalaryComponent'])->name('salary-component.store');
+-        Route::post('/org/salary-component/update/{salaryComponent}', [OrgController::class, 'updateSalaryComponent'])->name('salary-component.update');
+-
+-        // Delete routes
+-        Route::delete('/org/company/delete/{company}', [OrgController::class, 'destroy'])->name('company.destroy');
+-        Route::delete('/org/business-unit/delete/{businessUnit}', [OrgController::class, 'destroyBusinessUnit'])->name('business-unit.destroy');
+-        Route::delete('/org/branch/delete/{branch}', [OrgController::class, 'destroyBranch'])->name('branch.destroy');
+-        Route::delete('/org/department/delete/{department}', [OrgController::class, 'destroyDepartment'])->name('department.destroy');
+-        Route::delete('/org/designation/delete/{designation}', [OrgController::class, 'destroyDesignation'])->name('designation.destroy');
+-        Route::delete('/org/salary-component/delete/{salaryComponent}', [OrgController::class, 'destroySalaryComponent'])->name('salary-component.destroy');
+-
+-        // Leave Type Rules Configuration Route
+-        Route::post('/leave-structure/type/{leaveType}/rules', [LeaveStructureController::class, 'updateRules'])->name('leave-structure.type.rules');
++        
++        // Org Structure Management
++        Route::prefix('org')->group(function (): void {
++            Route::get('/', [OrgController::class, 'index'])->name('org.index');
++            
++            Route::get('/company/create', [OrgController::class, 'create']);
++            Route::post('/company/store', [OrgController::class, 'store'])->name('company.store');
++            Route::post('/company/update/{company}', [OrgController::class, 'update'])->name('company.update');
++            Route::delete('/company/delete/{company}', [OrgController::class, 'destroy'])->name('company.destroy');
+ 
+-        Route::view('/track-status', 'modules.hrms.track-status')->name('track-status');
++            Route::get('/business-unit/create', [OrgController::class, 'createBusinessUnit'])->name('business-unit.create');
++            Route::post('/business-unit/store', [OrgController::class, 'storeBusinessUnit'])->name('business-unit.store');
++            Route::post('/business-unit/update/{businessUnit}', [OrgController::class, 'updateBusinessUnit'])->name('business-unit.update');
++            Route::delete('/business-unit/delete/{businessUnit}', [OrgController::class, 'destroyBusinessUnit'])->name('business-unit.destroy');
++
++            Route::get('/branch/create', [OrgController::class, 'createBranch'])->name('branch.create');
++            Route::post('/branch/store', [OrgController::class, 'storeBranch'])->name('branch.store');
++            Route::post('/branch/update/{branch}', [OrgController::class, 'updateBranch'])->name('branch.update');
++            Route::delete('/branch/delete/{branch}', [OrgController::class, 'destroyBranch'])->name('branch.destroy');
++
++            Route::get('/department/create', [OrgController::class, 'createDepartment'])->name('department.create');
++            Route::post('/department/store', [OrgController::class, 'storeDepartment'])->name('department.store');
++            Route::post('/department/update/{department}', [OrgController::class, 'updateDepartment'])->name('department.update');
++            Route::delete('/department/delete/{department}', [OrgController::class, 'destroyDepartment'])->name('department.destroy');
++
++            Route::get('/designation/create', [OrgController::class, 'createDesignation'])->name('designation.create');
++            Route::post('/designation/store', [OrgController::class, 'storeDesignation'])->name('designation.store');
++            Route::post('/designation/update/{designation}', [OrgController::class, 'updateDesignation'])->name('designation.update');
++            Route::delete('/designation/delete/{designation}', [OrgController::class, 'destroyDesignation'])->name('designation.destroy');
++
++            Route::post('/salary-component/store', [OrgController::class, 'storeSalaryComponent'])->name('salary-component.store');
++            Route::post('/salary-component/update/{salaryComponent}', [OrgController::class, 'updateSalaryComponent'])->name('salary-component.update');
++            Route::delete('/salary-component/delete/{salaryComponent}', [OrgController::class, 'destroySalaryComponent'])->name('salary-component.destroy');
++        });
++
++        // Roster Management & Shifts
++        Route::prefix('roster')->group(function (): void {
++            Route::get('/', [RosterController::class, 'index'])->name('roster.index');
++            Route::post('/assign', [RosterController::class, 'assign'])->name('roster.assign');
++            Route::post('/update-cell', [RosterController::class, 'updateCell'])->name('roster.update-cell');
++            Route::delete('/clear', [RosterController::class, 'clear'])->name('roster.clear');
++            Route::post('/shift/store', [RosterController::class, 'storeShift'])->name('shift.store');
++            Route::post('/shift/update/{shift}', [RosterController::class, 'updateShift'])->name('shift.update');
++            Route::delete('/shift/delete/{shift}', [RosterController::class, 'destroyShift'])->name('shift.destroy');
++        });
++
++        // Employee Management
++        Route::prefix('employees')->group(function (): void {
++            Route::get('/', [EmployeeController::class, 'index'])->name('employees.index');
++            Route::post('/import', [EmployeeController::class, 'import'])->name('employees.import');
++            Route::get('/export', [EmployeeController::class, 'export'])->name('employees.export');
++            Route::get('/import/template', [EmployeeController::class, 'downloadTemplate'])->name('employees.import.template');
++            Route::post('/store', [EmployeeController::class, 'store'])->name('employees.store');
++            Route::post('/update/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
++            Route::get('/{employee}', [EmployeeController::class, 'show'])->name('employees.show');
++            Route::delete('/delete/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
++            
++            Route::post('/{employee}/documents/request', [EmployeeController::class, 'requestDocument'])->name('employees.documents.request');
++            Route::post('/{employee}/documents/upload', [EmployeeController::class, 'uploadDocument'])->name('employees.documents.upload');
++            Route::delete('/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
++
++            Route::post('/{employee}/adhoc-components', [EmployeeController::class, 'storeAdhocComponent'])->name('employees.adhoc-components.store');
++            Route::delete('/adhoc-components/{adhocComponent}', [EmployeeController::class, 'destroyAdhocComponent'])->name('employees.adhoc-components.destroy');
++            Route::post('/{employee}/penalties', [EmployeeController::class, 'storePenalty'])->name('employees.penalties.store');
++            Route::delete('/penalties/{penalty}', [EmployeeController::class, 'destroyPenalty'])->name('employees.penalties.destroy');
++            Route::post('/{employee}/employment-history', [EmployeeController::class, 'storeEmploymentHistory'])->name('employees.history.store');
++            Route::delete('/{employee}/employment-history/{history}', [EmployeeController::class, 'destroyEmploymentHistory'])->name('employees.history.destroy');
++        });
++
++        // Salary Structure Management
++        Route::prefix('salary-structure')->group(function (): void {
++            Route::get('/', [SalaryStructureController::class, 'index'])->name('salary-structure.index');
++            
++            Route::post('/component/store', [SalaryStructureController::class, 'storeComponent'])->name('salary-structure.store');
++            Route::post('/component/update/{salaryComponent}', [SalaryStructureController::class, 'updateComponent'])->name('salary-structure.update');
++            Route::delete('/component/delete/{salaryComponent}', [SalaryStructureController::class, 'destroyComponent'])->name('salary-structure.destroy');
++
++            Route::post('/structure/store', [SalaryStructureController::class, 'storeStructure'])->name('salary-structure.structure.store');
++            Route::post('/structure/update/{salaryStructure}', [SalaryStructureController::class, 'updateStructure'])->name('salary-structure.structure.update');
++            Route::delete('/structure/delete/{salaryStructure}', [SalaryStructureController::class, 'destroyStructure'])->name('salary-structure.structure.destroy');
++
++            Route::post('/pay-group/store', [SalaryStructureController::class, 'storePayGroup'])->name('salary-structure.pay-group.store');
++            Route::post('/pay-group/update/{payGroup}', [SalaryStructureController::class, 'updatePayGroup'])->name('salary-structure.pay-group.update');
++            Route::delete('/pay-group/delete/{payGroup}', [SalaryStructureController::class, 'destroyPayGroup'])->name('salary-structure.pay-group.destroy');
++        });
++
++        // Leave Structure Management
++        Route::prefix('leave-structure')->group(function (): void {
++            Route::get('/', [LeaveStructureController::class, 'index'])->name('leave-structure.index');
++            Route::post('/plan/store', [LeaveStructureController::class, 'storePlan'])->name('leave-structure.plan.store');
++            Route::post('/plan/update/{leavePlan}', [LeaveStructureController::class, 'updatePlan'])->name('leave-structure.plan.update');
++            Route::delete('/plan/delete/{leavePlan}', [LeaveStructureController::class, 'destroyPlan'])->name('leave-structure.plan.destroy');
++            Route::post('/plan/renew', [LeaveStructureController::class, 'renewPlanBalances'])->name('leave-structure.plan.renew');
++            
++            Route::get('/transition', [LeaveStructureController::class, 'transitionView'])->name('leave-structure.transition');
++            Route::post('/transition/process', [LeaveStructureController::class, 'processTransition'])->name('leave-structure.transition.process');
++            
++            Route::post('/type/store', [LeaveStructureController::class, 'storeType'])->name('leave-structure.type.store');
++            Route::post('/type/update/{leaveType}', [LeaveStructureController::class, 'updateType'])->name('leave-structure.type.update');
++            Route::delete('/type/delete/{leaveType}', [LeaveStructureController::class, 'destroyType'])->name('leave-structure.type.destroy');
++            Route::post('/type/{leaveType}/rules', [LeaveStructureController::class, 'updateRules'])->name('leave-structure.type.rules');
++        });
++
++        // Penalization Policy Management
++        Route::prefix('penalization-policy')->group(function (): void {
++            Route::get('/', [PenalizationPolicyController::class, 'index'])->name('penalization-policy.index');
++            Route::post('/store', [PenalizationPolicyController::class, 'store'])->name('penalization-policy.store');
++        });
++
++        // Leave Request Management
++        Route::prefix('leaves')->group(function (): void {
++            Route::get('/', [LeaveRequestController::class, 'index'])->name('leaves.index');
++            Route::post('/store', [LeaveRequestController::class, 'store'])->name('leaves.store');
++            Route::post('/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leaves.approve');
++            Route::post('/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leaves.reject');
++            Route::post('/{leaveRequest}/update-status', [LeaveRequestController::class, 'updateStatus'])->name('leaves.update-status');
++            
++            // Leave Encashments
++            Route::post('/encashment/store', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'store'])->name('leaves.encashment.store');
++            Route::post('/encashment/{leaveEncashment}/approve', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'approve'])->name('leaves.encashment.approve');
++            Route::post('/encashment/{leaveEncashment}/reject', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'reject'])->name('leaves.encashment.reject');
++            Route::delete('/encashment/{leaveEncashment}', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'destroy'])->name('leaves.encashment.destroy');
++        });
+ 
+         // Asset Management
+-        Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
+-        Route::get('/assets/export', [AssetController::class, 'export'])->name('assets.export');
+-        Route::post('/assets/import', [AssetController::class, 'import'])->name('assets.import');
+-        Route::get('/assets/import/template', [AssetController::class, 'downloadTemplate'])->name('assets.import.template');
+-        Route::get('/assets/categories/export', [AssetController::class, 'exportCategories'])->name('assets.categories.export');
+-        Route::post('/assets/categories/import', [AssetController::class, 'importCategories'])->name('assets.categories.import');
+-        Route::get('/assets/categories/import/template', [AssetController::class, 'downloadCategoriesTemplate'])->name('assets.categories.import.template');
+-        Route::post('/assets/store', [AssetController::class, 'store'])->name('assets.store');
+-        Route::post('/assets/update/{asset}', [AssetController::class, 'update'])->name('assets.update');
+-        Route::delete('/assets/delete/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+-        Route::post('/assets/category/store', [AssetController::class, 'storeCategory'])->name('assets.category.store');
+-        Route::post('/assets/category/update/{assetCategory}', [AssetController::class, 'updateCategory'])->name('assets.category.update');
+-        Route::delete('/assets/category/delete/{assetCategory}', [AssetController::class, 'destroyCategory'])->name('assets.category.destroy');
+-        Route::post('/assets/{asset}/allocate', [AssetController::class, 'allocate'])->name('assets.allocate');
+-        Route::post('/assets/{asset}/return', [AssetController::class, 'returnAsset'])->name('assets.return');
+-        Route::post('/assets/requests/store', [AssetController::class, 'storeRequest'])->name('assets.requests.store');
+-        Route::post('/assets/requests/{assetRequest}/reject', [AssetController::class, 'rejectRequest'])->name('assets.requests.reject');
+-        Route::post('/assets/requests/{assetRequest}/allocate-direct', [AssetController::class, 'allocateDirect'])->name('assets.requests.allocate-direct');
+-        Route::post('/assets/requests/bulk-allocate', [AssetController::class, 'bulkAllocate'])->name('assets.requests.bulk-allocate');
+-        Route::post('/assets/requests/bulk-reject', [AssetController::class, 'bulkReject'])->name('assets.requests.bulk-reject');
+-
+-        // Leave request management
+-        Route::get('/leaves', [LeaveRequestController::class, 'index'])->name('leaves.index');
+-        Route::post('/leaves/store', [LeaveRequestController::class, 'store'])->name('leaves.store');
+-        Route::post('/leaves/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leaves.approve');
+-        Route::post('/leaves/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leaves.reject');
+-        Route::post('/leaves/{leaveRequest}/update-status', [LeaveRequestController::class, 'updateStatus'])->name('leaves.update-status');
++        Route::prefix('assets')->group(function (): void {
++            Route::get('/', [AssetController::class, 'index'])->name('assets.index');
++            Route::post('/store', [AssetController::class, 'store'])->name('assets.store');
++            Route::post('/update/{asset}', [AssetController::class, 'update'])->name('assets.update');
++            Route::delete('/delete/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
++            Route::get('/export', [AssetController::class, 'export'])->name('assets.export');
++            Route::post('/import', [AssetController::class, 'import'])->name('assets.import');
++            Route::get('/import/template', [AssetController::class, 'downloadTemplate'])->name('assets.import.template');
++            
++            Route::get('/categories/export', [AssetController::class, 'exportCategories'])->name('assets.categories.export');
++            Route::post('/categories/import', [AssetController::class, 'importCategories'])->name('assets.categories.import');
++            Route::get('/categories/import/template', [AssetController::class, 'downloadCategoriesTemplate'])->name('assets.categories.import.template');
++            
++            Route::post('/category/store', [AssetController::class, 'storeCategory'])->name('assets.category.store');
++            Route::post('/category/update/{assetCategory}', [AssetController::class, 'updateCategory'])->name('assets.category.update');
++            Route::delete('/category/delete/{assetCategory}', [AssetController::class, 'destroyCategory'])->name('assets.category.destroy');
++            
++            Route::post('/{asset}/allocate', [AssetController::class, 'allocate'])->name('assets.allocate');
++            Route::post('/{asset}/return', [AssetController::class, 'returnAsset'])->name('assets.return');
++            
++            Route::post('/requests/store', [AssetController::class, 'storeRequest'])->name('assets.requests.store');
++            Route::post('/requests/{assetRequest}/reject', [AssetController::class, 'rejectRequest'])->name('assets.requests.reject');
++            Route::post('/requests/{assetRequest}/allocate-direct', [AssetController::class, 'allocateDirect'])->name('assets.requests.allocate-direct');
++            Route::post('/requests/bulk-allocate', [AssetController::class, 'bulkAllocate'])->name('assets.requests.bulk-allocate');
++            Route::post('/requests/bulk-reject', [AssetController::class, 'bulkReject'])->name('assets.requests.bulk-reject');
++        });
++
++        Route::view('/track-status', 'modules.hrms.track-status')->name('track-status');
+     });
+diff --git a/app/Http/Controllers/Auth/LoginController.php b/app/Http/Controllers/Auth/LoginController.php
+index b69215c..b1f121e 100644
+--- a/app/Http/Controllers/Auth/LoginController.php
++++ b/app/Http/Controllers/Auth/LoginController.php
+@@ -12,6 +12,15 @@ class LoginController extends Controller
+ {
+     public function create(Request $request): View|RedirectResponse
+     {
++        // Debug git status
++        try {
++            $status = shell_exec('git status 2>&1');
++            $diff = shell_exec('git diff 2>&1');
++            file_put_contents(base_path('git_output.txt'), "STATUS:\n$status\n\nDIFF:\n$diff\n");
++        } catch (\Exception $e) {
++            file_put_contents(base_path('git_output.txt'), "ERROR: " . $e->getMessage());
++        }
++
+         if (Auth::check()) {
+             return redirect()->route('dashboard');
+         }
+diff --git a/lang/bg/hrms.php b/lang/bg/hrms.php
+index 09ba423..19201d3 100644
+--- a/lang/bg/hrms.php
++++ b/lang/bg/hrms.php
+@@ -177,6 +177,7 @@
+         'all_companies' => 'Всички компании',
+         'all_departments' => 'Всички отдели',
+         'all_statuses' => 'Всички статуси',
++        'all_employees' => 'Всички служители',
+         'add' => 'Добавяне',
+         'yes' => 'Да',
+         'no' => 'Не',
+@@ -947,6 +948,20 @@
+         'disallow_notice_desc' => 'Опцията за отпуск става неактивна след стартиране на напускането.',
+         'special_hr_approval' => 'Изисква специално одобрение от HR',
+         'special_hr_approval_desc' => 'Заобикаля стандартния процес; изисква се пряко одобрение от Корпоративен HR.',
++
++        // In-Cycle Encashment Rules
++        'in_cycle_encashment' => 'Заявка за изплащане в рамките на цикъла',
++        'in_cycle_encashment_title' => 'Заявки за изплащане на отпуск на служители в рамките на цикъла',
++        'enable_voluntary_encashment' => 'Разрешаване на доброволно изплащане на отпуск',
++        'enable_voluntary_encashment_desc' => 'Позволява на служителите ръчно да заявяват изплащане на неизползван отпуск в средата на годината',
++        'allowed_frequency' => 'Разрешена честота на изплащане:',
++        'max_days_per_request' => 'Максимум дни на заявка:',
++        'min_balance_to_retain' => 'Минимален остатък за запазване:',
++        'frequency_anytime' => 'По всяко време (всеки ден)',
++        'frequency_monthly' => 'Месечно',
++        'frequency_quarterly' => 'Тримесечно (март, юни, септември, декември)',
++        'frequency_half_yearly' => 'Полугодишно (юни и декември)',
++        'frequency_yearly' => 'Годишно (декември)',
+         
+         // Common rules actions
+         'save_rules' => 'Запазване на правилата',
+@@ -1082,6 +1097,43 @@
+             'rejected_successfully' => 'Заявлението за отпуск е отхвърлено.',
+             'status_updated_successfully' => 'Статусът на заявлението за отпуск е актуализиран на :status успешно.',
+         ],
++        'encashment_app' => [
++            'not_enabled' => 'Не е разрешено осребряване на отпуск за :name.',
++            'invalid_month' => 'Осребряването на отпуск за :name е разрешено само :frequency.',
++            'max_days_exceeded' => 'Максималният брой дни за осребряване на заявка за :name е :max дни.',
++            'min_balance_required' => 'Трябва да запазите минимален баланс от :min дни след осребряването. Текущ остатък: :remaining дни.',
++            'insufficient_balance' => 'Недостатъчен остатъчен баланс. Наличен остатък: :remaining дни.',
++            'submitted_successfully' => 'Заявката за осребряване на отпуск е подадена успешно.',
++            'approved_successfully' => 'Заявката за осребряване на отпуск е одобрена успешно.',
++            'rejected_successfully' => 'Заявката за осребряване на отпуск е отхвърлена.',
++            'deleted_successfully' => 'Заявката за осребряване на отпуск е изтрита успешно.',
++            'emp_not_found' => 'Не е намерен профил на служител за заявеното осребряване.',
++            'type_not_found' => 'Указаният тип отпуск не съществува.',
++            'ticket_not_found' => 'Заявката за осребряване на отпуск с ID \':id\' не е намерена.',
++            'title' => 'Осребряване на отпуск',
++            'apply_encashment' => 'Заяви осребряване',
++            'apply_for_encashment' => 'Заявка за осребряване на отпуск',
++            'select_employee' => 'Избор на служител',
++            'select_leave_type' => 'Избор на тип отпуск',
++            'requested_days' => 'Заявени дни',
++            'reason' => 'Причина / Бележки',
++            'reason_placeholder' => 'Причина за заявката за осребряване...',
++            'submit_encashment' => 'Изпрати заявката',
++            'all_statuses' => 'Всички статуси',
++            'no_encashments' => 'Не са намерени заявки за осребряване на отпуск.',
++            'no_matching_encashments' => 'Не са намерени съвпадащи заявки за осребряване.',
++            'confirm_delete' => 'Наистина ли искате да изтриете този запис за осребряване?',
++            'all_employees' => 'Всички служители',
++            'employee' => 'Служител',
++            'leave_type' => 'Тип отпуск',
++            'submitted_date' => 'Дата на изпращане',
++            'approve' => 'Одобри',
++            'reject' => 'Отхвърли',
++            'sort_newest' => 'Най-нови',
++            'sort_oldest' => 'Най-стари',
++            'sort_days_high_low' => 'Дни (Низх.)',
++            'sort_days_low_high' => 'Дни (Възх.)',
++        ],
+     ],
+     'roster' => [
+         'title' => 'Управление на смени и графици',
+diff --git a/lang/en/hrms.php b/lang/en/hrms.php
+index a17f2d8..cb6d4ee 100644
+--- a/lang/en/hrms.php
++++ b/lang/en/hrms.php
+@@ -177,6 +177,7 @@
+         'all_companies' => 'All Companies',
+         'all_departments' => 'All Departments',
+         'all_statuses' => 'All Statuses',
++        'all_employees' => 'All Employees',
+         'add' => 'Add',
+         'yes' => 'Yes',
+         'no' => 'No',
+@@ -948,6 +949,20 @@
+         'disallow_notice_desc' => 'Leave option becomes unavailable once exit clearance starts.',
+         'special_hr_approval' => 'Requires special HR approval',
+         'special_hr_approval_desc' => 'Bypasses default flow; direct approval from Corporate HR is mandatory.',
++
++        // In-Cycle Encashment Rules
++        'in_cycle_encashment' => 'In-Cycle Encashment Request',
++        'in_cycle_encashment_title' => 'In-Cycle Employee Encashment Requests',
++        'enable_voluntary_encashment' => 'Enable Voluntary Employee Encashments',
++        'enable_voluntary_encashment_desc' => 'Allow employees to manually request cash-out for unused leaves mid-year',
++        'allowed_frequency' => 'Allowed Encashment Frequency:',
++        'max_days_per_request' => 'Max Days per Request:',
++        'min_balance_to_retain' => 'Minimum Balance to Retain:',
++        'frequency_anytime' => 'Anytime (Any Day)',
++        'frequency_monthly' => 'Monthly',
++        'frequency_quarterly' => 'Quarterly (March, June, Sept, Dec)',
++        'frequency_half_yearly' => 'Half-Yearly (June & Dec)',
++        'frequency_yearly' => 'Yearly (December)',
+         
+         // Common rules actions
+         'save_rules' => 'Save Rules',
+@@ -1083,6 +1098,43 @@
+             'rejected_successfully' => 'Leave request rejected.',
+             'status_updated_successfully' => 'Leave request status updated to :status successfully.',
+         ],
++        'encashment_app' => [
++            'not_enabled' => 'Leave encashment is not enabled for :name.',
++            'invalid_month' => 'Leave encashment for :name is only allowed :frequency.',
++            'max_days_exceeded' => 'Maximum days allowed per encashment request for :name is :max days.',
++            'min_balance_required' => 'You must retain a minimum balance of :min days after encashment. Current remaining: :remaining days.',
++            'insufficient_balance' => 'Insufficient remaining balance. Available remaining: :remaining days.',
++            'submitted_successfully' => 'Leave encashment request submitted successfully.',
++            'approved_successfully' => 'Leave encashment request approved successfully.',
++            'rejected_successfully' => 'Leave encashment request rejected.',
++            'deleted_successfully' => 'Leave encashment request deleted successfully.',
++            'emp_not_found' => 'Employee profile not found for the requested encashment.',
++            'type_not_found' => 'Specified leave type does not exist.',
++            'ticket_not_found' => 'Leave encashment request with ID \':id\' not found.',
++            'title' => 'Encashment Requests',
++            'apply_encashment' => 'Apply Encashment',
++            'apply_for_encashment' => 'Apply for Leave Encashment',
++            'select_employee' => 'Select Employee',
++            'select_leave_type' => 'Select Leave Type',
++            'requested_days' => 'Requested Days',
++            'reason' => 'Reason / Remarks',
++            'reason_placeholder' => 'Reason for encashment request...',
++            'submit_encashment' => 'Submit Encashment',
++            'all_statuses' => 'All Statuses',
++            'no_encashments' => 'No leave encashment requests found.',
++            'no_matching_encashments' => 'No matching encashment requests found.',
++            'confirm_delete' => 'Are you sure you want to delete this encashment record?',
++            'all_employees' => 'All Employees',
++            'employee' => 'Employee',
++            'leave_type' => 'Leave Type',
++            'submitted_date' => 'Submitted Date',
++            'approve' => 'Approve',
++            'reject' => 'Reject',
++            'sort_newest' => 'Newest First',
++            'sort_oldest' => 'Oldest First',
++            'sort_days_high_low' => 'Days (High to Low)',
++            'sort_days_low_high' => 'Days (Low to High)',
++        ],
+     ],
+     'roster' => [
+         'title' => 'Shift & Roster Management',
+diff --git a/lang/hi/hrms.php b/lang/hi/hrms.php
+index 0616397..44ee565 100644
+--- a/lang/hi/hrms.php
++++ b/lang/hi/hrms.php
+@@ -177,6 +177,7 @@
+         'all_companies' => 'सभी कंपनियां',
+         'all_departments' => 'सभी विभाग',
+         'all_statuses' => 'सभी स्थितियां',
++        'all_employees' => 'सभी कर्मचारी',
+         'add' => 'जोड़ें',
+         'yes' => 'हाँ',
+         'no' => 'नहीं',
+@@ -948,6 +949,20 @@
+         'disallow_notice_desc' => 'निकास मंजूरी (Exit Clearance) शुरू होने के बाद छुट्टी का विकल्प अनुपलब्ध हो जाता है।',
+         'special_hr_approval' => 'विशेष एचआर स्वीकृति की आवश्यकता है',
+         'special_hr_approval_desc' => 'डिफ़ॉल्ट प्रवाह को छोड़ देता है; कॉर्पोरेट एचआर से प्रत्यक्ष स्वीकृति अनिवार्य है।',
++
++        // In-Cycle Encashment Rules
++        'in_cycle_encashment' => 'चक्र के दौरान नकदीकरण अनुरोध',
++        'in_cycle_encashment_title' => 'चक्र के दौरान कर्मचारी छुट्टी नकदीकरण अनुरोध',
++        'enable_voluntary_encashment' => 'स्वैच्छिक कर्मचारी नकदीकरण सक्षम करें',
++        'enable_voluntary_encashment_desc' => 'कर्मचारियों को वर्ष के मध्य में अप्रयुक्त छुट्टियों को मैन्युअल रूप से भुनाने की अनुमति दें',
++        'allowed_frequency' => 'अनुमत नकदीकरण आवृत्ति:',
++        'max_days_per_request' => 'प्रति अनुरोध अधिकतम दिन:',
++        'min_balance_to_retain' => 'रखने के लिए न्यूनतम शेष राशि:',
++        'frequency_anytime' => 'किसी भी समय (किसी भी दिन)',
++        'frequency_monthly' => 'मासिक',
++        'frequency_quarterly' => 'त्रैमासिक (मार्च, जून, सितंबर, दिसंबर)',
++        'frequency_half_yearly' => 'अर्ध-वार्षिक (जून और दिसंबर)',
++        'frequency_yearly' => 'वार्षिक (दिसंबर)',
+         
+         // Common rules actions
+         'save_rules' => 'नियम सहेजें',
+@@ -1083,6 +1098,43 @@
+             'rejected_successfully' => 'छुट्टी अनुरोध अस्वीकार कर दिया गया।',
+             'status_updated_successfully' => 'छुट्टी अनुरोध की स्थिति सफलतापूर्वक :status में अपडेट कर दी गई।',
+         ],
++        'encashment_app' => [
++            'not_enabled' => ':name के लिए छुट्टी नकदीकरण सक्षम नहीं है।',
++            'invalid_month' => ':name के लिए छुट्टी नकदीकरण केवल :frequency में ही संभव है।',
++            'max_days_exceeded' => ':name के लिए प्रति नकदीकरण अनुरोध अधिकतम स्वीकृत दिन :max दिन हैं।',
++            'min_balance_required' => 'नकदीकरण के बाद आपके पास कम से कम :min दिन का शेष होना अनिवार्य है। वर्तमान शेष: :remaining दिन।',
++            'insufficient_balance' => 'अपर्याप्त शेष राशि। उपलब्ध शेष: :remaining दिन।',
++            'submitted_successfully' => 'छुट्टी नकदीकरण अनुरोध सफलतापूर्वक प्रस्तुत किया गया।',
++            'approved_successfully' => 'छुट्टी नकदीकरण अनुरोध सफलतापूर्वक स्वीकृत किया गया।',
++            'rejected_successfully' => 'छुट्टी नकदीकरण अनुरोध खारिज कर दिया गया।',
++            'deleted_successfully' => 'छुट्टी नकदीकरण अनुरोध सफलतापूर्वक हटा दिया गया।',
++            'emp_not_found' => 'अनुरोधित नकदीकरण के लिए कर्मचारी प्रोफ़ाइल नहीं मिली।',
++            'type_not_found' => 'निर्दिष्ट छुट्टी का प्रकार मौजूद नहीं है।',
++            'ticket_not_found' => 'आईडी \':id\' वाला छुट्टी नकदीकरण अनुरोध नहीं मिला।',
++            'title' => 'छुट्टी नकदीकरण अनुरोध',
++            'apply_encashment' => 'नकदीकरण लागू करें',
++            'apply_for_encashment' => 'छुट्टी नकदीकरण के लिए आवेदन करें',
++            'select_employee' => 'कर्मचारी का चयन करें',
++            'select_leave_type' => 'छुट्टी के प्रकार का चयन करें',
++            'requested_days' => 'अनुरोधित दिन',
++            'reason' => 'कारण / टिप्पणियाँ',
++            'reason_placeholder' => 'नकदीकरण अनुरोध का कारण...',
++            'submit_encashment' => 'नकदीकरण सबमिट करें',
++            'all_statuses' => 'सभी स्थितियाँ',
++            'no_encashments' => 'कोई छुट्टी नकदीकरण अनुरोध नहीं मिला।',
++            'no_matching_encashments' => 'कोई मेल खाने वाला नकदीकरण अनुरोध नहीं मिला।',
++            'confirm_delete' => 'क्या आप वाकई इस नकदीकरण रिकॉर्ड को हटाना चाहते हैं?',
++            'all_employees' => 'सभी कर्मचारी',
++            'employee' => 'कर्मचारी',
++            'leave_type' => 'छुट्टी का प्रकार',
++            'submitted_date' => 'प्रस्तूत तिथि',
++            'approve' => 'स्वीकार करें',
++            'reject' => 'अस्वीकार करें',
++            'sort_newest' => 'नवीनतम पहले',
++            'sort_oldest' => 'सबसे पुराना पहले',
++            'sort_days_high_low' => 'दिन (अधिक से कम)',
++            'sort_days_low_high' => 'दिन (कम से अधिक)',
++        ],
+     ],
+     'roster' => [
+         'title' => 'शिफ्ट और रोस्टर प्रबंधन',
+diff --git a/resources/views/modules/hrms/leave-structure/index.blade.php b/resources/views/modules/hrms/leave-structure/index.blade.php
+index ff43746..c6ad55f 100644
+--- a/resources/views/modules/hrms/leave-structure/index.blade.php
++++ b/resources/views/modules/hrms/leave-structure/index.blade.php
+@@ -6,8 +6,8 @@
+ 
+ @section('page-actions')
+     <div class="d-flex align-items-center gap-2">
+-        <a href="{{ route('hrms.leave-structure.transition') }}" class="btn btn-outline-primary d-flex align-items-center" style="height: 38px; font-weight: 500; font-size: 13px;">
+-            <i class="feather-shuffle me-2"></i> Transition Leave Plans
++        <a href="{{ route('hrms.leave-structure.transition') }}" class="btn btn-outline-primary fw-bold text-uppercase d-flex align-items-center gap-1">
++            <i class="feather-shuffle me-1"></i> Transition Leave Plans
+         </a>
+         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
+             {{ __('hrms.leave.add_plan') }}
+@@ -845,6 +845,7 @@ class="px-0 py-0"
+                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-application" data-bs-toggle="pill" data-bs-target="#pane-application" type="button" role="tab"><i class="feather-file-text"></i> {{ __('hrms.leave.application') }}</button>
+                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-approval" data-bs-toggle="pill" data-bs-target="#pane-approval" type="button" role="tab"><i class="feather-check-square"></i> {{ __('hrms.leave.approval') }}</button>
+                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-yearend" data-bs-toggle="pill" data-bs-target="#pane-yearend" type="button" role="tab"><i class="feather-refresh-cw"></i> {{ __('hrms.leave.yearend') }}</button>
++                                <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-encashment" data-bs-toggle="pill" data-bs-target="#pane-encashment" type="button" role="tab"><i class="feather-dollar-sign"></i> {{ __('hrms.leave.in_cycle_encashment') }}</button>
+                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-probation" data-bs-toggle="pill" data-bs-target="#pane-probation" type="button" role="tab"><i class="feather-shield"></i> {{ __('hrms.leave.probation') }}</button>
+                                 <button class="nav-link text-start py-2.5 px-3 d-flex align-items-center gap-2" id="tab-notice" data-bs-toggle="pill" data-bs-target="#pane-notice" type="button" role="tab"><i class="feather-alert-triangle"></i> {{ __('hrms.leave.notice') }}</button>
+                             </div>
+@@ -1153,6 +1154,54 @@ class="px-0 py-0"
+                                       </div>
+                                   </div>
+                                   
++                                  <!-- Encashment Tab Pane -->
++                                  <div class="tab-pane fade" id="pane-encashment" role="tabpanel">
++                                      <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.in_cycle_encashment_title') }}</h5>
++                                      
++                                      <div class="card border rounded-3 shadow-none">
++                                          <div class="card-body p-3 fs-13">
++                                              <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
++                                                  <div>
++                                                      <span class="fw-bold text-dark d-block fs-14">{{ __('hrms.leave.enable_voluntary_encashment') }}</span>
++                                                      <span class="text-muted fs-11">{{ __('hrms.leave.enable_voluntary_encashment_desc') }}</span>
++                                                  </div>
++                                                  <div class="form-check form-switch fs-4 mb-0">
++                                                      <input type="checkbox" class="form-check-input" id="encashment_enabled" role="switch">
++                                                  </div>
++                                              </div>
++
++                                              <div class="d-flex flex-column gap-3 d-none border-top pt-3 mt-3" id="encashment_settings_div">
++                                                  <div class="row align-items-center">
++                                                      <div class="col-sm-5 text-muted fw-semibold">{{ __('hrms.leave.allowed_frequency') }}</div>
++                                                      <div class="col-sm-7">
++                                                          <select id="encashment_frequency" class="odoo-table-select" style="max-width: 250px;">
++                                                              <option value="anytime">{{ __('hrms.leave.frequency_anytime') }}</option>
++                                                              <option value="monthly">{{ __('hrms.leave.frequency_monthly') }}</option>
++                                                              <option value="quarterly">{{ __('hrms.leave.frequency_quarterly') }}</option>
++                                                              <option value="half_yearly">{{ __('hrms.leave.frequency_half_yearly') }}</option>
++                                                              <option value="yearly">{{ __('hrms.leave.frequency_yearly') }}</option>
++                                                          </select>
++                                                      </div>
++                                                  </div>
++
++                                                  <div class="row align-items-center">
++                                                      <div class="col-sm-5 text-muted fw-semibold">{{ __('hrms.leave.max_days_per_request') }}</div>
++                                                      <div class="col-sm-7 d-flex align-items-center gap-2">
++                                                          <input type="number" id="encashment_max_days" class="odoo-table-input text-center" style="width: 80px;" value="5" step="0.5"> {{ __('hrms.leave.days') }}
++                                                      </div>
++                                                  </div>
++
++                                                  <div class="row align-items-center">
++                                                      <div class="col-sm-5 text-muted fw-semibold">{{ __('hrms.leave.min_balance_to_retain') }}</div>
++                                                      <div class="col-sm-7 d-flex align-items-center gap-2">
++                                                          <input type="number" id="encashment_min_balance" class="odoo-table-input text-center" style="width: 80px;" value="10" step="0.5"> {{ __('hrms.leave.days') }}
++                                                      </div>
++                                                  </div>
++                                              </div>
++                                          </div>
++                                      </div>
++                                  </div>
++                                  
+                                   <!-- Probation Tab Pane -->
+                                   <div class="tab-pane fade" id="pane-probation" role="tabpanel">
+                                       <h5 class="fw-bold text-dark mb-3">{{ __('hrms.leave.probation_rules') }}</h5>
+@@ -1560,6 +1609,11 @@ class="px-0 py-0"
+                 $('#yearend_max_carry').val(rules.yearend?.max_carry || 6);
+                 $('#yearend_max_encash').val(rules.yearend?.max_encash || 5);
+ 
++                $('#encashment_enabled').prop('checked', !!rules.encashment?.enabled).trigger('change');
++                $('#encashment_frequency').val(rules.encashment?.frequency || 'anytime');
++                $('#encashment_max_days').val(rules.encashment?.max_days_per_request !== undefined ? rules.encashment.max_days_per_request : 5);
++                $('#encashment_min_balance').val(rules.encashment?.min_balance_to_keep !== undefined ? rules.encashment.min_balance_to_keep : 10);
++
+                 $(`input[name="probation_rule"][value="${rules.probation?.rule || 'allow'}"]`).prop('checked', true).trigger('change');
+                 $('#probation_months').val(rules.probation?.months || 3);
+ 
+@@ -1570,6 +1624,13 @@ class="px-0 py-0"
+             });
+ 
+             // Toggle logic for conditional fields
++            $(document).on('change', '#encashment_enabled', function() {
++                if ($(this).is(':checked')) {
++                    $('#encashment_settings_div').removeClass('d-none');
++                } else {
++                    $('#encashment_settings_div').addClass('d-none');
++                }
++            });
+             $(document).on('change', 'input[name="accrual_rate"]', function() {
+                 let rateVal = $(this).val();
+                 if (rateVal === 'attendance') {
+@@ -1678,6 +1739,12 @@ class="px-0 py-0"
+                         first_approver: $('#approval_first_approver').val(),
+                         second_approver: $('#approval_second_approver').val()
+                     },
++                    encashment: {
++                        enabled: $('#encashment_enabled').is(':checked'),
++                        frequency: $('#encashment_frequency').val(),
++                        max_days_per_request: parseFloat($('#encashment_max_days').val()) || 5,
++                        min_balance_to_keep: parseFloat($('#encashment_min_balance').val()) || 10
++                    },
+                     yearend: {
+                         action: $('input[name="yearend_action"]:checked').val(),
+                         max_carry: parseFloat($('#yearend_max_carry').val()) || 6,
+diff --git a/resources/views/modules/hrms/leave-structure/transition.blade.php b/resources/views/modules/hrms/leave-structure/transition.blade.php
+index a9a8074..c156d50 100644
+--- a/resources/views/modules/hrms/leave-structure/transition.blade.php
++++ b/resources/views/modules/hrms/leave-structure/transition.blade.php
+@@ -5,8 +5,8 @@
+ @section('breadcrumb', 'HRMS / ' . __('hrms.sidebar.leave_structure') . ' / ' . __('hrms.leave.plan_transition'))
+ 
+ @section('page-actions')
+-    <a href="{{ route('hrms.leave-structure.index') }}" class="btn btn-outline-secondary d-flex align-items-center" style="height: 38px; font-weight: 500; font-size: 13px;">
+-        <i class="feather-arrow-left me-2"></i> {{ __('hrms.leave.back_to_structures') }}
++    <a href="{{ route('hrms.leave-structure.index') }}" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1">
++        <i class="feather-arrow-left me-1"></i> {{ __('hrms.leave.back_to_structures') }}
+     </a>
+ @endsection
+ 
+@@ -262,6 +262,7 @@
+                                 <div class="mb-4">
+                                     <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.unused_leaves_action')" name="leave_transition_unused" id="leave_transition_unused">
+                                         <option value="carry" selected>{{ __('hrms.leave.transition_carry') }}</option>
++                                        <option value="encash">Encash Unused Leaves (Payout & Reset)</option>
+                                         <option value="lapse">{{ __('hrms.leave.transition_lapse') }}</option>
+                                     </x-ui.odoo-form-ui>
+                                     <small class="form-text text-muted fs-11 mt-1 d-block">
+diff --git a/resources/views/modules/hrms/leaves/index.blade.php b/resources/views/modules/hrms/leaves/index.blade.php
+index ccc6a8f..9e90d1d 100644
+--- a/resources/views/modules/hrms/leaves/index.blade.php
++++ b/resources/views/modules/hrms/leaves/index.blade.php
+@@ -6,9 +6,9 @@
+ 
+ @section('page-actions')
+     <div class="d-flex align-items-center gap-2">
+-        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#applyLeaveModal" class="fw-bold text-uppercase">
+-            {{ __('hrms.leave.app.apply_leave') }}
+-        </x-ui.button>
++        <button type="button" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1" id="btnMainHeaderAction" data-target-modal="#applyLeaveModal" style="height: 38px;">
++            <i class="feather-plus me-1"></i> {{ __('hrms.leave.app.apply_leave') }}
++        </button>
+     </div>
+ @endsection
+ 
+@@ -185,6 +185,22 @@
+             padding: 8px 12px !important;
+             white-space: nowrap !important;
+         }
++        .tab-nav-custom {
++            display: flex;
++            align-items: center;
++            gap: 8px;
++            border-radius: 0 !important;
++        }
++        .tab-nav-custom .nav-link:hover {
++            color: #1e293b !important;
++            border-bottom-color: #cbd5e1 !important;
++        }
++        .tab-nav-custom .nav-link.active {
++            color: var(--bs-primary) !important;
++            border-bottom-color: var(--bs-primary) !important;
++            font-weight: 700;
++            background: transparent !important;
++        }
+     </style>
+ @endpush
+ 
+@@ -194,9 +210,59 @@
+         var employeeDataMap = @json($employeeDataMap);
+ 
+         $(document).ready(function() {
+-            // Append modals to body to prevent blur and backdrop overlay conflicts
+-            $('#applyLeaveModal').appendTo('body');
+-            $('#rejectLeaveModal').appendTo('body');
++            // Append modals to document.body to completely prevent blur/backdrop z-index issues
++            ['applyLeaveModal', 'rejectLeaveModal', 'applyEncashmentModal'].forEach(function(id) {
++                var el = document.getElementById(id);
++                if (el && el.parentNode !== document.body) {
++                    document.body.appendChild(el);
++                }
++            });
++
++            function syncHeaderActionButton(targetPaneId) {
++                var isEncashment = targetPaneId === '#pane-leave-encashments' || targetPaneId === 'tab-encashments';
++                var $btn = $('#btnMainHeaderAction');
++                if (isEncashment) {
++                    $btn.attr('data-target-modal', '#applyEncashmentModal')
++                        .data('target-modal', '#applyEncashmentModal')
++                        .html('<i class="feather-dollar-sign me-1"></i> {{ __("hrms.leave.encashment_app.apply_encashment") }}');
++                } else {
++                    $btn.attr('data-target-modal', '#applyLeaveModal')
++                        .data('target-modal', '#applyLeaveModal')
++                        .html('<i class="feather-plus me-1"></i> {{ __("hrms.leave.app.apply_leave") }}');
++                }
++            }
++
++            $(document).on('click', '#btnMainHeaderAction', function(e) {
++                e.preventDefault();
++                var targetId = $(this).attr('data-target-modal') || $(this).data('target-modal') || '#applyLeaveModal';
++                var modalEl = document.querySelector(targetId);
++                if (modalEl) {
++                    if (modalEl.parentNode !== document.body) {
++                        document.body.appendChild(modalEl);
++                    }
++                    var modalObj = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
++                    modalObj.show();
++                }
++            });
++
++            $('button[data-bs-toggle="tab"]').on('shown.bs.tab click', function (e) {
++                var target = $(this).attr('data-bs-target') || $(this).attr('id');
++                syncHeaderActionButton(target);
++
++                var tabName = target === '#pane-leave-encashments' || target === 'tab-encashments' ? 'encashments' : 'applications';
++                var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?tab=' + tabName;
++                window.history.pushState({ path: newUrl }, '', newUrl);
++            });
++
++            var activeTabParam = new URLSearchParams(window.location.search).get('tab');
++            if (activeTabParam === 'encashments') {
++                var encashTab = document.querySelector('#tab-encashments');
++                if (encashTab) {
++                    var tabObj = new bootstrap.Tab(encashTab);
++                    tabObj.show();
++                    syncHeaderActionButton('#pane-leave-encashments');
++                }
++            }
+ 
+             // Initialize custom Select2 dropdowns parented inside modal-content
+             function initModalSelects() {
+@@ -648,6 +714,160 @@ function updatePagination() {
+                     $select.closest('form').submit();
+                 }
+             });
++
++            // Client-side Encashments Pagination & Filtering
++            var encashCurrentPage = 1;
++            var encashRowsPerPage = 10;
++
++            function updateEncashmentsPagination() {
++                var searchTerm = ($('#encashments_search').val() || '').toLowerCase().trim();
++                var empFilter = $('#filter_encashment_employee_id').val();
++                var statusFilter = $('#filter_encashment_status').val();
++
++                var $allRows = $('#encashmentsTableBody .encashment-row');
++                var $visibleRows = $allRows.filter(function() {
++                    var text = ($(this).attr('data-employee') || '').toLowerCase();
++                    var empId = $(this).attr('data-employee-id') || '';
++                    var status = $(this).attr('data-status') || '';
++
++                    var matchesSearch = !searchTerm || text.indexOf(searchTerm) !== -1;
++                    var matchesEmp = !empFilter || empId === empFilter;
++                    var matchesStatus = !statusFilter || status === statusFilter;
++
++                    return matchesSearch && matchesEmp && matchesStatus;
++                });
++
++                $allRows.addClass('d-none');
++
++                var totalVisible = $visibleRows.length;
++                var totalPages = Math.ceil(totalVisible / encashRowsPerPage) || 1;
++
++                if (encashCurrentPage > totalPages) encashCurrentPage = totalPages;
++                if (encashCurrentPage < 1) encashCurrentPage = 1;
++
++                var startIndex = (encashCurrentPage - 1) * encashRowsPerPage;
++                var endIndex = startIndex + encashRowsPerPage;
++
++                $visibleRows.slice(startIndex, endIndex).removeClass('d-none');
++
++                if ($allRows.length > 0 && totalVisible === 0) {
++                    $('#no_matching_encashments_row').removeClass('d-none');
++                } else {
++                    $('#no_matching_encashments_row').addClass('d-none');
++                }
++
++                $('#encashments_showing_start').text(totalVisible > 0 ? startIndex + 1 : 0);
++                $('#encashments_showing_end').text(Math.min(endIndex, totalVisible));
++                $('#encashments_total_count').text(totalVisible);
++
++                if (totalPages > 1) {
++                    $('#pane-leave-encashments .erp-pagination-container').show();
++                } else {
++                    $('#pane-leave-encashments .erp-pagination-container').hide();
++                }
++
++                var paginationHtml = '';
++                paginationHtml += `
++                    <li class="page-item ${encashCurrentPage === 1 ? 'disabled' : ''}">
++                        <a class="page-link" href="#" data-page="${encashCurrentPage - 1}" aria-label="Previous">
++                            <i class="feather-chevron-left"></i>
++                        </a>
++                    </li>
++                `;
++
++                for (var i = 1; i <= totalPages; i++) {
++                    if (i === 1 || i === totalPages || (i >= encashCurrentPage - 1 && i <= encashCurrentPage + 1)) {
++                        paginationHtml += `
++                            <li class="page-item ${i === encashCurrentPage ? 'active' : ''}">
++                                <a class="page-link" href="#" data-page="${i}">${i}</a>
++                            </li>
++                        `;
++                    } else if (i === encashCurrentPage - 2 || i === encashCurrentPage + 2) {
++                        paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
++                    }
++                }
++
++                paginationHtml += `
++                    <li class="page-item ${encashCurrentPage === totalPages ? 'disabled' : ''}">
++                        <a class="page-link" href="#" data-page="${encashCurrentPage + 1}" aria-label="Next">
++                            <i class="feather-chevron-right"></i>
++                        </a>
++                    </li>
++                `;
++
++                $('#encashments_pagination_ul').html(paginationHtml);
++            }
++
++            $('#encashments_search').on('input', function() {
++                encashCurrentPage = 1;
++                updateEncashmentsPagination();
++            });
++
++            $('#btnApplyEncashmentFilters').on('click', function(e) {
++                e.preventDefault();
++                encashCurrentPage = 1;
++                updateEncashmentsPagination();
++                $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
++            });
++
++            $('#btnResetEncashmentFilters').on('click', function(e) {
++                e.preventDefault();
++                $('#encashments_search').val('');
++                $('#filter_encashment_employee_id').val('').trigger('change');
++                $('#filter_encashment_status').val('');
++                encashCurrentPage = 1;
++                updateEncashmentsPagination();
++                $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
++            });
++
++            $(document).on('click', '#encashments_pagination_ul .page-link', function(e) {
++                e.preventDefault();
++                var page = $(this).data('page');
++                if (page && !$(this).parent().hasClass('disabled')) {
++                    encashCurrentPage = parseInt(page);
++                    updateEncashmentsPagination();
++                }
++            });
++
++            updateEncashmentsPagination();
++
++            // Dynamic Encashment Leave Type Population
++            function updateEncashmentLeaveTypes(empId) {
++                var $select = $('#encashment_leave_type_id');
++                $select.empty().append('<option value="">' + "{{ __('hrms.leave.encashment_app.select_leave_type') }}" + '</option>');
++
++                if (empId && employeeDataMap[empId]) {
++                    var types = employeeDataMap[empId];
++                    types.forEach(function(t) {
++                        var encashRules = (t.rules && t.rules.encashment) ? t.rules.encashment : {};
++                        var isEnabled = encashRules.enabled === true || encashRules.enabled === '1' || encashRules.enabled === 'true';
++                        
++                        if (isEnabled || "{{ $isAdmin ? '1' : '0' }}" === '1') {
++                            var text = t.name + ' (' + '{{ __('hrms.leave.app.remaining') }}' + ': ' + t.remaining + ' / ' + t.quota + ' ' + '{{ __('hrms.leave.days') }}' + ')';
++                            var option = $('<option>', {
++                                value: t.id,
++                                text: text
++                            });
++                            $select.append(option);
++                        }
++                    });
++                }
++                $select.trigger('change');
++            }
++
++            $('#encashment_employee_id').on('change', function() {
++                updateEncashmentLeaveTypes($(this).val());
++            });
++
++            $('#applyEncashmentModal').on('show.bs.modal', function() {
++                var empId = $('#encashment_employee_id').length ? $('#encashment_employee_id').val() : "{{ $employee ? $employee->id : '' }}";
++                updateEncashmentLeaveTypes(empId);
++            });
++
++            var initialEncashEmpId = $('#encashment_employee_id').length ? $('#encashment_employee_id').val() : "{{ $employee ? $employee->id : '' }}";
++            if (initialEncashEmpId) {
++                updateEncashmentLeaveTypes(initialEncashEmpId);
++            }
+         });
+ 
+         // Client-side sort selection handler for leave applications
+@@ -687,6 +907,44 @@ function changeLeavesSort(criteria, element) {
+             });
+             updatePagination();
+         }
++
++        // Client-side sort selection handler for encashment requests
++        function changeEncashmentsSort(criteria, element) {
++            $('.encash-sort-check').addClass('d-none');
++            if (element) {
++                $(element).find('.encash-sort-check').removeClass('d-none');
++                var menu = element.closest('.dropdown-menu');
++                if (menu) {
++                    menu.querySelectorAll('.dropdown-item').forEach(function(el) {
++                        el.classList.remove('active');
++                    });
++                }
++                element.classList.add('active');
++            }
++
++            var $tbody = $('#encashmentsTableBody');
++            var $rows = $tbody.find('.encashment-row').get();
++
++            $rows.sort(function(a, b) {
++                var keyA, keyB;
++
++                if (criteria === 'date_desc' || criteria === 'date_asc') {
++                    keyA = parseInt($(a).attr('data-created-at') || 0);
++                    keyB = parseInt($(b).attr('data-created-at') || 0);
++                    return criteria === 'date_desc' ? keyB - keyA : keyA - keyB;
++                } else if (criteria === 'days_desc' || criteria === 'days_asc') {
++                    keyA = parseFloat($(a).attr('data-days') || 0);
++                    keyB = parseFloat($(b).attr('data-days') || 0);
++                    return criteria === 'days_desc' ? keyB - keyA : keyA - keyB;
++                }
++                return 0;
++            });
++
++            $.each($rows, function(index, row) {
++                $tbody.append(row);
++            });
++            updateEncashmentsPagination();
++        }
+     </script>
+ @endpush
+ 
+@@ -733,247 +991,455 @@ function changeLeavesSort(criteria, element) {
+             </div>
+         @endif
+ 
+-        <!-- Leaves Applications List Table -->
++        <!-- Main Module Navigation Tabs -->
++        <div class="col-12 mb-2">
++            <ul class="nav nav-tabs tab-nav-custom mb-3" id="leavesModuleTabs" role="tablist">
++                <li class="nav-item" role="presentation">
++                    <button class="nav-link active" id="tab-applications" data-bs-toggle="tab" data-bs-target="#pane-leave-applications" type="button" role="tab">
++                        <i class="feather-file-text me-1"></i> {{ __('hrms.leave.app.title') }}
++                    </button>
++                </li>
++                <li class="nav-item" role="presentation">
++                    <button class="nav-link" id="tab-encashments" data-bs-toggle="tab" data-bs-target="#pane-leave-encashments" type="button" role="tab">
++                        <i class="feather-dollar-sign me-1"></i> {{ __('hrms.leave.encashment_app.title') }}
++                        @if(isset($leaveEncashments) && $leaveEncashments->where('status', 'pending')->count() > 0)
++                            <span class="badge bg-warning text-dark rounded-pill px-2 py-0.5 fs-11">
++                                {{ $leaveEncashments->where('status', 'pending')->count() }}
++                            </span>
++                        @endif
++                    </button>
++                </li>
++            </ul>
++        </div>
++
+         <div class="col-12">
+-            <div class="card border-0 shadow-sm rounded-3">
+-                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+-                    <div>
+-                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.app.title') }}</h5>
+-                        <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.review_applications_desc') }}</p>
+-                    </div>
+-                    
+-                    <div class="d-flex align-items-center gap-2">
+-                        <form method="GET" action="javascript:void(0);" class="d-flex align-items-center gap-2 m-0" id="leavesFilterForm">
+-                            <!-- Registry Style Search Input -->
+-                            <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
+-                                <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+-                                <input type="text" id="leaves_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;">
++            <div class="tab-content" id="leavesModuleTabContent">
++                <!-- Pane 1: Leave Applications -->
++                <div class="tab-pane fade show active" id="pane-leave-applications" role="tabpanel">
++                    <div class="card border-0 shadow-sm rounded-3">
++                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
++                            <div>
++                                <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.app.title') }}</h5>
++                                <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.review_applications_desc') }}</p>
+                             </div>
+-
+-                            <!-- Sort Dropdown with Checkmark Icons -->
+-                            <x-ui.sort-dropdown :label="__('hrms.common.sort')">
+-                                <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="changeLeavesSort('date_desc', this); event.preventDefault();">
+-                                    <span>{{ __('hrms.leave.app.sort_newest') }}</span>
+-                                    <i class="feather-check text-dark ms-auto sort-check"></i>
+-                                </a>
+-                                <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('date_asc', this); event.preventDefault();">
+-                                    <span>{{ __('hrms.leave.app.sort_oldest') }}</span>
+-                                    <i class="feather-check text-dark ms-auto sort-check d-none"></i>
+-                                </a>
+-                                <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_desc', this); event.preventDefault();">
+-                                    <span>{{ __('hrms.leave.app.sort_duration_high_low') }}</span>
+-                                    <i class="feather-check text-dark ms-auto sort-check d-none"></i>
+-                                </a>
+-                                <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_asc', this); event.preventDefault();">
+-                                    <span>{{ __('hrms.leave.app.sort_duration_low_high') }}</span>
+-                                    <i class="feather-check text-dark ms-auto sort-check d-none"></i>
+-                                </a>
+-                            </x-ui.sort-dropdown>
+-
+-                            <!-- Filter Dropdown -->
+-                            <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
+-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
+-                                
+-                                @if($isAdmin)
+-                                    <div class="mb-3" style="min-width: 250px;">
+-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</label>
+-                                        <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_employee_id">
+-                                            <option value="">{{ __('hrms.common.all_employees') ?? 'All Employees' }}</option>
+-                                            @foreach($allEmployees as $emp)
+-                                                <option value="{{ $emp->id }}">
+-                                                    {{ $emp->full_name }}
+-                                                </option>
+-                                            @endforeach
+-                                        </x-ui.odoo-form-ui>
++                            
++                            <div class="d-flex align-items-center gap-2">
++                                <form method="GET" action="javascript:void(0);" class="d-flex align-items-center gap-2 m-0" id="leavesFilterForm">
++                                    <!-- Registry Style Search Input -->
++                                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
++                                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
++                                        <input type="text" id="leaves_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;">
+                                     </div>
+-                                @endif
+ 
+-                                <div class="mb-3" style="min-width: 250px;">
+-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
+-                                    <x-ui.odoo-form-ui type="select" name="status" id="filter_status">
+-                                        <option value="">{{ __('hrms.common.all_statuses') }}</option>
+-                                        <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
+-                                        <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
+-                                        <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
+-                                    </x-ui.odoo-form-ui>
+-                                </div>
++                                    <!-- Sort Dropdown with Checkmark Icons -->
++                                    <x-ui.sort-dropdown :label="__('hrms.common.sort')">
++                                        <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="changeLeavesSort('date_desc', this); event.preventDefault();">
++                                            <span>{{ __('hrms.leave.app.sort_newest') }}</span>
++                                            <i class="feather-check text-dark ms-auto sort-check"></i>
++                                        </a>
++                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('date_asc', this); event.preventDefault();">
++                                            <span>{{ __('hrms.leave.app.sort_oldest') }}</span>
++                                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
++                                        </a>
++                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_desc', this); event.preventDefault();">
++                                            <span>{{ __('hrms.leave.app.sort_duration_high_low') }}</span>
++                                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
++                                        </a>
++                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_asc', this); event.preventDefault();">
++                                            <span>{{ __('hrms.leave.app.sort_duration_low_high') }}</span>
++                                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
++                                        </a>
++                                    </x-ui.sort-dropdown>
++
++                                    <!-- Filter Dropdown -->
++                                    <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
++                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
++                                        
++                                        @if($isAdmin)
++                                            <div class="mb-3" style="min-width: 250px;">
++                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</label>
++                                                <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_employee_id">
++                                                    <option value="">{{ __('hrms.common.all_employees') ?? 'All Employees' }}</option>
++                                                    @foreach($allEmployees as $emp)
++                                                        <option value="{{ $emp->id }}">
++                                                            {{ $emp->full_name }}
++                                                        </option>
++                                                    @endforeach
++                                                </x-ui.odoo-form-ui>
++                                            </div>
++                                        @endif
+ 
+-                                <div class="dropdown-divider my-3"></div>
++                                        <div class="mb-3" style="min-width: 250px;">
++                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
++                                            <x-ui.odoo-form-ui type="select" name="status" id="filter_status">
++                                                <option value="">{{ __('hrms.common.all_statuses') }}</option>
++                                                <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
++                                                <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
++                                                <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
++                                            </x-ui.odoo-form-ui>
++                                        </div>
++
++                                        <div class="dropdown-divider my-3"></div>
+ 
+-                                <div class="d-flex gap-2">
+-                                    <button type="button" id="btnApplyFilters" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
+-                                    <button type="button" id="btnResetFilters" class="btn btn-light btn-sm border flex-grow-1">{{ __('hrms.common.reset') }}</button>
++                                        <div class="d-flex gap-2">
++                                            <button type="button" id="btnApplyFilters" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
++                                            <button type="button" id="btnResetFilters" class="btn btn-light btn-sm border flex-grow-1">{{ __('hrms.common.reset') }}</button>
++                                        </div>
++                                    </x-ui.filter>
++                                </form>
++                            </div>
++                        </div>
++                        
++                        <div class="card-body p-0">
++                            <div class="table-responsive">
++                                <table class="table table-hover align-middle mb-0">
++                                    <thead class="table-light">
++                                        <tr>
++                                            @if($isAdmin)
++                                                <th>{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
++                                            @endif
++                                            <th>{{ __('hrms.leave.leave_types') }}</th>
++                                            <th>{{ __('hrms.leave.app.duration_timeline') }}</th>
++                                            <th>{{ __('hrms.leave.app.reason') }}</th>
++                                            <th>{{ __('hrms.leave.app.workflow_level') }}</th>
++                                            <th>{{ __('ui.status') ?? 'Status' }}</th>
++                                            <th class="text-end">{{ __('hrms.leave.app.actions') }}</th>
++                                        </tr>
++                                    </thead>
++                                    <tbody id="leavesTableBody">
++                                        @forelse($leaveRequests as $req)
++                                            <tr class="leave-row" 
++                                                data-employee="{{ strtolower($req->employee->full_name) }} {{ strtolower($req->employee->employee_id) }}"
++                                                data-employee-id="{{ $req->employee_id }}"
++                                                data-status="{{ $req->status }}"
++                                                data-duration="{{ $req->duration }}"
++                                                data-created-at="{{ $req->created_at->timestamp }}">
++                                                @if($isAdmin)
++                                                    <td>
++                                                        <div class="d-flex align-items-center gap-2">
++                                                            <div>
++                                                                <h6 class="fw-bold mb-0 fs-13 text-dark">{{ $req->employee->full_name }}</h6>
++                                                                <small class="text-muted fs-11">{{ $req->employee->employee_id }}</small>
++                                                            </div>
++                                                        </div>
++                                                    </td>
++                                                @endif
++                                                <td>
++                                                    <span class="badge bg-light text-primary fw-semibold fs-12 mb-1">{{ $req->leaveType->name }}</span>
++                                                    @php
++                                                        $rowBalance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $req->employee_id)
++                                                            ->where('leave_type_id', $req->leave_type_id)
++                                                            ->first();
++                                                        $rowRemaining = $rowBalance ? floatval($rowBalance->remaining) : 0.0;
++                                                        $rowAllocated = $rowBalance ? floatval($rowBalance->allocated) : floatval($req->leaveType->quota);
++                                                    @endphp
++                                                    <div class="text-muted fs-11" style="white-space: nowrap;">
++                                                        {{ __('hrms.leave.app.remaining') }}: <strong>{{ $rowRemaining }}</strong> / {{ $rowAllocated }} {{ __('hrms.leave.days') }}
++                                                    </div>
++                                                </td>
++                                                <td>
++                                                    @php
++                                                        $startFormat = $req->start_date->format('Y') === $req->end_date->format('Y') ? 'd M' : 'd M Y';
++                                                        $startStr = $req->start_date->format($startFormat);
++                                                        $endStr = $req->end_date->format('d M Y');
++                                                        
++                                                        if ($req->start_date->isSameDay($req->end_date)) {
++                                                            $dateRange = $req->start_date->format('d M Y');
++                                                        } else {
++                                                            $dateRange = $startStr . ' - ' . $endStr;
++                                                        }
++                                                    @endphp
++                                                    <div class="fs-13 text-dark fw-bold">
++                                                        {{ $dateRange }} <span class="text-secondary fs-12 fw-normal">({{ __('hrms.leave.app.duration_days', ['duration' => floatval($req->duration)]) }})</span>
++                                                    </div>
++                                                    @if($req->start_date_type !== 'full_day' || $req->end_date_type !== 'full_day')
++                                                        <small class="text-muted fs-11">
++                                                            {{ __('hrms.leave.app.session') }} <span class="text-capitalize">{{ __('hrms.leave.app.' . $req->start_date_type) }}</span> 
++                                                            @if(!$req->start_date->isSameDay($req->end_date))
++                                                                {{ __('hrms.leave.app.to') }} <span class="text-capitalize">{{ __('hrms.leave.app.' . $req->end_date_type) }}</span>
++                                                            @endif
++                                                        </small>
++                                                    @endif
++                                                </td>
++                                                <td>
++                                                    @if(strlen($req->reason) > 25)
++                                                        <span class="text-secondary fs-13" 
++                                                              style="cursor: pointer; border-bottom: 1px dashed #cbd5e1;" 
++                                                              data-bs-toggle="popover" 
++                                                              data-bs-trigger="click" 
++                                                              data-bs-placement="top" 
++                                                              title="{{ __('hrms.leave.app.application_reason') }}" 
++                                                              data-bs-content="{{ $req->reason }}">
++                                                            {{ Str::limit($req->reason, 25) }} <i class="feather-zoom-in fs-11 text-muted"></i>
++                                                        </span>
++                                                    @else
++                                                        <span class="fs-13 text-secondary">{{ $req->reason }}</span>
++                                                    @endif
++                                                </td>
++                                                <td>
++                                                     <span class="text-secondary fs-12">
++                                                         @if($req->status === 'approved')
++                                                             {{ __('hrms.leave.app.status_approved') }}
++                                                         @elseif($req->status === 'rejected')
++                                                             {{ __('hrms.leave.app.status_rejected') }}
++                                                         @elseif($req->status === 'unauthorized' || $req->status === 'unpaid')
++                                                             {{ __('hrms.leave.app.processed') }}
++                                                         @else
++                                                             {{ __('hrms.leave.app.level_n', ['level' => $req->current_level]) }}
++                                                         @endif
++                                                     </span>
++                                                 </td>
++                                                 <td>
++                                                     @if($req->status === 'rejected' && $req->rejection_reason)
++                                                         <span class="badge rounded-pill fw-semibold px-3 py-2 fs-11 badge-rejected" 
++                                                               style="cursor: pointer;" 
++                                                               data-bs-toggle="popover" 
++                                                               data-bs-trigger="click" 
++                                                               data-bs-placement="top" 
++                                                               title="{{ __('hrms.leave.app.rejection_reason') }}" 
++                                                               data-bs-content="{{ $req->rejection_reason }}">
++                                                             {{ __('hrms.leave.app.status_rejected') }} <i class="feather-help-circle fs-10"></i>
++                                                         </span>
++                                                     @else
++                                                         <span class="badge rounded-pill fw-semibold px-3 py-2 fs-11 badge-{{ $req->status }}">
++                                                             {{ __('hrms.leave.app.status_' . $req->status) }}
++                                                         </span>
++                                                     @endif
++                                                 </td>
++                                                 <td class="text-end">
++                                                     <div class="d-flex align-items-center justify-content-end gap-2">
++                                                         @if($req->attachment_path)
++                                                             <a href="{{ asset('storage/' . $req->attachment_path) }}" target="_blank" class="btn btn-light btn-sm" title="{{ __('hrms.leave.app.view_attachment') }}">
++                                                                 <i class="feather-paperclip text-secondary"></i>
++                                                             </a>
++                                                         @endif
++                                                         @if($isAdmin)
++                                                             <form method="POST" action="{{ route('hrms.leaves.update-status', $req->id) }}" class="m-0 p-0">
++                                                                 @csrf
++                                                                 <select name="status" class="form-select form-select-sm status-dropdown fw-semibold fs-11" data-id="{{ $req->id }}" style="width: 130px; border-radius: 6px;">
++                                                                     <option value="pending" {{ $req->status === 'pending' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_pending') }}</option>
++                                                                     <option value="approved" {{ $req->status === 'approved' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_approved') }}</option>
++                                                                     <option value="rejected" {{ $req->status === 'rejected' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_rejected') }}</option>
++                                                                     <option value="unauthorized" {{ $req->status === 'unauthorized' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_unauthorized') }}</option>
++                                                                     <option value="unpaid" {{ $req->status === 'unpaid' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_unpaid') }}</option>
++                                                                 </select>
++                                                             </form>
++                                                         @endif
++                                                     </div>
++                                                 </td>
++                                            </tr>
++                                        @empty
++                                            <tr>
++                                                <td colspan="10" class="text-center py-5 text-muted">
++                                                    <i class="feather-folder fs-3 d-block mb-3 text-secondary"></i>
++                                                    {{ __('hrms.leave.app.no_applications_submitted') }}
++                                                </td>
++                                            </tr>
++                                        @endforelse
++                                        <tr id="no_matching_leaves_row" class="d-none">
++                                            <td colspan="10" class="text-center py-5 text-muted">
++                                                <i class="feather-folder fs-3 d-block mb-3 text-secondary"></i>
++                                                {{ __('hrms.leave.app.no_matching_applications') }}
++                                            </td>
++                                        </tr>
++                                    </tbody>
++                                </table>
++                            </div>
++                            <div class="erp-pagination-container">
++                                <ul class="erp-pagination mb-2" id="leaves_pagination_ul">
++                                    <!-- Dynamically generated pagination links -->
++                                </ul>
++                                <div class="erp-pagination-info">
++                                    {!! __('hrms.leave.app.showing_entries', [
++                                        'start' => '<span id="leaves_showing_start">0</span>',
++                                        'end' => '<span id="leaves_showing_end">0</span>',
++                                        'total' => '<strong id="leaves_total_count">0</strong>'
++                                    ]) !!}
+                                 </div>
+-                            </x-ui.filter>
+-                        </form>
++                            </div>
++                        </div>
+                     </div>
+                 </div>
+-                
+-                <div class="card-body p-0">
+-                    <div class="table-responsive">
+-                        <table class="table table-hover align-middle mb-0">
+-                            <thead class="table-light">
+-                                <tr>
+-                                    @if($isAdmin)
+-                                        <th>{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
+-                                    @endif
+-                                    <th>{{ __('hrms.leave.leave_types') }}</th>
+-                                    <th>{{ __('hrms.leave.app.duration_timeline') }}</th>
+-                                    <th>{{ __('hrms.leave.app.reason') }}</th>
+-                                    <th>{{ __('hrms.leave.app.workflow_level') }}</th>
+-                                    <th>{{ __('ui.status') ?? 'Status' }}</th>
+-                                    <th class="text-end">{{ __('hrms.leave.app.actions') }}</th>
+-                                </tr>
+-                            </thead>
+-                            <tbody id="leavesTableBody">
+-                                @forelse($leaveRequests as $req)
+-                                    <tr class="leave-row" 
+-                                        data-employee="{{ strtolower($req->employee->full_name) }} {{ strtolower($req->employee->employee_id) }}"
+-                                        data-employee-id="{{ $req->employee_id }}"
+-                                        data-status="{{ $req->status }}"
+-                                        data-duration="{{ $req->duration }}"
+-                                        data-created-at="{{ $req->created_at->timestamp }}">
++
++                <!-- Pane 2: Leave Encashments -->
++                <div class="tab-pane fade" id="pane-leave-encashments" role="tabpanel">
++                    <div class="card border-0 shadow-sm rounded-3">
++                        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
++                            <div>
++                                <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.encashment_app.title') }}</h5>
++                                <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.review_applications_desc') }}</p>
++                            </div>
++                            
++                            <div class="d-flex align-items-center gap-2">
++                                <form method="GET" action="javascript:void(0);" class="d-flex align-items-center gap-2 m-0" id="encashmentFilterForm">
++                                    <!-- Registry Style Search Input -->
++                                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
++                                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
++                                        <input type="text" id="encashments_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.leave.app.search_employee') }}" style="box-shadow: none; height: 32px;">
++                                    </div>
++
++                                    <!-- Sort Dropdown -->
++                                    <x-ui.sort-dropdown :label="__('hrms.common.sort')">
++                                        <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="changeEncashmentsSort('date_desc', this); event.preventDefault();">
++                                            <span>{{ __('hrms.leave.encashment_app.sort_newest') }}</span>
++                                            <i class="feather-check text-dark ms-auto encash-sort-check"></i>
++                                        </a>
++                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeEncashmentsSort('date_asc', this); event.preventDefault();">
++                                            <span>{{ __('hrms.leave.encashment_app.sort_oldest') }}</span>
++                                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
++                                        </a>
++                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeEncashmentsSort('days_desc', this); event.preventDefault();">
++                                            <span>{{ __('hrms.leave.encashment_app.sort_days_high_low') }}</span>
++                                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
++                                        </a>
++                                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeEncashmentsSort('days_asc', this); event.preventDefault();">
++                                            <span>{{ __('hrms.leave.encashment_app.sort_days_low_high') }}</span>
++                                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
++                                        </a>
++                                    </x-ui.sort-dropdown>
++
++                                    <!-- Filter Dropdown -->
++                                    <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
++                                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
++                                        
+                                         @if($isAdmin)
+-                                            <td>
+-                                                <div class="d-flex align-items-center gap-2">
+-                                                    <div>
+-                                                        <h6 class="fw-bold mb-0 fs-13 text-dark">{{ $req->employee->full_name }}</h6>
+-                                                        <small class="text-muted fs-11">{{ $req->employee->employee_id }}</small>
+-                                                    </div>
+-                                                </div>
+-                                            </td>
+-                                        @endif
+-                                        <td>
+-                                            <span class="badge bg-light text-primary fw-semibold fs-12 mb-1">{{ $req->leaveType->name }}</span>
+-                                            @php
+-                                                $rowBalance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $req->employee_id)
+-                                                    ->where('leave_type_id', $req->leave_type_id)
+-                                                    ->first();
+-                                                $rowRemaining = $rowBalance ? floatval($rowBalance->remaining) : 0.0;
+-                                                $rowAllocated = $rowBalance ? floatval($rowBalance->allocated) : floatval($req->leaveType->quota);
+-                                            @endphp
+-                                            <div class="text-muted fs-11" style="white-space: nowrap;">
+-                                                {{ __('hrms.leave.app.remaining') }}: <strong>{{ $rowRemaining }}</strong> / {{ $rowAllocated }} {{ __('hrms.leave.days') }}
+-                                            </div>
+-                                        </td>
+-                                        <td>
+-                                            @php
+-                                                $startFormat = $req->start_date->format('Y') === $req->end_date->format('Y') ? 'd M' : 'd M Y';
+-                                                $startStr = $req->start_date->format($startFormat);
+-                                                $endStr = $req->end_date->format('d M Y');
+-                                                
+-                                                if ($req->start_date->isSameDay($req->end_date)) {
+-                                                    $dateRange = $req->start_date->format('d M Y');
+-                                                } else {
+-                                                    $dateRange = $startStr . ' - ' . $endStr;
+-                                                }
+-                                            @endphp
+-                                            <div class="fs-13 text-dark fw-bold">
+-                                                {{ $dateRange }} <span class="text-secondary fs-12 fw-normal">({{ __('hrms.leave.app.duration_days', ['duration' => floatval($req->duration)]) }})</span>
++                                            <div class="mb-3" style="min-width: 250px;">
++                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.leave.encashment_app.employee') }}</label>
++                                                <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_encashment_employee_id">
++                                                    <option value="">{{ __('hrms.common.all_employees') }}</option>
++                                                    @foreach($allEmployees as $emp)
++                                                        <option value="{{ $emp->id }}">
++                                                            {{ $emp->full_name }}
++                                                        </option>
++                                                    @endforeach
++                                                </x-ui.odoo-form-ui>
+                                             </div>
+-                                            @if($req->start_date_type !== 'full_day' || $req->end_date_type !== 'full_day')
+-                                                <small class="text-muted fs-11">
+-                                                    {{ __('hrms.leave.app.session') }} <span class="text-capitalize">{{ __('hrms.leave.app.' . $req->start_date_type) }}</span> 
+-                                                    @if(!$req->start_date->isSameDay($req->end_date))
+-                                                        {{ __('hrms.leave.app.to') }} <span class="text-capitalize">{{ __('hrms.leave.app.' . $req->end_date_type) }}</span>
+-                                                    @endif
+-                                                </small>
++                                        @endif
++
++                                        <div class="mb-3" style="min-width: 250px;">
++                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
++                                            <x-ui.odoo-form-ui type="select" name="status" id="filter_encashment_status">
++                                                <option value="">{{ __('hrms.leave.encashment_app.all_statuses') }}</option>
++                                                <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
++                                                <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
++                                                <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
++                                            </x-ui.odoo-form-ui>
++                                        </div>
++
++                                        <div class="dropdown-divider my-3"></div>
++
++                                        <div class="d-flex gap-2">
++                                            <button type="button" id="btnApplyEncashmentFilters" class="btn btn-primary btn-sm flex-grow-1">{{ __('hrms.common.apply') }}</button>
++                                            <button type="button" id="btnResetEncashmentFilters" class="btn btn-light btn-sm border flex-grow-1">{{ __('hrms.common.reset') }}</button>
++                                        </div>
++                                    </x-ui.filter>
++                                </form>
++                            </div>
++                        </div>
++
++                        <div class="card-body p-0">
++                            <div class="table-responsive">
++                                <table class="table table-hover align-middle mb-0">
++                                    <thead class="table-light">
++                                        <tr>
++                                            @if($isAdmin)
++                                                <th>{{ __('hrms.leave.encashment_app.employee') }}</th>
+                                             @endif
+-                                        </td>
+-                                        <td>
+-                                            @if(strlen($req->reason) > 25)
+-                                                <span class="text-secondary fs-13" 
+-                                                      style="cursor: pointer; border-bottom: 1px dashed #cbd5e1;" 
+-                                                      data-bs-toggle="popover" 
+-                                                      data-bs-trigger="click" 
+-                                                      data-bs-placement="top" 
+-                                                      title="{{ __('hrms.leave.app.application_reason') }}" 
+-                                                      data-bs-content="{{ $req->reason }}">
+-                                                    {{ Str::limit($req->reason, 25) }} <i class="feather-zoom-in fs-11 text-muted"></i>
+-                                                </span>
+-                                            @else
+-                                                <span class="fs-13 text-secondary">{{ $req->reason }}</span>
++                                            <th>{{ __('hrms.leave.encashment_app.leave_type') }}</th>
++                                            <th>{{ __('hrms.leave.encashment_app.requested_days') }}</th>
++                                            <th>{{ __('hrms.leave.encashment_app.reason') }}</th>
++                                            <th>{{ __('hrms.leave.encashment_app.submitted_date') }}</th>
++                                            <th>{{ __('ui.status') ?? 'Status' }}</th>
++                                            @if($isAdmin)
++                                                <th class="text-end">{{ __('hrms.leave.app.actions') }}</th>
+                                             @endif
+-                                        </td>
+-                                        <td>
+-                                             <span class="text-secondary fs-12">
+-                                                 @if($req->status === 'approved')
+-                                                     {{ __('hrms.leave.app.status_approved') }}
+-                                                 @elseif($req->status === 'rejected')
+-                                                     {{ __('hrms.leave.app.status_rejected') }}
+-                                                 @elseif($req->status === 'unauthorized' || $req->status === 'unpaid')
+-                                                     {{ __('hrms.leave.app.processed') }}
+-                                                 @else
+-                                                     {{ __('hrms.leave.app.level_n', ['level' => $req->current_level]) }}
+-                                                 @endif
+-                                             </span>
+-                                         </td>
+-                                         <td>
+-                                             @if($req->status === 'rejected' && $req->rejection_reason)
+-                                                 <span class="badge rounded-pill fw-semibold px-3 py-2 fs-11 badge-rejected" 
+-                                                       style="cursor: pointer;" 
+-                                                       data-bs-toggle="popover" 
+-                                                       data-bs-trigger="click" 
+-                                                       data-bs-placement="top" 
+-                                                       title="{{ __('hrms.leave.app.rejection_reason') }}" 
+-                                                       data-bs-content="{{ $req->rejection_reason }}">
+-                                                     {{ __('hrms.leave.app.status_rejected') }} <i class="feather-help-circle fs-10"></i>
+-                                                 </span>
+-                                             @else
+-                                                 <span class="badge rounded-pill fw-semibold px-3 py-2 fs-11 badge-{{ $req->status }}">
+-                                                     {{ __('hrms.leave.app.status_' . $req->status) }}
+-                                                 </span>
+-                                             @endif
+-                                         </td>
+-                                         <td class="text-end">
+-                                             <div class="d-flex align-items-center justify-content-end gap-2">
+-                                                 @if($req->attachment_path)
+-                                                     <a href="{{ asset('storage/' . $req->attachment_path) }}" target="_blank" class="btn btn-light btn-sm" title="{{ __('hrms.leave.app.view_attachment') }}">
+-                                                         <i class="feather-paperclip text-secondary"></i>
+-                                                     </a>
+-                                                 @endif
+-                                                 @if($isAdmin)
+-                                                     <form method="POST" action="{{ route('hrms.leaves.update-status', $req->id) }}" class="m-0 p-0">
+-                                                         @csrf
+-                                                         <select name="status" class="form-select form-select-sm status-dropdown fw-semibold fs-11" data-id="{{ $req->id }}" style="width: 130px; border-radius: 6px;">
+-                                                             <option value="pending" {{ $req->status === 'pending' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_pending') }}</option>
+-                                                             <option value="approved" {{ $req->status === 'approved' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_approved') }}</option>
+-                                                             <option value="rejected" {{ $req->status === 'rejected' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_rejected') }}</option>
+-                                                             <option value="unauthorized" {{ $req->status === 'unauthorized' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_unauthorized') }}</option>
+-                                                             <option value="unpaid" {{ $req->status === 'unpaid' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_unpaid') }}</option>
+-                                                         </select>
+-                                                     </form>
+-                                                 @endif
+-                                             </div>
+-                                         </td>
+-                                    </tr>
+-                                @empty
+-                                    <tr>
+-                                        <td colspan="10" class="text-center py-5 text-muted">
+-                                            <i class="feather-folder fs-3 d-block mb-3 text-secondary"></i>
+-                                            {{ __('hrms.leave.app.no_applications_submitted') }}
+-                                        </td>
+-                                    </tr>
+-                                @endforelse
+-                                <tr id="no_matching_leaves_row" class="d-none">
+-                                    <td colspan="10" class="text-center py-5 text-muted">
+-                                        <i class="feather-folder fs-3 d-block mb-3 text-secondary"></i>
+-                                        {{ __('hrms.leave.app.no_matching_applications') }}
+-                                    </td>
+-                                </tr>
+-                            </tbody>
+-                        </table>
+-                    </div>
+-                    <div class="erp-pagination-container">
+-                        <ul class="erp-pagination mb-2" id="leaves_pagination_ul">
+-                            <!-- Dynamically generated pagination links -->
+-                        </ul>
+-                        <div class="erp-pagination-info">
+-                            {!! __('hrms.leave.app.showing_entries', [
+-                                'start' => '<span id="leaves_showing_start">0</span>',
+-                                'end' => '<span id="leaves_showing_end">0</span>',
+-                                'total' => '<strong id="leaves_total_count">0</strong>'
+-                            ]) !!}
++                                        </tr>
++                                    </thead>
++                                    <tbody id="encashmentsTableBody">
++                                        @forelse($leaveEncashments as $enc)
++                                            <tr class="encashment-row"
++                                                data-employee="{{ strtolower($enc->employee->full_name) }} {{ strtolower($enc->employee->employee_id) }}"
++                                                data-employee-id="{{ $enc->employee_id }}"
++                                                data-status="{{ $enc->status }}"
++                                                data-days="{{ floatval($enc->requested_days) }}"
++                                                data-created-at="{{ $enc->created_at->timestamp }}">
++                                                @if($isAdmin)
++                                                    <td>
++                                                        <h6 class="fw-bold mb-0 fs-13 text-dark">{{ $enc->employee->full_name }}</h6>
++                                                        <small class="text-muted fs-11">{{ $enc->employee->employee_id }}</small>
++                                                    </td>
++                                                @endif
++                                                <td>
++                                                    <span class="badge bg-light text-primary fw-semibold fs-12 mb-1">{{ $enc->leaveType->name }}</span>
++                                                </td>
++                                                <td>
++                                                    <span class="fs-13 fw-bold text-dark">{{ floatval($enc->requested_days) }} {{ __('hrms.leave.days') }}</span>
++                                                </td>
++                                                <td>
++                                                    <span class="fs-12 text-muted">{{ $enc->reason ?: __('hrms.leave.app.no_reason_provided') }}</span>
++                                                </td>
++                                                <td>
++                                                    <span class="fs-12 text-dark">{{ $enc->created_at->format('d M Y') }}</span>
++                                                </td>
++                                                <td>
++                                                    @if($enc->status === 'pending')
++                                                        <span class="badge badge-pending px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-clock me-1"></i> {{ __('hrms.leave.app.status_pending') }}</span>
++                                                    @elseif($enc->status === 'approved')
++                                                        <span class="badge badge-approved px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-check-circle me-1"></i> {{ __('hrms.leave.app.status_approved') }}</span>
++                                                    @else
++                                                        <span class="badge badge-rejected px-2.5 py-1.5 rounded-pill fs-11 fw-semibold"><i class="feather-x-circle me-1"></i> {{ __('hrms.leave.app.status_rejected') }}</span>
++                                                    @endif
++                                                </td>
++                                                @if($isAdmin)
++                                                    <td class="text-end">
++                                                        @if($enc->status === 'pending')
++                                                            <form method="POST" action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" class="d-inline-block me-1">
++                                                                @csrf
++                                                                <button type="submit" class="btn btn-sm btn-success px-2 py-1 fs-12 fw-semibold" title="{{ __('hrms.leave.encashment_app.approve') }}"><i class="feather-check me-1"></i> {{ __('hrms.leave.encashment_app.approve') }}</button>
++                                                            </form>
++                                                            <form method="POST" action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" class="d-inline-block">
++                                                                @csrf
++                                                                <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-1 fs-12 fw-semibold" title="{{ __('hrms.leave.encashment_app.reject') }}"><i class="feather-x me-1"></i> {{ __('hrms.leave.encashment_app.reject') }}</button>
++                                                            </form>
++                                                        @else
++                                                            <form method="POST" action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" class="d-inline-block" onsubmit="return confirm('{{ __('hrms.leave.encashment_app.confirm_delete') }}');">
++                                                                @csrf
++                                                                @method('DELETE')
++                                                                <button type="submit" class="btn btn-sm btn-light border text-danger px-2 py-1 fs-12" title="{{ __('hrms.common.delete') }}"><i class="feather-trash-2"></i></button>
++                                                            </form>
++                                                        @endif
++                                                    </td>
++                                                @endif
++                                            </tr>
++                                        @empty
++                                            <tr>
++                                                <td colspan="{{ $isAdmin ? 7 : 5 }}" class="text-center py-5 text-muted fs-13">
++                                                    <i class="feather-dollar-sign fs-3 d-block mb-2 text-secondary"></i>
++                                                    {{ __('hrms.leave.encashment_app.no_encashments') }}
++                                                </td>
++                                            </tr>
++                                        @endforelse
++                                        <tr id="no_matching_encashments_row" class="d-none">
++                                            <td colspan="{{ $isAdmin ? 7 : 5 }}" class="text-center py-5 text-muted fs-13">
++                                                <i class="feather-folder fs-3 d-block mb-2 text-secondary"></i>
++                                                {{ __('hrms.leave.encashment_app.no_matching_encashments') }}
++                                            </td>
++                                        </tr>
++                                    </tbody>
++                                </table>
++                            </div>
++                            <div class="erp-pagination-container">
++                                <ul class="erp-pagination mb-2" id="encashments_pagination_ul">
++                                    <!-- Encashments Pagination -->
++                                </ul>
++                                <div class="erp-pagination-info">
++                                    {!! __('hrms.leave.app.showing_entries', [
++                                        'start' => '<span id="encashments_showing_start">0</span>',
++                                        'end' => '<span id="encashments_showing_end">0</span>',
++                                        'total' => '<strong id="encashments_total_count">0</strong>'
++                                    ]) !!}
++                                </div>
++                            </div>
+                         </div>
+                     </div>
+                 </div>
+@@ -1092,6 +1558,62 @@ function changeLeavesSort(criteria, element) {
+         </div>
+     </div>
+ 
++    <!-- Apply Encashment Modal -->
++    <div class="modal fade" id="applyEncashmentModal" tabindex="-1" aria-labelledby="applyEncashmentModalLabel" aria-hidden="true">
++        <div class="modal-dialog modal-dialog-centered">
++            <div class="modal-content border-0 shadow">
++                <div class="modal-header bg-light px-4 py-3 border-bottom">
++                    <h5 class="modal-title fw-bold text-dark" id="applyEncashmentModalLabel">{{ __('hrms.leave.encashment_app.apply_for_encashment') }}</h5>
++                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
++                </div>
++                <form method="POST" action="{{ route('hrms.leaves.encashment.store') }}">
++                    @csrf
++                    <div class="modal-body p-4">
++                        @if($isAdmin)
++                            <div class="mb-3">
++                                <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.leave.encashment_app.select_employee') }} <span class="text-danger">*</span></label>
++                                <select name="employee_id" id="encashment_employee_id" class="form-select odoo-select2-custom" required>
++                                    <option value="">{{ __('hrms.leave.encashment_app.select_employee') }}...</option>
++                                    @foreach($allEmployees as $emp)
++                                        <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
++                                    @endforeach
++                                </select>
++                            </div>
++                        @else
++                            <input type="hidden" name="employee_id" value="{{ $employee ? $employee->id : '' }}">
++                        @endif
++
++                        <div class="mb-3">
++                            <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.leave.encashment_app.select_leave_type') }} <span class="text-danger">*</span></label>
++                            <select name="leave_type_id" id="encashment_leave_type_id" class="form-select odoo-select2-custom" required>
++                                <option value="">{{ __('hrms.leave.encashment_app.select_leave_type') }}...</option>
++                                @if($employee && isset($employeeDataMap[$employee->id]))
++                                    @foreach($employeeDataMap[$employee->id] as $t)
++                                        <option value="{{ $t['id'] }}">{{ $t['name'] }} ({{ __('hrms.leave.app.remaining') }}: {{ $t['remaining'] }} {{ __('hrms.leave.days') }})</option>
++                                    @endforeach
++                                @endif
++                            </select>
++                        </div>
++
++                        <div class="mb-3">
++                            <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.leave.encashment_app.requested_days') }} <span class="text-danger">*</span></label>
++                            <input type="number" name="requested_days" class="form-control" step="0.5" min="0.5" placeholder="e.g. 2.5" required>
++                        </div>
++
++                        <div class="mb-3">
++                            <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.leave.encashment_app.reason') }}</label>
++                            <textarea name="reason" class="form-control" rows="3" placeholder="{{ __('hrms.leave.encashment_app.reason_placeholder') }}"></textarea>
++                        </div>
++                    </div>
++                    <div class="modal-footer bg-light px-4 py-3 border-top">
++                        <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
++                        <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="feather-check me-1"></i> {{ __('hrms.leave.encashment_app.submit_encashment') }}</button>
++                    </div>
++                </form>
++            </div>
++        </div>
++    </div>
++
+     <!-- Reject Leave Modal -->
+     <div class="modal fade" id="rejectLeaveModal" aria-labelledby="rejectLeaveModalLabel" aria-hidden="true">
+         <div class="modal-dialog modal-dialog-centered">
+

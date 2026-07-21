@@ -5,8 +5,8 @@
 @section('breadcrumb', 'HRMS / ' . __('hrms.sidebar.leave_structure') . ' / ' . __('hrms.leave.plan_transition'))
 
 @section('page-actions')
-    <a href="{{ route('hrms.leave-structure.index') }}" class="btn btn-outline-secondary d-flex align-items-center" style="height: 38px; font-weight: 500; font-size: 13px;">
-        <i class="feather-arrow-left me-2"></i> {{ __('hrms.leave.back_to_structures') }}
+    <a href="{{ route('hrms.leave-structure.index') }}" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1">
+        <i class="feather-arrow-left me-1"></i> {{ __('hrms.leave.back_to_structures') }}
     </a>
 @endsection
 
@@ -262,6 +262,7 @@
                                 <div class="mb-4">
                                     <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.unused_leaves_action')" name="leave_transition_unused" id="leave_transition_unused">
                                         <option value="carry" selected>{{ __('hrms.leave.transition_carry') }}</option>
+                                        <option value="encash">Encash Unused Leaves (Payout & Reset)</option>
                                         <option value="lapse">{{ __('hrms.leave.transition_lapse') }}</option>
                                     </x-ui.odoo-form-ui>
                                     <small class="form-text text-muted fs-11 mt-1 d-block">

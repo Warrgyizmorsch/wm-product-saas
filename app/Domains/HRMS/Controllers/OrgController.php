@@ -16,47 +16,7 @@ class OrgController extends Controller {
     public function index(Request $request) {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
-        // Programmatically run schema updates if they haven't been applied yet
-        try {
-            if (!\Illuminate\Support\Facades\Schema::hasColumn('branches', 'company_id')) {
-                \Illuminate\Support\Facades\Schema::table('branches', function (\Illuminate\Database\Schema\Blueprint $table) {
-                    try {
-                        $table->dropForeign('branches_business_unit_id_foreign');
-                    } catch (\Exception $ex) {
-                        // ignore if doesn't exist
-                    }
-                    $table->unsignedBigInteger('business_unit_id')->nullable()->change();
-                    $table->foreign('business_unit_id')->references('id')->on('branches')->nullOnDelete();
 
-                    $table->unsignedBigInteger('company_id')->nullable()->after('business_unit_id');
-                    $table->foreign('company_id')->references('id')->on('companies')->nullOnDelete();
-                });
-            }
-            if (!\Illuminate\Support\Facades\Schema::hasColumn('departments', 'company_id')) {
-                \Illuminate\Support\Facades\Schema::table('departments', function (\Illuminate\Database\Schema\Blueprint $table) {
-                    try {
-                        $table->dropUnique('departments_branch_id_code_unique');
-                    } catch (\Exception $ex) {
-                        // ignore if unique constraint name is different
-                    }
-                    try {
-                        $table->dropForeign('departments_branch_id_foreign');
-                    } catch (\Exception $ex) {
-                        // ignore if doesn't exist
-                    }
-                    $table->unsignedBigInteger('branch_id')->nullable()->change();
-                    $table->foreign('branch_id')->references('id')->on('branches')->nullOnDelete();
-
-                    $table->unsignedBigInteger('company_id')->nullable()->after('branch_id');
-                    $table->unsignedBigInteger('business_unit_id')->nullable()->after('company_id');
-                    $table->foreign('company_id')->references('id')->on('companies')->nullOnDelete();
-                    $table->foreign('business_unit_id')->references('id')->on('business_units')->nullOnDelete();
-                });
-            }
-
-        } catch (\Exception $e) {
-            // Silently capture any setup errors
-        }
 
         $activeTab = $request->string('tab')->value() ?: 'legal-entities';
         $co_pageName = ($activeTab === 'legal-entities') ? 'page' : 'co_page';
