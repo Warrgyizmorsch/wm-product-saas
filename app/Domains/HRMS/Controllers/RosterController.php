@@ -262,17 +262,40 @@ class RosterController extends Controller
         $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'date' => 'required|date',
-            'shift_id' => 'nullable|exists:production_shifts,id',
+            'shift_id' => 'nullable',
+            'value' => 'nullable|string',
         ]);
+
+        $employeeId = $request->input('employee_id');
+        $date = $request->input('date');
+        $value = $request->input('value');
+
+        if ($value === null) {
+            $value = $request->filled('shift_id') ? (string)$request->input('shift_id') : 'default';
+        }
+
+        if ($value === 'default' || $value === '') {
+            ShiftRoster::where([
+                'employee_id' => $employeeId,
+                'date' => $date,
+            ])->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => __('hrms.roster.cell_updated'),
+            ]);
+        }
+
+        $shiftId = $value === 'off' ? null : (int)$value;
 
         $roster = ShiftRoster::updateOrCreate(
             [
                 'tenant_id' => tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id(),
-                'employee_id' => $request->input('employee_id'),
-                'date' => $request->input('date'),
+                'employee_id' => $employeeId,
+                'date' => $date,
             ],
             [
-                'shift_id' => $request->input('shift_id'),
+                'shift_id' => $shiftId,
                 'status' => 'scheduled',
             ]
         );
@@ -282,6 +305,187 @@ class RosterController extends Controller
             'message' => __('hrms.roster.cell_updated'),
             'roster' => $roster
         ]);
+    }
+
+    public function updateWeeklyPattern(Request $request): JsonResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'day_of_week' => 'required|integer|between:0,6',
+            'value' => 'nullable|string',
+        ]);
+
+        $employee = Employee::findOrFail($request->input('employee_id'));
+        $dayOfWeek = (int)$request->input('day_of_week');
+        $val = $request->input('value');
+
+        $pattern = $employee->weekly_pattern ?: [];
+        
+        if ($val === '' || $val === null || $val === 'default') {
+            unset($pattern[$dayOfWeek]);
+        } else {
+            $pattern[$dayOfWeek] = $val === 'off' ? 'off' : (int)$val;
+        }
+
+        ksort($pattern);
+
+        $employee->update([
+            'weekly_pattern' => $pattern
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Weekly pattern updated successfully.',
+            'weekly_pattern' => $pattern
+        ]);
+    }
+
+    public function assignWeekly(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'employee_ids' => 'nullable|array',
+            'employee_ids.*' => 'exists:employees,id',
+            'bulk_company_ids' => 'nullable|array',
+            'bulk_company_ids.*' => 'exists:companies,id',
+            'bulk_business_unit_ids' => 'nullable|array',
+            'bulk_business_unit_ids.*' => 'exists:business_units,id',
+            'bulk_branch_ids' => 'nullable|array',
+            'bulk_branch_ids.*' => 'exists:branches,id',
+            'bulk_department_ids' => 'nullable|array',
+            'bulk_department_ids.*' => 'exists:departments,id',
+            'bulk_designation_ids' => 'nullable|array',
+            'bulk_designation_ids.*' => 'exists:designations,id',
+            'days' => 'required|array',
+            'days.*' => 'integer|between:0,6',
+            'shift_id' => 'nullable|string',
+        ]);
+
+        $employeeIds = $request->input('employee_ids');
+
+        if (empty($employeeIds)) {
+            $query = Employee::where('status', 1);
+
+            if ($request->filled('bulk_company_ids')) {
+                $query->whereIn('company_id', $request->input('bulk_company_ids'));
+            }
+            if ($request->filled('bulk_business_unit_ids')) {
+                $query->whereIn('business_unit_id', $request->input('bulk_business_unit_ids'));
+            }
+            if ($request->filled('bulk_branch_ids')) {
+                $query->whereIn('branch_id', $request->input('bulk_branch_ids'));
+            }
+            if ($request->filled('bulk_department_ids')) {
+                $query->whereIn('department_id', $request->input('bulk_department_ids'));
+            }
+            if ($request->filled('bulk_designation_ids')) {
+                $query->whereIn('designation_id', $request->input('bulk_designation_ids'));
+            }
+
+            $employeeIds = $query->pluck('id')->toArray();
+        }
+
+        if (empty($employeeIds)) {
+            return back()->with('error', 'No employees found matching the filters.');
+        }
+
+        $days = $request->input('days');
+        $shiftId = $request->input('shift_id');
+
+        foreach ($employeeIds as $empId) {
+            $employee = Employee::find($empId);
+            if ($employee) {
+                $pattern = $employee->weekly_pattern ?: [];
+                foreach ($days as $day) {
+                    if ($shiftId === '' || $shiftId === null || $shiftId === 'default') {
+                        unset($pattern[$day]);
+                    } else {
+                        $pattern[$day] = $shiftId === 'off' ? 'off' : (int)$shiftId;
+                    }
+                }
+                ksort($pattern);
+                $employee->update(['weekly_pattern' => $pattern]);
+            }
+        }
+
+        return redirect()->route('hrms.roster.index', [
+            'tab' => 'weekly_patterns',
+            'company_id' => $request->input('company_id'),
+            'department_id' => $request->input('department_id'),
+        ])->with('success', 'Weekly patterns assigned successfully.');
+    }
+
+    public function clearWeekly(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'employee_ids' => 'nullable|array',
+            'employee_ids.*' => 'exists:employees,id',
+            'bulk_company_ids' => 'nullable|array',
+            'bulk_company_ids.*' => 'exists:companies,id',
+            'bulk_business_unit_ids' => 'nullable|array',
+            'bulk_business_unit_ids.*' => 'exists:business_units,id',
+            'bulk_branch_ids' => 'nullable|array',
+            'bulk_branch_ids.*' => 'exists:branches,id',
+            'bulk_department_ids' => 'nullable|array',
+            'bulk_department_ids.*' => 'exists:departments,id',
+            'bulk_designation_ids' => 'nullable|array',
+            'bulk_designation_ids.*' => 'exists:designations,id',
+            'days' => 'required|array',
+            'days.*' => 'integer|between:0,6',
+        ]);
+
+        $employeeIds = $request->input('employee_ids');
+
+        if (empty($employeeIds)) {
+            $query = Employee::where('status', 1);
+
+            if ($request->filled('bulk_company_ids')) {
+                $query->whereIn('company_id', $request->input('bulk_company_ids'));
+            }
+            if ($request->filled('bulk_business_unit_ids')) {
+                $query->whereIn('business_unit_id', $request->input('bulk_business_unit_ids'));
+            }
+            if ($request->filled('bulk_branch_ids')) {
+                $query->whereIn('branch_id', $request->input('bulk_branch_ids'));
+            }
+            if ($request->filled('bulk_department_ids')) {
+                $query->whereIn('department_id', $request->input('bulk_department_ids'));
+            }
+            if ($request->filled('bulk_designation_ids')) {
+                $query->whereIn('designation_id', $request->input('bulk_designation_ids'));
+            }
+
+            $employeeIds = $query->pluck('id')->toArray();
+        }
+
+        if (empty($employeeIds)) {
+            return back()->with('error', 'No employees found matching the filters.');
+        }
+
+        $days = $request->input('days');
+
+        foreach ($employeeIds as $empId) {
+            $employee = Employee::find($empId);
+            if ($employee) {
+                $pattern = $employee->weekly_pattern ?: [];
+                foreach ($days as $day) {
+                    unset($pattern[$day]);
+                }
+                ksort($pattern);
+                $employee->update(['weekly_pattern' => $pattern]);
+            }
+        }
+
+        return redirect()->route('hrms.roster.index', [
+            'tab' => 'weekly_patterns',
+            'company_id' => $request->input('company_id'),
+            'department_id' => $request->input('department_id'),
+        ])->with('success', 'Weekly patterns cleared successfully.');
     }
 
     public function clear(Request $request): RedirectResponse

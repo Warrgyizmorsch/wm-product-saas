@@ -2568,16 +2568,15 @@
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_emp_requesting') }}" name="employee_name_display" value="{{ $employee->display_name }} ({{ $employee->employee_id }})" :readonly="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.lbl_asset_category') }}" name="asset_category_ids[]" id="req_asset_category_ids" :required="true" :multiple="true" select2-selector="default">
-                                    @foreach($categories->where('company_id', $employee->company_id) as $category)
-                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                <x-ui.odoo-form-ui type="select" label="Select Item to Request" name="asset_item_id" id="req_asset_item_id" :required="true" select2-selector="default">
+                                    <option value="">Select Item</option>
+                                    @foreach(\App\Domains\HRMS\Models\AssetItem::where('company_id', $employee->company_id)->get() as $item)
+                                        <option value="{{ $item->id }}">{{ $item->name }} (Category: {{ $item->category->name ?? 'N/A' }})</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.lbl_select_specific_assets') }}" name="requested_asset_ids[]" id="req_requested_asset_ids" :required="true" :multiple="true" select2-selector="default">
-                                    <!-- Options populated via JS -->
-                                </x-ui.odoo-form-ui>
+                                <x-ui.odoo-form-ui type="input" label="Requested Quantity" name="quantity" inputType="number" min="1" value="1" :required="true" />
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_reason_req') }}" name="reason" placeholder="{{ __('hrms.employees.mdl_reason_placeholder') }}" :required="true" />
@@ -2605,42 +2604,7 @@
                 $('#addHistoryModal').appendTo('body');
                 $('#returnAssetModal').appendTo('body');
                 $('#requestAssetModal').appendTo('body');
-                // Dynamic filtering of assets inside Request Asset Modal based on selected categories
-                const availableAssets = {!! json_encode($availableAssets->map(function($a) {
-                    return [
-                        'id' => $a->id,
-                        'name' => $a->name . ' (' . $a->asset_code . ')',
-                        'category_id' => $a->asset_category_id
-                    ];
-                })) !!};
-
-                const $catSelect = $('#req_asset_category_ids');
-                const $assetSelect = $('#req_requested_asset_ids');
-
-                if ($catSelect.length && $assetSelect.length) {
-                    function updateAvailableAssets() {
-                        const selectedCats = $catSelect.val() || [];
-                        const currentSelectedAssets = $assetSelect.val() || [];
-                        
-                        $assetSelect.empty();
-                        
-                        availableAssets.forEach(function(asset) {
-                            if (selectedCats.includes(String(asset.category_id))) {
-                                const opt = new Option(asset.name, asset.id);
-                                if (currentSelectedAssets.includes(String(asset.id))) {
-                                    opt.selected = true;
-                                }
-                                $assetSelect.append(opt);
-                            }
-                        });
-                        
-                        if ($assetSelect.hasClass('select2-hidden-accessible')) {
-                            $assetSelect.trigger('change.select2');
-                        }
-                    }
-                    
-                    $catSelect.on('change', updateAvailableAssets);
-                }                // Handle return modal details binding
+                // Handle return modal details binding
                 $('#returnAssetModal').on('show.bs.modal', function(event) {
                     var button = $(event.relatedTarget);
                     var assetId = button.data('asset-id');

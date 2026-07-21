@@ -51,9 +51,6 @@
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end">
-                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-shift" data-bs-toggle="modal" data-bs-target="#viewShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}" title="{{ __('hrms.employees.view_profile') }}" data-bs-toggle="tooltip">
-                                            <i class="feather feather-eye"></i>
-                                        </a>
                                         <x-ui.action-dropdown>
                                             <li>
                                                 <a class="dropdown-item btn-edit-shift" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}">
@@ -91,46 +88,6 @@
 <script>
     (function() {
         function init() {
-            // View Action Trigger
-            document.querySelectorAll('.btn-view-shift').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    let shift = JSON.parse(atob(this.dataset.shift));
-                    
-                    let nameEl = document.getElementById('modal_view_shift_name');
-                    if (nameEl) nameEl.innerText = shift.name;
-                    
-                    let codeEl = document.getElementById('modal_view_shift_code');
-                    if (codeEl) codeEl.innerText = shift.code;
-                    
-                    let startEl = document.getElementById('modal_view_shift_start');
-                    if (startEl) startEl.innerText = shift.start_time ? shift.start_time.substring(0, 5) : 'N/A';
-                    
-                    let endEl = document.getElementById('modal_view_shift_end');
-                    if (endEl) endEl.innerText = shift.end_time ? shift.end_time.substring(0, 5) : 'N/A';
-                    
-                    let breakEl = document.getElementById('modal_view_shift_break');
-                    if (breakEl) breakEl.innerText = (shift.break_minutes || 0) + ' {{ __("hrms.employees.lbl_mins") }}';
-                    
-                    let overtimeEl = document.getElementById('modal_view_shift_overtime');
-                    if (overtimeEl) {
-                        if (shift.overtime_allowed === true || shift.overtime_allowed === 1 || shift.overtime_allowed === '1') {
-                            overtimeEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.mdl_yes") }}</span>';
-                        } else {
-                            overtimeEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.mdl_no") }}</span>';
-                        }
-                    }
-                    
-                    let statusEl = document.getElementById('modal_view_shift_status');
-                    if (statusEl) {
-                        if (shift.active === true || shift.active === 1 || shift.active === '1') {
-                            statusEl.innerHTML = '<span class="badge bg-soft-success text-success">{{ __("hrms.employees.frm_status_active") }}</span>';
-                        } else {
-                            statusEl.innerHTML = '<span class="badge bg-soft-danger text-danger">{{ __("hrms.employees.frm_status_inactive") }}</span>';
-                        }
-                    }
-                });
-            });
-
             // Edit Action Trigger
             document.querySelectorAll('.btn-edit-shift').forEach(btn => {
                 btn.addEventListener('click', function() {

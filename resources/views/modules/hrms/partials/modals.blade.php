@@ -1427,58 +1427,6 @@
 <!--                 SHIFT MODALS                 -->
 <!-- ============================================ -->
 
-<!-- View Shift Modal -->
-<div class="modal fade" id="viewShiftModal" tabindex="-1" aria-labelledby="viewShiftModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header bg-soft-primary text-primary py-3">
-                <h5 class="modal-title fw-bold" id="viewShiftModalLabel"><i class="feather-clock me-2"></i>{{ __('hrms.org.shift_details') }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4">
-                    <div class="avatar-text avatar-xl rounded bg-soft-primary text-primary d-flex align-items-center justify-content-center fw-bold fs-20" style="width: 56px; height: 56px; min-width: 56px; min-height: 56px;">
-                        <i class="feather-clock"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-1 fw-bold text-dark" id="modal_view_shift_name"></h4>
-                        <span class="fs-12 text-muted font-monospace" id="modal_view_shift_code"></span>
-                    </div>
-                </div>
-                
-                <div class="row g-3">
-                     <div class="col-sm-6">
-                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.employees.tbl_company') }}</label>
-                        <span class="fs-13 fw-bold text-dark" id="modal_view_shift_company"></span>
-                    </div>
-                    <div class="col-sm-6">
-                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.org.start_time') }}</label>
-                        <span class="fs-13 fw-bold text-dark font-monospace" id="modal_view_shift_start"></span>
-                    </div>
-                    <div class="col-sm-6">
-                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.org.end_time') }}</label>
-                        <span class="fs-13 fw-bold text-dark font-monospace" id="modal_view_shift_end"></span>
-                    </div>
-                    <div class="col-sm-6">
-                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.org.break_minutes') }}</label>
-                        <span class="fs-13 fw-bold text-dark" id="modal_view_shift_break"></span>
-                    </div>
-                    <div class="col-sm-6">
-                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.org.overtime_allowed') }}</label>
-                        <div id="modal_view_shift_overtime"></div>
-                    </div>
-                    <div class="col-sm-6">
-                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.org.status') }}</label>
-                        <div id="modal_view_shift_status"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer bg-light py-2">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Add Shift Modal -->
 <div class="modal fade" id="addShiftModal" tabindex="-1" aria-labelledby="addShiftModalLabel" aria-hidden="true">

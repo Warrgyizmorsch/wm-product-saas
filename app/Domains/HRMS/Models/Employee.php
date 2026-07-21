@@ -66,7 +66,8 @@ class Employee extends BaseModel
         'emergency_contact_number',
         'emergency_contact_relation',
 
-        'status'
+        'status',
+        'weekly_pattern'
     ];
 
     protected $casts = [
@@ -77,6 +78,7 @@ class Employee extends BaseModel
         'experience' => 'decimal:2',
         'current_salary' => 'decimal:2',
         'status' => 'boolean',
+        'weekly_pattern' => 'array',
     ];
 
     protected static function booted(): void
@@ -415,5 +417,47 @@ class Employee extends BaseModel
                 $oldBal->delete();
             }
         }
+    }
+
+    /**
+     * Resolve the active shift for a given date.
+     * Precedence:
+     * 1. Date-specific roster override (from shift_rosters table)
+     * 2. Weekly pattern default (from employee's weekly_pattern JSON field)
+     * 3. General default shift (from employee's default shift_id)
+     *
+     * @param string|\Carbon\Carbon $date
+     * @return \App\Domains\Production\Models\ProductionShift|null
+     */
+    public function resolveShiftForDate($date)
+    {
+        $carbonDate = \Carbon\Carbon::parse($date);
+        $dateStr = $carbonDate->format('Y-m-d');
+        $dayOfWeek = $carbonDate->dayOfWeek;
+
+        // 1. Check for specific date override in shift_rosters
+        $roster = \App\Domains\HRMS\Models\ShiftRoster::where([
+            'employee_id' => $this->id,
+            'date' => $dateStr
+        ])->first();
+
+        if ($roster) {
+            if (is_null($roster->shift_id)) {
+                return null; // Day Off override
+            }
+            return \App\Domains\Production\Models\ProductionShift::find($roster->shift_id);
+        }
+
+        // 2. Check for weekly pattern default
+        if (isset($this->weekly_pattern) && isset($this->weekly_pattern[$dayOfWeek])) {
+            $weeklyShiftId = $this->weekly_pattern[$dayOfWeek];
+            if ($weeklyShiftId === 'off') {
+                return null; // Weekly Off
+            }
+            return \App\Domains\Production\Models\ProductionShift::find($weeklyShiftId);
+        }
+
+        // 3. Fall back to general default shift
+        return $this->shift;
     }
 }
