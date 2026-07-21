@@ -65,7 +65,7 @@
                 </x-ui.filter>
         </form>
         @if ($canManageTaskLists)
-            <button type="button" class="btn btn-primary btn-sm" onclick="openTaskListModal('add')">
+            <button type="button" class="btn btn-primary btn-sm" onclick="startTaskListInlineCreate()">
                 <i class="feather-plus me-1"></i>{{ __('projects.add_tasklist') }}
             </button>
         @endif
@@ -93,10 +93,14 @@
     </div>
 @endif
 
-@forelse ($visibleTaskLists as $index => $taskList)
-    @include('modules.projects.tasklists._list-card')
-@empty
-    <div class="text-center py-5">
+@if ($visibleTaskLists->isNotEmpty())
+    <div id="taskListContainer">
+        @foreach ($visibleTaskLists as $index => $taskList)
+            @include('modules.projects.tasklists._list-card')
+        @endforeach
+    </div>
+@else
+    <div id="taskListEmptyState" class="text-center py-5">
         <div class="avatar-text avatar-lg bg-soft-primary text-primary mx-auto mb-3">
             <i class="feather-{{ $hasActiveTaskFilters ? 'search' : 'list' }} fs-2"></i>
         </div>
@@ -111,11 +115,12 @@
             <p class="fs-12 text-muted mb-3">{{ __('projects.no_tasklists_hint') }}</p>
         @endif
     </div>
-@endforelse
+@endif
 
 @if ($canManageTaskLists)
     @include('modules.projects.tasklists._modal')
     @include('modules.projects.tasklists._drawer')
+    @include('modules.projects.tasklists._create-row')
 
     @if ($errors->any() && in_array(old('_tasklist_form'), ['add', 'edit'], true))
         @push('scripts')

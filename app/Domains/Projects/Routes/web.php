@@ -15,6 +15,7 @@ Route::prefix('projects')
     ->group(function (): void {
         Route::get('/', [ProjectController::class, 'index'])->name('index');
         Route::post('/', [ProjectController::class, 'store'])->name('store');
+        Route::post('bulk-action', [ProjectController::class, 'bulkAction'])->name('bulk-action');
 
         Route::get('milestones', [MilestoneController::class, 'index'])->name('milestones.index');
 
@@ -41,6 +42,7 @@ Route::prefix('projects')
                 Route::get('{milestone}', [MilestoneController::class, 'show'])->name('show');
                 Route::post('/', [MilestoneController::class, 'store'])->name('store');
                 Route::put('{milestone}', [MilestoneController::class, 'update'])->name('update');
+                Route::patch('{milestone}/field', [MilestoneController::class, 'updateField'])->name('field');
                 Route::delete('{milestone}', [MilestoneController::class, 'destroy'])->name('destroy');
             });
 

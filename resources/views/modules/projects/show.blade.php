@@ -12,8 +12,44 @@
     </div>
 @endsection
 
+@push('styles')
+    <style>
+        .erp-single-panel.project-show-panel {
+            background-color: #f4f5f8 !important;
+        }
+        .project-details-accordion .accordion-item {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+        }
+        .project-details-accordion .accordion-button {
+            border-left: 3px solid var(--bs-primary);
+        }
+        .project-details-accordion .accordion-body {
+            border-top: 1px solid #eef0f5;
+        }
+        .project-show-panel .project-content-card {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.06);
+        }
+        .project-show-panel .project-stat-card {
+            border-width: 2px !important;
+            border-radius: 12px !important;
+            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.10), 0 2px 4px rgba(15, 23, 42, 0.06);
+        }
+        .project-header-activity-btn {
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 14px;
+        }
+    </style>
+@endpush
+
 @section('content')
-    <div class="erp-single-panel bg-white">
+    <div class="erp-single-panel project-show-panel">
         @if ($errors->any())
             <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
                 <h6 class="alert-heading fw-bold mb-1">{{ __('projects.validation_errors') }}</h6>
@@ -52,22 +88,28 @@
             </h4>
             <div class="d-flex flex-wrap align-items-center gap-2">
                 <a href="javascript:void(0);" onclick="openActivityDrawer('{{ route('projects.activity', $project) }}')"
-                    class="btn btn-light">
+                    class="btn btn-primary project-header-activity-btn">
                     <i class="feather-activity me-2"></i>{{ __('projects.activity') }}
                 </a>
-                <form action="{{ route('projects.destroy', $project) }}" method="POST"
-                    onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn btn-danger">
-                        <i class="feather-trash-2 me-2"></i>{{ __('projects.delete') }}
-                    </button>
-                </form>
+                @can('delete', $project)
+                    <x-ui.action-dropdown id="projectHeaderActions">
+                        <li>
+                            <form action="{{ route('projects.destroy', $project) }}" method="POST"
+                                onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="dropdown-item text-danger">
+                                    <i class="feather-trash-2 me-2"></i>{{ __('projects.delete') }}
+                                </button>
+                            </form>
+                        </li>
+                    </x-ui.action-dropdown>
+                @endcan
             </div>
         </div>
 
         {{-- Identity / Meta Grid --}}
-        <div class="accordion mb-4" id="projectDetailsAccordion">
+        <div class="accordion mb-4 project-details-accordion" id="projectDetailsAccordion">
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button" type="button" data-bs-toggle="collapse"
@@ -321,6 +363,7 @@
     @push('scripts')
         <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
         <script src="{{ asset('assets/js/milestones/inline-create.js') }}"></script>
+        <script src="{{ asset('assets/js/tasklists/inline-create.js') }}"></script>
         <script>
             function openActivityDrawer(url) {
                 var drawerEl = document.getElementById('activityLogDrawer');

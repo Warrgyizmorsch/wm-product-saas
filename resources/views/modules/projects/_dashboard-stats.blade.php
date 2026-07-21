@@ -44,7 +44,7 @@
     @foreach ($statCards as $stat)
         <div class="col-md-3">
             <a href="{{ route('projects.show', $project) }}?tab={{ $stat['tab'] }}#tab-{{ $stat['tab'] }}" class="text-decoration-none d-block">
-                <div class="bg-soft-{{ $stat['tone'] }} rounded p-3 text-center border border-{{ $stat['tone'] }}">
+                <div class="bg-soft-{{ $stat['tone'] }} rounded p-3 text-center border border-{{ $stat['tone'] }} project-stat-card">
                     <div class="text-{{ $stat['tone'] }} fs-11 text-uppercase fw-bold mb-1">{{ $stat['label'] }}</div>
                     <h3 class="text-{{ $stat['tone'] }} fw-bold mb-1">{{ $stat['value'] }}</h3>
                     <div class="fs-11 text-muted">{{ $stat['meta'] }}</div>

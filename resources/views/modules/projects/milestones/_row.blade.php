@@ -18,6 +18,13 @@
     $rowTasksTotal = (int) ($milestone->tasks_count ?? 0);
     $rowTasksDone = (int) ($milestone->completed_tasks_count ?? 0);
 
+    // Task-weighted progress, mirroring the workspace hero: completion_percentage
+    // is only a manually-set field and drifts from actual task completion, so the
+    // bar/percentage must derive from the task counts shown alongside it.
+    $rowTaskProgress = $rowTasksTotal > 0
+        ? (int) round(($rowTasksDone / $rowTasksTotal) * 100)
+        : (int) ($milestone->completion_percentage ?? 0);
+
     $rowJsData = [
         'id' => $milestone->id,
         'updateUrl' => route('projects.milestones.update', [$project, $milestone->id]),
@@ -58,10 +65,10 @@
         <div style="min-width: 140px; width: 160px;" class="flex-shrink-0">
             <div class="d-flex justify-content-between fs-11 text-muted mb-1">
                 <span>{{ $rowTasksDone }} / {{ $rowTasksTotal }}</span>
-                <span class="fw-semibold">{{ $milestone->completion_percentage }}%</span>
+                <span class="fw-semibold">{{ $rowTaskProgress }}%</span>
             </div>
             <div class="progress ht-6">
-                <div class="progress-bar bg-{{ $rowHealthVariant }}" style="width: {{ $milestone->completion_percentage }}%"></div>
+                <div class="progress-bar bg-success" style="width: {{ $rowTaskProgress }}%"></div>
             </div>
         </div>
 
@@ -171,10 +178,10 @@
         <div class="mt-2">
             <div class="d-flex justify-content-between fs-11 text-muted mb-1">
                 <span>{{ $rowTasksDone }} / {{ $rowTasksTotal }} {{ __('projects.tasks') }}</span>
-                <span class="fw-semibold">{{ $milestone->completion_percentage }}%</span>
+                <span class="fw-semibold">{{ $rowTaskProgress }}%</span>
             </div>
             <div class="progress ht-6">
-                <div class="progress-bar bg-{{ $rowHealthVariant }}" style="width: {{ $milestone->completion_percentage }}%"></div>
+                <div class="progress-bar bg-success" style="width: {{ $rowTaskProgress }}%"></div>
             </div>
         </div>
 

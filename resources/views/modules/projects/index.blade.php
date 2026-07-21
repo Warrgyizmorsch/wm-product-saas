@@ -20,6 +20,105 @@
     </style>
 @endpush
 
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const headerCheckbox = document.getElementById('check-all-projects');
+            const rowCheckboxes = document.querySelectorAll('.project-checkbox');
+            const bulkActionsToolbar = document.getElementById('bulk-actions-toolbar');
+            const bulkActionsLabel = document.querySelector('#bulk-actions-toolbar .bulk-actions-label');
+
+            function updateToolbarVisibility() {
+                const selectedCount = document.querySelectorAll('.project-checkbox:checked').length;
+
+                if (bulkActionsToolbar) {
+                    bulkActionsToolbar.classList.toggle('d-none', selectedCount === 0);
+                }
+                if (bulkActionsLabel) {
+                    bulkActionsLabel.textContent = @js(__('projects.selected_actions')) + ` (${selectedCount})`;
+                }
+            }
+
+            if (headerCheckbox) {
+                headerCheckbox.addEventListener('change', function () {
+                    rowCheckboxes.forEach(cb => { cb.checked = headerCheckbox.checked; });
+                    updateToolbarVisibility();
+                });
+            }
+
+            rowCheckboxes.forEach(cb => {
+                cb.addEventListener('change', function () {
+                    const allChecked = Array.from(rowCheckboxes).every(r => r.checked);
+                    const someChecked = Array.from(rowCheckboxes).some(r => r.checked);
+                    if (headerCheckbox) {
+                        headerCheckbox.checked = allChecked;
+                        headerCheckbox.indeterminate = someChecked && !allChecked;
+                    }
+                    updateToolbarVisibility();
+                });
+            });
+
+            document.querySelectorAll('.bulk-action-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const action = this.getAttribute('data-action');
+                    const selectedCheckboxes = document.querySelectorAll('.project-checkbox:checked');
+
+                    if (selectedCheckboxes.length === 0) {
+                        confirmAction(@js(__('projects.select_one_first')), null, {
+                            title: @js(__('projects.no_selection')),
+                            confirmButtonText: @js(__('projects.ok')),
+                            confirmButtonClass: 'btn-primary'
+                        });
+                        return;
+                    }
+
+                    let title = '';
+                    let confirmMessage = '';
+                    let confirmText = '';
+                    let variant = 'primary';
+
+                    if (action === 'delete') {
+                        title = @js(__('projects.delete_selected'));
+                        confirmMessage = @js(__('projects.confirm_delete_selected')).replace(':count', selectedCheckboxes.length);
+                        confirmText = @js(__('projects.delete'));
+                        variant = 'danger';
+                    }
+
+                    confirmAction(
+                        confirmMessage,
+                        function () {
+                            const form = document.getElementById('bulk-action-form');
+                            const container = document.getElementById('bulk-action-inputs-container');
+                            container.innerHTML = '';
+
+                            const actionInput = document.createElement('input');
+                            actionInput.type = 'hidden';
+                            actionInput.name = 'action';
+                            actionInput.value = action;
+                            container.appendChild(actionInput);
+
+                            selectedCheckboxes.forEach(cb => {
+                                const hiddenInput = document.createElement('input');
+                                hiddenInput.type = 'hidden';
+                                hiddenInput.name = 'ids[]';
+                                hiddenInput.value = cb.value;
+                                container.appendChild(hiddenInput);
+                            });
+
+                            form.submit();
+                        },
+                        {
+                            title: title,
+                            confirmButtonText: confirmText,
+                            confirmButtonClass: 'btn-' + variant
+                        }
+                    );
+                });
+            });
+        });
+    </script>
+@endpush
+
 @section('page-actions')
     @can('create', \App\Domains\Projects\Models\Project::class)
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createProjectModal">
@@ -52,11 +151,19 @@
         @endif
 
         <!-- Toolbar: Sort, Filters -->
-        <div class="d-flex align-items-center mb-3">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
             <h5 class="fw-bold text-dark mb-0">
                 <i class="feather-briefcase me-2 text-primary"></i>{{ __('projects.project_directory') }}
             </h5>
-            <div class="d-flex gap-2 ms-auto">
+            <div class="d-flex flex-wrap gap-2 ms-auto">
+                <div id="bulk-actions-toolbar" class="d-none">
+                    <x-ui.bulk-actions :label="__('projects.selected_actions') . ' (0)'" id="bulk-actions-dropdown">
+                        <button type="button" class="dropdown-item text-danger bulk-action-btn" data-action="delete">
+                            <i class="feather-trash-2 me-2 text-danger"></i> {{ __('projects.delete_selected') }}
+                        </button>
+                    </x-ui.bulk-actions>
+                </div>
+
                 <x-ui.sort-dropdown :label="__('projects.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'project_code', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'project_code' && $sortOrder === 'asc' ? 'active' : '' }}">
                         <span>{{ __('projects.sort_code_asc') }}</span>
@@ -114,7 +221,7 @@
                 <thead>
                     <tr>
                         <th style="width: 3%" class="text-center">
-                            <input type="checkbox" class="form-check-input">
+                            <input type="checkbox" id="check-all-projects" class="form-check-input">
                         </th>
                         <th style="width: 12%" class="fw-bold text-dark">{{ __('projects.code') }}</th>
                         <th style="width: 20%" class="fw-bold text-dark">{{ __('projects.name') }}</th>
@@ -131,7 +238,7 @@
                     @forelse ($paginatedProjects as $project)
                         <tr>
                             <td class="text-center">
-                                <input type="checkbox" class="form-check-input">
+                                <input type="checkbox" class="form-check-input project-checkbox" value="{{ $project->id }}">
                             </td>
                             <td>
                                 <a href="{{ route('projects.show', $project) }}" class="fw-bold text-primary hover-primary">
@@ -166,14 +273,6 @@
                             <td class="fw-medium text-dark">{{ $project->end_date?->format('d/m/Y') ?: '—' }}</td>
                             <td class="text-end">
                                 <x-ui.action-dropdown :viewUrl="route('projects.show', $project)">
-                                    @can('update', $project)
-                                        <li>
-                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editProjectModal-{{ $project->id }}">
-                                                <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('projects.edit_description') }}
-                                            </button>
-                                        </li>
-                                        <li><hr class="dropdown-divider"></li>
-                                    @endcan
                                     <li>
                                         <form method="POST" action="{{ route('projects.destroy', $project) }}" onsubmit="return confirmFormSubmit(event, @js(__('projects.confirm_delete')));">
                                             @csrf
@@ -227,11 +326,11 @@
         </x-ui.modal>
     @endcan
 
-    @foreach ($paginatedProjects as $project)
-        @can('update', $project)
-            @include('modules.projects._edit-description-modal', ['project' => $project])
-        @endcan
-    @endforeach
+    {{-- Bulk Actions Hidden Form --}}
+    <form id="bulk-action-form" action="{{ route('projects.bulk-action') }}" method="POST" style="display: none;">
+        @csrf
+        <div id="bulk-action-inputs-container"></div>
+    </form>
 
     @include('modules.projects._modal-reopen-script')
 @endsection

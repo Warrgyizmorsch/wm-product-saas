@@ -62,22 +62,27 @@
     $paginatedMilestones = $filteredMilestones->slice(($milestonePage - 1) * $milestonesPerPage, $milestonesPerPage);
 @endphp
 
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <h5 class="fw-bold text-dark mb-0">
-        <i class="feather-flag me-2 text-primary"></i>{{ __('projects.milestones') }}
-    </h5>
-</div>
+@once
+    @push('styles')
+        <style>
+            .milestone-toolbar-search,
+            .milestone-toolbar-search-btn {
+                height: 36px !important;
+            }
+        </style>
+    @endpush
+@endonce
 
 {{-- Toolbar --}}
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
     <form method="GET" action="{{ route('projects.show', $project) }}" class="d-flex flex-wrap align-items-center gap-2">
         <input type="hidden" name="tab" value="milestones">
         <div style="min-width: 220px;">
-            <input type="text" name="search" class="form-control form-control-sm" value="{{ $milestoneSearch }}"
+            <input type="text" name="search" class="form-control form-control-sm milestone-toolbar-search" value="{{ $milestoneSearch }}"
                    placeholder="{{ __('projects.milestone_search_and_desc_placeholder') }}">
         </div>
 
-        <button type="submit" class="btn btn-primary btn-sm">
+        <button type="submit" class="btn btn-primary btn-sm milestone-toolbar-search-btn">
             <i class="feather-search me-1"></i>{{ __('ui.search') }}
         </button>
 
@@ -160,7 +165,7 @@
 
 {{-- Milestone hybrid rows --}}
 @if ($paginatedMilestones->isNotEmpty())
-    <div class="border rounded-3 overflow-hidden" id="milestoneListContainer">
+    <div class="border rounded-3 overflow-hidden project-content-card" id="milestoneListContainer">
         @foreach ($paginatedMilestones as $milestone)
             @include('modules.projects.milestones._row')
         @endforeach
