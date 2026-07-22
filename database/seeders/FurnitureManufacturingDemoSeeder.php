@@ -46,6 +46,9 @@ use App\Domains\Production\Models\Routing;
 use App\Domains\Production\Models\RoutingApproval;
 use App\Domains\Production\Models\RoutingOperation;
 use App\Domains\Production\Models\WorkCenter;
+use App\Domains\Production\Models\ProductionWip;
+use App\Domains\Production\Models\ProductionWipTransaction;
+use App\Domains\Production\Models\ProductionCostAdjustment;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -82,6 +85,10 @@ class FurnitureManufacturingDemoSeeder extends Seeder
     {
         // ─── Step 0: Clean tables ───────────────────────────────────────────
         Schema::disableForeignKeyConstraints();
+
+        DB::table('production_wip_transactions')->truncate();
+        DB::table('production_wips')->truncate();
+        DB::table('production_cost_adjustments')->truncate();
 
         // Scenario-level tables
         DB::table('production_event_timelines')->truncate();
@@ -364,8 +371,8 @@ class FurnitureManufacturingDemoSeeder extends Seeder
         ProductionPlanRequirement::create(['tenant_id' => $tenant->id, 'production_plan_id' => $plan->id, 'product_id' => $woodStain->id,  'bom_level' => 1, 'required_quantity' => 12.5,  'available_quantity' => 10.0,  'shortage_quantity' => 2.5,  'uom_id' => $ltr->id, 'status' => 'shortage']);
         ProductionPlanRequirement::create(['tenant_id' => $tenant->id, 'production_plan_id' => $plan->id, 'product_id' => $lacquer->id,    'bom_level' => 1, 'required_quantity' => 15.0,  'available_quantity' => 15.0,  'shortage_quantity' => 0.0,  'uom_id' => $ltr->id, 'status' => 'available']);
 
-        ProductionPlanOperation::create(['tenant_id' => $tenant->id, 'production_plan_id' => $plan->id, 'work_center_id' => $wcCnc->id,     'sequence' => 10, 'operation_number' => 'OP-010', 'name' => 'CNC Cutting', 'setup_time_minutes' => 25, 'processing_time_minutes' => 60, 'total_time_minutes' => 85]);
-        ProductionPlanOperation::create(['tenant_id' => $tenant->id, 'production_plan_id' => $plan->id, 'work_center_id' => $wcAssembly->id, 'sequence' => 40, 'operation_number' => 'OP-040', 'name' => 'Assembly',    'setup_time_minutes' => 20, 'processing_time_minutes' => 55, 'total_time_minutes' => 75]);
+        ProductionPlanOperation::create(['tenant_id' => $tenant->id, 'production_plan_id' => $plan->id, 'routing_operation_id' => $rtopC1->id, 'work_center_id' => $wcCnc->id, 'machine_id' => $machCnc->id, 'sequence' => 10, 'operation_number' => 'OP-010', 'name' => 'CNC Cutting', 'setup_time_minutes' => 25, 'processing_time_minutes' => 60, 'total_time_minutes' => 85]);
+        ProductionPlanOperation::create(['tenant_id' => $tenant->id, 'production_plan_id' => $plan->id, 'routing_operation_id' => $rtopC4->id, 'work_center_id' => $wcAssembly->id, 'machine_id' => $machPress->id, 'sequence' => 40, 'operation_number' => 'OP-040', 'name' => 'Assembly',    'setup_time_minutes' => 20, 'processing_time_minutes' => 55, 'total_time_minutes' => 75]);
 
         // ═══════════════════════════════════════════════════════════════════════
         //  SCENARIO A — PERFECT RUN: 10x Dining Chair, CLOSED
@@ -388,7 +395,7 @@ class FurnitureManufacturingDemoSeeder extends Seeder
             ProductionOrderProgressLog::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordA->id, 'operation_id' => $op->id, 'quantity_produced' => 10, 'setup_minutes_logged' => $setup, 'run_minutes_logged' => $run, 'recorded_by' => $userId, 'recorded_at' => now()->subDays($dAgo)->setTime(11, 0), 'start_time' => now()->subDays($dAgo)->setTime(8, 0), 'stop_time' => now()->subDays($dAgo)->setTime(9, 0)]);
         }
 
-        $schedA = ProductionSchedule::create(['tenant_id' => $tenant->id, 'schedule_number' => 'SCHED-FURN-A001', 'production_order_id' => $ordA->id, 'scheduling_type' => 'forward', 'status' => 'completed', 'scheduled_at' => now()->subDays(11), 'completed_at' => now()->subDays(7), 'created_by' => $userId]);
+        $schedA = ProductionSchedule::create(['tenant_id' => $tenant->id, 'schedule_number' => 'SCHED-FURN-A001', 'production_order_id' => $ordA->id, 'scheduling_type' => 'forward', 'status' => 'completed', 'scheduled_at' => now()->subDays(11), 'completed_at' => now()->subDays(7), 'capacity_utilization' => 82.50, 'created_by' => $userId]);
         foreach ([[$opA10, $wcCnc, $machCnc, 10, 10, 8, 0, 9, 20], [$opA20, $wcSanding, $machSander, 10, 10, 9, 30, 10, 20], [$opA30, $wcSprayBooth, $machSpray, 9, 9, 8, 0, 9, 5], [$opA40, $wcAssembly, $machPress, 8, 8, 8, 0, 9, 15], [$opA50, $wcQcFinal, null, 7, 7, 10, 0, 10, 25]] as $i => [$op,$wc,$mac,$dp,$da,$sh,$sm,$eh,$em]) {
             ProductionScheduleOperation::create(['tenant_id' => $tenant->id, 'production_schedule_id' => $schedA->id, 'production_order_id' => $ordA->id, 'production_order_operation_id' => $op->id, 'work_center_id' => $wc->id, 'machine_id' => $mac ? $mac->id : null, 'sequence' => ($i + 1) * 10, 'planned_start' => now()->subDays($dp)->setTime($sh, $sm), 'planned_finish' => now()->subDays($dp)->setTime($eh, $em), 'actual_start' => now()->subDays($da)->setTime($sh, $sm), 'actual_finish' => now()->subDays($da)->setTime($eh, $em), 'status' => 'completed', 'shift_code' => 'SHIFT-DAY']);
         }
@@ -410,6 +417,295 @@ class FurnitureManufacturingDemoSeeder extends Seeder
 
         ProductionOrderReceipt::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordA->id, 'product_id' => $diningChair->id, 'quantity_received' => 10.00, 'quality_status' => 'passed', 'received_by' => $userId, 'received_at' => now()->subDays(6)]);
         ProductionEventTimeline::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordA->id, 'event_type' => 'Production Closed', 'title' => 'Scenario A – Perfect Chair Run Closed', 'description' => '10 Dining Chair DC-1 produced. All inspections passed. Zero defects. Order closed.', 'severity' => 'success', 'event_source' => 'Seeder', 'triggered_by' => $userId, 'event_time' => now()->subDays(6)]);
+
+        // Seed WIP for Scenario A
+        $wipA = ProductionWip::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'product_id' => $diningChair->id,
+            'current_routing_operation_id' => $opA50->routing_operation_id,
+            'current_work_center_id' => $wcQcFinal->id,
+            'current_machine_id' => null,
+            'quantity' => 0.0000,
+            'available_quantity' => 0.0000,
+            'completed_quantity' => 10.0000,
+            'rejected_quantity' => 0.0000,
+            'scrap_quantity' => 0.0000,
+            'rework_quantity' => 0.0000,
+            'status' => 'completed',
+            'material_cost' => 615.00,
+            'labor_cost' => 3978.00,
+            'machine_cost' => 10303.00,
+            'overhead_cost' => 77.22,
+            'total_value' => 615.00 + 3978.00 + 10303.00 + 77.22,
+            'started_at' => now()->subDays(10)->setTime(8, 0),
+            'last_moved_at' => now()->subDays(6),
+            'completed_at' => now()->subDays(6),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => null,
+            'to_operation_id' => $opA10->routing_operation_id,
+            'from_work_center_id' => null,
+            'to_work_center_id' => $wcCnc->id,
+            'machine_id' => $machCnc->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'created',
+            'quantity' => 10,
+            'good_quantity' => 0,
+            'cost_before' => 0,
+            'cost_added' => 0,
+            'cost_after' => 0,
+            'remarks' => 'WIP tracking initialized.',
+            'transaction_at' => now()->subDays(10)->setTime(8, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA10->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcCnc->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machCnc->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 10,
+            'good_quantity' => 10,
+            'cost_before' => 0,
+            'cost_added' => 5799.92,
+            'cost_after' => 5799.92,
+            'remarks' => 'CNC profiling completed successfully.',
+            'transaction_at' => now()->subDays(10)->setTime(9, 20),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA10->routing_operation_id,
+            'to_operation_id' => $opA20->routing_operation_id,
+            'from_work_center_id' => $wcCnc->id,
+            'to_work_center_id' => $wcSanding->id,
+            'machine_id' => $machSander->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'transferred',
+            'quantity' => 10,
+            'cost_before' => 5799.92,
+            'cost_added' => 0,
+            'cost_after' => 5799.92,
+            'remarks' => 'Transferred to Sanding section.',
+            'transaction_at' => now()->subDays(10)->setTime(9, 30),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA20->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcSanding->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machSander->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 10,
+            'good_quantity' => 10,
+            'cost_before' => 5799.92,
+            'cost_added' => 2033.20,
+            'cost_after' => 7833.12,
+            'remarks' => 'Sanding completed.',
+            'transaction_at' => now()->subDays(10)->setTime(10, 20),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA20->routing_operation_id,
+            'to_operation_id' => $opA30->routing_operation_id,
+            'from_work_center_id' => $wcSanding->id,
+            'to_work_center_id' => $wcSprayBooth->id,
+            'machine_id' => $machSpray->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'transferred',
+            'quantity' => 10,
+            'cost_before' => 7833.12,
+            'cost_added' => 0,
+            'cost_after' => 7833.12,
+            'remarks' => 'Transferred to Spray Booth.',
+            'transaction_at' => now()->subDays(9)->setTime(8, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA30->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcSprayBooth->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machSpray->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 10,
+            'good_quantity' => 10,
+            'cost_before' => 7833.12,
+            'cost_added' => 3242.60,
+            'cost_after' => 11075.72,
+            'remarks' => 'Coatings applied successfully.',
+            'transaction_at' => now()->subDays(9)->setTime(9, 5),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA30->routing_operation_id,
+            'to_operation_id' => $opA40->routing_operation_id,
+            'from_work_center_id' => $wcSprayBooth->id,
+            'to_work_center_id' => $wcAssembly->id,
+            'machine_id' => $machPress->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'transferred',
+            'quantity' => 10,
+            'cost_before' => 11075.72,
+            'cost_added' => 0,
+            'cost_after' => 11075.72,
+            'remarks' => 'Transferred to Assembly section.',
+            'transaction_at' => now()->subDays(8)->setTime(8, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA40->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcAssembly->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machPress->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 10,
+            'good_quantity' => 10,
+            'cost_before' => 11075.72,
+            'cost_added' => 3280.20,
+            'cost_after' => 14355.92,
+            'remarks' => 'Structural assembly completed.',
+            'transaction_at' => now()->subDays(8)->setTime(9, 15),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA40->routing_operation_id,
+            'to_operation_id' => $opA50->routing_operation_id,
+            'from_work_center_id' => $wcAssembly->id,
+            'to_work_center_id' => $wcQcFinal->id,
+            'machine_id' => null,
+            'operator_id' => $userId,
+            'transaction_type' => 'transferred',
+            'quantity' => 10,
+            'cost_before' => 14355.92,
+            'cost_added' => 0,
+            'cost_after' => 14355.92,
+            'remarks' => 'Transferred to Quality Control desk.',
+            'transaction_at' => now()->subDays(7)->setTime(10, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA50->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcQcFinal->id,
+            'to_work_center_id' => null,
+            'machine_id' => null,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 10,
+            'good_quantity' => 10,
+            'cost_before' => 14355.92,
+            'cost_added' => 2.30,
+            'cost_after' => 14358.22,
+            'remarks' => 'Final QC check passed.',
+            'transaction_at' => now()->subDays(7)->setTime(10, 25),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipA->id,
+            'production_order_id' => $ordA->id,
+            'production_batch_id' => $batchA->id,
+            'from_operation_id' => $opA50->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcQcFinal->id,
+            'to_work_center_id' => null,
+            'machine_id' => null,
+            'operator_id' => $userId,
+            'transaction_type' => 'converted_to_finished_goods',
+            'quantity' => 10,
+            'cost_before' => 14358.22 + 615.00,
+            'cost_added' => 0,
+            'cost_after' => 0,
+            'remarks' => 'Completed WIP quantity of 10 received into finished inventory.',
+            'transaction_at' => now()->subDays(6),
+            'created_by' => $userId,
+        ]);
+
+        // Seed manual cost adjustments for Scenario A
+        ProductionCostAdjustment::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordA->id,
+            'adjustment_date' => now()->subDays(8),
+            'cost_component' => 'labor',
+            'category' => 'Additional Labour',
+            'description' => 'Overtime premium for final assembly rush',
+            'amount' => 120.00,
+            'status' => 'recorded',
+            'created_by' => $userId,
+        ]);
+
+        ProductionCostAdjustment::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordA->id,
+            'adjustment_date' => now()->subDays(8),
+            'cost_component' => 'machine',
+            'category' => 'Tool Damage',
+            'description' => 'Bessey clamp thread strip replacement',
+            'amount' => 45.00,
+            'status' => 'recorded',
+            'created_by' => $userId,
+        ]);
 
         // ═══════════════════════════════════════════════════════════════════════
         //  SCENARIO B — CNC MACHINE BREAKDOWN (Downtime + State History)
@@ -438,7 +734,7 @@ class FurnitureManufacturingDemoSeeder extends Seeder
 
         ProductionOrderReservation::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordC->id, 'product_id' => $teakLumber->id, 'quantity_planned' => 50.0, 'quantity_reserved' => 50.0, 'quantity_issued' => 50.0, 'uom_id' => $pcs->id]);
 
-        $schedC = ProductionSchedule::create(['tenant_id' => $tenant->id, 'schedule_number' => 'SCHED-FURN-C001', 'production_order_id' => $ordC->id, 'scheduling_type' => 'forward', 'status' => 'completed', 'scheduled_at' => now()->subDays(9), 'completed_at' => now()->subDays(4), 'created_by' => $userId]);
+        $schedC = ProductionSchedule::create(['tenant_id' => $tenant->id, 'schedule_number' => 'SCHED-FURN-C001', 'production_order_id' => $ordC->id, 'scheduling_type' => 'forward', 'status' => 'completed', 'scheduled_at' => now()->subDays(9), 'completed_at' => now()->subDays(4), 'capacity_utilization' => 64.80, 'created_by' => $userId]);
         ProductionScheduleOperation::create(['tenant_id' => $tenant->id, 'production_schedule_id' => $schedC->id, 'production_order_id' => $ordC->id, 'production_order_operation_id' => $opC10->id, 'work_center_id' => $wcCnc->id,      'machine_id' => $machCnc->id,   'sequence' => 10, 'planned_start' => now()->subDays(8)->setTime(8, 0),  'planned_finish' => now()->subDays(8)->setTime(10, 0),  'actual_start' => now()->subDays(8)->setTime(8, 5),  'actual_finish' => now()->subDays(8)->setTime(10, 10), 'status' => 'completed', 'shift_code' => 'SHIFT-DAY']);
         ProductionScheduleOperation::create(['tenant_id' => $tenant->id, 'production_schedule_id' => $schedC->id, 'production_order_id' => $ordC->id, 'production_order_operation_id' => $opC40->id, 'work_center_id' => $wcAssembly->id, 'machine_id' => $machPress->id, 'sequence' => 40, 'planned_start' => now()->subDays(6)->setTime(8, 0),  'planned_finish' => now()->subDays(6)->setTime(9, 45), 'actual_start' => now()->subDays(6)->setTime(8, 0),  'actual_finish' => now()->subDays(6)->setTime(10, 5),  'status' => 'completed', 'shift_code' => 'SHIFT-DAY']);
 
@@ -461,6 +757,172 @@ class FurnitureManufacturingDemoSeeder extends Seeder
 
         ProductionEventTimeline::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordC->id, 'event_type' => 'NCR Raised',        'title' => 'Quality Failure – Table Leg Joint Wobble', 'description' => 'NCR NCR-FURN-C001 raised for DT1-00003. Leg joint bond failure at QC. Disposition: Rework.',     'severity' => 'warning',  'event_source' => 'Seeder', 'triggered_by' => $userId, 'event_time' => now()->subDays(4)->setTime(14, 30)]);
         ProductionEventTimeline::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordC->id, 'event_type' => 'Rework Completed',  'title' => 'Rework RWK-FURN-C001 Completed',          'description' => 'Table leg joint reworked and re-inspected. DT1-00003 passed. CAPA closed.',                   'severity' => 'success',  'event_source' => 'Seeder', 'triggered_by' => $userId, 'event_time' => now()->subDays(2)]);
+
+        // Seed WIP for Scenario C
+        $wipC = ProductionWip::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordC->id,
+            'production_batch_id' => $batchC->id,
+            'product_id' => $diningTable->id,
+            'current_routing_operation_id' => $opC50->routing_operation_id,
+            'current_work_center_id' => $wcQcFinal->id,
+            'current_machine_id' => null,
+            'quantity' => 0.0000,
+            'available_quantity' => 0.0000,
+            'completed_quantity' => 5.0000,
+            'rejected_quantity' => 1.0000,
+            'scrap_quantity' => 0.0000,
+            'rework_quantity' => 1.0000,
+            'status' => 'completed',
+            'material_cost' => 425.00,
+            'labor_cost' => 2200.00,
+            'machine_cost' => 4800.00,
+            'overhead_cost' => 150.00,
+            'total_value' => 425.00 + 2200.00 + 4800.00 + 150.00,
+            'started_at' => now()->subDays(8)->setTime(8, 0),
+            'last_moved_at' => now()->subDays(4),
+            'completed_at' => now()->subDays(4),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipC->id,
+            'production_order_id' => $ordC->id,
+            'production_batch_id' => $batchC->id,
+            'from_operation_id' => null,
+            'to_operation_id' => $opC10->routing_operation_id,
+            'from_work_center_id' => null,
+            'to_work_center_id' => $wcCnc->id,
+            'machine_id' => $machCnc->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'created',
+            'quantity' => 5,
+            'good_quantity' => 0,
+            'cost_before' => 0,
+            'cost_added' => 0,
+            'cost_after' => 0,
+            'remarks' => 'WIP tracking initialized.',
+            'transaction_at' => now()->subDays(8)->setTime(8, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipC->id,
+            'production_order_id' => $ordC->id,
+            'production_batch_id' => $batchC->id,
+            'from_operation_id' => $opC10->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcCnc->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machCnc->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 5,
+            'good_quantity' => 5,
+            'cost_before' => 0,
+            'cost_added' => 1200.00,
+            'cost_after' => 1200.00,
+            'remarks' => 'Tabletop CNC cutting completed.',
+            'transaction_at' => now()->subDays(8)->setTime(10, 10),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipC->id,
+            'production_order_id' => $ordC->id,
+            'production_batch_id' => $batchC->id,
+            'from_operation_id' => $opC40->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcAssembly->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machPress->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 5,
+            'good_quantity' => 4,
+            'rejected_quantity' => 1,
+            'cost_before' => 1200.00,
+            'cost_added' => 1500.00,
+            'cost_after' => 2700.00,
+            'remarks' => 'Assembly completed with 1 unit rejected due to wobbling leg joint.',
+            'transaction_at' => now()->subDays(6)->setTime(10, 5),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipC->id,
+            'production_order_id' => $ordC->id,
+            'production_batch_id' => $batchC->id,
+            'from_operation_id' => $opC40->routing_operation_id,
+            'transaction_type' => 'sent_to_rework',
+            'quantity' => 1,
+            'remarks' => 'Wobble joint sent to joinery bench for rework.',
+            'transaction_at' => now()->subDays(4)->setTime(14, 30),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipC->id,
+            'production_order_id' => $ordC->id,
+            'production_batch_id' => $batchC->id,
+            'from_operation_id' => $opC40->routing_operation_id,
+            'transaction_type' => 'rework_completed',
+            'quantity' => 1,
+            'remarks' => 'Wobble joint disassembled, re-glued, and successfully cured.',
+            'transaction_at' => now()->subDays(3)->setTime(12, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipC->id,
+            'production_order_id' => $ordC->id,
+            'production_batch_id' => $batchC->id,
+            'from_operation_id' => $opC50->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcQcFinal->id,
+            'to_work_center_id' => null,
+            'machine_id' => null,
+            'operator_id' => $userId,
+            'transaction_type' => 'converted_to_finished_goods',
+            'quantity' => 5,
+            'cost_before' => 2700.00 + 425.00,
+            'cost_added' => 0,
+            'cost_after' => 0,
+            'remarks' => 'Completed WIP quantity of 5 received into finished inventory after rework clearance.',
+            'transaction_at' => now()->subDays(4),
+            'created_by' => $userId,
+        ]);
+
+        // Seed manual cost adjustments for Scenario C
+        ProductionCostAdjustment::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordC->id,
+            'adjustment_date' => now()->subDays(3),
+            'cost_component' => 'labor',
+            'category' => 'Rework Expense',
+            'description' => 'Leg disassembly and re-gluing labor cost',
+            'amount' => 70.00,
+            'status' => 'recorded',
+            'created_by' => $userId,
+        ]);
+
+        ProductionCostAdjustment::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordC->id,
+            'adjustment_date' => now()->subDays(3),
+            'cost_component' => 'material',
+            'category' => 'Quality Failure',
+            'description' => 'Extra PVA glue and sanding pad consumables used during rework',
+            'amount' => 15.00,
+            'status' => 'recorded',
+            'created_by' => $userId,
+        ]);
 
         // ═══════════════════════════════════════════════════════════════════════
         //  SCENARIO D — QUALITY FAILURE → NCR → SCRAP (Grain Crack – Chair)
@@ -485,6 +947,126 @@ class FurnitureManufacturingDemoSeeder extends Seeder
 
         ProductionEventTimeline::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordD->id, 'event_type' => 'NCR Raised', 'title' => 'Material Defect – Grain Crack on Chair Leg', 'description' => 'NCR NCR-FURN-D001 raised for DC1-D-0006. Severe teak grain crack detected. Disposition: Scrap. 1 unit written off at cost £45.', 'severity' => 'critical', 'event_source' => 'Seeder', 'triggered_by' => $userId, 'event_time' => now()->subDays(1)->setTime(15, 30)]);
 
+        // Seed WIP for Scenario D
+        $wipD = ProductionWip::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordD->id,
+            'production_batch_id' => $batchD->id,
+            'product_id' => $diningChair->id,
+            'current_routing_operation_id' => $opD50->routing_operation_id,
+            'current_work_center_id' => $wcQcFinal->id,
+            'current_machine_id' => null,
+            'quantity' => 0.0000,
+            'available_quantity' => 0.0000,
+            'completed_quantity' => 7.0000,
+            'rejected_quantity' => 1.0000,
+            'scrap_quantity' => 1.0000,
+            'rework_quantity' => 0.0000,
+            'status' => 'completed',
+            'material_cost' => 430.50,
+            'labor_cost' => 1800.00,
+            'machine_cost' => 3800.00,
+            'overhead_cost' => 120.00,
+            'total_value' => 430.50 + 1800.00 + 3800.00 + 120.00,
+            'started_at' => now()->subDays(4)->setTime(8, 0),
+            'last_moved_at' => now()->subDays(1),
+            'completed_at' => now()->subDays(1),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipD->id,
+            'production_order_id' => $ordD->id,
+            'production_batch_id' => $batchD->id,
+            'from_operation_id' => null,
+            'to_operation_id' => $rtopC1->id, // OP-010 for Chair Routing
+            'from_work_center_id' => null,
+            'to_work_center_id' => $wcCnc->id,
+            'machine_id' => $machCnc->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'created',
+            'quantity' => 8,
+            'good_quantity' => 0,
+            'cost_before' => 0,
+            'cost_added' => 0,
+            'cost_after' => 0,
+            'remarks' => 'WIP tracking initialized.',
+            'transaction_at' => now()->subDays(4)->setTime(8, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipD->id,
+            'production_order_id' => $ordD->id,
+            'production_batch_id' => $batchD->id,
+            'from_operation_id' => $opD40->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcAssembly->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machPress->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 8,
+            'good_quantity' => 7,
+            'rejected_quantity' => 1,
+            'scrap_quantity' => 1,
+            'cost_before' => 1800.00,
+            'cost_added' => 1000.00,
+            'cost_after' => 2800.00,
+            'remarks' => 'Structural assembly completed. 1 unit rejected and marked for scrap due to deep grain crack.',
+            'transaction_at' => now()->subDays(2)->setTime(14, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipD->id,
+            'production_order_id' => $ordD->id,
+            'production_batch_id' => $batchD->id,
+            'from_operation_id' => $opD40->routing_operation_id,
+            'transaction_type' => 'scrapped',
+            'quantity' => 1,
+            'remarks' => 'Unit written off and scrap logged under NCR-FURN-D001.',
+            'transaction_at' => now()->subDays(1)->setTime(16, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipD->id,
+            'production_order_id' => $ordD->id,
+            'production_batch_id' => $batchD->id,
+            'from_operation_id' => $opD50->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcQcFinal->id,
+            'to_work_center_id' => null,
+            'machine_id' => null,
+            'operator_id' => $userId,
+            'transaction_type' => 'converted_to_finished_goods',
+            'quantity' => 7,
+            'cost_before' => 2800.00 + 430.50,
+            'cost_added' => 0,
+            'cost_after' => 0,
+            'remarks' => 'Completed WIP quantity of 7 received into finished inventory.',
+            'transaction_at' => now()->subDays(1),
+            'created_by' => $userId,
+        ]);
+
+        // Seed manual cost adjustments for Scenario D
+        ProductionCostAdjustment::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordD->id,
+            'adjustment_date' => now()->subDays(1),
+            'cost_component' => 'material',
+            'category' => 'Quality Failure',
+            'description' => 'Teak blank material write-off (DC1-D-0006 leg crack)',
+            'amount' => 45.00,
+            'status' => 'recorded',
+            'created_by' => $userId,
+        ]);
+
         // ═══════════════════════════════════════════════════════════════════════
         //  SCENARIO E — ACTIVE ORDER IN PROGRESS: 10x Dining Table, OP-030 RUNNING
         // ═══════════════════════════════════════════════════════════════════════
@@ -500,7 +1082,7 @@ class FurnitureManufacturingDemoSeeder extends Seeder
         ProductionOrderReservation::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordE->id, 'product_id' => $teakLumber->id, 'quantity_planned' => 100.0, 'quantity_reserved' => 100.0, 'quantity_issued' => 20.0, 'uom_id' => $pcs->id]);
         ProductionOrderReservation::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordE->id, 'product_id' => $woodStain->id, 'quantity_planned' => 6.0,  'quantity_reserved' => 6.0,  'quantity_issued' => 6.0, 'uom_id' => $ltr->id]);
 
-        $schedE = ProductionSchedule::create(['tenant_id' => $tenant->id, 'schedule_number' => 'SCHED-FURN-E001', 'production_order_id' => $ordE->id, 'scheduling_type' => 'forward', 'status' => 'in_progress', 'scheduled_at' => now()->subDays(3), 'completed_at' => null, 'created_by' => $userId]);
+        $schedE = ProductionSchedule::create(['tenant_id' => $tenant->id, 'schedule_number' => 'SCHED-FURN-E001', 'production_order_id' => $ordE->id, 'scheduling_type' => 'forward', 'status' => 'in_progress', 'scheduled_at' => now()->subDays(3), 'completed_at' => null, 'capacity_utilization' => 78.90, 'created_by' => $userId]);
         ProductionScheduleOperation::create(['tenant_id' => $tenant->id, 'production_schedule_id' => $schedE->id, 'production_order_id' => $ordE->id, 'production_order_operation_id' => $opE10->id, 'work_center_id' => $wcCnc->id,       'machine_id' => $machCnc->id,   'sequence' => 10, 'planned_start' => now()->subDays(2)->setTime(8, 0),  'planned_finish' => now()->subDays(2)->setTime(10, 0),  'actual_start' => now()->subDays(2)->setTime(8, 0),  'actual_finish' => now()->subDays(2)->setTime(10, 10), 'status' => 'completed', 'shift_code' => 'SHIFT-DAY']);
         ProductionScheduleOperation::create(['tenant_id' => $tenant->id, 'production_schedule_id' => $schedE->id, 'production_order_id' => $ordE->id, 'production_order_operation_id' => $opE20->id, 'work_center_id' => $wcSanding->id,   'machine_id' => $machSander->id, 'sequence' => 20, 'planned_start' => now()->subDays(2)->setTime(10, 30), 'planned_finish' => now()->subDays(2)->setTime(12, 0), 'actual_start' => now()->subDays(2)->setTime(10, 30), 'actual_finish' => now()->subDays(2)->setTime(12, 0), 'status' => 'completed', 'shift_code' => 'SHIFT-DAY']);
         ProductionScheduleOperation::create(['tenant_id' => $tenant->id, 'production_schedule_id' => $schedE->id, 'production_order_id' => $ordE->id, 'production_order_operation_id' => $opE30->id, 'work_center_id' => $wcSprayBooth->id, 'machine_id' => $machSpray->id, 'sequence' => 30, 'planned_start' => now()->setTime(8, 0),               'planned_finish' => now()->setTime(9, 30),              'actual_start' => now()->subHours(3),               'actual_finish' => null,                              'status' => 'running',   'shift_code' => 'SHIFT-DAY']);
@@ -516,6 +1098,168 @@ class FurnitureManufacturingDemoSeeder extends Seeder
         ProductionEventTimeline::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordE->id, 'machine_id' => $machCnc->id,  'operator_id' => $userId, 'event_type' => 'Operation Started',    'title' => 'OP-010 CNC Cutting Started',              'description' => '10x Table DT-1 top cutting started on Biesse CNC Router.',                       'severity' => 'info',    'event_source' => 'Seeder', 'triggered_by' => $userId, 'event_time' => now()->subDays(2)->setTime(8, 0)]);
         ProductionEventTimeline::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordE->id, 'machine_id' => $machCnc->id,  'operator_id' => $userId, 'event_type' => 'Operation Completed',  'title' => 'OP-010 CNC Cutting Completed',            'description' => 'CNC cutting done for all 10 tabletops. No defects. Passed to sanding.',         'severity' => 'success', 'event_source' => 'Seeder', 'triggered_by' => $userId, 'event_time' => now()->subDays(2)->setTime(10, 10)]);
         ProductionEventTimeline::create(['tenant_id' => $tenant->id, 'production_order_id' => $ordE->id, 'machine_id' => $machSpray->id, 'operator_id' => $userId, 'event_type' => 'Operation Started',    'title' => 'OP-030 Staining & Lacquer – In Progress', 'description' => 'Walnut stain application started on Spray System W-400. Est. 1hr 10min remaining.', 'severity' => 'info',    'event_source' => 'Seeder', 'triggered_by' => $userId, 'event_time' => now()->subHours(3)]);
+
+        // Seed WIP for Scenario E
+        $wipE = ProductionWip::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordE->id,
+            'production_batch_id' => null, // batch is in progress
+            'product_id' => $diningTable->id,
+            'current_routing_operation_id' => $opE30->routing_operation_id,
+            'current_work_center_id' => $wcSprayBooth->id,
+            'current_machine_id' => $machSpray->id,
+            'quantity' => 10.0000,
+            'available_quantity' => 10.0000,
+            'completed_quantity' => 0.0000,
+            'rejected_quantity' => 0.0000,
+            'scrap_quantity' => 0.0000,
+            'rework_quantity' => 0.0000,
+            'status' => 'active',
+            'material_cost' => 170.00,
+            'labor_cost' => 2200.00,
+            'machine_cost' => 4800.00,
+            'overhead_cost' => 150.00,
+            'total_value' => 170.00 + 2200.00 + 4800.00 + 150.00,
+            'started_at' => now()->subDays(2)->setTime(8, 0),
+            'last_moved_at' => now()->subHours(3),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipE->id,
+            'production_order_id' => $ordE->id,
+            'from_operation_id' => null,
+            'to_operation_id' => $opE10->routing_operation_id,
+            'from_work_center_id' => null,
+            'to_work_center_id' => $wcCnc->id,
+            'machine_id' => $machCnc->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'created',
+            'quantity' => 10,
+            'good_quantity' => 0,
+            'cost_before' => 0,
+            'cost_added' => 0,
+            'cost_after' => 0,
+            'remarks' => 'WIP tracking initialized.',
+            'transaction_at' => now()->subDays(2)->setTime(8, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipE->id,
+            'production_order_id' => $ordE->id,
+            'from_operation_id' => $opE10->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcCnc->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machCnc->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 10,
+            'good_quantity' => 10,
+            'cost_before' => 0,
+            'cost_added' => 2400.00,
+            'cost_after' => 2400.00,
+            'remarks' => 'Tabletop CNC cutting completed.',
+            'transaction_at' => now()->subDays(2)->setTime(10, 10),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipE->id,
+            'production_order_id' => $ordE->id,
+            'from_operation_id' => $opE10->routing_operation_id,
+            'to_operation_id' => $opE20->routing_operation_id,
+            'from_work_center_id' => $wcCnc->id,
+            'to_work_center_id' => $wcSanding->id,
+            'machine_id' => $machSander->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'transferred',
+            'quantity' => 10,
+            'cost_before' => 2400.00,
+            'cost_added' => 0,
+            'cost_after' => 2400.00,
+            'remarks' => 'Transferred to Sanding section.',
+            'transaction_at' => now()->subDays(2)->setTime(10, 30),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipE->id,
+            'production_order_id' => $ordE->id,
+            'from_operation_id' => $opE20->routing_operation_id,
+            'to_operation_id' => null,
+            'from_work_center_id' => $wcSanding->id,
+            'to_work_center_id' => null,
+            'machine_id' => $machSander->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_completed',
+            'quantity' => 10,
+            'good_quantity' => 10,
+            'cost_before' => 2400.00,
+            'cost_added' => 1100.00,
+            'cost_after' => 3500.00,
+            'remarks' => 'Sanding completed.',
+            'transaction_at' => now()->subDays(2)->setTime(12, 0),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipE->id,
+            'production_order_id' => $ordE->id,
+            'from_operation_id' => $opE20->routing_operation_id,
+            'to_operation_id' => $opE30->routing_operation_id,
+            'from_work_center_id' => $wcSanding->id,
+            'to_work_center_id' => $wcSprayBooth->id,
+            'machine_id' => $machSpray->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'transferred',
+            'quantity' => 10,
+            'cost_before' => 3500.00,
+            'cost_added' => 0,
+            'cost_after' => 3500.00,
+            'remarks' => 'Transferred to Spray Booth.',
+            'transaction_at' => now()->subHours(3),
+            'created_by' => $userId,
+        ]);
+
+        ProductionWipTransaction::create([
+            'tenant_id' => $tenant->id,
+            'wip_id' => $wipE->id,
+            'production_order_id' => $ordE->id,
+            'from_operation_id' => null,
+            'to_operation_id' => $opE30->routing_operation_id,
+            'from_work_center_id' => null,
+            'to_work_center_id' => $wcSprayBooth->id,
+            'machine_id' => $machSpray->id,
+            'operator_id' => $userId,
+            'transaction_type' => 'operation_started',
+            'quantity' => 10,
+            'cost_before' => 3500.00,
+            'cost_added' => 0,
+            'cost_after' => 3500.00,
+            'remarks' => 'Staining operation started.',
+            'transaction_at' => now()->subHours(3),
+            'created_by' => $userId,
+        ]);
+
+        // Seed manual cost adjustments for Scenario E
+        ProductionCostAdjustment::create([
+            'tenant_id' => $tenant->id,
+            'production_order_id' => $ordE->id,
+            'adjustment_date' => now(),
+            'cost_component' => 'overhead',
+            'category' => 'Electricity',
+            'description' => 'Estimated incremental power consumption for spray booth extraction',
+            'amount' => 25.00,
+            'status' => 'recorded',
+            'created_by' => $userId,
+        ]);
 
         // Dashboard preference
         ProductionDashboardPreference::updateOrCreate(

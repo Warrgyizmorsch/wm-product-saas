@@ -189,4 +189,25 @@ class ProductionRbacTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    /** @test */
+    public function super_admin_has_access_to_all_production_routes(): void
+    {
+        $superAdmin = $this->createUserWithRole('superadmin@example.com', 'super_admin');
+
+        $this->actingAs($superAdmin)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('production.work-centers.index'))
+            ->assertOk();
+
+        $this->actingAs($superAdmin)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('production.orders.index'))
+            ->assertOk();
+
+        $this->actingAs($superAdmin)
+            ->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('production.boms.index'))
+            ->assertOk();
+    }
 }

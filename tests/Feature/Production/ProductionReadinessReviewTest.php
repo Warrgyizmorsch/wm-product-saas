@@ -107,7 +107,7 @@ class ProductionReadinessReviewTest extends TestCase
         $service = app(ProductionWipService::class);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage("Cannot convert WIP: This tracking card has already been completed or has no remaining available quantity.");
+        $this->expectExceptionMessage("Cannot convert WIP: This tracking card has no remaining available quantity.");
 
         // Warehouse ID doesn't need to exist for validation checking to fail
         $service->convertWipToFinishedGoods($wip->id, 999, 'Double complete testing', $this->user->id);

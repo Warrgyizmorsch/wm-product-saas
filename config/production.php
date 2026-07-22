@@ -17,126 +17,207 @@ return [
 
         // Work Center & Machine master data management
         'production.work_center.manage' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.machine.manage' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         // Routing lifecycle permissions
         'production.routing.create' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.routing.update' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         // Only managers can approve — Q4 decision
         'production.routing.approve' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
         ],
 
         'production.routing.cancel' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
         ],
 
         'production.intelligence.view' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.quality.manage' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.quality.approve' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
         ],
 
         // BOM lifecycle permissions
         'production.bom.create' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.bom.update' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.bom.approve' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
         ],
 
         // Planning permissions
         'production.planning.create' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.planning.update' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.planning.approve' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
         ],
 
         'production.planning.cancel' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
         ],
 
         // Order permissions
         'production.order.create' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.order.update' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.order.cancel' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
         ],
 
         // MES & Schedule permissions
         'production.mes.execute' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],
 
         'production.schedule.manage' => [
+            'super_admin',
             'admin',
+            'tenant_owner',
+            'company_admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.cost_adjustment.create' => [
+            'super_admin',
+            'admin',
+            'tenant_owner',
+            'company_admin',
+            'production_manager',
+            'production_engineer',
+        ],
+
+        'production.cost_adjustment.update' => [
+            'super_admin',
+            'admin',
+            'tenant_owner',
+            'company_admin',
             'production_manager',
             'production_engineer',
         ],

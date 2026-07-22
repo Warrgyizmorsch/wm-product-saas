@@ -68,21 +68,21 @@
             {{ __('production.back_to_list') }}
         </x-ui.icon-btn>
 
-        {{-- Grouped Header Actions Dropdown --}}
-        <x-ui.action-dropdown id="headerActionsDropdown">
-            @if($order->isDraft())
+        @if($order->isDraft())
+            {{-- Release Order Button --}}
+            <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5">
+                    <i class="feather-play-circle"></i> {{ __('production.release_order') }}
+                </button>
+            </form>
+
+            {{-- Grouped Header Actions Dropdown --}}
+            <x-ui.action-dropdown id="headerActionsDropdown">
                 <li>
                     <a href="{{ route('production.orders.edit', $order->id) }}" class="dropdown-item py-1.5 fs-12">
                         <i class="feather-edit me-2 text-primary fs-12"></i>{{ __('production.edit_order') }}
                     </a>
-                </li>
-                <li>
-                    <form method="POST" action="{{ route('production.orders.release', $order->id) }}">
-                        @csrf
-                        <button type="submit" class="dropdown-item text-success py-1.5 fs-12">
-                            <i class="feather-play-circle me-2 text-success fs-12"></i>{{ __('production.release_order') }}
-                        </button>
-                    </form>
                 </li>
                 <li>
                     <form method="POST" action="{{ route('production.orders.destroy', $order->id) }}" onsubmit="return confirm('{{ __('production.confirm_delete_draft') }}');">
@@ -93,9 +93,28 @@
                         </button>
                     </form>
                 </li>
-            @endif
+            </x-ui.action-dropdown>
+        @endif
 
-            @if($order->isReleased() || $order->isInProgress())
+        @if($order->isReleased() || $order->isInProgress())
+            {{-- Complete Order Button --}}
+            <form method="POST" action="{{ route('production.orders.complete', $order->id) }}" onsubmit="return confirm('{{ __('production.confirm_complete_order') }}');" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1.5">
+                    <i class="feather-check-circle"></i> {{ __('production.complete_order') }}
+                </button>
+            </form>
+
+            {{-- Cancel Order Button --}}
+            <form method="POST" action="{{ route('production.orders.cancel', $order->id) }}" onsubmit="return confirm('{{ __('production.confirm_cancel_order') }}');" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-danger d-inline-flex align-items-center gap-1.5">
+                    <i class="feather-slash"></i> {{ __('production.cancel_order') }}
+                </button>
+            </form>
+
+            {{-- Grouped Actions Dropdown --}}
+            <x-ui.action-dropdown id="headerActionsDropdown">
                 <li>
                     <a href="javascript:void(0)" class="dropdown-item py-1.5 fs-12" data-bs-toggle="modal" data-bs-target="#progressModal">
                         <i class="feather-edit-3 me-2 text-primary fs-12"></i>{{ __('production.log_progress') }}
@@ -121,35 +140,18 @@
                         <i class="feather-alert-triangle me-2 text-danger fs-12"></i>{{ __('production.log_scrap_rework') }}
                     </a>
                 </li>
-                <li>
-                    <form method="POST" action="{{ route('production.orders.complete', $order->id) }}" onsubmit="return confirm('{{ __('production.confirm_complete_order') }}');">
-                        @csrf
-                        <button type="submit" class="dropdown-item text-success py-1.5 fs-12">
-                            <i class="feather-check-circle me-2 text-success fs-12"></i>{{ __('production.complete_order') }}
-                        </button>
-                    </form>
-                </li>
-                <li>
-                    <form method="POST" action="{{ route('production.orders.cancel', $order->id) }}" onsubmit="return confirm('{{ __('production.confirm_cancel_order') }}');">
-                        @csrf
-                        <button type="submit" class="dropdown-item text-danger py-1.5 fs-12">
-                            <i class="feather-slash me-2 text-danger fs-12"></i>{{ __('production.cancel_order') }}
-                        </button>
-                    </form>
-                </li>
-            @endif
+            </x-ui.action-dropdown>
+        @endif
 
-            @if($order->isCompleted())
-                <li>
-                    <form method="POST" action="{{ route('production.orders.close', $order->id) }}" onsubmit="return confirm('{{ __('production.confirm_close_order') }}');">
-                        @csrf
-                        <button type="submit" class="dropdown-item text-secondary py-1.5 fs-12">
-                            <i class="feather-archive me-2 text-secondary fs-12"></i>{{ __('production.close_archive_order') }}
-                        </button>
-                    </form>
-                </li>
-            @endif
-        </x-ui.action-dropdown>
+        @if($order->isCompleted())
+            {{-- Close & Archive Order Button --}}
+            <form method="POST" action="{{ route('production.orders.close', $order->id) }}" onsubmit="return confirm('{{ __('production.confirm_close_order') }}');" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-secondary d-inline-flex align-items-center gap-1.5">
+                    <i class="feather-archive"></i> {{ __('production.close_archive_order') }}
+                </button>
+            </form>
+        @endif
     </div>
 @endsection
 
@@ -529,15 +531,11 @@
                                 </td>
                                 <td class="text-end">
                                     @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
-                                        <x-ui.action-dropdown id="opActionDropdown{{ $op->id }}">
-                                            <li>
-                                                <a class="dropdown-item py-1.5 fs-12" href="javascript:void(0)"
-                                                   data-bs-toggle="modal" data-bs-target="#progressModal"
-                                                   onclick="var selectEl = document.getElementById('op_select_id'); if (selectEl) { selectEl.value = '{{ $op->id }}'; selectEl.dispatchEvent(new Event('change')); if (window.jQuery && jQuery().select2) { $(selectEl).trigger('change'); } }">
-                                                    <i class="feather-edit-3 me-2 text-primary fs-12"></i>{{ __('production.log_execution_progress') }}
-                                                </a>
-                                            </li>
-                                        </x-ui.action-dropdown>
+                                        <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2 fs-11 d-inline-flex align-items-center gap-1"
+                                                data-bs-toggle="modal" data-bs-target="#progressModal"
+                                                onclick="var selectEl = document.getElementById('op_select_id'); if (selectEl) { selectEl.value = '{{ $op->id }}'; selectEl.dispatchEvent(new Event('change')); if (window.jQuery && jQuery().select2) { $(selectEl).trigger('change'); } }">
+                                            <i class="feather-edit-3"></i> {{ __('production.log_progress') }}
+                                        </button>
                                     @else
                                         —
                                     @endif

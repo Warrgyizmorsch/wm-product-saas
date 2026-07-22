@@ -113,8 +113,9 @@
                                 html += '<td class="text-center text-muted">' + parseFloat(item.available_quantity).toFixed(4) + '</td>';
                                 html += '<td class="text-center fw-bold ' + (item.for_production_qty > 0 ? 'text-danger' : 'text-success') + '">' + parseFloat(item.for_production_qty).toFixed(4) + '</td>';
                                 html += '<td class="text-center">' + item.uom + '</td>';
-                                html += '<td class="text-center font-monospace">$' + parseFloat(item.rate).toFixed(2) + '</td>';
-                                html += '<td class="text-center font-monospace fw-bold">$' + parseFloat(item.amount).toFixed(2) + '</td>';
+                                var currencySymbol = response.currency_symbol || '$';
+                                html += '<td class="text-center font-monospace">' + currencySymbol + parseFloat(item.rate).toFixed(2) + '</td>';
+                                html += '<td class="text-center font-monospace fw-bold">' + currencySymbol + parseFloat(item.amount).toFixed(2) + '</td>';
                                 html += '<td class="text-muted fs-12">' + (item.notes || '—') + '</td>';
                                 html += '</tr>';
                             });

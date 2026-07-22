@@ -835,6 +835,7 @@ return [
     'for_production_qty' => 'उत्पादन हेतु मात्रा',
     'rate_unit' => 'दर / इकाई',
     'total_amount' => 'कुल राशि',
+    'notes' => 'नोट्स',
     'save_changes' => 'परिवर्तन सहेजें',
     'release_order' => 'आदेश जारी करें',
     'log_progress' => 'निष्पादन प्रगति दर्ज करें',

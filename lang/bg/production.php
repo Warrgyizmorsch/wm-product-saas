@@ -835,6 +835,7 @@ return [
     'for_production_qty' => 'Количество за производство',
     'rate_unit' => 'Цена / Мярка',
     'total_amount' => 'Обща сума',
+    'notes' => 'Бележки',
     'save_changes' => 'Запази промените',
     'release_order' => 'Издай поръчка',
     'log_progress' => 'Регистрирай напредък',
