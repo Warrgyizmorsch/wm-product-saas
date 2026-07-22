@@ -31,7 +31,7 @@
             'num' => '4',
             'name' => 'Production Orders',
             'route' => 'production.orders.index',
-            'active_routes' => ['production.orders.*', 'production.cost-adjustments.*', 'production.material-requests.*'],
+            'active_routes' => ['production.orders.*', 'production.cost-adjustments.*', 'sales.material-requests.*'],
             'icon' => 'feather-file-text',
         ],
         [

@@ -83,7 +83,7 @@
                                             <i class="feather-cpu me-1"></i>{{ $requisition->sourceable->order_number }}
                                         </a>
                                     @elseif($requisition->source_type === 'material_request' && $requisition->sourceable)
-                                        <a href="{{ route('production.material-requests.show', $requisition->source_id) }}" class="text-primary hover-underline">
+                                        <a href="{{ route('sales.material-requests.show', $requisition->source_id) }}" class="text-primary hover-underline">
                                             <i class="feather-file-text me-1"></i>{{ $requisition->sourceable->requisition_number }}
                                         </a>
                                     @elseif($requisition->source_type === 'material_requirement' && $requisition->sourceable)

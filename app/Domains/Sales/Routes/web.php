@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\Sales\Controllers\SalesOrderController;
+use App\Domains\Sales\Controllers\MaterialRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('sales')
@@ -34,6 +35,14 @@ Route::prefix('sales')
         Route::post('material-requirements/{delivery}/dispatch', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'dispatch'])->name('material-requirements.dispatch');
         Route::post('material-requirements/{delivery}/dispatch-order', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'storeDispatchOrder'])->name('material-requirements.dispatch-order.store');
         Route::post('material-requirements/{delivery}/deliver', [\App\Domains\Sales\Controllers\MaterialRequirementController::class, 'deliver'])->name('material-requirements.deliver');
+
+        // Material Requests (Prod) Routes
+        Route::get('material-requests', [MaterialRequestController::class, 'index'])->name('material-requests.index');
+        Route::get('material-requests/{id}', [MaterialRequestController::class, 'show'])->name('material-requests.show');
+        Route::post('material-requests/items/{id}/reserve', [MaterialRequestController::class, 'reserve'])->name('material-requests.reserve');
+        Route::post('material-requests/items/{id}/issue', [MaterialRequestController::class, 'issue'])->name('material-requests.issue');
+        Route::post('material-requests/items/{id}/create-pr', [MaterialRequestController::class, 'createPurchaseRequisition'])->name('material-requests.create-pr');
+        Route::post('material-requests/{id}/bulk-action', [MaterialRequestController::class, 'bulkAction'])->name('material-requests.bulk-action');
 
         // Dispatch Orders Routes
         Route::get('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'index'])->name('dispatches.index');

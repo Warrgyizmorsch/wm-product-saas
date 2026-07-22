@@ -21,7 +21,6 @@ use App\Domains\Production\Controllers\NcrController;
 use App\Domains\Production\Controllers\OperatorAssignmentController;
 use App\Domains\Production\Controllers\OperatorSkillController;
 use App\Domains\Production\Controllers\ProductionBomController;
-use App\Domains\Production\Controllers\MaterialRequestController;
 use App\Domains\Production\Controllers\ProductionOrderController;
 use App\Domains\Production\Controllers\ProductionPlanController;
 use App\Domains\Production\Controllers\ProductionScheduleController;
@@ -127,12 +126,6 @@ Route::prefix('production')
         Route::get('cost-adjustments/{adjustment}/download', [\App\Domains\Production\Controllers\ProductionCostAdjustmentController::class, 'downloadAttachment'])->name('cost-adjustments.download');
         Route::resource('orders', ProductionOrderController::class);
 
-        // ── Requisition Slips (Material Requests) ─────────────────────────────
-        Route::get('material-requests', [MaterialRequestController::class, 'index'])->name('material-requests.index');
-        Route::get('material-requests/{id}', [MaterialRequestController::class, 'show'])->name('material-requests.show');
-        Route::post('material-requests/items/{id}/reserve', [MaterialRequestController::class, 'reserve'])->name('material-requests.reserve');
-        Route::post('material-requests/items/{id}/issue', [MaterialRequestController::class, 'issue'])->name('material-requests.issue');
-        Route::post('material-requests/items/{id}/create-pr', [MaterialRequestController::class, 'createPurchaseRequisition'])->name('material-requests.create-pr');
         // ── Work-in-Progress (WIP) Management ───────────────────────────────
         Route::post('wip/{wip}/transfer', [WipController::class, 'transfer'])->name('wip.transfer');
         Route::post('wip/{wip}/adjust', [WipController::class, 'adjust'])->name('wip.adjust');
