@@ -24,7 +24,7 @@
             </div>
 
             <!-- Filters & Search Bar -->
-            <form method="GET" action="{{ route('production.material-requests.index') }}" class="mb-4">
+            <form method="GET" action="{{ route('sales.material-requests.index') }}" class="mb-4">
                 <div class="row g-2">
                     <div class="col-md-5">
                         <div class="input-group">
@@ -44,7 +44,7 @@
                         <button type="submit" class="btn btn-primary w-100 fs-13">Apply Filters</button>
                     </div>
                     <div class="col-md-2">
-                        <a href="{{ route('production.material-requests.index') }}" class="btn btn-light border w-100 fs-13">Reset</a>
+                        <a href="{{ route('sales.material-requests.index') }}" class="btn btn-light border w-100 fs-13">Reset</a>
                     </div>
                 </div>
             </form>
@@ -65,7 +65,7 @@
                         @forelse($slips as $slip)
                             <tr>
                                 <td class="fw-bold">
-                                    <a href="{{ route('production.material-requests.show', $slip->id) }}" class="text-primary text-decoration-none">
+                                    <a href="{{ route('sales.material-requests.show', $slip->id) }}" class="text-primary text-decoration-none">
                                         {{ $slip->requisition_number }}
                                     </a>
                                 </td>
@@ -88,7 +88,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
-                                    <a href="{{ route('production.material-requests.show', $slip->id) }}" class="btn btn-sm btn-outline-primary border">
+                                    <a href="{{ route('sales.material-requests.show', $slip->id) }}" class="btn btn-sm btn-outline-primary border">
                                         <i class="feather-eye me-1"></i> View Details
                                     </a>
                                 </td>

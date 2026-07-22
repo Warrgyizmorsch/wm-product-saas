@@ -214,7 +214,7 @@ class ProductionOrderController extends Controller
                 $validated['notes'] ?? null
             );
 
-            return redirect()->route('production.material-requests.show', $slip->id)
+            return redirect()->route('sales.material-requests.show', $slip->id)
                 ->with('success', "Ad-hoc Material Requisition {$slip->requisition_number} successfully created for Order {$order->order_number}.");
         } catch (\Exception $e) {
             return redirect()->back()->with('error', $e->getMessage());

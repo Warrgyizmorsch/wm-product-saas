@@ -42,7 +42,7 @@
         __('ui.supply_chain') => [
             ['label' => 'Store', 'icon' => 'feather-archive', 'url' => '#', 'children' => [
                 ['label' => 'Material Requirements', 'route' => 'sales.material-requirements.index'],
-                ['label' => 'Material Requests (Prod)', 'route' => 'production.material-requests.index'],
+                ['label' => 'Material Requests (Prod)', 'route' => 'sales.material-requests.index'],
                 ['label' => 'Dispatch Orders', 'route' => 'sales.dispatches.index'],
             ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],

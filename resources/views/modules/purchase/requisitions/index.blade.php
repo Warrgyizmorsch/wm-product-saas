@@ -136,7 +136,7 @@
                                         {{ $req->sourceable->order_number }}
                                     </a>
                                 @elseif($req->source_type === 'material_request' && $req->sourceable)
-                                    <a href="{{ route('production.material-requests.show', $req->source_id) }}" class="text-primary fw-medium">
+                                    <a href="{{ route('sales.material-requests.show', $req->source_id) }}" class="text-primary fw-medium">
                                         {{ $req->sourceable->requisition_number }}
                                     </a>
                                 @elseif($req->source_type === 'material_requirement' && $req->sourceable)

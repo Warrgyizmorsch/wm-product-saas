@@ -108,9 +108,7 @@
 
                             <x-ui.odoo-form-ui type="input" label="Purchase Order No." name="po_number_dummy" value="[Auto-Generated]" readonly="true" />
 
-                            <x-ui.odoo-form-ui type="input" label="Reference Document" name="reference" placeholder="e.g. Contract No, RFQ Ref..." :value="old('reference')" />
 
-                            <x-ui.odoo-form-ui type="input" label="Supplier Quotation No." name="supplier_quotation_number" placeholder="e.g. QU-9876..." :value="old('supplier_quotation_number')" />
 
                             <x-ui.odoo-form-ui type="select" label="Load from PR (Indent)" name="purchase_requisition_id" id="requisitionSelect">
                                 <option value="">-- Direct PO (No PR link) --</option>
@@ -688,6 +686,9 @@
                     data: { requisition_id: prId },
                     success: function(res) {
                         if (res.success && res.items.length > 0) {
+                            if (res.items[0] && res.items[0].warehouse_name && res.items[0].warehouse_name !== '—') {
+                                $('#locationSelect').val(res.items[0].warehouse_name).trigger('change');
+                            }
                             $('#poItemsTable tbody').empty();
                             rowIdx = -1;
                             res.items.forEach(function(item) {

@@ -1218,7 +1218,7 @@
                         @forelse($slips as $slip)
                             <tr>
                                 <td>
-                                    <a href="{{ route('production.material-requests.show', $slip->id) }}" class="fw-bold text-primary font-monospace">
+                                    <a href="{{ route('sales.material-requests.show', $slip->id) }}" class="fw-bold text-primary font-monospace">
                                         {{ $slip->requisition_number }}
                                     </a>
                                 </td>
@@ -1268,7 +1268,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
-                                    <x-ui.action-dropdown :viewUrl="route('production.material-requests.show', $slip->id)">
+                                    <x-ui.action-dropdown :viewUrl="route('sales.material-requests.show', $slip->id)">
                                     </x-ui.action-dropdown>
                                 </td>
                             </tr>
