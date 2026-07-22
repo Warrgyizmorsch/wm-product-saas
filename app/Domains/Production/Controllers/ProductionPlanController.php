@@ -395,7 +395,8 @@ class ProductionPlanController extends Controller
         return response()->json([
             'success' => true,
             'items' => $items,
-            'warehouse_name' => $warehouse?->name ?? 'Default Warehouse'
+            'warehouse_name' => $warehouse?->name ?? 'Default Warehouse',
+            'currency_symbol' => active_currency_symbol(),
         ]);
     }
 
@@ -435,8 +436,8 @@ class ProductionPlanController extends Controller
             $reqQty = $item->quantity * $multiplier;
             $availQty = StockService::getAvailableStock($item->material_id, $warehouseId);
             $forProdQty = max(0.0, $reqQty - $availQty);
-            $rate = (float) ($item->material->unit_cost ?? 0.0);
-            $amount = $reqQty * $rate;
+            $rate = convert_from_base((float) ($item->material->unit_cost ?? 0.0));
+            $amount = convert_from_base($reqQty * (float) ($item->material->unit_cost ?? 0.0));
 
             $itemPrefix = $prefix === "" ? (string)$index : $prefix . "." . $index;
 
