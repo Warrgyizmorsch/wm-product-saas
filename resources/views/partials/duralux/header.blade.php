@@ -311,7 +311,7 @@
                 </div>
 
                 @include('partials.duralux.language-switcher')
-                @include('partials.duralux.currency-switcher')
+                {{-- Currency is auto-resolved from tenant settings via SetCurrency middleware. --}}
 
                 <div class="nxl-h-item d-none d-sm-flex">
                     <div class="full-screen-switcher">

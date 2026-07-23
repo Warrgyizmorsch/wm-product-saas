@@ -92,10 +92,11 @@
             <thead>
                 <tr>
                     <th style="width: 15%">NCR Number</th>
-                    <th style="width: 15%">Category</th>
-                    <th style="width: 15%">Status</th>
-                    <th style="width: 20%">Linked Inspection</th>
-                    <th style="width: 15%">Order ID</th>
+                    <th style="width: 12%">Category</th>
+                    <th style="width: 12%">Disposition</th>
+                    <th style="width: 10%">Status</th>
+                    <th style="width: 18%">Linked Inspection</th>
+                    <th style="width: 25%">Production Order &amp; Product</th>
                     <th style="width: 15%">Created At</th>
                     <th class="text-end" style="width: 5%">Actions</th>
                 </tr>
@@ -109,6 +110,17 @@
                             </a>
                         </td>
                         <td class="text-capitalize text-dark fw-medium">{{ str_replace('_', ' ', $ncr->category) }}</td>
+                        <td>
+                            @if($ncr->disposition_type === 'rework')
+                                <span class="badge bg-light text-warning border border-warning px-2.5 py-1 text-uppercase">Rework</span>
+                            @elseif($ncr->disposition_type === 'scrap')
+                                <span class="badge bg-light text-danger border border-danger px-2.5 py-1 text-uppercase">Scrap</span>
+                            @elseif($ncr->disposition_type === 'use_as_is')
+                                <span class="badge bg-light text-success border border-success px-2.5 py-1 text-uppercase">Use As-Is</span>
+                            @else
+                                <span class="badge bg-light text-secondary border border-secondary px-2.5 py-1 text-uppercase">Pending</span>
+                            @endif
+                        </td>
                         <td>
                             @if($ncr->status === 'closed')
                                 <span class="erp-badge-active">Closed</span>
@@ -130,8 +142,17 @@
                             @endif
                         </td>
                         <td>
-                            @if($ncr->production_order_id)
-                                <span class="text-dark">Order #{{ $ncr->production_order_id }}</span>
+                            @if($ncr->order)
+                                <div class="d-flex flex-column">
+                                    <a href="{{ route('production.orders.show', $ncr->order->id) }}" class="fw-bold text-primary">
+                                        {{ $ncr->order->order_number }}
+                                    </a>
+                                    @if($ncr->order->product)
+                                        <span class="text-muted fs-11 text-truncate" style="max-width: 180px;">
+                                            {{ $ncr->order->product->name }}
+                                        </span>
+                                    @endif
+                                </div>
                             @else
                                 <span class="text-muted">—</span>
                             @endif

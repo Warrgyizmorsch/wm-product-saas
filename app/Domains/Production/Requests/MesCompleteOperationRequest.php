@@ -17,9 +17,9 @@ class MesCompleteOperationRequest extends FormRequest
             'quantity_produced' => 'required|numeric|min:0',
             'quantity_rejected' => 'nullable|numeric|min:0',
             'quantity_scrapped' => 'nullable|numeric|min:0',
-            'setup_minutes'     => 'nullable|numeric|min:0',
-            'run_minutes'       => 'nullable|numeric|min:0',
-            'remarks'           => 'nullable|string|max:1000',
+            'setup_minutes' => 'nullable|numeric|min:0',
+            'run_minutes' => 'nullable|numeric|min:0',
+            'remarks' => 'nullable|string|max:1000',
         ];
     }
 }

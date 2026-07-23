@@ -20,7 +20,7 @@ class ReworkController extends Controller
         $tenantId = require_tenant_id();
 
         $query = ProductionReworkOrder::where('tenant_id', $tenantId)
-            ->with(['ncr', 'originalOrder']);
+            ->with(['ncr', 'originalOrder.product']);
 
         if ($request->filled('search')) {
             $search = '%'.$request->input('search').'%';
@@ -53,7 +53,7 @@ class ReworkController extends Controller
         $this->authorize('view', ProductionReworkOrder::class);
         $tenantId = require_tenant_id();
         $rework = ProductionReworkOrder::where('tenant_id', $tenantId)
-            ->with(['ncr', 'originalOrder', 'operations.workCenter', 'operations.machine'])
+            ->with(['ncr', 'originalOrder.product', 'operations.workCenter', 'operations.machine'])
             ->findOrFail($id);
 
         return view('modules.production.quality.rework.show', compact('rework'));

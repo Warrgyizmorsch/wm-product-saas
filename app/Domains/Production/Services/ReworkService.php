@@ -149,6 +149,60 @@ class ReworkService
             if (! $incomplete) {
                 $rework->update(['status' => 'completed']);
 
+                // Auto-resolve NCR
+                $ncr = $rework->ncr;
+                if ($ncr && $ncr->status !== 'closed') {
+                    $ncr->update([
+                        'status' => 'closed',
+                        'closed_by' => auth()->id(),
+                        'closed_at' => Carbon::now(),
+                        'esignature_closed' => hash('sha256', (auth()->id() ?? 'system').$ncr->id.'closed'.now()->timestamp),
+                    ]);
+
+                    $this->eventService->writeEvent($ncr->tenant_id, [
+                        'production_order_id' => $ncr->production_order_id,
+                        'event_type' => 'NCR Closed',
+                        'title' => 'Non-Conformance Resolved',
+                        'description' => "NCR {$ncr->ncr_number} automatically closed upon Rework completion.",
+                        'severity' => 'success',
+                        'event_source' => 'ReworkService',
+                    ]);
+                }
+
+                // Update original ProductionOrderRework status
+                $orderRework = \App\Domains\Production\Models\ProductionOrderRework::where('production_order_id', $rework->original_production_order_id)
+                    ->where('production_order_operation_id', $ncr?->production_order_operation_id)
+                    ->where('status', '!=', 'completed')
+                    ->first();
+
+                if ($orderRework) {
+                    $orderRework->update(['status' => 'completed']);
+                    $reworkQty = $orderRework->quantity;
+
+                    // Update operation-level counts
+                    $originalOp = \App\Domains\Production\Models\ProductionOrderOperation::find($ncr->production_order_operation_id);
+                    if ($originalOp) {
+                        $originalOp->quantity_rejected = max(0.0000, $originalOp->quantity_rejected - $reworkQty);
+                        $originalOp->quantity_produced += $reworkQty;
+                        $originalOp->save();
+                    }
+
+                    // Update WIP counts
+                    $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $rework->original_production_order_id)->first();
+                    if ($wip) {
+                        $wip->rejected_quantity = max(0.0000, $wip->rejected_quantity - $reworkQty);
+                        $wip->completed_quantity += $reworkQty;
+                        $wip->save();
+                    }
+                    
+                    // Update original production order's quantity_rejected
+                    $originalOrder = $rework->originalOrder;
+                    if ($originalOrder) {
+                        $originalOrder->quantity_rejected = max(0.0000, $originalOrder->quantity_rejected - $reworkQty);
+                        $originalOrder->save();
+                    }
+                }
+
                 $this->eventService->writeEvent($op->tenant_id, [
                     'production_order_id' => $rework->original_production_order_id,
                     'event_type' => 'Rework Completed',

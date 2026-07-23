@@ -565,6 +565,228 @@ class ProductionOrderTest extends TestCase
         }
     }
 
+    public function test_logging_progress_with_rejected_or_scrapped_quantities_automatically_generates_quality_records(): void
+    {
+        $order = $this->createDirectOrderHelper();
+        $op = $order->operations->first();
+
+        $this->post(route('production.orders.release', $order->id));
+
+        // Log execution with 2 rejected and 1 scrapped
+        $this->post(route('production.orders.log-progress', $order->id), [
+            'operation_id' => $op->id,
+            'quantity_produced' => 2.0,
+            'quantity_rejected' => 2.0,
+            'quantity_scrapped' => 1.0,
+            'setup_minutes_logged' => 10,
+            'run_minutes_logged' => 30,
+            'complete_operation' => 0,
+        ]);
+
+        // Assert NCR was created for rework and scrap
+        $this->assertDatabaseHas('production_ncrs', [
+            'production_order_id' => $order->id,
+            'disposition_type' => 'rework',
+        ]);
+        $this->assertDatabaseHas('production_ncrs', [
+            'production_order_id' => $order->id,
+            'disposition_type' => 'scrap',
+        ]);
+
+        // Assert Rework Order was created
+        $this->assertDatabaseHas('production_rework_orders', [
+            'original_production_order_id' => $order->id,
+        ]);
+
+        // Assert Scrap Disposal was created
+        $this->assertDatabaseHas('production_scrap_disposals', [
+            'quantity' => 1.0,
+        ]);
+    }
+
+    public function test_completing_rework_order_reconciles_quantities_back_to_produced(): void
+    {
+        $order = $this->createDirectOrderHelper();
+        $op = $order->operations->first();
+        $this->withoutExceptionHandling();
+
+        $this->post(route('production.orders.release', $order->id));
+
+        // Log progress with 2 rejected (creates NCR and Rework order)
+        $this->post(route('production.orders.log-progress', $order->id), [
+            'operation_id' => $op->id,
+            'quantity_produced' => 2.0,
+            'quantity_rejected' => 2.0,
+            'quantity_scrapped' => 0.0,
+            'setup_minutes_logged' => 10,
+            'run_minutes_logged' => 30,
+            'complete_operation' => 0,
+        ]);
+
+        $order->refresh();
+        $this->assertEquals(2.0, $order->quantity_rejected);
+
+        $reworkOrder = \App\Domains\Production\Models\ProductionReworkOrder::where('original_production_order_id', $order->id)->first();
+        // Since we created 2 operations by default (sequence 10, 20), complete them both
+        foreach ($reworkOrder->operations as $reworkOp) {
+            // Start rework operation
+            $this->post(route('production.quality.rework.ops.start', $reworkOp->id));
+
+            // Complete rework operation
+            $this->post(route('production.quality.rework.ops.complete', $reworkOp->id), [
+                'setup_time_actual' => 10.0,
+            ]);
+        }
+
+        $order->refresh();
+        $op->refresh();
+
+        // Rejected quantity should be reduced back to 0 at order and operation levels
+        $this->assertEquals(0.0, $order->quantity_rejected);
+        $this->assertEquals(0.0, $op->quantity_rejected);
+        // Produced quantity should be incremented (2.0 original + 2.0 reworked = 4.0)
+        $this->assertEquals(4.0, $op->quantity_produced);
+
+        // Associated NCR should be closed
+        $ncr = $reworkOrder->ncr;
+        $ncr->refresh();
+        $this->assertEquals('closed', $ncr->status);
+    }
+
+    public function test_scrapped_quantities_do_not_restrict_production_limits(): void
+    {
+        $order = $this->createDirectOrderHelper();
+        $op = $order->operations->first();
+
+        $this->post(route('production.orders.release', $order->id));
+
+        // Log progress: 4 produced, 6 scrapped (Total target = 5.0)
+        // With previous logic this would fail because 4+6 = 10 > 5.
+        // With new logic, scrapped is ignored in check, so 4 produced is compared to 5, which passes.
+        $response = $this->post(route('production.orders.log-progress', $order->id), [
+            'operation_id' => $op->id,
+            'quantity_produced' => 4.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 6.0,
+            'setup_minutes_logged' => 10,
+            'run_minutes_logged' => 30,
+            'complete_operation' => 0,
+        ]);
+
+        $response->assertRedirect();
+        
+        $order->refresh();
+        $op->refresh();
+
+        // 6 scrapped logged successfully
+        $this->assertEquals(6.0, $op->quantity_scrapped);
+        $this->assertEquals(6.0, $order->quantity_scrapped);
+        // Produced quantity should be 4
+        $this->assertEquals(4.0, $op->quantity_produced);
+
+        // Operator should be allowed to log 1 more produced unit without hitting the limit (4 + 1 = 5)
+        $response2 = $this->post(route('production.orders.log-progress', $order->id), [
+            'operation_id' => $op->id,
+            'quantity_produced' => 1.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 0.0,
+            'setup_minutes_logged' => 10,
+            'run_minutes_logged' => 30,
+            'complete_operation' => 0,
+        ]);
+
+        $response2->assertRedirect();
+    }
+
+    public function test_approving_scrap_disposal_closes_associated_ncr(): void
+    {
+        $order = $this->createDirectOrderHelper();
+        $op = $order->operations->first();
+
+        $this->post(route('production.orders.release', $order->id));
+
+        // Log progress with 1 scrapped (creates NCR and Scrap Disposal)
+        $this->post(route('production.orders.log-progress', $order->id), [
+            'operation_id' => $op->id,
+            'quantity_produced' => 0.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 1.0,
+            'setup_minutes_logged' => 10,
+            'run_minutes_logged' => 30,
+            'complete_operation' => 0,
+        ]);
+
+        $ncr = \App\Domains\Production\Models\ProductionNcr::where('production_order_id', $order->id)->where('disposition_type', 'scrap')->first();
+        $this->assertNotNull($ncr);
+        $this->assertEquals('open', $ncr->status);
+
+        $disposal = \App\Domains\Production\Models\ProductionScrapDisposal::where('ncr_id', $ncr->id)->first();
+        $this->assertNotNull($disposal);
+        $this->assertEquals('pending_approval', $disposal->status);
+
+        // Approve the scrap disposal
+        $this->post(route('production.quality.scrap.approve', $disposal->id));
+
+        $disposal->refresh();
+        $ncr->refresh();
+
+        $this->assertEquals('approved', $disposal->status);
+        $this->assertEquals('closed', $ncr->status);
+    }
+
+    public function test_cannot_log_progress_on_completed_operation_or_fully_produced_target(): void
+    {
+        $order = $this->createDirectOrderHelper();
+        $op = $order->operations->first();
+
+        $this->post(route('production.orders.release', $order->id));
+
+        // 1. Cannot log on completed operation
+        $op->update(['status' => 'completed']);
+
+        $response = $this->post(route('production.orders.log-progress', $order->id), [
+            'operation_id' => $op->id,
+            'quantity_produced' => 1.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 0.0,
+            'setup_minutes_logged' => 10,
+            'run_minutes_logged' => 30,
+            'complete_operation' => 0,
+        ]);
+
+        $response->assertSessionHas('error');
+
+        // Restore operation status to draft/in_progress
+        $op->update(['status' => 'in_progress']);
+
+        // Log 5.0 (the full target limit of 5.0)
+        $this->post(route('production.orders.log-progress', $order->id), [
+            'operation_id' => $op->id,
+            'quantity_produced' => 5.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 0.0,
+            'setup_minutes_logged' => 10,
+            'run_minutes_logged' => 30,
+            'complete_operation' => 0,
+        ]);
+
+        $op->refresh();
+        $this->assertEquals(5.0, $op->quantity_produced);
+
+        // 2. Cannot log any more once target is hit
+        $response2 = $this->post(route('production.orders.log-progress', $order->id), [
+            'operation_id' => $op->id,
+            'quantity_produced' => 0.0,
+            'quantity_rejected' => 0.0,
+            'quantity_scrapped' => 1.0,
+            'setup_minutes_logged' => 10,
+            'run_minutes_logged' => 30,
+            'complete_operation' => 0,
+        ]);
+
+        $response2->assertSessionHas('error');
+    }
+
     private function createDirectOrderHelper(): ProductionOrder
     {
         $this->actingAs($this->user);

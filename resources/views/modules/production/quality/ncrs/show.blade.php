@@ -23,7 +23,21 @@
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <div>
                 <h4 class="fw-bold text-dark mb-1">Non-Conformance Report: {{ $ncr->ncr_number }}</h4>
-                <div class="text-muted fs-12">Category: <strong class="text-capitalize text-dark">{{ $ncr->category }}</strong></div>
+                <div class="text-muted fs-12 d-flex gap-3 align-items-center">
+                    <span>Category: <strong class="text-capitalize text-dark">{{ str_replace('_', ' ', $ncr->category) }}</strong></span>
+                    <span>•</span>
+                    <span>Disposition: 
+                        @if($ncr->disposition_type === 'rework')
+                            <span class="badge bg-light text-warning border border-warning px-2.5 py-0.5 text-uppercase fs-10 fw-bold">Rework</span>
+                        @elseif($ncr->disposition_type === 'scrap')
+                            <span class="badge bg-light text-danger border border-danger px-2.5 py-0.5 text-uppercase fs-10 fw-bold">Scrap</span>
+                        @elseif($ncr->disposition_type === 'use_as_is')
+                            <span class="badge bg-light text-success border border-success px-2.5 py-0.5 text-uppercase fs-10 fw-bold">Use As-Is</span>
+                        @else
+                            <span class="badge bg-light text-secondary border border-secondary px-2.5 py-0.5 text-uppercase fs-10 fw-bold">Pending Assessment</span>
+                        @endif
+                    </span>
+                </div>
             </div>
             <div>
                 <span class="badge bg-soft-danger text-danger px-3 py-1.5 rounded-pill text-uppercase">{{ $ncr->status }}</span>
@@ -58,10 +72,17 @@
                     </div>
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
-                            @if($ncr->production_order_id)
-                                <a href="{{ route('production.orders.show', $ncr->production_order_id) }}" class="text-primary">
-                                    Order #{{ $ncr->production_order_id }}
-                                </a>
+                            @if($ncr->order)
+                                <div class="d-flex flex-column">
+                                    <a href="{{ route('production.orders.show', $ncr->order->id) }}" class="text-primary fw-bold">
+                                        {{ $ncr->order->order_number }}
+                                    </a>
+                                    @if($ncr->order->product)
+                                        <span class="text-muted fs-11 mt-0.5 fw-normal">
+                                            Product: <strong>{{ $ncr->order->product->name }}</strong> ({{ $ncr->order->product->sku }})
+                                        </span>
+                                    @endif
+                                </div>
                             @else
                                 —
                             @endif

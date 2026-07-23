@@ -139,7 +139,7 @@ class ProductionOrderController extends Controller
     {
         $order = ProductionOrder::with([
             'product', 'bom', 'routing', 'creator', 'releaser', 'completer', 'closer',
-            'operations.workCenter', 'operations.machine',
+            'operations.workCenter', 'operations.machine', 'operations.scheduleOperation', 'operations.operatorAssignments.user',
             'reservations.product', 'reservations.uom', 'reservations.warehouse',
             'issues.product', 'issues.user', 'issues.warehouse',
             'progressLogs.operation', 'progressLogs.user', 'progressLogs.machine',
@@ -182,10 +182,11 @@ class ProductionOrderController extends Controller
         $costComponents = \App\Domains\Production\Models\ProductionCostAdjustment::getCostComponents();
         $categories = \App\Domains\Production\Models\ProductionCostAdjustment::getCategories();
         $warehouses = Warehouse::where('tenant_id', $order->tenant_id)->orderByDesc('is_default')->orderBy('name')->get();
+        $operators = \App\Models\User::where('tenant_id', $order->tenant_id)->orderBy('name')->get();
 
         return view('modules.production.orders.show', compact(
             'order', 'costs', 'dailyHistory', 'costAdjustments', 'finalCostingSummary',
-            'costComponents', 'categories', 'warehouses'
+            'costComponents', 'categories', 'warehouses', 'operators'
         ));
     }
 

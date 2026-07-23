@@ -111,6 +111,16 @@ class ProductionOrderOperation extends BaseModel
         return $this->hasMany(ProductionOrderProgressLog::class, 'operation_id');
     }
 
+    public function scheduleOperation(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ProductionScheduleOperation::class, 'production_order_operation_id');
+    }
+
+    public function operatorAssignments(): HasMany
+    {
+        return $this->hasMany(ProductionOperatorAssignment::class, 'production_order_operation_id');
+    }
+
     public function isRunning(): bool
     {
         return $this->status === self::STATUS_RUNNING;

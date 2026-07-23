@@ -71,6 +71,28 @@ class ScrapService
                 'disposed_at' => Carbon::now(),
                 'disposed_by' => $userId,
             ]);
+
+            // Auto-resolve NCR
+            $ncr = $disposal->ncr;
+            if ($ncr && $ncr->status !== 'closed') {
+                $ncr->update([
+                    'status' => 'closed',
+                    'closed_by' => $userId,
+                    'closed_at' => Carbon::now(),
+                    'esignature_closed' => hash('sha256', ($userId ?? 'system').$ncr->id.'closed'.now()->timestamp),
+                ]);
+
+                // Write a timeline event for the order
+                app(ProductionEventService::class)->writeEvent($ncr->tenant_id, [
+                    'production_order_id' => $ncr->production_order_id,
+                    'event_type' => 'NCR Closed',
+                    'title' => 'Non-Conformance Resolved',
+                    'description' => "NCR {$ncr->ncr_number} automatically closed upon Scrap Disposal approval.",
+                    'severity' => 'success',
+                    'event_source' => 'ScrapService',
+                    'triggered_by' => $userId,
+                ]);
+            }
         });
     }
 }

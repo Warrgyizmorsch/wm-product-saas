@@ -66,11 +66,12 @@
                 <x-ui.odoo-form-ui type="table">
                     <thead>
                         <tr>
-                            <th style="width: 10%">ID</th>
-                            <th style="width: 25%">Category</th>
-                            <th style="width: 20%">Reason</th>
-                            <th style="width: 15%" class="text-end">Qty</th>
-                            <th style="width: 15%" class="text-end">Value</th>
+                            <th style="width: 8%">ID</th>
+                            <th style="width: 15%">Category</th>
+                            <th style="width: 22%">Production Order &amp; Product</th>
+                            <th style="width: 15%">Reason</th>
+                            <th style="width: 12%" class="text-end">Qty</th>
+                            <th style="width: 13%" class="text-end">Value</th>
                             <th style="width: 10%">Status</th>
                             <th class="text-end" style="width: 5%">Action</th>
                         </tr>
@@ -80,7 +81,23 @@
                             <tr>
                                 <td class="font-monospace fw-bold text-dark">#{{ $sc->id }}</td>
                                 <td class="text-capitalize text-dark fw-medium">{{ str_replace('_', ' ', $sc->category) }}</td>
-                                <td class="text-capitalize text-muted">{{ $sc->reason_code }}</td>
+                                <td>
+                                    @if($sc->ncr && $sc->ncr->order)
+                                        <div class="d-flex flex-column">
+                                            <a href="{{ route('production.orders.show', $sc->ncr->order->id) }}" class="fw-bold text-primary">
+                                                {{ $sc->ncr->order->order_number }}
+                                            </a>
+                                            @if($sc->ncr->order->product)
+                                                <span class="text-muted fs-11 text-truncate" style="max-width: 180px;">
+                                                    {{ $sc->ncr->order->product->name }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td class="text-capitalize text-muted">{{ str_replace('_', ' ', $sc->reason_code) }}</td>
                                 <td class="text-end fw-bold text-dark">{{ number_format($sc->quantity, 2) }}</td>
                                 <td class="text-end text-danger fw-bold">{{ format_currency($sc->cost) }}</td>
 

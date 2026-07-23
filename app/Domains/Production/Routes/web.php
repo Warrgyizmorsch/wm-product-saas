@@ -164,6 +164,7 @@ Route::prefix('production')
         Route::post('mes/{op}/pause', [MesController::class, 'pause'])->name('mes.pause');
         Route::post('mes/{op}/resume', [MesController::class, 'resume'])->name('mes.resume');
         Route::post('mes/{op}/complete', [MesController::class, 'complete'])->name('mes.complete');
+        Route::post('mes/{op}/log-progress', [MesController::class, 'logProgress'])->name('mes.log-progress');
         Route::post('mes/{op}/hold', [MesController::class, 'hold'])->name('mes.hold');
         Route::post('mes/{op}/cancel', [MesController::class, 'cancel'])->name('mes.cancel');
 
