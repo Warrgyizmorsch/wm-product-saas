@@ -13,6 +13,8 @@ return [
     'active_projects' => 'Активни проекти',
     'project_directory' => 'Директория с проекти',
     'search_placeholder' => 'Търсене по име или код',
+    'search_client_placeholder' => 'Търсене на клиент...',
+    'search_owner_placeholder' => 'Търсене на собственик...',
     'all_statuses' => 'Всички статуси',
     'all_priorities' => 'Всички приоритети',
     'all_assignees' => 'Всички изпълнители',

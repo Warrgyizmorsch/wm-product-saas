@@ -115,6 +115,44 @@
                     );
                 });
             });
+
+            document.querySelectorAll('#project-filter-form [data-ajax-url]').forEach(function (select) {
+                if (!window.jQuery || !jQuery.fn.select2) {
+                    return;
+                }
+
+                jQuery(select).select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    placeholder: select.getAttribute('data-placeholder') || '',
+                    allowClear: true,
+                    minimumInputLength: 2,
+                    dropdownParent: jQuery(select).closest('.erp-filter-dropdown'),
+                    ajax: {
+                        url: select.getAttribute('data-ajax-url'),
+                        dataType: 'json',
+                        delay: 250,
+                        data: function (params) {
+                            return { q: params.term };
+                        },
+                        processResults: function (data) {
+                            return { results: data.results };
+                        },
+                    },
+                });
+            });
+
+            document.querySelectorAll('#project-filter-form [data-local-select2]').forEach(function (select) {
+                if (!window.jQuery || !jQuery.fn.select2) {
+                    return;
+                }
+
+                jQuery(select).select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    dropdownParent: jQuery(select).closest('.erp-filter-dropdown'),
+                });
+            });
         });
     </script>
 @endpush
@@ -175,7 +213,7 @@
                     </a>
                 </x-ui.sort-dropdown>
 
-                <form method="GET" action="{{ route('projects.index') }}" class="d-inline">
+                <form id="project-filter-form" method="GET" action="{{ route('projects.index') }}" class="d-inline">
                     <x-ui.filter :label="__('ui.filter')" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('projects.filter_options') }}</h6>
 
@@ -185,13 +223,53 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.client') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="client_id"
+                                :searchable="false" data-ajax-url="{{ route('projects.lookups.clients') }}"
+                                data-placeholder="{{ __('projects.search_client_placeholder') }}">
+                                @if ($selectedClient)
+                                    <option value="{{ $selectedClient->id }}" selected>{{ $selectedClient->name }}</option>
+                                @endif
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.owner') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="owner_id"
+                                :searchable="false" data-ajax-url="{{ route('projects.lookups.owners') }}"
+                                data-placeholder="{{ __('projects.search_owner_placeholder') }}">
+                                @if ($selectedOwner)
+                                    <option value="{{ $selectedOwner->id }}" selected>{{ $selectedOwner->name }}</option>
+                                @endif
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.status') }}</label>
-                            <x-ui.odoo-form-ui type="select" name="status">
+                            <x-ui.odoo-form-ui type="select" name="status" :searchable="false" data-local-select2="1">
                                 <option value="">{{ __('projects.all_statuses') }}</option>
                                 @foreach ($statuses as $status)
                                     <option value="{{ $status }}" @selected(request('status') === $status)>{{ __('projects.statuses.' . $status) }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.priority') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="priority" :searchable="false" data-local-select2="1">
+                                <option value="">{{ __('projects.all_priorities') }}</option>
+                                @foreach ($priorities as $priority)
+                                    <option value="{{ $priority }}" @selected(request('priority') === $priority)>{{ __('projects.priorities.' . $priority) }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.start_date') }} / {{ __('projects.end_date') }}</label>
+                            <div class="d-flex gap-2">
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="start_date" value="{{ request('start_date') }}" />
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="end_date" value="{{ request('end_date') }}" />
+                            </div>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">

@@ -5,6 +5,7 @@ namespace App\Domains\Projects\Repositories;
 use App\Domains\Projects\Models\Project;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 
 class ProjectRepository implements ProjectRepositoryInterface
 {
@@ -29,21 +30,43 @@ class ProjectRepository implements ProjectRepositoryInterface
     {
         $query = Project::query()->with(['customer', 'owner', 'manager']);
 
-        if (!empty($filters['status'])) {
-            $query->where('projects.status', $filters['status']);
-        }
+        $startDate = $this->parseDateOrNull($filters['start_date'] ?? null);
+        $endDate = $this->parseDateOrNull($filters['end_date'] ?? null);
 
-        if (!empty($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('projects.name', 'like', "%{$search}%")
-                  ->orWhere('projects.project_code', 'like', "%{$search}%");
+        $query
+            ->when(!empty($filters['status']), fn (Builder $q) => $q->where('projects.status', $filters['status']))
+            ->when(!empty($filters['priority']), fn (Builder $q) => $q->where('projects.priority', $filters['priority']))
+            ->when(!empty($filters['client_id']), fn (Builder $q) => $q->where('projects.customer_id', $filters['client_id']))
+            ->when(!empty($filters['owner_id']), fn (Builder $q) => $q->where('projects.owner_id', $filters['owner_id']))
+            ->when($startDate !== null, fn (Builder $q) => $q->whereDate('projects.start_date', '>=', $startDate))
+            ->when($endDate !== null, fn (Builder $q) => $q->whereDate('projects.end_date', '<=', $endDate))
+            ->when(!empty($filters['search']), function (Builder $q) use ($filters) {
+                $search = $filters['search'];
+                $q->where(fn (Builder $sub) => $sub->where('projects.name', 'like', "%{$search}%")
+                    ->orWhere('projects.project_code', 'like', "%{$search}%"));
             });
-        }
 
         $this->applySort($query, $filters['sort'] ?? null, $filters['direction'] ?? null);
 
         return $query->paginate($perPage)->withQueryString();
+    }
+
+    /**
+     * Parses a date filter value, treating anything unparseable as absent
+     * rather than letting it reach whereDate() and throw — malformed query
+     * params should be ignored, not error the page.
+     */
+    private function parseDateOrNull(?string $value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /**

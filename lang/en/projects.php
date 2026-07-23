@@ -13,6 +13,8 @@ return [
     'active_projects' => 'Active Projects',
     'project_directory' => 'Project Directory',
     'search_placeholder' => 'Search name or code',
+    'search_client_placeholder' => 'Search client...',
+    'search_owner_placeholder' => 'Search owner...',
     'all_statuses' => 'All Statuses',
     'all_priorities' => 'All Priorities',
     'all_assignees' => 'All Assignees',
