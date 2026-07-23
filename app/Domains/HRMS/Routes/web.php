@@ -144,7 +144,7 @@ Route::prefix('hrms')
         Route::prefix('assets')->group(function (): void {
             Route::get('/', [AssetController::class, 'index'])->name('assets.index');
             Route::post('/store', [AssetController::class, 'store'])->name('assets.store');
-            Route::post('/update/{asset}', [AssetController::class, 'update'])->name('assets.update');
+            Route::match(['post', 'put'], '/update/{asset}', [AssetController::class, 'update'])->name('assets.update');
             Route::delete('/delete/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
             Route::get('/export', [AssetController::class, 'export'])->name('assets.export');
             Route::post('/import', [AssetController::class, 'import'])->name('assets.import');
@@ -155,12 +155,14 @@ Route::prefix('hrms')
             Route::get('/categories/import/template', [AssetController::class, 'downloadCategoriesTemplate'])->name('assets.categories.import.template');
             
             Route::post('/category/store', [AssetController::class, 'storeCategory'])->name('assets.category.store');
-            Route::post('/category/update/{assetCategory}', [AssetController::class, 'updateCategory'])->name('assets.category.update');
+            Route::match(['post', 'put'], '/category/update/{assetCategory}', [AssetController::class, 'updateCategory'])->name('assets.category.update');
             Route::delete('/category/delete/{assetCategory}', [AssetController::class, 'destroyCategory'])->name('assets.category.destroy');
             
             Route::post('/item/store', [AssetController::class, 'storeItem'])->name('assets.item.store');
-            Route::post('/item/update/{assetItem}', [AssetController::class, 'updateItem'])->name('assets.item.update');
+            Route::match(['post', 'put'], '/item/update/{assetItem}', [AssetController::class, 'updateItem'])->name('assets.item.update');
             Route::delete('/item/delete/{assetItem}', [AssetController::class, 'destroyItem'])->name('assets.item.destroy');
+            Route::post('/item/{assetItem}/allocate', [AssetController::class, 'allocateItem'])->name('assets.item.allocate');
+            Route::post('/item/{assetItem}/return', [AssetController::class, 'returnItem'])->name('assets.item.return');
             
             Route::post('/{asset}/allocate', [AssetController::class, 'allocate'])->name('assets.allocate');
             Route::post('/{asset}/return', [AssetController::class, 'returnAsset'])->name('assets.return');

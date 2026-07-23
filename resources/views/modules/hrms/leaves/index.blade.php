@@ -1395,7 +1395,7 @@
                                                                 <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-1 fs-12 fw-semibold" title="{{ __('hrms.leave.encashment_app.reject') }}"><i class="feather-x me-1"></i> {{ __('hrms.leave.encashment_app.reject') }}</button>
                                                             </form>
                                                         @else
-                                                            <form method="POST" action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" class="d-inline-block" onsubmit="return confirm('{{ __('hrms.leave.encashment_app.confirm_delete') }}');">
+                                                            <form method="POST" action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" class="d-inline-block" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.encashment_app.confirm_delete') }}', { title: 'Delete Encashment Application', variant: 'danger', confirmButtonText: 'Delete' });">
                                                                 @csrf
                                                                 @method('DELETE')
                                                                 <button type="submit" class="btn btn-sm btn-light border text-danger px-2 py-1 fs-12" title="{{ __('hrms.common.delete') }}"><i class="feather-trash-2"></i></button>

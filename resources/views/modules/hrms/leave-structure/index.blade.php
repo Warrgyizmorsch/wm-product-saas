@@ -358,7 +358,7 @@
                                             </div>
                                             
                                             <!-- Actions Dropdown for Leave Plan -->
-                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $selectedPlan->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.leave.delete_plan_confirm') }}');">
+                                            <form action="{{ route('hrms.leave-structure.plan.destroy', $selectedPlan->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.delete_plan_confirm') }}', { title: 'Delete Leave Plan', variant: 'danger', confirmButtonText: 'Delete' });">
                                                 @csrf
                                                 @method('DELETE')
                                                 <x-ui.action-dropdown>
@@ -485,7 +485,7 @@
                                                             <td>
                                                                 <span class="fw-bold text-dark">{{ floatval($type->quota) }} {{ __('hrms.leave.days') }}</span>
                                                             <td class="text-end">
-                                                                <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.leave.delete_type_confirm') }}');">
+                                                                <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.delete_type_confirm') }}', { title: 'Delete Leave Type', variant: 'danger', confirmButtonText: 'Delete' });">
                                                                     @csrf
                                                                     @method('DELETE')
                                                                     <div class="hstack gap-2 justify-content-end">

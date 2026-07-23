@@ -5,7 +5,7 @@
 @section('breadcrumb', 'HRMS / ' . __('hrms.sidebar.asset_management'))
 
 @section('page-actions')
-    <div id="hdr-btn-log-asset" class="d-none d-flex align-items-center gap-2">
+    <div id="hdr-btn-add-item" class="d-none d-flex align-items-center gap-2">
         <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importAssetModal" class="fw-bold text-uppercase">
             {{ __('hrms.employees.import') }}
         </x-ui.button>
@@ -13,23 +13,12 @@
             {{ __('hrms.employees.export') }}
         </x-ui.button>
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAssetModal" class="fw-bold text-uppercase">
-            {{ __('hrms.assets.log_asset') }}
+            {{ __('hrms.assets.add_item') }}
         </x-ui.button>
     </div>
     <div id="hdr-btn-add-category" class="d-none d-flex align-items-center gap-2">
-        <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importCategoryModal" class="fw-bold text-uppercase">
-            {{ __('hrms.employees.import') }}
-        </x-ui.button>
-        <x-ui.button variant="outline-primary" icon="feather-download" href="{{ route('hrms.assets.categories.export') }}" id="btn-export-categories-link" class="fw-bold text-uppercase">
-            {{ __('hrms.employees.export') }}
-        </x-ui.button>
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addCategoryModal" class="fw-bold text-uppercase">
             {{ __('hrms.assets.add_category') }}
-        </x-ui.button>
-    </div>
-    <div id="hdr-btn-add-item" class="d-none d-flex align-items-center gap-2">
-        <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addAssetItemModal" class="fw-bold text-uppercase">
-            Add Item Type
         </x-ui.button>
     </div>
 @endsection
@@ -194,18 +183,13 @@
             <!-- Tabs Navigation -->
             <ul class="nav nav-tabs border-bottom mb-4" id="assetModuleTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="registry-tab" data-bs-toggle="tab" data-bs-target="#registry-pane" type="button" role="tab" aria-controls="registry-pane" aria-selected="true">
-                        <i class="feather-package me-2"></i>{{ __('hrms.assets.tab_registry') }}
+                    <button class="nav-link active" id="items-tab" data-bs-toggle="tab" data-bs-target="#items-pane" type="button" role="tab" aria-controls="items-pane" aria-selected="true">
+                        <i class="feather-box me-2"></i>{{ __('hrms.assets.tab_items') }}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories-pane" type="button" role="tab" aria-controls="categories-pane" aria-selected="false">
                         <i class="feather-sliders me-2"></i>{{ __('hrms.assets.tab_categories') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="items-tab" data-bs-toggle="tab" data-bs-target="#items-pane" type="button" role="tab" aria-controls="items-pane" aria-selected="false">
-                        <i class="feather-box me-2"></i>{{ __('hrms.assets.tab_items') }}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -221,225 +205,7 @@
             </ul>
 
             <div class="tab-content" id="assetModuleTabsContent">
-                <!-- 1. ASSET REGISTRY TAB -->
-                <div class="tab-pane fade show active" id="registry-pane" role="tabpanel" aria-labelledby="registry-tab">
-                    <div class="card border rounded bg-white shadow-sm">
-                        <div class="card-header border-bottom d-flex flex-wrap justify-content-between align-items-center py-3 px-4 bg-white gap-3">
-                            <div>
-                                <h5 class="fw-bold mb-0 text-dark" style="font-size: 16px;">{{ __('hrms.assets.directory_title') }}</h5>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <!-- Registry Search & Filter Form -->
-                                <form method="GET" action="{{ route('hrms.assets.index') }}" class="d-flex align-items-center gap-2 m-0">
-                                    @foreach(['category_search', 'category_company_id', 'request_search', 'request_category_id', 'request_company_id', 'request_status'] as $param)
-                                        @if(request()->filled($param))
-                                            <input type="hidden" name="{{ $param }}" value="{{ request($param) }}">
-                                        @endif
-                                    @endforeach
-                                    <input type="hidden" name="registry_sort" id="registry_sort" value="{{ request('registry_sort', 'code_asc') }}">
-                                    
-                                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
-                                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                        <input type="text" name="registry_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.assets.search_placeholder') }}" value="{{ request('registry_search') }}" style="box-shadow: none; height: 32px;">
-                                    </div>
 
-                                    <div class="d-flex gap-2">
-                                        <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
-                                            <a class="dropdown-item py-2 {{ request('registry_sort', 'code_asc') == 'code_asc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'code_asc', this); event.preventDefault();">{{ __('hrms.common.sort_code_asc') }}</a>
-                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'code_desc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'code_desc', this); event.preventDefault();">{{ __('hrms.common.sort_code_desc') }}</a>
-                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'name_asc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'name_asc', this); event.preventDefault();">{{ __('hrms.common.sort_name_asc') }}</a>
-                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'name_desc' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'name_desc', this); event.preventDefault();">{{ __('hrms.common.sort_name_desc') }}</a>
-                                            <a class="dropdown-item py-2 {{ request('registry_sort') == 'newest' ? 'active' : '' }}" href="#" onclick="changeSort('registry', 'newest', this); event.preventDefault();">{{ __('hrms.assets.sort_newest') }}</a>
-                                        </x-ui.sort-dropdown>
-
-                                        <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
-                                            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
-                                            
-                                            <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.category') }}</label>
-                                                <x-ui.odoo-form-ui type="select" name="registry_category_id">
-                                                    <option value="">{{ __('hrms.assets.all_categories') }}</option>
-                                                    @foreach($categories as $category)
-                                                        <option value="{{ $category->id }}" {{ request('registry_category_id') == $category->id ? 'selected' : '' }}>
-                                                            {{ $category->name }}
-                                                        </option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-                                            </div>
-
-                                            <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.status') }}</label>
-                                                <x-ui.odoo-form-ui type="select" name="registry_status">
-                                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                                    <option value="available" {{ request('registry_status') === 'available' ? 'selected' : '' }}>{{ __('hrms.assets.status_available') }}</option>
-                                                    <option value="allocated" {{ request('registry_status') === 'allocated' ? 'selected' : '' }}>{{ __('hrms.assets.status_allocated') }}</option>
-                                                    <option value="maintenance" {{ request('registry_status') === 'maintenance' ? 'selected' : '' }}>{{ __('hrms.assets.status_maintenance') }}</option>
-                                                    <option value="scrapped" {{ request('registry_status') === 'scrapped' ? 'selected' : '' }}>{{ __('hrms.assets.status_scrapped') }}</option>
-                                                </x-ui.odoo-form-ui>
-                                            </div>
-
-                                            <div class="mb-3" style="min-width: 250px;">
-                                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.assets.condition') }}</label>
-                                                <x-ui.odoo-form-ui type="select" name="registry_condition">
-                                                    <option value="">{{ __('hrms.assets.all_conditions') }}</option>
-                                                    <option value="new" {{ request('registry_condition') === 'new' ? 'selected' : '' }}>{{ __('hrms.assets.cond_new') }}</option>
-                                                    <option value="good" {{ request('registry_condition') === 'good' ? 'selected' : '' }}>{{ __('hrms.assets.cond_good') }}</option>
-                                                    <option value="fair" {{ request('registry_condition') === 'fair' ? 'selected' : '' }}>{{ __('hrms.assets.cond_fair') }}</option>
-                                                    <option value="damaged" {{ request('registry_condition') === 'damaged' ? 'selected' : '' }}>{{ __('hrms.assets.cond_damaged') }}</option>
-                                                    <option value="scrapped" {{ request('registry_condition') === 'scrapped' ? 'selected' : '' }}>{{ __('hrms.assets.cond_scrapped') }}</option>
-                                                </x-ui.odoo-form-ui>
-                                            </div>
-
-                                            <div class="d-flex gap-2 justify-content-end mt-4">
-                                                <a href="{{ route('hrms.assets.index', request()->except(['registry_search', 'registry_category_id', 'registry_status', 'registry_condition'])) }}" class="btn btn-sm btn-light border">{{ __('hrms.common.reset') }}</a>
-                                                <button type="submit" class="btn btn-sm btn-primary">{{ __('hrms.common.apply') }}</button>
-                                            </div>
-                                        </x-ui.filter>
-
-                                    @if(request()->anyFilled(['registry_search', 'registry_category_id', 'registry_status', 'registry_condition']))
-                                        <a href="{{ route('hrms.assets.index', request()->except(['registry_search', 'registry_category_id', 'registry_status', 'registry_condition'])) }}" class="btn btn-sm btn-light border px-2 d-flex align-items-center justify-content-center" style="height: 38px; border-radius: 6px; font-size: 12px;" title="Clear Filters">
-                                            <i class="feather-x"></i>
-                                        </a>
-                                    @endif
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0 text-center">
-                                    <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
-                                        <tr>
-                                            <th class="text-start" style="padding-left: 20px; width: 140px;">{{ __('hrms.assets.asset_tag') }}</th>
-                                            <th class="text-start">{{ __('hrms.assets.asset_brand') }}</th>
-                                            <th>{{ __('hrms.assets.category') }}</th>
-                                            <th>{{ __('hrms.assets.serial_number') }}</th>
-                                            <th>{{ __('hrms.assets.status') }}</th>
-                                            <th>{{ __('hrms.assets.condition') }}</th>
-                                            <th>{{ __('hrms.assets.holder') }}</th>
-                                            <th class="text-end" style="padding-right: 20px; width: 220px;">{{ __('hrms.assets.actions') }}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse($assets as $asset)
-                                            <tr>
-                                                <td class="text-start" style="padding-left: 20px;">
-                                                    <code class="fw-bold fs-13 text-dark">{{ $asset->asset_code }}</code>
-                                                </td>
-                                                <td class="text-start">
-                                                    <div class="fw-bold text-dark fs-13">{{ $asset->name }}</div>
-                                                    <small class="text-muted fs-11">{{ $asset->brand }} {{ $asset->model_number }}</small>
-                                                </td>
-                                                <td>
-                                                    <span class="badge bg-light text-secondary border px-2 py-1">{{ $asset->category->name }}</span>
-                                                </td>
-                                                <td>
-                                                    <span class="text-dark fw-semibold fs-13">{{ $asset->serial_number ?: 'N/A' }}</span>
-                                                </td>
-                                                <td>
-                                                    <span class="badge badge-{{ $asset->status }} px-2 py-1 text-capitalize">
-                                                        {{ __('hrms.assets.status_' . $asset->status) }}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span class="badge badge-{{ $asset->condition }} px-2 py-1 text-capitalize">
-                                                        {{ __('hrms.assets.cond_' . $asset->condition) }}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    @if($asset->assignedEmployee)
-                                                        <div class="fw-bold text-dark fs-12">{{ $asset->assignedEmployee->display_name }}</div>
-                                                        <small class="text-muted fs-10" style="font-size: 10px;">Since {{ $asset->allocated_at ? $asset->allocated_at->format('d M, Y') : '-' }}</small>
-                                                    @else
-                                                        <span class="text-muted fs-12">-</span>
-                                                    @endif
-                                                </td>
-                                                <td class="text-end" style="padding-right: 20px;">
-                                                    <div class="d-flex justify-content-end align-items-center gap-2">
-                                                        @if($asset->status === 'available')
-                                                            <button type="button" class="action-dropdown-btn text-uppercase fw-bold px-3" style="width: auto !important; font-size: 11px; letter-spacing: 0.5px; height: 32px;" data-bs-toggle="modal" data-bs-target="#allocateAssetModal" data-asset-id="{{ $asset->id }}" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})" data-company-id="{{ $asset->company_id }}">
-                                                                {{ __('hrms.assets.allocate') }}
-                                                            </button>
-                                                        @elseif($asset->status === 'allocated')
-                                                            <button type="button" class="action-dropdown-btn text-uppercase fw-bold px-3" style="width: auto !important; font-size: 11px; letter-spacing: 0.5px; height: 32px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-asset-id="{{ $asset->id }}" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})">
-                                                                {{ __('hrms.assets.release') }}
-                                                            </button>
-                                                        @endif
-
-                                                        <x-ui.action-dropdown>
-                                                            <li>
-                                                                <a class="dropdown-item show-history-btn" href="javascript:void(0)" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})" data-allocations="{{ base64_encode($asset->allocations()->with('employee')->get()->toJson()) }}">
-                                                                    <i class="feather feather-clock me-3"></i>
-                                                                    <span>{{ __('hrms.assets.history_log') }}</span>
-                                                                </a>
-                                                            </li>
-                                                            <li>
-                                                                <a class="dropdown-item" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editAssetModal" 
-                                                                    data-asset-id="{{ $asset->id }}" 
-                                                                    data-asset-category-id="{{ $asset->asset_category_id }}" 
-                                                                    data-asset-item-id="{{ $asset->asset_item_id }}" 
-                                                                    data-asset-code="{{ $asset->asset_code }}" 
-                                                                    data-name="{{ $asset->name }}" 
-                                                                    data-brand="{{ $asset->brand }}" 
-                                                                    data-model-number="{{ $asset->model_number }}" 
-                                                                    data-serial-number="{{ $asset->serial_number }}" 
-                                                                    data-purchase-date="{{ $asset->purchase_date ? $asset->purchase_date->format('Y-m-d') : '' }}" 
-                                                                    data-purchase-cost="{{ $asset->purchase_cost }}" 
-                                                                    data-condition="{{ $asset->condition }}" 
-                                                                    data-notes="{{ $asset->notes }}">
-                                                                    <i class="feather feather-edit-3 me-3"></i>
-                                                                    <span>{{ __('hrms.assets.edit') }}</span>
-                                                                </a>
-                                                            </li>
-                                                            <li>
-                                                                <hr class="dropdown-divider">
-                                                            </li>
-                                                            <li>
-                                                                <form action="{{ route('hrms.assets.destroy', $asset->id) }}" method="POST" onsubmit="return confirm('{{ __('hrms.assets.confirm_delete_asset') ?? 'Are you sure you want to delete this asset record?' }}');">
-                                                                    @csrf
-                                                                    @method('DELETE')
-                                                                    <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                                        <i class="feather feather-trash-2 me-3"></i>
-                                                                        <span>{{ __('hrms.assets.delete') }}</span>
-                                                                    </button>
-                                                                </form>
-                                                            </li>
-                                                        </x-ui.action-dropdown>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="8" class="text-center py-5 text-muted fs-12">
-                                                    <i class="feather-package fs-32 d-block mb-3 text-secondary"></i>
-                                                    <div class="fw-bold mb-1">{{ __('hrms.assets.empty_registry_title') }}</div>
-                                                    <div>{{ __('hrms.assets.empty_registry_desc') }}</div>
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-                            @php
-                                $currentPage = $assets->currentPage();
-                                $totalPages = $assets->lastPage();
-                                $totalResults = $assets->total();
-                                $perPage = $assets->perPage();
-                            @endphp
-                            @if($assets->hasPages())
-                                <div class="card-footer bg-white border-top px-4 py-3">
-                                    <x-ui.pagination
-                                        class="px-0 py-0"
-                                        :current-page="$currentPage"
-                                        :total-pages="$totalPages"
-                                        :total-results="$totalResults"
-                                        :per-page="$perPage"
-                                    />
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                </div>
 
                 <!-- 2. ASSET CATEGORIES TAB -->
                 <div class="tab-pane fade" id="categories-pane" role="tabpanel" aria-labelledby="categories-tab">
@@ -505,8 +271,7 @@
                                 <table class="table table-hover align-middle mb-0 text-center">
                                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                                         <tr>
-                                            <th class="text-start" style="padding-left: 20px;">{{ __('hrms.assets.category_name') }}</th>
-                                            <th class="text-start">{{ __('hrms.assets.description') }}</th>
+                                            <th class="text-start" style="padding-left: 20px;">{{ __('hrms.assets.category_name') }} & Description</th>
                                             <th>{{ __('hrms.assets.total_assets') }}</th>
                                             <th>{{ __('hrms.assets.org_entity') }}</th>
                                             <th>{{ __('hrms.assets.created_at') }}</th>
@@ -516,11 +281,16 @@
                                     <tbody>
                                         @forelse($filteredCategories as $category)
                                             <tr>
-                                                <td class="text-start" style="padding-left: 20px; font-weight: 700; color: #0f172a;">
-                                                    {{ $category->name }}
-                                                </td>
-                                                <td class="text-start text-muted fs-12" style="max-width: 300px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
-                                                    {{ $category->description ?: __('hrms.assets.no_description_provided') }}
+                                                <td class="text-start" style="padding-left: 20px; max-width: 320px;">
+                                                    <div class="fw-bold text-dark fs-13">{{ $category->name }}</div>
+                                                    @if($category->description)
+                                                        <div class="text-muted fs-11 mt-1 d-flex align-items-center gap-1 desc-expandable-container">
+                                                            <span class="text-truncate desc-text-truncate" style="max-width: 240px;" title="{{ $category->description }}">{{ $category->description }}</span>
+                                                            <a href="javascript:void(0)" class="text-primary text-decoration-none fw-bold fs-10 btn-read-more-dynamic d-none" data-title="{{ $category->name }}" data-desc="{{ $category->description }}" style="white-space: nowrap;">(Read More)</a>
+                                                        </div>
+                                                    @else
+                                                        <div class="text-muted fs-11 mt-1 fst-italic">{{ __('hrms.assets.no_description_provided') }}</div>
+                                                    @endif
                                                 </td>
                                                 <td>
                                                     <span class="badge bg-soft-primary text-primary px-3 py-1 rounded-pill">{{ $category->assets()->count() }}</span>
@@ -528,36 +298,33 @@
                                                 <td>{{ $category->company->company_name }}</td>
                                                 <td class="text-muted fs-12">{{ $category->created_at->format('d M, Y') }}</td>
                                                 <td class="text-end" style="padding-right: 20px;">
-                                                    <x-ui.action-dropdown>
-                                                        <li>
-                                                            <a class="dropdown-item edit-category-btn" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editCategoryModal"
-                                                                data-category-id="{{ $category->id }}"
-                                                                data-company-id="{{ $category->company_id }}"
-                                                                data-name="{{ $category->name }}"
-                                                                data-description="{{ $category->description }}">
-                                                                <i class="feather feather-edit-3 me-3"></i>
-                                                                <span>{{ __('hrms.assets.edit') }}</span>
-                                                            </a>
-                                                        </li>
-                                                        <li>
-                                                            <hr class="dropdown-divider">
-                                                        </li>
-                                                        <li>
-                                                            <form action="{{ route('hrms.assets.category.destroy', $category->id) }}" method="POST" onsubmit="return confirm('{{ __('hrms.assets.confirm_delete_category') ?? 'Are you sure you want to delete this asset category? This action cannot be undone.' }}');">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                                    <i class="feather feather-trash-2 me-3"></i>
-                                                                    <span>{{ __('hrms.assets.delete') }}</span>
-                                                                </button>
-                                                            </form>
-                                                        </li>
-                                                    </x-ui.action-dropdown>
+                                                     <x-ui.action-dropdown>
+                                                         <li>
+                                                             <a class="dropdown-item d-flex align-items-center py-2 px-3 fs-13 text-dark edit-category-btn" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editCategoryModal"
+                                                                 data-category-id="{{ $category->id }}"
+                                                                 data-company-id="{{ $category->company_id }}"
+                                                                 data-name="{{ $category->name }}"
+                                                                 data-description="{{ $category->description }}">
+                                                                 <i class="feather-edit-2 text-primary me-2.5 fs-14"></i>
+                                                                 <span>{{ __('hrms.assets.edit') }}</span>
+                                                             </a>
+                                                         </li>
+                                                         <li>
+                                                             <form action="{{ route('hrms.assets.category.destroy', $category->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.assets.confirm_delete_category') ?? 'Are you sure you want to delete this asset category? This action cannot be undone.' }}', { title: 'Delete Asset Category', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                                 @csrf
+                                                                 @method('DELETE')
+                                                                 <button type="submit" class="dropdown-item d-flex align-items-center py-2 px-3 fs-13 text-danger border-0 bg-transparent w-100 text-start">
+                                                                     <i class="feather-trash-2 text-danger me-2.5 fs-14"></i>
+                                                                     <span>{{ __('hrms.assets.delete') }}</span>
+                                                                 </button>
+                                                             </form>
+                                                         </li>
+                                                     </x-ui.action-dropdown>
                                                 </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                                <td colspan="5" class="text-center py-5 text-muted fs-12">
                                                     <i class="feather-sliders fs-32 d-block mb-3 text-secondary"></i>
                                                     <div class="fw-bold mb-1">{{ __('hrms.assets.empty_categories_title') }}</div>
                                                     <div>{{ __('hrms.assets.empty_categories_desc') }}</div>
@@ -589,7 +356,7 @@
                 </div>
 
                 <!-- 2b. ITEM CATALOG TAB -->
-                <div class="tab-pane fade" id="items-pane" role="tabpanel" aria-labelledby="items-tab">
+                <div class="tab-pane fade show active" id="items-pane" role="tabpanel" aria-labelledby="items-tab">
                     <div class="card border rounded bg-white shadow-sm">
                         <div class="card-header border-bottom d-flex flex-wrap justify-content-between align-items-center py-3 px-4 bg-white gap-3">
                             <div>
@@ -662,23 +429,29 @@
                         <div class="card-body p-0">
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0 text-center">
-                                    <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
-                                        <tr>
-                                            <th class="py-3 px-4 text-start">Item Name</th>
-                                            <th class="py-3">Category</th>
-                                            <th class="py-3">Company</th>
-                                            <th class="py-3">Registered Units</th>
-                                            <th class="py-3">Available Units</th>
-                                            <th class="py-3 text-end px-4">{{ __('hrms.assets.action') }}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="fs-12">
-                                        @forelse($filteredItems as $itemObj)
-                                            <tr>
-                                                <td class="py-3 px-4 text-start fw-bold text-dark">{{ $itemObj->name }}</td>
-                                                <td class="py-3 text-muted">{{ $itemObj->category->name ?? 'N/A' }}</td>
-                                                <td class="py-3 text-muted">{{ $itemObj->company->company_name ?? 'N/A' }}</td>
-                                                <td class="py-3"><span class="badge bg-light text-dark fw-bold px-2.5 py-1.5 fs-11 rounded-pill">{{ $itemObj->assets->count() }}</span></td>
+                                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
+                                         <tr>
+                                             <th class="py-3 px-4 text-start">Item Name</th>
+                                             <th class="py-3">Category</th>
+                                             <th class="py-3">Registered Units</th>
+                                             <th class="py-3">Available Units</th>
+                                             <th class="py-3 text-end px-4">{{ __('hrms.assets.actions') }}</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody class="fs-12">
+                                         @forelse($filteredItems as $itemObj)
+                                             <tr class="item-main-row" data-item-id="{{ $itemObj->id }}">
+                                                 <td class="py-3 px-4 text-start" style="max-width: 320px;">
+                                                     <div class="fw-bold text-dark fs-13">{{ $itemObj->name }}</div>
+                                                     @if($itemObj->description)
+                                                         <div class="text-muted fs-11 mt-0.5 d-flex align-items-center gap-1 desc-expandable-container">
+                                                             <span class="text-truncate desc-text-truncate" style="max-width: 240px;" title="{{ $itemObj->description }}">{{ $itemObj->description }}</span>
+                                                             <a href="javascript:void(0)" class="text-primary text-decoration-none fw-bold fs-10 btn-read-more-dynamic d-none" data-title="{{ $itemObj->name }}" data-desc="{{ $itemObj->description }}" style="white-space: nowrap;">(Read More)</a>
+                                                         </div>
+                                                     @endif
+                                                 </td>
+                                                 <td class="py-3 text-muted">{{ $itemObj->category->name ?? 'N/A' }}</td>
+                                                 <td class="py-3"><span class="badge bg-light text-dark fw-bold px-2.5 py-1.5 fs-11 rounded-pill">{{ $itemObj->assets->count() }}</span></td>
                                                 <td class="py-3">
                                                     @php
                                                         $availCount = $itemObj->assets->where('status', 'available')->count();
@@ -688,41 +461,184 @@
                                                     </span>
                                                 </td>
                                                 <td class="py-3 text-end px-4">
-                                                    <div class="dropdown">
-                                                        <button class="btn btn-sm btn-icon btn-light" data-bs-toggle="dropdown" aria-expanded="false">
-                                                            <i class="feather-more-vertical"></i>
+                                                    <div class="d-flex justify-content-end align-items-center gap-2">
+                                                        <button class="btn btn-sm btn-icon btn-light toggle-assets-btn" type="button" data-item-id="{{ $itemObj->id }}" style="text-decoration: none; width: 28px; height: 28px;" title="Toggle Serialized Assets">
+                                                            <i class="feather-chevron-right toggle-icon" style="font-size: 12px;"></i>
                                                         </button>
-                                                        <ul class="dropdown-menu dropdown-menu-end shadow-sm border" style="font-size: 13px;">
+                                                        <x-ui.action-dropdown>
+                                                            @php
+                                                                $firstAsset = $itemObj->assets->first();
+                                                                $encodedAssets = base64_encode($itemObj->assets->toJson());
+                                                                $availableCount = $itemObj->assets->where('status', 'available')->count();
+                                                                $allocatedCount = $itemObj->assets->where('status', 'allocated')->count();
+
+                                                                $allocatedAssetsOnly = $itemObj->assets->where('status', 'allocated')->values();
+                                                                $encodedAllocatedAssets = base64_encode($allocatedAssetsOnly->toJson());
+
+                                                                $allocationsByEmployee = $itemObj->assets->where('status', 'allocated')
+                                                                    ->groupBy('assigned_employee_id')
+                                                                    ->map(function($assets) {
+                                                                        $first = $assets->first();
+                                                                        return [
+                                                                            'employee_id' => $first->assigned_employee_id,
+                                                                            'employee_name' => $first->assignedEmployee->display_name ?? 'Unknown',
+                                                                            'count' => $assets->count()
+                                                                        ];
+                                                                    })->values();
+                                                                $encodedAllocations = base64_encode($allocationsByEmployee->toJson());
+                                                            @endphp
                                                             <li>
-                                                                <a class="dropdown-item py-2 d-flex align-items-center gap-2" href="#" 
+                                                                <a class="dropdown-item d-flex align-items-center py-2 px-3 fs-13 text-dark" href="#" 
                                                                    data-bs-toggle="modal" 
                                                                    data-bs-target="#editAssetItemModal" 
                                                                    data-id="{{ $itemObj->id }}" 
                                                                    data-name="{{ $itemObj->name }}" 
                                                                    data-category="{{ $itemObj->asset_category_id }}"
-                                                                   data-description="{{ $itemObj->description }}">
-                                                                    <i class="feather-edit text-primary"></i>{{ __('hrms.common.edit') }}
+                                                                   data-description="{{ $itemObj->description }}"
+                                                                   data-brand="{{ $firstAsset->brand ?? '' }}"
+                                                                   data-model-number="{{ $firstAsset->model_number ?? '' }}"
+                                                                   data-purchase-date="{{ $firstAsset && $firstAsset->purchase_date ? $firstAsset->purchase_date->format('Y-m-d') : '' }}"
+                                                                   data-purchase-cost="{{ $firstAsset->purchase_cost ?? '' }}"
+                                                                   data-condition="{{ $firstAsset->condition ?? 'good' }}"
+                                                                   data-notes="{{ $firstAsset->notes ?? '' }}"
+                                                                   data-units="{{ $encodedAssets }}">
+                                                                    <i class="feather-edit-2 text-primary me-2.5 fs-14"></i><span>{{ __('hrms.assets.edit') }}</span>
                                                                 </a>
                                                             </li>
+                                                            @if($availableCount > 0)
                                                             <li>
-                                                                <form action="{{ route('hrms.assets.item.destroy', $itemObj->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this item?');">
+                                                                <a class="dropdown-item d-flex align-items-center py-2 px-3 fs-13 text-dark item-allocate-trigger-btn" href="#" 
+                                                                   data-bs-toggle="modal" 
+                                                                   data-bs-target="#allocateAssetModal" 
+                                                                   data-item-id="{{ $itemObj->id }}" 
+                                                                   data-item-name="{{ $itemObj->name }}" 
+                                                                   data-company-id="{{ $itemObj->category->company_id ?? $itemObj->company_id }}" 
+                                                                   data-available="{{ $availableCount }}">
+                                                                    <i class="feather-user-check text-success me-2.5 fs-14"></i><span>Allocate</span>
+                                                                </a>
+                                                            </li>
+                                                            @endif
+                                                            @if($allocatedCount > 0)
+                                                            <li>
+                                                                <a class="dropdown-item d-flex align-items-center py-2 px-3 fs-13 text-dark item-return-trigger-btn" href="#" 
+                                                                   data-bs-toggle="modal" 
+                                                                   data-bs-target="#returnAssetModal" 
+                                                                   data-item-id="{{ $itemObj->id }}" 
+                                                                   data-item-name="{{ $itemObj->name }}" 
+                                                                   data-allocations="{{ $encodedAllocations }}"
+                                                                   data-allocated-assets="{{ $encodedAllocatedAssets }}">
+                                                                    <i class="feather-user-x text-warning me-2.5 fs-14"></i><span>Return</span>
+                                                                </a>
+                                                            </li>
+                                                            @endif
+                                                            <li>
+                                                                <form action="{{ route('hrms.assets.item.destroy', $itemObj->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this item?', { title: 'Delete Asset Item', variant: 'danger', confirmButtonText: 'Delete' });">
                                                                     @csrf
                                                                     @method('DELETE')
-                                                                    <button type="submit" class="dropdown-item py-2 d-flex align-items-center gap-2 text-danger">
-                                                                        <i class="feather-trash-2"></i>{{ __('hrms.common.delete') }}
+                                                                    <button type="submit" class="dropdown-item d-flex align-items-center py-2 px-3 fs-13 text-danger border-0 bg-transparent w-100 text-start">
+                                                                        <i class="feather-trash-2 text-danger me-2.5 fs-14"></i><span>{{ __('hrms.assets.delete') }}</span>
                                                                     </button>
                                                                 </form>
                                                             </li>
-                                                        </ul>
+                                                        </x-ui.action-dropdown>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr id="assets-row-{{ $itemObj->id }}" class="assets-collapse-row d-none" style="background-color: #f8fafc;">
+                                                <td colspan="6" class="p-3">
+                                                    <div class="card border rounded shadow-sm bg-white m-2">
+                                                        <div class="card-header bg-light py-2 px-3 d-flex align-items-center justify-content-between">
+                                                            <span class="fw-bold text-dark fs-12 text-start"><i class="feather-package me-1 text-primary"></i>Serialized Assets Registry for {{ $itemObj->name }}</span>
+                                                            <span class="badge bg-primary fs-11 rounded-pill">{{ $itemObj->assets->count() }} Units</span>
+                                                        </div>
+                                                        <div class="card-body p-0">
+                                                            <div class="table-responsive">
+                                                                <table class="table table-sm table-hover align-middle mb-0 text-center fs-12">
+                                                                    <thead class="table-light text-uppercase fs-10" style="letter-spacing: 0.5px;">
+                                                                        <tr>
+                                                                            <th class="py-2.5 px-3 text-start">Asset Code</th>
+                                                                            <th class="py-2.5">Serial Number</th>
+                                                                            <th class="py-2.5">Condition</th>
+                                                                            <th class="py-2.5">Status</th>
+                                                                            <th class="py-2.5">Assigned To</th>
+                                                                            <th class="py-2.5 text-end px-3">Actions</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @forelse($itemObj->assets as $asset)
+                                                                            <tr>
+                                                                                <td class="py-2 px-3 text-start fw-bold text-dark">
+                                                                                    <a href="javascript:void(0);" class="show-history-btn" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})" data-allocations="{{ base64_encode($asset->allocations()->with('employee')->get()->toJson()) }}">
+                                                                                        {{ $asset->asset_code }}
+                                                                                    </a>
+                                                                                </td>
+                                                                                <td class="py-2 text-muted">{{ $asset->serial_number ?? 'N/A' }}</td>
+                                                                                <td class="py-2">
+                                                                                    @php
+                                                                                        $condBadge = [
+                                                                                            'new' => 'bg-soft-success text-success',
+                                                                                            'good' => 'bg-soft-info text-info',
+                                                                                            'fair' => 'bg-soft-warning text-warning',
+                                                                                            'damaged' => 'bg-soft-danger text-danger',
+                                                                                            'scrapped' => 'bg-soft-secondary text-secondary'
+                                                                                        ];
+                                                                                        $badgeStyleClass = $condBadge[$asset->condition] ?? 'bg-light text-muted';
+                                                                                    @endphp
+                                                                                    <span class="badge {{ $badgeStyleClass }} rounded-pill px-2 py-1 fs-11">{{ ucfirst($asset->condition) }}</span>
+                                                                                </td>
+                                                                                <td class="py-2">
+                                                                                    @php
+                                                                                        $statusColors = [
+                                                                                            'available' => 'badge-available',
+                                                                                            'allocated' => 'badge-allocated',
+                                                                                            'maintenance' => 'badge-maintenance',
+                                                                                            'scrapped' => 'badge-scrapped'
+                                                                                        ];
+                                                                                        $badgeStyle = $statusColors[$asset->status] ?? 'bg-light text-muted';
+                                                                                    @endphp
+                                                                                    <span class="badge {{ $badgeStyle }} px-2 py-1 fs-11 rounded-pill">
+                                                                                        {{ ucfirst($asset->status) }}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="py-2 text-muted">
+                                                                                    @if($asset->status === 'allocated' && $asset->assignedEmployee)
+                                                                                        <div class="fw-semibold text-dark fs-11">{{ $asset->assignedEmployee->display_name }}</div>
+                                                                                        <div class="fs-9 text-muted mt-0.5" style="font-size: 9px;">Since {{ $asset->allocated_at ? $asset->allocated_at->format('d M, Y') : '-' }}</div>
+                                                                                    @else
+                                                        -
+                                                                                    @endif
+                                                                                </td>
+                                                                                <td class="py-2 text-end px-3">
+                                                                                    <div class="d-flex justify-content-end gap-1 align-items-center">
+
+                                                                                        <form action="{{ route('hrms.assets.destroy', $asset->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this asset record?', { title: 'Delete Serialized Asset', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                                                            @csrf
+                                                                                            @method('DELETE')
+                                                                                            <button type="submit" class="btn btn-xs btn-icon btn-light text-danger" title="Delete">
+                                                                                                <i class="feather-trash-2" style="font-size: 10px;"></i>
+                                                                                            </button>
+                                                                                        </form>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        @empty
+                                                                            <tr>
+                                                                                <td colspan="6" class="py-3 text-muted text-center fs-11">No physical units registered under this item.</td>
+                                                                            </tr>
+                                                                        @endforelse
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                                <td colspan="5" class="text-center py-5 text-muted fs-12">
                                                     <i class="feather-box fs-32 d-block mb-3 text-secondary"></i>
                                                     <div class="fw-bold mb-1">No Items Configured</div>
-                                                    <div>Create an item type master to catalog serialized hardware.</div>
+                                                    <div>Create an item master to catalog serialized hardware.</div>
                                                 </td>
                                             </tr>
                                         @endforelse
@@ -812,6 +728,7 @@
                                                 <x-ui.odoo-form-ui type="select" name="request_status">
                                                     <option value="">{{ __('hrms.common.all_statuses') }}</option>
                                                     <option value="pending" {{ request('request_status') === 'pending' ? 'selected' : '' }}>{{ __('hrms.assets.status_pending') }}</option>
+                                                    <option value="partially_allocated" {{ request('request_status') === 'partially_allocated' ? 'selected' : '' }}>Partially Allocated</option>
                                                     <option value="allocated" {{ request('request_status') === 'allocated' ? 'selected' : '' }}>{{ __('hrms.assets.status_allocated') }}</option>
                                                     <option value="rejected" {{ request('request_status') === 'rejected' ? 'selected' : '' }}>{{ __('hrms.assets.status_rejected') }}</option>
                                                 </x-ui.odoo-form-ui>
@@ -850,54 +767,85 @@
                                     <thead class="table-light text-uppercase fs-11" style="letter-spacing: 0.5px;">
                                         <tr>
                                             <th style="width: 40px; padding-left: 20px;"><input type="checkbox" id="selectAllRequests" class="form-check-input"></th>
-                                            <th class="text-start">{{ __('hrms.employees.title') }}</th>
-                                            <th>{{ __('hrms.assets.org_entity') }}</th>
-                                            <th>{{ __('hrms.assets.req_asset') }}</th>
-                                            <th>{{ __('hrms.assets.req_reason') }}</th>
-                                            <th>{{ __('hrms.assets.req_at') }}</th>
-                                            <th>{{ __('hrms.assets.status') }}</th>
-                                            <th class="text-end" style="padding-right: 20px; width: 220px;">{{ __('hrms.assets.actions') }}</th>
+                                            <th class="text-start" style="width: 32%;">{{ __('hrms.employees.title') }} & {{ __('hrms.assets.org_entity') }}</th>
+                                            <th class="text-start" style="width: 38%;">{{ __('hrms.assets.req_asset') }} & {{ __('hrms.assets.status') }}</th>
+                                            <th class="text-end" style="padding-right: 20px; width: 30%;">{{ __('hrms.assets.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @forelse($requests as $req)
+                                            @php 
+                                                if (isset($req->allocated_assets_count)) {
+                                                    $allocatedCount = $req->allocated_assets_count;
+                                                } else {
+                                                    $allocatedCount = ($req->status === 'allocated' ? $req->quantity : ($req->allocated_asset_id ? 1 : 0));
+                                                }
+                                                $remainingQty = max(0, $req->quantity - $allocatedCount); 
+                                            @endphp
                                             <tr>
                                                 <td style="padding-left: 20px;">
-                                                    @if($req->status === 'pending')
-                                                        <input type="checkbox" class="form-check-input request-select-checkbox" value="{{ $req->id }}" data-category-id="{{ $req->asset_category_id }}" data-category-name="{{ $req->category->name }}" data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})" data-company-id="{{ $req->company_id }}" data-requested-asset-id="{{ $req->requested_asset_id }}">
+                                                    @if(in_array($req->status, ['pending', 'partially_allocated']))
+                                                        <input type="checkbox" class="form-check-input request-select-checkbox" value="{{ $req->id }}" data-category-id="{{ $req->asset_category_id }}" data-category-name="{{ $req->category->name }}" data-item-id="{{ $req->asset_item_id }}" data-item-name="{{ $req->item->name ?? $req->category->name }}" data-quantity="{{ $req->quantity }}" data-allocated-count="{{ $allocatedCount }}" data-remaining-qty="{{ $remainingQty }}" data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})" data-company-id="{{ $req->company_id }}" data-requested-asset-id="{{ $req->requested_asset_id }}">
                                                     @endif
                                                 </td>
                                                 <td class="text-start">
                                                     <div class="fw-bold text-dark fs-13">{{ $req->employee->display_name }}</div>
-                                                    <small class="text-muted fs-11">{{ $req->employee->employee_id }}</small>
+                                                    <div class="text-muted fs-11 mt-0.5">
+                                                        <span>{{ $req->employee->employee_id }}</span>
+                                                        @if($req->company)
+                                                            <span class="mx-1">•</span><span class="fw-medium text-secondary">{{ $req->company->company_name }}</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="fs-11 text-muted mt-0.5">
+                                                        <i class="feather-calendar me-1 text-primary"></i>Requested: <span class="fw-medium text-dark">{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}</span>
+                                                    </div>
                                                 </td>
-                                                <td>{{ $req->company->company_name }}</td>
-                                                <td>
-                                                    <span class="badge bg-light text-secondary border px-2 py-1 mb-1">{{ $req->category->name }}</span>
-                                                    @if($req->requestedAsset)
-                                                        <div class="fs-11 text-muted">Req Asset: <strong class="text-dark">{{ $req->requestedAsset->name }} ({{ $req->requestedAsset->asset_code }})</strong></div>
-                                                    @endif
-                                                </td>
-                                                <td class="text-start text-muted fs-12" style="max-width: 250px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ $req->reason }}">
-                                                    {{ $req->reason }}
-                                                </td>
-                                                <td class="text-muted fs-12">{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}</td>
-                                                <td>
-                                                    @if($req->status === 'pending')
-                                                        <span class="badge bg-soft-warning text-warning px-2 py-1 text-capitalize">{{ __('hrms.assets.status_' . $req->status) }}</span>
-                                                    @elseif($req->status === 'allocated')
-                                                        <span class="badge bg-soft-success text-success px-2 py-1 text-capitalize">{{ __('hrms.assets.status_' . $req->status) }}</span>
-                                                    @elseif($req->status === 'rejected')
-                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 text-capitalize" title="{{ $req->admin_notes }}">{{ __('hrms.assets.status_' . $req->status) }}</span>
-                                                    @else
-                                                        <span class="badge bg-light text-secondary px-2 py-1 text-capitalize">{{ __('hrms.assets.status_' . $req->status) }}</span>
-                                                    @endif
+                                                <td class="text-start">
+                                                    <div class="fw-bold text-dark fs-13">{{ $req->item->name ?? $req->category->name }}</div>
+                                                    <div class="my-0.5">
+                                                        <span class="badge bg-light text-secondary border px-2 py-0.5 fs-11">{{ $req->category->name }}</span>
+                                                    </div>
+                                                    <div class="fs-11 text-muted mb-1">
+                                                        Req: <strong class="text-dark">{{ $req->quantity }}</strong> | 
+                                                        Allocated: <strong class="text-success">{{ $allocatedCount }}</strong> | 
+                                                        Rem: <strong class="{{ $remainingQty > 0 ? 'text-danger' : 'text-muted' }}">{{ $remainingQty }}</strong>
+                                                    </div>
+                                                    <div>
+                                                        @if($req->status === 'pending')
+                                                            <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11 text-capitalize">Pending</span>
+                                                        @elseif($req->status === 'partially_allocated')
+                                                            <span class="badge bg-soft-info text-info px-2.5 py-1 rounded-pill fs-11 text-capitalize">Partially Allocated</span>
+                                                        @elseif($req->status === 'allocated')
+                                                            <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11 text-capitalize">Allocated</span>
+                                                        @elseif($req->status === 'rejected')
+                                                            <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11 text-capitalize" title="{{ $req->admin_notes }}">Rejected</span>
+                                                        @else
+                                                            <span class="badge bg-light text-secondary px-2.5 py-1 rounded-pill fs-11 text-capitalize">{{ __('hrms.assets.status_' . $req->status) }}</span>
+                                                        @endif
+                                                    </div>
                                                 </td>
                                                 <td class="text-end" style="padding-right: 20px;">
-                                                    @if($req->status === 'pending')
-                                                        <div class="d-flex justify-content-end align-items-center gap-2">
-                                                            <button type="button" class="action-dropdown-btn text-uppercase fw-bold px-3 allocate-request-trigger-btn" 
-                                                                style="width: auto !important; font-size: 11px; letter-spacing: 0.5px; height: 32px;"
+                                                    <div class="d-flex justify-content-end align-items-center gap-2">
+                                                        <button type="button" class="btn btn-sm btn-icon btn-light-brand view-req-details-btn" 
+                                                            title="View Request Details & Reason"
+                                                            data-emp-name="{{ $req->employee->display_name }}"
+                                                            data-emp-id="{{ $req->employee->employee_id }}"
+                                                            data-company="{{ $req->company->company_name ?? '' }}"
+                                                            data-asset-name="{{ $req->item->name ?? $req->category->name }}"
+                                                            data-category="{{ $req->category->name }}"
+                                                            data-req-qty="{{ $req->quantity }}"
+                                                            data-alloc-qty="{{ $allocatedCount }}"
+                                                            data-rem-qty="{{ $remainingQty }}"
+                                                            data-status-raw="{{ $req->status }}"
+                                                            data-status="{{ ucfirst(str_replace('_', ' ', $req->status)) }}"
+                                                            data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
+                                                            data-reason="{{ $req->reason ?: 'No reason provided.' }}">
+                                                            <i class="feather-eye"></i>
+                                                        </button>
+
+                                                        @if(in_array($req->status, ['pending', 'partially_allocated']))
+                                                            <button type="button" class="btn btn-sm btn-primary fw-bold allocate-request-trigger-btn px-3" 
+                                                                style="font-size: 11px; height: 32px; letter-spacing: 0.5px;"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#allocateAssetModal"
                                                                 data-request-id="{{ $req->id }}"
@@ -905,26 +853,30 @@
                                                                 data-employee-name="{{ $req->employee->display_name }} ({{ $req->employee->employee_id }})"
                                                                 data-asset-item-id="{{ $req->asset_item_id }}"
                                                                 data-item-name="{{ $req->item->name ?? 'N/A' }}"
-                                                                data-quantity="{{ $req->quantity }}">
+                                                                data-quantity="{{ $req->quantity }}"
+                                                                data-allocated-count="{{ $allocatedCount }}"
+                                                                data-remaining-qty="{{ $remainingQty }}">
                                                                 Fulfill
                                                             </button>
 
-                                                            <button type="button" class="btn btn-sm btn-outline-danger text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center reject-request-btn"
-                                                                style="font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;"
+                                                            <button type="button" class="btn btn-sm btn-soft-danger fw-bold reject-request-btn px-3"
+                                                                style="font-size: 11px; height: 32px; letter-spacing: 0.5px;"
                                                                 data-request-id="{{ $req->id }}">
-                                                                {{ __('hrms.assets.reject') }}
+                                                                Reject
                                                             </button>
-                                                        </div>
-                                                    @elseif($req->status === 'allocated')
-                                                        <span class="text-muted fs-12">Allocated</span>
-                                                    @else
-                                                        <span class="text-muted fs-12">-</span>
-                                                    @endif
+                                                        @elseif($req->status === 'allocated')
+                                                            <span class="text-success fs-12 fw-semibold ms-1"><i class="feather-check-circle me-1"></i>Allocated</span>
+                                                        @elseif($req->status === 'rejected')
+                                                            <span class="text-danger fs-12 fw-semibold ms-1" title="{{ $req->admin_notes }}"><i class="feather-x-circle me-1"></i>Rejected</span>
+                                                        @else
+                                                            <span class="text-muted fs-12 ms-1">-</span>
+                                                        @endif
+                                                    </div>
                                                 </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="8" class="text-center py-5 text-muted fs-12">
+                                                <td colspan="4" class="text-center py-5 text-muted fs-12">
                                                     <i class="feather-user-check fs-32 d-block mb-3 text-secondary"></i>
                                                     <div class="fw-bold mb-1">{{ __('hrms.assets.empty_requests_title') }}</div>
                                                     <div>{{ __('hrms.assets.empty_requests_desc') }}</div>
@@ -959,7 +911,7 @@
     </div>
 
     <!-- MODAL 1: ADD ASSET -->
-    <div class="modal fade" id="addAssetModal" tabindex="-1" aria-labelledby="addAssetModalLabel" aria-hidden="true">
+    <div class="modal fade" id="addAssetModal" aria-labelledby="addAssetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -973,12 +925,18 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Asset Item Type" name="asset_item_id" :required="true" select2-selector="default">
-                                    <option value="">Select Item Type</option>
-                                    @foreach($items as $itm)
-                                        <option value="{{ $itm->id }}">{{ $itm->name }} (Category: {{ $itm->category->name ?? 'N/A' }})</option>
+                                <x-ui.odoo-form-ui type="select" label="Asset Category" name="asset_category_id" :required="true" select2-selector="default">
+                                    <option value="">Select Category</option>
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}" {{ old('asset_category_id') == $category->id ? 'selected' : '' }}>{{ $category->name }} ({{ $category->company->company_name ?? 'All' }})</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="Item Name" name="name" placeholder="e.g. Laptop, Mobile Phone, Office Desk" :required="true" value="{{ old('name') }}" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="textarea" label="Item Description" name="description" placeholder="Brief details about this item..." value="{{ old('description') }}" />
                             </div>
                             <div class="col-6">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" placeholder="e.g. Apple" />
@@ -993,15 +951,6 @@
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_cost') }}" name="purchase_cost" inputType="number" step="0.01" placeholder="0.00" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.condition') }}" name="condition" :required="true" select2-selector="default">
-                                    <option value="good">{{ __('hrms.assets.cond_good') }}</option>
-                                    <option value="new">{{ __('hrms.assets.cond_new') }}</option>
-                                    <option value="fair">{{ __('hrms.assets.cond_fair') }}</option>
-                                    <option value="damaged">{{ __('hrms.assets.cond_damaged') }}</option>
-                                    <option value="scrapped">{{ __('hrms.assets.cond_scrapped') }}</option>
-                                </x-ui.odoo-form-ui>
-                            </div>
-                            <div class="col-12">
                                 <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" placeholder="Condition details, license specifications, configurations..." />
                             </div>
                             
@@ -1012,8 +961,8 @@
                                 <div class="bg-light p-3 rounded mb-3 border d-flex align-items-center justify-content-between gap-3 flex-wrap">
                                     <div class="d-flex align-items-center gap-2">
                                         <label class="form-label mb-0 fs-12 fw-bold text-muted">Generate Sequential Codes:</label>
-                                        <input type="text" id="gen_prefix" class="form-control form-control-sm" placeholder="Prefix (e.g. AST-LAP-)" style="width: 150px; height: 32px;">
-                                        <input type="number" id="gen_count" class="form-control form-control-sm" placeholder="Count" min="1" max="50" style="width: 80px; height: 32px;">
+                                        <input type="text" id="gen_prefix" class="form-control form-control-sm" placeholder="Prefix (e.g. AST-)" style="width: 200px; height: 32px;">
+                                        <input type="number" id="gen_count" class="form-control form-control-sm" placeholder="Count" min="1" max="50" style="width: 100px; height: 32px;">
                                         <button type="button" class="btn btn-sm btn-primary fw-bold text-uppercase" id="btn-generate-units" style="height: 32px;">Generate</button>
                                     </div>
                                     <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="btn-add-unit-row" style="height: 32px;"><i class="feather-plus me-1"></i>Add Row</button>
@@ -1024,7 +973,8 @@
                                         <thead class="table-light text-uppercase fs-11" style="position: sticky; top: 0; z-index: 2;">
                                             <tr>
                                                 <th class="py-2.5 px-3 text-start">Asset Code (Unique ID) *</th>
-                                                <th class="py-2.5">Serial Number</th>
+                                                <th class="py-2.5">Serial Number *</th>
+                                                <th class="py-2.5">Condition *</th>
                                                 <th class="py-2.5 text-end px-3">Action</th>
                                             </tr>
                                         </thead>
@@ -1034,10 +984,21 @@
                                                     <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required>
                                                 </td>
                                                 <td class="py-2">
-                                                    <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN-XXXX">
+                                                    <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN-XXXX" required>
+                                                </td>
+                                                <td class="py-2" style="min-width: 120px;">
+                                                    <select name="units[0][condition]" class="form-select form-select-sm" required>
+                                                        <option value="good">Good</option>
+                                                        <option value="new">New</option>
+                                                        <option value="fair">Fair</option>
+                                                        <option value="damaged">Damaged</option>
+                                                        <option value="scrapped">Scrapped</option>
+                                                    </select>
                                                 </td>
                                                 <td class="py-2 text-end px-3">
-                                                    <button type="button" class="btn btn-sm btn-soft-danger btn-remove-unit-row" disabled><i class="feather-trash-2"></i></button>
+                                                    <div class="d-flex justify-content-end gap-1">
+                                                        <button type="button" class="btn btn-sm btn-soft-danger btn-remove-unit-row" disabled><i class="feather-trash-2"></i></button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -1056,7 +1017,7 @@
     </div>
 
     <!-- MODAL 2: EDIT ASSET -->
-    <div class="modal fade" id="editAssetModal" tabindex="-1" aria-labelledby="editAssetModalLabel" aria-hidden="true">
+    <div class="modal fade" id="editAssetModal" aria-labelledby="editAssetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1070,8 +1031,8 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Asset Item Type" name="asset_item_id" id="edit_asset_item_id" :required="true" select2-selector="default">
-                                    <option value="">Select Item Type</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.asset_item') }}" name="asset_item_id" id="edit_asset_item_id" :required="true" select2-selector="default">
+                                    <option value="">{{ __('hrms.assets.select_item') }}</option>
                                     @foreach($items as $itm)
                                         <option value="{{ $itm->id }}">{{ $itm->name }} (Category: {{ $itm->category->name ?? 'N/A' }})</option>
                                     @endforeach
@@ -1090,7 +1051,7 @@
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" id="edit_model_number" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.serial_number') }}" name="serial_number" id="edit_serial_number" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.serial_number') }}" name="serial_number" id="edit_serial_number" :required="true" />
                             </div>
                             <div class="col-6">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_date') }}" name="purchase_date" id="edit_purchase_date" inputType="date" />
@@ -1167,53 +1128,9 @@
         </div>
     </div>
  
-    <!-- IMPORT CATEGORY MODAL -->
-    <div class="modal fade" id="importCategoryModal" tabindex="-1" aria-labelledby="importCategoryModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold text-dark" id="importCategoryModalLabel">
-                        <i class="feather-upload me-2 text-primary" style="font-size: 16px;"></i>{{ __('hrms.assets.import_categories') }}
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form action="{{ route('hrms.assets.categories.import') }}" method="POST" enctype="multipart/form-data">
-                    @csrf
-                    <div class="modal-body text-start">
-                        <div class="alert bg-light border-0 d-flex flex-column gap-2 p-3 mb-4 rounded-3 text-dark fs-12">
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="feather-info text-primary fs-15"></i>
-                                <span class="fw-bold">{{ __('hrms.assets.import_instructions_title') }}</span>
-                            </div>
-                            <span class="text-muted leading-relaxed">
-                                {{ __('hrms.assets.import_cat_instructions_desc') }}
-                            </span>
-                            <div class="mt-1">
-                                <a href="{{ route('hrms.assets.categories.import.template') }}" class="btn btn-xs btn-soft-primary d-inline-flex align-items-center fw-bold py-1.5 px-3" style="border-radius: 6px; font-size: 11px;">
-                                    <i class="feather-download me-1.5 fs-12"></i> {{ __('hrms.assets.download_template') }}
-                                </a>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                             <div class="erp-custom-file-upload">
-                                 <label class="file-upload-label py-3 px-4 w-100" style="cursor: pointer; border-style: dashed; border-width: 2px;" for="category_import_file">
-                                     <i class="feather-upload-cloud me-2 text-primary fs-20"></i>
-                                     <span class="file-text text-muted" id="category_import_file_text">{{ __('hrms.assets.select_excel_file') }}</span>
-                                     <input type="file" name="file" id="category_import_file" class="d-none" required accept=".xlsx" onchange="document.getElementById('category_import_file_text').innerText = this.files[0]?.name || '{{ __('hrms.assets.select_excel_file') }}'">
-                                 </label>
-                             </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer bg-light py-2 gap-2">
-                        <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.employees.import') }}</button>
-                        <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.common.discard') }}</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 
-    <div class="modal fade" id="allocateAssetModal" tabindex="-1" aria-labelledby="allocateAssetModalLabel" aria-hidden="true">
+
+    <div class="modal fade" id="allocateAssetModal" aria-labelledby="allocateAssetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1227,11 +1144,17 @@
                     <input type="hidden" name="request_id" id="allocate_request_id">
                     <div class="modal-body">
                         <div class="row g-3">
-                            <!-- Container A: Registry Checkout (Pre-selected Asset, select Employee) -->
+                            <!-- Container A: Registry Checkout (Pre-selected Item, select Employee, specify Qty) -->
                             <div id="registry_checkout_container" class="col-12 p-0 m-0 row g-3">
                                 <div class="col-12">
-                                    <label class="info-label mb-1">{{ __('hrms.assets.asset_to_assign') }}</label>
+                                    <label class="info-label mb-1">Asset Item</label>
                                     <input type="text" id="allocate_asset_name_display" class="form-control bg-light" readonly>
+                                </div>
+                                <div class="col-6">
+                                    <x-ui.odoo-form-ui type="input" label="Available Units" id="allocate_available_qty_display" :readonly="true" />
+                                </div>
+                                <div class="col-6">
+                                    <x-ui.odoo-form-ui type="input" label="Qty to Allocate" name="quantity" id="allocate_quantity_input" inputType="number" min="1" :required="true" />
                                 </div>
                                 <div class="col-12">
                                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.employee') }}" name="assigned_employee_id" id="registry_employee_select" :required="true" select2-selector="default">
@@ -1250,16 +1173,24 @@
                                     <input type="text" id="allocate_employee_name_display" class="form-control bg-light" readonly>
                                     <input type="hidden" name="assigned_employee_id" id="request_employee_id" disabled>
                                 </div>
-                                <div class="col-12">
-                                    <label class="info-label mb-1">Requested Quantity</label>
-                                    <input type="text" id="allocate_requested_qty" class="form-control bg-light" readonly>
+                                <div class="col-4">
+                                    <label class="info-label mb-1">Requested</label>
+                                    <input type="text" id="allocate_requested_qty" class="form-control bg-light text-center fw-bold" readonly>
+                                </div>
+                                <div class="col-4">
+                                    <label class="info-label mb-1">Allocated</label>
+                                    <input type="text" id="allocate_already_allocated_qty" class="form-control bg-light text-center text-success fw-bold" readonly>
+                                </div>
+                                <div class="col-4">
+                                    <label class="info-label mb-1">Remaining</label>
+                                    <input type="text" id="allocate_remaining_qty" class="form-control bg-light text-center text-danger fw-bold" readonly>
                                 </div>
                                 <div class="col-12">
                                     <label class="info-label mb-2 fw-bold text-dark d-block">Select Serialized Assets to Assign</label>
                                     <div id="request_assets_checklist" class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
                                         <!-- Checklist populated via JS -->
                                     </div>
-                                    <small class="text-muted mt-1 d-block">Select physical units matching the requested quantity.</small>
+                                    <small class="text-muted mt-1 d-block">Select physical units to fulfill the request (maximum <span id="max_selectable_count" class="fw-bold text-primary">0</span> unit(s)).</small>
                                 </div>
                             </div>
  
@@ -1281,7 +1212,7 @@
     </div>
 
     <!-- MODAL 4: ADD CATEGORY -->
-    <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+    <div class="modal fade" id="addCategoryModal" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1320,7 +1251,7 @@
     </div>
  
     <!-- MODAL 4B: EDIT CATEGORY -->
-    <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+    <div class="modal fade" id="editCategoryModal" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1363,7 +1294,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="addAssetItemModalLabel">
-                        <i class="feather-box me-2 text-primary"></i>Create Item Type
+                        <i class="feather-box me-2 text-primary"></i>{{ __('hrms.assets.create_item') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -1383,7 +1314,7 @@
                                 <x-ui.odoo-form-ui type="input" label="Item Name" name="name" placeholder="e.g. Laptop, Mobile Phone, Office Desk" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" placeholder="Brief details about this item type..." />
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" placeholder="Brief details about this item..." />
                             </div>
                         </div>
                     </div>
@@ -1397,17 +1328,18 @@
     </div>
 
     <!-- MODAL 4D: EDIT ASSET ITEM -->
-    <div class="modal fade" id="editAssetItemModal" tabindex="-1" aria-labelledby="editAssetItemModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+    <div class="modal fade" id="editAssetItemModal" aria-labelledby="editAssetItemModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="editAssetItemModalLabel">
-                        <i class="feather-box me-2 text-primary"></i>Edit Item Type
+                        <i class="feather-box me-2 text-primary"></i>Edit Item & Serialized Assets
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="editAssetItemForm" method="POST">
                     @csrf
+                    @method('PUT')
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
@@ -1422,7 +1354,53 @@
                                 <x-ui.odoo-form-ui type="input" label="Item Name" name="name" id="edit_item_name" placeholder="e.g. Laptop, Mobile Phone, Office Desk" :required="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.description') }}" name="description" id="edit_item_description" placeholder="Brief details about this item type..." />
+                                <x-ui.odoo-form-ui type="textarea" label="Item Description" name="description" id="edit_item_description" placeholder="Brief details about this item..." />
+                            </div>
+                            <div class="col-6">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.brand_vendor') }}" name="brand" id="edit_item_brand" placeholder="e.g. Apple" />
+                            </div>
+                            <div class="col-6">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.model_number') }}" name="model_number" id="edit_item_model_number" placeholder="e.g. A2442" />
+                            </div>
+                            <div class="col-6">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_date') }}" name="purchase_date" id="edit_item_purchase_date" inputType="date" />
+                            </div>
+                            <div class="col-6">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.purchase_cost') }}" name="purchase_cost" id="edit_item_purchase_cost" inputType="number" step="0.01" placeholder="0.00" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.assets.internal_notes') }}" name="notes" id="edit_item_notes" placeholder="Condition details, license specifications, configurations..." />
+                            </div>
+
+                            <div class="col-12 border-top pt-3 mt-3">
+                                <h6 class="fw-bold text-dark mb-3">Serialized Units Registry</h6>
+                                
+                                <!-- Code generator panel -->
+                                <div class="bg-light p-3 rounded mb-3 border d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <label class="form-label mb-0 fs-12 fw-bold text-muted">Generate Sequential Codes:</label>
+                                        <input type="text" id="edit_item_gen_prefix" class="form-control form-control-sm" placeholder="Prefix (e.g. AST-)" style="width: 200px; height: 32px;">
+                                        <input type="number" id="edit_item_gen_count" class="form-control form-control-sm" placeholder="Count" min="1" max="50" style="width: 100px; height: 32px;">
+                                        <button type="button" class="btn btn-sm btn-primary fw-bold text-uppercase" id="edit-item-btn-generate-units" style="height: 32px;">Generate</button>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="edit-item-btn-add-unit-row" style="height: 32px;"><i class="feather-plus me-1"></i>Add Row</button>
+                                </div>
+
+                                <div class="table-responsive border rounded bg-white" style="max-height: 250px;">
+                                    <table class="table table-sm table-hover align-middle mb-0 text-center" id="edit-item-bulk-units-table">
+                                        <thead class="table-light text-uppercase fs-11" style="position: sticky; top: 0; z-index: 2;">
+                                            <tr>
+                                                <th class="py-2.5 px-3 text-start">Asset Code (Unique ID) *</th>
+                                                <th class="py-2.5">Serial Number *</th>
+                                                <th class="py-2.5">Condition *</th>
+                                                <th class="py-2.5 text-end px-3">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="edit-item-bulk-units-tbody">
+                                            <!-- Dynamically populated -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1435,7 +1413,7 @@
         </div>
     </div>
 
-    <div class="modal fade" id="returnAssetModal" tabindex="-1" aria-labelledby="returnAssetModalLabel" aria-hidden="true">
+    <div class="modal fade" id="returnAssetModal" aria-labelledby="returnAssetModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -1449,8 +1427,20 @@
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="info-label mb-1">{{ __('hrms.assets.asset_to_return') }}</label>
+                                <label class="info-label mb-1">Asset Item</label>
                                 <input type="text" id="return_asset_name_display" class="form-control bg-light" readonly>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.assets.employee') }}" name="employee_id" id="return_employee_select" :required="true" select2-selector="default">
+                                    <option value="">Select Employee</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <label class="info-label mb-2 fw-bold text-dark d-block">Select Serialized Assets to Return</label>
+                                <div id="return_assets_checklist" class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
+                                    <span class="text-muted fs-12">Please select an employee first.</span>
+                                </div>
+                                <small class="text-muted mt-1 d-block">Select the specific physical units being returned.</small>
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.assets.return_date') }}" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
@@ -1557,9 +1547,9 @@
                             <table class="table table-bordered align-middle text-center mb-0" id="bulk_allocate_table">
                                 <thead class="table-light fs-11 text-uppercase">
                                     <tr>
-                                        <th class="text-start">{{ __('hrms.assets.employee') }}</th>
-                                        <th>{{ __('hrms.assets.category_req_asset') }}</th>
-                                        <th class="text-start">{{ __('hrms.assets.asset_to_allocate') }}</th>
+                                        <th class="text-start" style="width: 25%;">{{ __('hrms.assets.employee') }}</th>
+                                        <th class="text-start" style="width: 30%;">Requested Item & Qty</th>
+                                        <th class="text-start" style="width: 45%;">Select Available Asset Units to Fulfill</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1606,6 +1596,110 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL: VIEW FULL DESCRIPTION -->
+    <div class="modal fade" id="viewDescriptionModal" tabindex="-1" aria-labelledby="viewDescriptionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="viewDescriptionModalLabel">
+                        <i class="feather-info me-2 text-primary"></i><span id="desc_modal_title">Full Description</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="bg-light p-3 rounded border text-dark fs-13" id="desc_modal_content" style="white-space: pre-wrap; line-height: 1.6; max-height: 350px; overflow-y: auto;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: VIEW ASSET REQUEST DETAILS -->
+    <div class="modal fade" id="viewRequestDetailsModal" tabindex="-1" aria-labelledby="viewRequestDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 520px;">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom py-3">
+                    <h5 class="modal-title fw-bold text-dark fs-15 mb-0" id="viewRequestDetailsModalLabel">
+                        <i class="feather-eye me-2 text-primary"></i>Asset Request Details
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- EMPLOYEE & COMPANY CARD -->
+                    <div class="card border shadow-none bg-light mb-3">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1">Requested By</span>
+                                    <h6 class="fw-bold text-dark mb-0 fs-14" id="req_detail_emp_name">Employee Name</h6>
+                                    <div class="fs-11 text-muted fw-medium" id="req_detail_emp_id">EMP0000</div>
+                                </div>
+                                <div>
+                                    <span class="badge bg-white text-secondary border px-2.5 py-1 fs-11 fw-semibold" id="req_detail_company">Company</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ASSET & CATEGORY DETAILS -->
+                    <div class="border rounded-3 p-3 bg-white mb-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fs-10 text-uppercase fw-bold text-muted">Requested Asset</span>
+                            <span class="badge bg-light text-secondary border px-2 py-0.5 fs-11" id="req_detail_category">Category</span>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-0 fs-15" id="req_detail_asset_name">Asset Name</h6>
+                    </div>
+
+                    <!-- STATUS & QUANTITY BREAKDOWN -->
+                    <div class="border rounded-3 p-3 bg-white mb-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fs-10 text-uppercase fw-bold text-muted">Status & Quantity Progress</span>
+                            <div id="req_detail_status_container">
+                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11" id="req_detail_status">Pending</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-2 mt-2">
+                            <div class="flex-fill border rounded p-2 text-center bg-light">
+                                <span class="fs-10 text-uppercase text-muted d-block">Requested</span>
+                                <strong class="fs-13 text-dark" id="req_detail_req_qty">0</strong>
+                            </div>
+                            <div class="flex-fill border rounded p-2 text-center bg-soft-success border-success-subtle">
+                                <span class="fs-10 text-uppercase text-success d-block">Allocated</span>
+                                <strong class="fs-13 text-success" id="req_detail_alloc_qty">0</strong>
+                            </div>
+                            <div class="flex-fill border rounded p-2 text-center bg-soft-danger border-danger-subtle">
+                                <span class="fs-10 text-uppercase text-danger d-block">Remaining</span>
+                                <strong class="fs-13 text-danger" id="req_detail_rem_qty">0</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- REQUEST DATE & REASON -->
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-white mb-2">
+                                <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1"><i class="feather-calendar me-1 text-primary"></i>Request Date</span>
+                                <div class="fs-12 fw-semibold text-dark" id="req_detail_date">-</div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-white">
+                                <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1"><i class="feather-message-square me-1 text-primary"></i>Reason for Request</span>
+                                <div class="fs-12 text-dark" id="req_detail_reason" style="white-space: pre-wrap; line-height: 1.5;">No reason provided.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-light-brand px-4" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @push('scripts')
@@ -1623,9 +1717,12 @@
             return [
                 'id' => $a->id,
                 'name' => $a->name . ' (' . $a->asset_code . ')',
+                'asset_code' => $a->asset_code,
+                'serial_number' => $a->serial_number,
                 'category_id' => $a->asset_category_id,
                 'asset_item_id' => $a->asset_item_id,
-                'company_id' => $a->company_id
+                'company_id' => $a->company_id,
+                'status' => $a->status ?? 'available'
             ];
         })) !!};
 
@@ -1638,6 +1735,54 @@
         $(document).ready(function() {
             // Append modals to body root to prevent Bootstrap backdrop overlay issues inside settings flex container
             $('#addAssetModal').appendTo('body');
+
+            $('#addAssetModal').on('show.bs.modal', function() {
+                var modal = $(this);
+                // Clear inputs
+                modal.find('input[name="name"]').val('');
+                modal.find('textarea[name="description"]').val('');
+                modal.find('input[name="brand"]').val('');
+                modal.find('input[name="model_number"]').val('');
+                modal.find('input[name="purchase_date"]').val('');
+                modal.find('input[name="purchase_cost"]').val('');
+                modal.find('textarea[name="notes"]').val('');
+                
+                let catSelect = modal.find('select[name="asset_category_id"]');
+                if (catSelect.length) {
+                    catSelect.val('').trigger('change');
+                }
+                
+                // Reset units table to only have one empty row
+                let tbody = $('#bulk-units-tbody');
+                tbody.empty();
+                unitRowIndex = 1; // start index from 1 for dynamically added rows
+                let rowHtml = `
+                    <tr>
+                        <td class="py-2 px-3 text-start">
+                            <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required>
+                        </td>
+                        <td class="py-2">
+                            <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN-XXXX">
+                        </td>
+                        <td class="py-2" style="min-width: 120px;">
+                            <select name="units[0][condition]" class="form-select form-select-sm" required>
+                                <option value="good">Good</option>
+                                <option value="new">New</option>
+                                <option value="fair">Fair</option>
+                                <option value="damaged">Damaged</option>
+                                <option value="scrapped">Scrapped</option>
+                            </select>
+                        </td>
+                        <td class="py-2 text-end px-3">
+                            <div class="d-flex justify-content-end gap-1">
+                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-unit-row" disabled><i class="feather-trash-2"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                tbody.append(rowHtml);
+                toggleRemoveButtons();
+            });
             $('#editAssetModal').appendTo('body');
             $('#allocateAssetModal').appendTo('body');
             $('#addCategoryModal').appendTo('body');
@@ -1666,17 +1811,6 @@
                 $(this).attr('href', url);
             });
 
-            $(document).on('click', '#btn-export-categories-link', function(e) {
-                var search = $('#categories-pane input[name="category_search"]').val() || '';
-                var company = $('#categories-pane select[name="category_company_id"]').val() || '';
-                var sort = $('#category_sort').val() || '';
-                
-                var url = '{{ route("hrms.assets.categories.export") }}?category_search=' + encodeURIComponent(search) +
-                          '&category_company_id=' + encodeURIComponent(company) +
-                          '&category_sort=' + encodeURIComponent(sort);
-                $(this).attr('href', url);
-            });
-
             // Handle edit category details binding
             $('#editCategoryModal').on('show.bs.modal', function(event) {
                 var button = $(event.relatedTarget);
@@ -1702,6 +1836,12 @@
                 var categoryId = button.data('category');
                 var name = button.data('name');
                 var description = button.data('description');
+                var brand = button.data('brand');
+                var modelNumber = button.data('model-number');
+                var purchaseDate = button.data('purchase-date');
+                var purchaseCost = button.data('purchase-cost');
+                var notes = button.data('notes');
+                var encodedUnits = button.data('units');
 
                 var modal = $(this);
                 modal.find('form').attr('action', '/hrms/assets/item/update/' + id);
@@ -1709,6 +1849,176 @@
                 modal.find('#edit_item_category_id').val(categoryId).trigger('change');
                 modal.find('#edit_item_name').val(name);
                 modal.find('#edit_item_description').val(description);
+                modal.find('#edit_item_brand').val(brand);
+                modal.find('#edit_item_model_number').val(modelNumber);
+                modal.find('#edit_item_purchase_date').val(purchaseDate);
+                modal.find('#edit_item_purchase_cost').val(purchaseCost);
+                modal.find('#edit_item_notes').val(notes);
+
+                var tbody = modal.find('#edit-item-bulk-units-tbody');
+                tbody.empty();
+
+                if (encodedUnits) {
+                    var units = JSON.parse(atob(encodedUnits));
+                    if (units && units.length > 0) {
+                        units.forEach(function(unit, index) {
+                            var rowHtml = `<tr>
+                                <td class="py-2 px-3 text-start">
+                                    <input type="hidden" name="units[${index}][id]" value="${unit.id}">
+                                    <input type="text" name="units[${index}][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required value="${unit.asset_code}">
+                                </td>
+                                <td class="py-2">
+                                    <input type="text" name="units[${index}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN123456" value="${unit.serial_number || ''}" required>
+                                </td>
+                                <td class="py-2" style="min-width: 120px;">
+                                    <select name="units[${index}][condition]" class="form-select form-select-sm" required>
+                                        <option value="good" ${unit.condition === 'good' ? 'selected' : ''}>Good</option>
+                                        <option value="new" ${unit.condition === 'new' ? 'selected' : ''}>New</option>
+                                        <option value="fair" ${unit.condition === 'fair' ? 'selected' : ''}>Fair</option>
+                                        <option value="damaged" ${unit.condition === 'damaged' ? 'selected' : ''}>Damaged</option>
+                                        <option value="scrapped" ${unit.condition === 'scrapped' ? 'selected' : ''}>Scrapped</option>
+                                    </select>
+                                </td>
+                                <td class="py-2 text-end px-3">
+                                    <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row"><i class="feather-trash-2"></i></button>
+                                </td>
+                            </tr>`;
+                            tbody.append(rowHtml);
+                        });
+                    }
+                }
+
+                if (tbody.children().length === 0) {
+                    var rowHtml = `<tr>
+                        <td class="py-2 px-3 text-start">
+                            <input type="text" name="units[0][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required>
+                        </td>
+                        <td class="py-2">
+                            <input type="text" name="units[0][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN123456" required>
+                        </td>
+                        <td class="py-2" style="min-width: 120px;">
+                            <select name="units[0][condition]" class="form-select form-select-sm" required>
+                                <option value="good">Good</option>
+                                <option value="new">New</option>
+                                <option value="fair">Fair</option>
+                                <option value="damaged">Damaged</option>
+                                <option value="scrapped">Scrapped</option>
+                            </select>
+                        </td>
+                        <td class="py-2 text-end px-3">
+                            <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row"><i class="feather-trash-2"></i></button>
+                        </td>
+                    </tr>`;
+                    tbody.append(rowHtml);
+                }
+            });
+
+            // Automatically initialize select2 inside modals with dropdownParent set to the modal to fix focus/closing bugs
+            $(document).on('shown.bs.modal', '.modal', function() {
+                var modal = $(this);
+                modal.find('select[select2-selector="default"]').each(function() {
+                    if ($(this).hasClass('select2-hidden-accessible')) {
+                        $(this).select2('destroy');
+                    }
+                    $(this).select2({
+                        dropdownParent: modal,
+                        placeholder: $(this).attr('placeholder') || "Select Option",
+                        allowClear: true
+                    });
+                });
+            });
+
+            // Add unit row in Edit Modal
+            $(document).on('click', '#edit-item-btn-add-unit-row', function() {
+                var tbody = $('#edit-item-bulk-units-tbody');
+                var index = tbody.children().length;
+                var rowHtml = `<tr>
+                    <td class="py-2 px-3 text-start">
+                        <input type="text" name="units[${index}][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required>
+                    </td>
+                    <td class="py-2">
+                        <input type="text" name="units[${index}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN123456" required>
+                    </td>
+                    <td class="py-2" style="min-width: 120px;">
+                        <select name="units[${index}][condition]" class="form-select form-select-sm" required>
+                            <option value="good">Good</option>
+                            <option value="new">New</option>
+                            <option value="fair">Fair</option>
+                            <option value="damaged">Damaged</option>
+                            <option value="scrapped">Scrapped</option>
+                        </select>
+                    </td>
+                    <td class="py-2 text-end px-3">
+                        <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row"><i class="feather-trash-2"></i></button>
+                    </td>
+                </tr>`;
+                tbody.append(rowHtml);
+            });
+
+            // Remove unit row in Edit Modal
+            $(document).on('click', '.btn-remove-edit-unit-row', function() {
+                var tbody = $('#edit-item-bulk-units-tbody');
+                if (tbody.children().length > 1) {
+                    $(this).closest('tr').remove();
+                    tbody.children().each(function(index, row) {
+                        $(row).find('input[name*="units["]').each(function() {
+                            var name = $(this).attr('name');
+                            var updatedName = name.replace(/units\[\d+\]/, 'units[' + index + ']');
+                            $(this).attr('name', updatedName);
+                        });
+                    });
+                } else {
+                    alert('At least one physical asset unit must be registered.');
+                }
+            });
+
+            // Generate units in Edit Modal
+            $(document).on('click', '#edit-item-btn-generate-units', function() {
+                var prefix = $('#edit_item_gen_prefix').val().trim();
+                var count = parseInt($('#edit_item_gen_count').val());
+                if (!prefix) {
+                    alert('Please enter a code prefix.');
+                    return;
+                }
+                if (isNaN(count) || count < 1 || count > 50) {
+                    alert('Please enter a count between 1 and 50.');
+                    return;
+                }
+
+                var tbody = $('#edit-item-bulk-units-tbody');
+                if (tbody.children().length === 1 && !tbody.find('input[name$="[asset_code]"]').val().trim()) {
+                    tbody.empty();
+                }
+
+                var startIndex = tbody.children().length;
+                var currentNumber = startIndex + 1;
+
+                for (var i = 0; i < count; i++) {
+                    var finalIndex = startIndex + i;
+                    var code = prefix + String(currentNumber).padStart(3, '0');
+                    var rowHtml = `<tr>
+                        <td class="py-2 px-3 text-start">
+                            <input type="text" name="units[${finalIndex}][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" required value="${code}">
+                        </td>
+                        <td class="py-2">
+                            <input type="text" name="units[${finalIndex}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN123456" required>
+                        </td>
+                        <td class="py-2" style="min-width: 120px;">
+                            <select name="units[${finalIndex}][condition]" class="form-select form-select-sm" required>
+                                <option value="good">Good</option>
+                                <option value="new">New</option>
+                                <option value="fair">Fair</option>
+                                <option value="damaged">Damaged</option>
+                                <option value="scrapped">Scrapped</option>
+                            </select>
+                        </td>
+                        <td class="py-2 text-end px-3">
+                            <button type="button" class="btn btn-sm btn-icon btn-light text-danger btn-remove-edit-unit-row"><i class="feather-trash-2"></i></button>
+                        </td>
+                    </tr>`;
+                    tbody.append(rowHtml);
+                    currentNumber++;
+                }
             });
 
             // Handle edit asset details binding
@@ -1750,7 +2060,7 @@
                 addUnitRow('', '');
             });
 
-            function addUnitRow(code = '', serial = '') {
+            function addUnitRow(code = '', serial = '', condition = 'good') {
                 let tbody = $('#bulk-units-tbody');
                 let rowHtml = `
                     <tr>
@@ -1758,10 +2068,21 @@
                             <input type="text" name="units[${unitRowIndex}][asset_code]" class="form-control form-control-sm text-center" placeholder="e.g. AST-001" value="${code}" required>
                         </td>
                         <td class="py-2">
-                            <input type="text" name="units[${unitRowIndex}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN-XXXX" value="${serial}">
+                            <input type="text" name="units[${unitRowIndex}][serial_number]" class="form-control form-control-sm text-center" placeholder="e.g. SN-XXXX" value="${serial}" required>
+                        </td>
+                        <td class="py-2" style="min-width: 120px;">
+                            <select name="units[${unitRowIndex}][condition]" class="form-select form-select-sm" required>
+                                <option value="good" ${condition === 'good' ? 'selected' : ''}>Good</option>
+                                <option value="new" ${condition === 'new' ? 'selected' : ''}>New</option>
+                                <option value="fair" ${condition === 'fair' ? 'selected' : ''}>Fair</option>
+                                <option value="damaged" ${condition === 'damaged' ? 'selected' : ''}>Damaged</option>
+                                <option value="scrapped" ${condition === 'scrapped' ? 'selected' : ''}>Scrapped</option>
+                            </select>
                         </td>
                         <td class="py-2 text-end px-3">
-                            <button type="button" class="btn btn-sm btn-soft-danger btn-remove-unit-row"><i class="feather-trash-2"></i></button>
+                            <div class="d-flex justify-content-end gap-1">
+                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-unit-row"><i class="feather-trash-2"></i></button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -1775,6 +2096,8 @@
                 toggleRemoveButtons();
             });
 
+
+
             function toggleRemoveButtons() {
                 let rows = $('#bulk-units-tbody tr');
                 if (rows.length <= 1) {
@@ -1783,6 +2106,8 @@
                     rows.find('.btn-remove-unit-row').prop('disabled', false);
                 }
             }
+
+
 
             // Sequential Code Generator
             $('#btn-generate-units').on('click', function() {
@@ -1818,12 +2143,85 @@
             // Handle return modal details binding
             $('#returnAssetModal').on('show.bs.modal', function(event) {
                 var button = $(event.relatedTarget);
-                var assetId = button.data('asset-id');
-                var assetName = button.data('asset-name');
+                var itemId = button.data('item-id');
+                var itemName = button.data('item-name');
+                var rawAllocations = button.data('allocations');
+                var rawAllocatedAssets = button.data('allocated-assets');
 
                 var modal = $(this);
-                modal.find('form').attr('action', '/hrms/assets/' + assetId + '/return');
-                modal.find('#return_asset_name_display').val(assetName);
+                modal.find('form').attr('action', '/hrms/assets/item/' + itemId + '/return');
+                modal.find('#return_asset_name_display').val(itemName);
+
+                var employeeSelect = modal.find('#return_employee_select');
+                employeeSelect.empty();
+                employeeSelect.append(new Option('Select Employee', ''));
+
+                var allocations = [];
+                if (rawAllocations) {
+                    allocations = JSON.parse(atob(rawAllocations));
+                }
+
+                var allocatedAssets = [];
+                if (rawAllocatedAssets) {
+                    allocatedAssets = JSON.parse(atob(rawAllocatedAssets));
+                }
+
+                allocations.forEach(function(alloc) {
+                    var label = alloc.employee_name + ' (Holds ' + alloc.count + ' unit(s))';
+                    var option = new Option(label, alloc.employee_id);
+                    employeeSelect.append(option);
+                });
+
+                var checklistDiv = modal.find('#return_assets_checklist');
+                checklistDiv.html('<span class="text-muted fs-12">Please select an employee first.</span>');
+
+                employeeSelect.off('change').on('change', function() {
+                    var employeeId = $(this).val();
+                    checklistDiv.empty();
+
+                    if (!employeeId) {
+                        checklistDiv.html('<span class="text-muted fs-12">Please select an employee first.</span>');
+                        return;
+                    }
+
+                    var empAssets = allocatedAssets.filter(function(asset) {
+                        return String(asset.assigned_employee_id) === String(employeeId);
+                    });
+
+                    if (empAssets.length === 0) {
+                        checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
+                    } else {
+                        empAssets.forEach(function(asset) {
+                            var checkboxId = 'return_asset_check_' + asset.id;
+                            var itemHtml = `
+                                <div class="form-check py-1 border-bottom-dashed d-flex align-items-center">
+                                    <input class="form-check-input return-allocated-asset-checkbox" type="checkbox" name="allocated_asset_ids[]" value="${asset.id}" id="${checkboxId}" style="cursor: pointer;">
+                                    <label class="form-check-label fs-12 ms-2 text-dark mb-0" for="${checkboxId}" style="cursor: pointer;">
+                                        <strong>Code:</strong> ${asset.asset_code} | <strong>Serial:</strong> ${asset.serial_number || 'N/A'}
+                                    </label>
+                                </div>
+                            `;
+                            checklistDiv.append(itemHtml);
+                        });
+                    }
+                });
+
+                modal.find('form').off('submit').on('submit', function(e) {
+                    var checkedCount = modal.find('.return-allocated-asset-checkbox:checked').length;
+                    if (checkedCount === 0) {
+                        e.preventDefault();
+                        alert('Please select at least one physical asset/serial number to return.');
+                    }
+                });
+
+                if (employeeSelect.hasClass('select2-hidden-accessible')) {
+                    employeeSelect.select2('destroy');
+                }
+                employeeSelect.select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    dropdownParent: modal
+                });
             });
 
             // Handle asset history log click
@@ -1894,7 +2292,7 @@
                     .replace(':asset', assetName)
                     .replace(':employee', empName);
 
-                if (confirm(confirmMsg)) {
+                confirmAction(confirmMsg, function() {
                     var form = $('<form>', {
                         'action': '/hrms/assets/requests/' + requestId + '/allocate-direct',
                         'method': 'POST'
@@ -1908,6 +2306,53 @@
 
                     $('body').append(form);
                     form.submit();
+                }, { title: 'Allocate Asset Confirmation', variant: 'success', confirmButtonText: 'Allocate' });
+            });
+
+            // Client-side validation: ensure Serial Number & Asset Code show inline error messages below fields
+            $('#addAssetModal form, #editAssetItemForm, #editAssetForm').on('submit', function(e) {
+                let form = $(this);
+                let invalid = false;
+
+                form.find('input[name*="[asset_code]"], input[name="asset_code"]').each(function() {
+                    let parent = $(this).parent();
+                    if (!$(this).val() || !$(this).val().trim()) {
+                        invalid = true;
+                        $(this).addClass('is-invalid');
+                        if (parent.find('.invalid-feedback').length === 0) {
+                            $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">Asset code is required.</div>');
+                        }
+                    } else {
+                        $(this).removeClass('is-invalid');
+                        parent.find('.invalid-feedback').remove();
+                    }
+                });
+
+                form.find('input[name*="[serial_number]"], input[name="serial_number"]').each(function() {
+                    let parent = $(this).parent();
+                    if (!$(this).val() || !$(this).val().trim()) {
+                        invalid = true;
+                        $(this).addClass('is-invalid');
+                        if (parent.find('.invalid-feedback').length === 0) {
+                            $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">Serial number is required.</div>');
+                        }
+                    } else {
+                        $(this).removeClass('is-invalid');
+                        parent.find('.invalid-feedback').remove();
+                    }
+                });
+
+                if (invalid) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            // Real-time clearance of inline errors when typing
+            $(document).on('input', 'input[name*="[asset_code]"], input[name="asset_code"], input[name*="[serial_number]"], input[name="serial_number"]', function() {
+                if ($(this).val() && $(this).val().trim()) {
+                    $(this).removeClass('is-invalid');
+                    $(this).parent().find('.invalid-feedback').remove();
                 }
             });
 
@@ -1915,11 +2360,16 @@
             $('#allocateAssetForm').on('submit', function(e) {
                 var isRequestFlow = !$('#request_checkout_container').hasClass('d-none');
                 if (isRequestFlow) {
-                    var qty = parseInt($('#allocate_requested_qty').val());
+                    var remainingQty = parseInt($('#allocate_remaining_qty').val()) || parseInt($('#allocate_requested_qty').val());
                     var checkedCount = $('.request-allocated-asset-checkbox:checked').length;
-                    if (checkedCount !== qty) {
+                    if (checkedCount === 0) {
                         e.preventDefault();
-                        alert('You must select exactly ' + qty + ' physical unit(s) to fulfill this request (currently selected: ' + checkedCount + ').');
+                        alert('Please select at least one physical asset/serial number to fulfill this request.');
+                        return false;
+                    }
+                    if (checkedCount > remainingQty) {
+                        e.preventDefault();
+                        alert('You cannot select more physical units than remaining needed (' + remainingQty + ').');
                         return false;
                     }
                 }
@@ -1939,6 +2389,8 @@
                     var employeeName = button.data('employee-name');
                     var itemId = button.data('asset-item-id');
                     var qty = button.data('quantity');
+                    var allocatedCount = button.data('allocated-count') || 0;
+                    var remainingQty = button.data('remaining-qty') || (qty - allocatedCount);
 
                     // Set active inputs
                     $('#allocate_request_id').val(requestId);
@@ -1947,9 +2399,13 @@
 
                     // Configure inputs disabled and required states to prevent double submissions and force selection
                     $('#registry_employee_select').prop('disabled', true);
+                    $('#allocate_quantity_input').prop('disabled', true);
                     $('#request_employee_id').prop('disabled', false).val(employeeId);
                     $('#allocate_employee_name_display').val(employeeName);
                     $('#allocate_requested_qty').val(qty);
+                    $('#allocate_already_allocated_qty').val(allocatedCount);
+                    $('#allocate_remaining_qty').val(remainingQty);
+                    $('#max_selectable_count').text(remainingQty);
 
                     // Rebuild asset checkboxes checklist based on AssetItem match
                     var checklistDiv = $('#request_assets_checklist');
@@ -1960,7 +2416,7 @@
                     });
 
                     if (filteredAssets.length === 0) {
-                        checklistDiv.html('<div class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No available units in inventory for this item type.</div>');
+                        checklistDiv.html('<div class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No available units in inventory for this item.</div>');
                     } else {
                         filteredAssets.forEach(function(asset) {
                             var checkboxId = 'allocate_asset_checkbox_' + asset.id;
@@ -1978,8 +2434,9 @@
                     form.attr('action', '/hrms/assets/requests/' + requestId + '/allocate');
                 } else {
                     // FLOW 2: REGISTRY DIRECT ALLOCATION
-                    var assetId = button.data('asset-id');
-                    var assetName = button.data('asset-name');
+                    var itemId = button.data('item-id');
+                    var itemName = button.data('item-name');
+                    var availableQty = button.data('available');
                     var companyId = button.data('company-id');
 
                     // Set active inputs
@@ -1990,9 +2447,15 @@
                     // Configure inputs disabled and required states
                     $('#request_employee_id').prop('disabled', true);
                     $('#registry_employee_select').prop('disabled', false);
-                    $('#allocate_asset_name_display').val(assetName);
+                    $('#allocate_quantity_input').prop('disabled', false);
+                    $('#allocate_asset_name_display').val(itemName);
+                    $('#allocate_available_qty_display').val(availableQty);
 
-                    // Re-filter employee options by company
+                    var qtyInput = $('#allocate_quantity_input');
+                    qtyInput.attr('max', availableQty);
+                    qtyInput.val(1);
+
+                    // Re-filter employee options
                     var employeeSelect = $('#registry_employee_select');
                     employeeSelect.empty();
                     employeeSelect.append(new Option('Select Employee', ''));
@@ -2015,7 +2478,7 @@
                         dropdownParent: modal
                     });
                     employeeSelect.val('').trigger('change');
-                    form.attr('action', '/hrms/assets/' + assetId + '/allocate');
+                    form.attr('action', '/hrms/assets/item/' + itemId + '/allocate');
                 }
             });
 
@@ -2217,14 +2680,30 @@
                 }
             });
 
+            // Toggle assets sub-table collapse
+            $(document).on('click', '.toggle-assets-btn', function() {
+                let itemId = $(this).data('item-id');
+                let targetRow = $('#assets-row-' + itemId);
+                let icon = $(this).find('.toggle-icon');
+                
+                if (targetRow.hasClass('d-none')) {
+                    targetRow.removeClass('d-none');
+                    icon.removeClass('feather-chevron-right').addClass('feather-chevron-down');
+                } else {
+                    targetRow.addClass('d-none');
+                    icon.removeClass('feather-chevron-down').addClass('feather-chevron-right');
+                }
+            });
+
             // Toggle Add buttons in header based on active tab
             function updateHeaderActions() {
-                var activeTabId = localStorage.getItem('activeAssetTab') || 'registry-tab';
+                var activeTabId = localStorage.getItem('activeAssetTab') || 'items-tab';
                 if (activeTabId === 'registry-tab') {
-                    $('#hdr-btn-log-asset').removeClass('d-none');
-                    $('#hdr-btn-add-category').addClass('d-none');
-                    $('#hdr-btn-add-item').addClass('d-none');
-                } else if (activeTabId === 'categories-tab') {
+                    activeTabId = 'items-tab';
+                    localStorage.setItem('activeAssetTab', 'items-tab');
+                }
+                
+                if (activeTabId === 'categories-tab') {
                     $('#hdr-btn-log-asset').addClass('d-none');
                     $('#hdr-btn-add-category').removeClass('d-none');
                     $('#hdr-btn-add-item').addClass('d-none');
@@ -2291,7 +2770,7 @@
                 bulkRejectModal.show();
             });
 
-            // Bulk Allocate click handler (shows requested specific asset and submits hidden input)
+            // Bulk Allocate click handler (allows multi-unit selection per request)
             $('#btnBulkAllocate').on('click', function() {
                 const checkedCheckboxes = $('.request-select-checkbox:checked');
                 const tableBody = $('#bulk_allocate_table tbody');
@@ -2303,43 +2782,63 @@
                     const empName = $chk.data('employee-name');
                     const catId = $chk.data('category-id');
                     const catName = $chk.data('category-name');
+                    const itemId = $chk.data('item-id');
+                    const itemName = $chk.data('item-name') || catName;
                     const compId = $chk.data('company-id');
-                    const reqAssetId = $chk.data('requested-asset-id');
+                    const requestedQty = parseInt($chk.data('quantity')) || 1;
+                    const allocatedCount = parseInt($chk.data('allocated-count')) || 0;
+                    const remainingQty = parseInt($chk.data('remaining-qty')) || (requestedQty - allocatedCount);
 
-                    let displayAssetHtml = '';
-                    let hiddenInputHtml = '';
-
-                    if (reqAssetId) {
-                        const assetObj = allAvailableAssets.find(function(asset) {
-                            return String(asset.id) === String(reqAssetId);
-                        });
-
-                        if (assetObj) {
-                            displayAssetHtml = `<strong class="text-dark">${assetObj.name}</strong>`;
-                            hiddenInputHtml = `<input type="hidden" name="allocations[${reqId}]" value="${assetObj.id}">`;
-                        } else {
-                            displayAssetHtml = `<span class="text-danger fw-bold"><i class="feather-alert-triangle"></i> ${langAssets.requestedAssetNotAvail}</span>`;
+                    // Find matching available units
+                    const matchedAssets = allAvailableAssets.filter(function(asset) {
+                        if (asset.status && asset.status !== 'available') return false;
+                        if (itemId && asset.asset_item_id) {
+                            return String(asset.asset_item_id) === String(itemId);
                         }
+                        if (catId && asset.category_id) {
+                            return String(asset.category_id) === String(catId);
+                        }
+                        return false;
+                    });
+
+                    let assetSelectionHtml = '';
+
+                    if (matchedAssets.length > 0) {
+                        assetSelectionHtml += `<div class="bg-light p-2 rounded border" style="max-height: 150px; overflow-y: auto;">`;
+                        assetSelectionHtml += `<div class="fs-11 text-muted mb-1">Select up to <strong>${remainingQty}</strong> unit(s):</div>`;
+                        matchedAssets.forEach(function(asset) {
+                            assetSelectionHtml += `
+                                <div class="form-check py-1">
+                                    <input type="checkbox" name="allocations[${reqId}][]" value="${asset.id}" class="form-check-input bulk-unit-checkbox" data-req-id="${reqId}" data-rem-qty="${remainingQty}">
+                                    <label class="form-check-label fs-12 fw-semibold text-dark">
+                                        ${asset.asset_code} <span class="text-muted fs-11">(${asset.serial_number || 'No Serial'})</span>
+                                    </label>
+                                </div>
+                            `;
+                        });
+                        assetSelectionHtml += `</div>`;
                     } else {
-                        const autoAsset = allAvailableAssets.find(function(asset) {
-                            return String(asset.category_id) === String(catId) && String(asset.company_id) === String(compId);
-                        });
-
-                        if (autoAsset) {
-                            displayAssetHtml = `<strong class="text-secondary">${autoAsset.name}</strong> <span class="badge bg-soft-secondary text-secondary ms-1 fs-10">${langAssets.autoMatched}</span>`;
-                            hiddenInputHtml = `<input type="hidden" name="allocations[${reqId}]" value="${autoAsset.id}">`;
-                        } else {
-                            displayAssetHtml = `<span class="text-danger fw-bold"><i class="feather-alert-triangle"></i> ${langAssets.noAvailAssetsInCat.replace(':category', catName)}</span>`;
-                        }
+                        assetSelectionHtml = `<span class="text-danger fw-bold fs-12"><i class="feather-alert-triangle me-1"></i>No available units found for ${itemName}.</span>`;
                     }
 
                     const rowHtml = `
                         <tr>
-                            <td class="text-start"><strong>${empName}</strong></td>
-                            <td><span class="badge bg-light text-secondary border px-2 py-1">${catName}</span></td>
                             <td class="text-start">
-                                ${displayAssetHtml}
-                                ${hiddenInputHtml}
+                                <strong class="text-dark fs-13">${empName}</strong>
+                            </td>
+                            <td class="text-start">
+                                <div class="fw-bold text-dark fs-12">${itemName}</div>
+                                <span class="badge bg-light text-secondary border px-2 py-0.5 fs-11">${catName}</span>
+                                <div class="fs-11 text-muted mt-1">
+                                    Req: <strong class="text-dark">${requestedQty}</strong> | Rem: <strong class="text-danger">${remainingQty}</strong>
+                                </div>
+                                <div class="mt-2 pt-1 border-top d-flex align-items-center justify-content-between">
+                                    <span class="fs-11 fw-bold text-muted text-uppercase">Allocating Qty:</span>
+                                    <span class="badge bg-soft-success text-success border border-success border-opacity-25 px-2 py-1 fs-11" id="bulk_alloc_badge_${reqId}">0 / ${remainingQty} unit(s)</span>
+                                </div>
+                            </td>
+                            <td class="text-start">
+                                ${assetSelectionHtml}
                             </td>
                         </tr>
                     `;
@@ -2351,8 +2850,96 @@
                 bulkAllocModal.show();
             });
 
+            // Restrict maximum selected checkboxes in Bulk Allocate Modal to remaining qty and update badge
+            $(document).on('change', '.bulk-unit-checkbox', function() {
+                const reqId = $(this).data('req-id');
+                const remQty = parseInt($(this).data('rem-qty')) || 1;
+                let checkedCount = $(`.bulk-unit-checkbox[data-req-id="${reqId}"]:checked`).length;
+
+                if (checkedCount > remQty) {
+                    $(this).prop('checked', false);
+                    checkedCount = remQty;
+                    alert(`You can select at most ${remQty} unit(s) for this request.`);
+                }
+
+                const badge = $(`#bulk_alloc_badge_${reqId}`);
+                if (checkedCount > 0) {
+                    badge.removeClass('bg-soft-secondary text-secondary border-secondary').addClass('bg-soft-success text-success border-success').text(`${checkedCount} / ${remQty} unit(s)`);
+                } else {
+                    badge.removeClass('bg-soft-success text-success border-success').addClass('bg-soft-secondary text-secondary border-secondary').text(`0 / ${remQty} unit(s)`);
+                }
+            });
+
+            function checkTruncatedDescriptions() {
+                $('.desc-expandable-container').each(function() {
+                    const textEl = $(this).find('.desc-text-truncate')[0];
+                    const readMoreBtn = $(this).find('.btn-read-more-dynamic');
+                    if (textEl && (textEl.scrollWidth > textEl.clientWidth + 1)) {
+                        readMoreBtn.removeClass('d-none');
+                        $(textEl).css('cursor', 'pointer');
+                    } else {
+                        readMoreBtn.addClass('d-none');
+                        $(textEl).css('cursor', 'default');
+                    }
+                });
+            }
+
+            setTimeout(checkTruncatedDescriptions, 100);
+            $(window).on('resize', checkTruncatedDescriptions);
+            $('a[data-bs-toggle="tab"], button[data-bs-toggle="tab"]').on('shown.bs.tab', function() {
+                setTimeout(checkTruncatedDescriptions, 50);
+            });
+
+            // View full description modal handler (clicking Read More link OR clicking the truncated text)
+            $(document).on('click', '.btn-read-more-dynamic, .desc-text-truncate', function() {
+                const container = $(this).closest('.desc-expandable-container');
+                const readMoreBtn = container.find('.btn-read-more-dynamic');
+                if (!readMoreBtn.hasClass('d-none')) {
+                    const title = readMoreBtn.data('title') || 'Description';
+                    const desc = readMoreBtn.data('desc') || '';
+                    $('#desc_modal_title').text(title + ' - Full Description');
+                    $('#desc_modal_content').text(desc);
+                    $('#viewDescriptionModal').appendTo('body').modal('show');
+                }
+            });
+
+            // View request full details modal handler
+            $(document).on('click', '.view-req-details-btn', function() {
+                const btn = $(this);
+                const status = (btn.data('status-raw') || 'pending').toLowerCase();
+                
+                $('#req_detail_emp_name').text(btn.data('emp-name'));
+                $('#req_detail_emp_id').text(btn.data('emp-id'));
+                $('#req_detail_company').text(btn.data('company') || 'Company');
+                $('#req_detail_asset_name').text(btn.data('asset-name'));
+                $('#req_detail_category').text(btn.data('category'));
+                $('#req_detail_req_qty').text(btn.data('req-qty') || 0);
+                $('#req_detail_alloc_qty').text(btn.data('alloc-qty') || 0);
+                $('#req_detail_rem_qty').text(btn.data('rem-qty') || 0);
+                $('#req_detail_date').text(btn.data('date'));
+                $('#req_detail_reason').text(btn.data('reason'));
+
+                let badgeHtml = '';
+                if (status === 'pending') {
+                    badgeHtml = '<span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11">Pending</span>';
+                } else if (status === 'partially_allocated' || status === 'partial') {
+                    badgeHtml = '<span class="badge bg-soft-info text-info px-2.5 py-1 rounded-pill fs-11">Partially Allocated</span>';
+                } else if (status === 'allocated') {
+                    badgeHtml = '<span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11">Allocated</span>';
+                } else if (status === 'rejected') {
+                    badgeHtml = '<span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded-pill fs-11">Rejected</span>';
+                } else {
+                    badgeHtml = `<span class="badge bg-light text-secondary px-2.5 py-1 rounded-pill fs-11">${btn.data('status')}</span>`;
+                }
+                $('#req_detail_status_container').html(badgeHtml);
+
+                $('#viewRequestDetailsModal').appendTo('body').modal('show');
+            });
+
             $('#bulkAllocateModal').appendTo('body');
             $('#bulkRejectModal').appendTo('body');
+            $('#viewDescriptionModal').appendTo('body');
+            $('#viewRequestDetailsModal').appendTo('body');
         });
 
         // Global function for sorting

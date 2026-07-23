@@ -118,7 +118,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
-                                    <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.salary.delete_structure_confirm') }}');">
+                                    <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_structure_confirm') }}', { title: 'Delete Salary Structure', variant: 'danger', confirmButtonText: 'Delete' });">
                                         @csrf
                                         @method('DELETE')
                                         <div class="hstack gap-2 justify-content-end">

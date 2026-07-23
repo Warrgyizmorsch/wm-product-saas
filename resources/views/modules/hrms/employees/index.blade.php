@@ -533,7 +533,7 @@
                                                 </a>
                                             </li>
                                             <li>
-                                                <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this employee?');" style="display: inline;">
+                                                 <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this employee?', { title: 'Delete Employee', variant: 'danger', confirmButtonText: 'Delete' });" style="display: inline;">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start">
