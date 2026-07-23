@@ -288,7 +288,7 @@
                                         </div>
  
                                         <!-- Actions Dropdown for Pay Group -->
-                                        <form action="{{ route('hrms.salary-structure.pay-group.destroy', $selectedPayGroup->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.salary.delete_pay_group_confirm') }}');">
+                                        <form action="{{ route('hrms.salary-structure.pay-group.destroy', $selectedPayGroup->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_pay_group_confirm') }}', { title: 'Delete Pay Group', variant: 'danger', confirmButtonText: 'Delete' });">
                                             @csrf
                                             @method('DELETE')
                                             <x-ui.action-dropdown>

@@ -103,7 +103,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.business-unit.destroy', $unit->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.org.confirm_delete_bu') }}');">
+                                <form action="{{ route('hrms.business-unit.destroy', $unit->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_bu') }}', { title: 'Delete Business Unit', variant: 'danger', confirmButtonText: 'Delete' });">
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end">

@@ -1455,10 +1455,10 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_code') }}" name="code" :required="true" placeholder="{{ __('hrms.org.shift_code_placeholder') }}" :errorText="$errors->first('code')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.start_time') }}" name="start_time" :required="true" placeholder="{{ __('hrms.org.start_time_placeholder') }}" :errorText="$errors->first('start_time')" />
+                            <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.start_time') }}" name="start_time" :required="true" :errorText="$errors->first('start_time')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.end_time') }}" name="end_time" :required="true" placeholder="{{ __('hrms.org.end_time_placeholder') }}" :errorText="$errors->first('end_time')" />
+                            <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.end_time') }}" name="end_time" :required="true" :errorText="$errors->first('end_time')" />
                         </div>
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.break_minutes') }}" name="break_minutes" inputType="number" :required="true" placeholder="{{ __('hrms.org.break_minutes_placeholder') }}" value="0" :errorText="$errors->first('break_minutes')" />
@@ -1513,10 +1513,10 @@
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_code') }}" name="code" id="edit_shift_code" :required="true" :errorText="$errors->first('code')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.start_time') }}" name="start_time" id="edit_shift_start" :required="true" :errorText="$errors->first('start_time')" />
+                            <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.start_time') }}" name="start_time" id="edit_shift_start" :required="true" :errorText="$errors->first('start_time')" />
                         </div>
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.end_time') }}" name="end_time" id="edit_shift_end" :required="true" :errorText="$errors->first('end_time')" />
+                            <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.end_time') }}" name="end_time" id="edit_shift_end" :required="true" :errorText="$errors->first('end_time')" />
                         </div>
                         <div class="col-12">
                             <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.break_minutes') }}" name="break_minutes" id="edit_shift_break" inputType="number" :required="true" :errorText="$errors->first('break_minutes')" />

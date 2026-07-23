@@ -135,9 +135,15 @@ class AssetController extends Controller
         $companies = Company::query()->where('status', true)->orderBy('company_name')->get();
         $employees = Employee::query()->where('status', true)->orderBy('full_name')->get();
         
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
+
         // 5. Requests Search & Filter
         $requestsQuery = AssetRequest::query()
             ->with(['company', 'employee', 'category', 'item', 'allocatedAsset', 'requestedAsset']);
+
+        if ($hasRequestColumn) {
+            $requestsQuery->withCount('allocatedAssets');
+        }
 
         if ($request->filled('request_search')) {
             $search = $request->input('request_search');
@@ -181,7 +187,7 @@ class AssetController extends Controller
             ->withQueryString();
 
         // Total Pending Requests Count (unaffected by filters, for the tab badge)
-        $pendingRequestsCount = AssetRequest::query()->where('status', 'pending')->count();
+        $pendingRequestsCount = AssetRequest::query()->whereIn('status', ['pending', 'partially_allocated'])->count();
 
         $availableAssets = Asset::query()
             ->where('status', 'available')
@@ -207,80 +213,46 @@ class AssetController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $rules = [
+            'asset_category_id' => 'required|exists:asset_categories,id',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
             'brand' => 'nullable|string|max:255',
             'model_number' => 'nullable|string|max:255',
             'purchase_date' => 'nullable|date',
             'purchase_cost' => 'nullable|numeric|min:0',
-            'condition' => 'nullable|string|in:new,good,fair,damaged,scrapped',
             'notes' => 'nullable|string|max:1000',
+            'units' => 'required|array|min:1',
+            'units.*.asset_code' => 'required|string|max:255|unique:assets,asset_code',
+            'units.*.serial_number' => 'required|string|max:255',
+            'units.*.condition' => 'required|string|in:new,good,fair,damaged,scrapped',
         ];
 
-        if ($request->has('units')) {
-            $rules['asset_item_id'] = 'required|exists:asset_items,id';
-            $rules['units'] = 'required|array|min:1';
-            $rules['units.*.asset_code'] = 'required|string|max:255|unique:assets,asset_code';
-            $rules['units.*.serial_number'] = 'nullable|string|max:255';
-            $validated = $request->validate($rules);
-            
-            $item = AssetItem::findOrFail($validated['asset_item_id']);
-            $companyId = $item->company_id;
-            $categoryId = $item->asset_category_id;
-            $name = $item->name;
-        } else {
-            // Old single asset creation logic for compatibility
-            $rules['asset_category_id'] = 'required|exists:asset_categories,id';
-            $rules['asset_code'] = 'required|string|max:255|unique:assets,asset_code';
-            $rules['name'] = 'required|string|max:255';
-            $rules['serial_number'] = 'nullable|string|max:255';
-            $validated = $request->validate($rules);
-            
-            $category = AssetCategory::findOrFail($validated['asset_category_id']);
-            $companyId = $category->company_id;
-            $categoryId = $category->id;
-            $name = $validated['name'];
-            
-            // Auto-create or find matching AssetItem to keep data structure synchronized
-            $item = AssetItem::firstOrCreate(
-                [
-                    'company_id' => $companyId,
-                    'asset_category_id' => $categoryId,
-                    'name' => $name
-                ],
-                [
-                    'description' => 'Automatically created from single asset registration.'
-                ]
-            );
-            $validated['asset_item_id'] = $item->id;
-        }
+        $validated = $request->validate($rules);
 
-        $condition = $validated['condition'] ?? 'good';
-        $status = 'available';
-        if ($condition === 'damaged') {
-            $status = 'maintenance';
-        } elseif ($condition === 'scrapped') {
-            $status = 'scrapped';
-        }
+        $category = AssetCategory::findOrFail($validated['asset_category_id']);
+        $companyId = $category->company_id;
+        $categoryId = $category->id;
+        $name = $validated['name'];
 
-        \DB::transaction(function () use ($validated, $companyId, $categoryId, $name, $status, $condition) {
-            if (isset($validated['units'])) {
-                foreach ($validated['units'] as $unit) {
-                    Asset::create([
-                        'company_id' => $companyId,
-                        'asset_category_id' => $categoryId,
-                        'asset_item_id' => $validated['asset_item_id'],
-                        'name' => $name,
-                        'brand' => $validated['brand'] ?? null,
-                        'model_number' => $validated['model_number'] ?? null,
-                        'purchase_date' => $validated['purchase_date'] ?? null,
-                        'purchase_cost' => $validated['purchase_cost'] ?? null,
-                        'condition' => $condition,
-                        'status' => $status,
-                        'notes' => $validated['notes'] ?? null,
-                        'asset_code' => $unit['asset_code'],
-                        'serial_number' => $unit['serial_number'] ?? null,
-                    ]);
+        // Create the AssetItem
+        $item = AssetItem::create([
+            'company_id' => $companyId,
+            'asset_category_id' => $categoryId,
+            'name' => $name,
+            'description' => $validated['description'] ?? null,
+        ]);
+        $validated['asset_item_id'] = $item->id;
+
+        \DB::transaction(function () use ($validated, $companyId, $categoryId, $name) {
+            foreach ($validated['units'] as $unit) {
+                $condition = $unit['condition'] ?? 'good';
+                $status = 'available';
+                if ($condition === 'damaged') {
+                    $status = 'maintenance';
+                } elseif ($condition === 'scrapped') {
+                    $status = 'scrapped';
                 }
-            } else {
+
                 Asset::create([
                     'company_id' => $companyId,
                     'asset_category_id' => $categoryId,
@@ -293,12 +265,12 @@ class AssetController extends Controller
                     'condition' => $condition,
                     'status' => $status,
                     'notes' => $validated['notes'] ?? null,
-                    'asset_code' => $validated['asset_code'],
-                    'serial_number' => $validated['serial_number'] ?? null,
+                    'asset_code' => $unit['asset_code'],
+                    'serial_number' => $unit['serial_number'] ?? null,
                 ]);
             }
         });
- 
+
         return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_logged'));
     }
 
@@ -310,7 +282,7 @@ class AssetController extends Controller
             'asset_code' => ['required', 'string', 'max:255', Rule::unique('assets', 'asset_code')->ignore($asset->id)],
             'brand' => 'nullable|string|max:255',
             'model_number' => 'nullable|string|max:255',
-            'serial_number' => 'nullable|string|max:255',
+            'serial_number' => 'required|string|max:255',
             'purchase_date' => 'nullable|date',
             'purchase_cost' => 'nullable|numeric|min:0',
             'condition' => 'required|string|in:new,good,fair,damaged,scrapped',
@@ -436,6 +408,9 @@ class AssetController extends Controller
             'request_id' => 'nullable|exists:asset_requests,id',
         ]);
 
+        $this->ensureRequestStatusColumnIsVarchar();
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
+
         // Capture allocation condition (default to current asset condition)
         $allocCondition = $asset->condition;
 
@@ -459,24 +434,40 @@ class AssetController extends Controller
         if (!empty($validated['request_id'])) {
             $assetRequest = AssetRequest::find($validated['request_id']);
             if ($assetRequest) {
+                if ($hasRequestColumn) {
+                    $asset->update(['asset_request_id' => $assetRequest->id]);
+                    $totalAllocated = $assetRequest->allocatedAssets()->count();
+                } else {
+                    $totalAllocated = 1;
+                }
+                $newStatus = ($totalAllocated >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
+
                 $assetRequest->update([
-                    'status' => 'allocated',
+                    'status' => $newStatus,
                     'allocated_asset_id' => $asset->id,
                     'admin_notes' => 'Allocated asset ' . $asset->asset_code . ' (' . $asset->name . ') on ' . date('d M, Y'),
                 ]);
             }
         } else {
-            // Auto-resolve any pending request for this employee and this category!
+            // Auto-resolve any pending/partial request for this employee and this item!
             $pendingRequest = AssetRequest::query()
                 ->where('employee_id', $validated['assigned_employee_id'])
-                ->where('asset_category_id', $asset->asset_category_id)
-                ->where('status', 'pending')
+                ->where('asset_item_id', $asset->asset_item_id)
+                ->whereIn('status', ['pending', 'partially_allocated'])
                 ->orderBy('created_at', 'asc') // Resolve oldest request first
                 ->first();
 
             if ($pendingRequest) {
+                if ($hasRequestColumn) {
+                    $asset->update(['asset_request_id' => $pendingRequest->id]);
+                    $totalAllocated = $pendingRequest->allocatedAssets()->count();
+                } else {
+                    $totalAllocated = 1;
+                }
+                $newStatus = ($totalAllocated >= $pendingRequest->quantity) ? 'allocated' : 'partially_allocated';
+
                 $pendingRequest->update([
-                    'status' => 'allocated',
+                    'status' => $newStatus,
                     'allocated_asset_id' => $asset->id,
                     'admin_notes' => 'Allocated asset ' . $asset->asset_code . ' (' . $asset->name . ') directly from registry on ' . date('d M, Y'),
                 ]);
@@ -537,6 +528,146 @@ class AssetController extends Controller
     }
 
     /**
+     * Allocate a quantity of assets of a specific item type.
+     */
+    public function allocateItem(Request $request, AssetItem $assetItem): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'assigned_employee_id' => 'required|exists:employees,id',
+            'allocated_at' => 'required|date',
+            'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $quantity = (int) $validated['quantity'];
+        $this->ensureRequestStatusColumnIsVarchar();
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
+
+        $availableAssets = Asset::where('asset_item_id', $assetItem->id)
+            ->where('status', 'available')
+            ->take($quantity)
+            ->get();
+
+        if ($availableAssets->count() < $quantity) {
+            return redirect()->back()->withErrors(['quantity' => 'Only ' . $availableAssets->count() . ' available units left to allocate.']);
+        }
+
+        \DB::transaction(function() use ($availableAssets, $validated, $hasRequestColumn) {
+            foreach ($availableAssets as $asset) {
+                $asset->update([
+                    'status' => 'allocated',
+                    'assigned_employee_id' => $validated['assigned_employee_id'],
+                    'allocated_at' => $validated['allocated_at'],
+                    'expected_return_date' => $validated['expected_return_date'] ?? null,
+                ]);
+
+                $asset->allocations()->create([
+                    'employee_id' => $validated['assigned_employee_id'],
+                    'allocated_at' => $validated['allocated_at'],
+                    'allocation_condition' => $asset->condition,
+                    'notes' => $asset->notes,
+                ]);
+
+                // Auto-resolve any pending/partial request for this employee and this item
+                $pendingRequest = AssetRequest::query()
+                    ->where('employee_id', $validated['assigned_employee_id'])
+                    ->where('asset_item_id', $asset->asset_item_id)
+                    ->whereIn('status', ['pending', 'partially_allocated'])
+                    ->orderBy('created_at', 'asc')
+                    ->first();
+
+                if ($pendingRequest) {
+                    if ($hasRequestColumn) {
+                        $asset->update(['asset_request_id' => $pendingRequest->id]);
+                        $totalAllocated = $pendingRequest->allocatedAssets()->count();
+                    } else {
+                        $totalAllocated = 1;
+                    }
+                    $newStatus = ($totalAllocated >= $pendingRequest->quantity) ? 'allocated' : 'partially_allocated';
+
+                    $pendingRequest->update([
+                        'status' => $newStatus,
+                        'allocated_asset_id' => $asset->id,
+                        'admin_notes' => 'Allocated asset ' . $asset->asset_code . ' (' . $asset->name . ') directly from registry on ' . date('d M, Y'),
+                    ]);
+                }
+            }
+        });
+
+        return redirect()->back()->with('success', 'Successfully allocated ' . $quantity . ' unit(s) of ' . $assetItem->name . '.');
+    }
+
+    /**
+     * Return selected physical assets of a specific item type.
+     */
+    public function returnItem(Request $request, AssetItem $assetItem): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'allocated_asset_ids' => 'required|array|min:1',
+            'allocated_asset_ids.*' => 'required|integer|exists:assets,id',
+            'returned_at' => 'nullable|date',
+            'return_condition' => 'nullable|string|in:new,good,fair,damaged,scrapped',
+            'return_notes' => 'nullable|string|max:1000',
+        ]);
+
+        $assetIds = $validated['allocated_asset_ids'];
+        $returnedAt = $validated['returned_at'] ?? date('Y-m-d');
+        $returnCondition = $validated['return_condition'];
+        $returnNotes = $validated['return_notes'] ?? null;
+
+        $allocatedAssets = Asset::whereIn('id', $assetIds)
+            ->where('asset_item_id', $assetItem->id)
+            ->where('status', 'allocated')
+            ->where('assigned_employee_id', $validated['employee_id'])
+            ->get();
+
+        if ($allocatedAssets->count() !== count($assetIds)) {
+            return redirect()->back()->withErrors(['allocated_asset_ids' => 'Some of the selected assets could not be found or are not assigned to this employee.']);
+        }
+
+        \DB::transaction(function() use ($allocatedAssets, $returnedAt, $returnCondition, $returnNotes) {
+            foreach ($allocatedAssets as $asset) {
+                $cond = $returnCondition ?: $asset->condition;
+                
+                $activeAllocation = $asset->allocations()
+                    ->whereNull('returned_at')
+                    ->orderBy('allocated_at', 'desc')
+                    ->first();
+
+                if ($activeAllocation) {
+                    $activeAllocation->update([
+                        'returned_at' => $returnedAt,
+                        'return_condition' => $cond,
+                        'notes' => $returnNotes ?: $activeAllocation->notes,
+                    ]);
+                }
+
+                $status = 'available';
+                if ($cond === 'damaged') {
+                    $status = 'maintenance';
+                } elseif ($cond === 'scrapped') {
+                    $status = 'scrapped';
+                }
+
+                $asset->update([
+                    'status' => $status,
+                    'condition' => $cond,
+                    'assigned_employee_id' => null,
+                    'allocated_at' => null,
+                    'expected_return_date' => null,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Successfully returned ' . $allocatedAssets->count() . ' unit(s) of ' . $assetItem->name . '.');
+    }
+
+    /**
      * Store a newly created asset request.
      */
     public function storeRequest(Request $request): RedirectResponse
@@ -546,7 +677,31 @@ class AssetController extends Controller
         $requestDate = date('Y-m-d');
         $reason = $request->input('reason');
 
-        if ($request->has('asset_item_id')) {
+        if ($request->has('items') && is_array($request->input('items'))) {
+            $request->validate([
+                'employee_id' => 'required|exists:employees,id',
+                'reason' => 'required|string|max:1000',
+                'items' => 'required|array|min:1',
+                'items.*.asset_item_id' => 'required|exists:asset_items,id',
+                'items.*.quantity' => 'required|integer|min:1',
+            ]);
+
+            foreach ($request->input('items') as $itemData) {
+                $item = AssetItem::find($itemData['asset_item_id']);
+                if ($item) {
+                    AssetRequest::create([
+                        'company_id' => $companyId,
+                        'employee_id' => $employee->id,
+                        'asset_category_id' => $item->asset_category_id,
+                        'asset_item_id' => $item->id,
+                        'quantity' => (int) ($itemData['quantity'] ?? 1),
+                        'reason' => $reason,
+                        'request_date' => $requestDate,
+                        'status' => 'pending',
+                    ]);
+                }
+            }
+        } elseif ($request->has('asset_item_id')) {
             $request->validate([
                 'employee_id' => 'required|exists:employees,id',
                 'asset_item_id' => 'required|exists:asset_items,id',
@@ -696,9 +851,10 @@ class AssetController extends Controller
     public function allocateRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $this->ensureRequestStatusColumnIsVarchar();
 
-        if ($assetRequest->status !== 'pending') {
-            return redirect()->back()->with('error', 'Request is not pending.');
+        if (!in_array($assetRequest->status, ['pending', 'partially_allocated'])) {
+            return redirect()->back()->with('error', 'Request is not pending or partially allocated.');
         }
 
         $validated = $request->validate([
@@ -719,15 +875,31 @@ class AssetController extends Controller
             }
         }
 
-        \DB::transaction(function () use ($assetRequest, $assets, $validated) {
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
+        $currentAllocatedCount = 0;
+        if ($hasRequestColumn) {
+            $currentAllocatedCount = $assetRequest->allocatedAssets()->count();
+        } else {
+            $currentAllocatedCount = ($assetRequest->status === 'allocated' ? $assetRequest->quantity : ($assetRequest->allocated_asset_id ? 1 : 0));
+        }
+
+        if ($currentAllocatedCount + $assets->count() > $assetRequest->quantity) {
+            return redirect()->back()->with('error', "Cannot allocate more than requested quantity of {$assetRequest->quantity} units (already allocated: {$currentAllocatedCount}).");
+        }
+
+        \DB::transaction(function () use ($assetRequest, $assets, $validated, $hasRequestColumn, $currentAllocatedCount) {
             $first = true;
             foreach ($assets as $asset) {
-                $asset->update([
+                $updateData = [
                     'status' => 'allocated',
                     'assigned_employee_id' => $assetRequest->employee_id,
                     'allocated_at' => $validated['allocated_at'],
                     'expected_return_date' => $validated['expected_return_date'],
-                ]);
+                ];
+                if ($hasRequestColumn) {
+                    $updateData['asset_request_id'] = $assetRequest->id;
+                }
+                $asset->update($updateData);
 
                 $asset->allocations()->create([
                     'employee_id' => $assetRequest->employee_id,
@@ -736,7 +908,7 @@ class AssetController extends Controller
                     'notes' => 'Allocated via request #' . $assetRequest->id,
                 ]);
 
-                if ($first) {
+                if ($first && !$assetRequest->allocated_asset_id) {
                     $assetRequest->update([
                         'allocated_asset_id' => $asset->id,
                     ]);
@@ -745,9 +917,13 @@ class AssetController extends Controller
             }
 
             $assetCodes = $assets->pluck('asset_code')->implode(', ');
+            $totalAllocated = $hasRequestColumn ? $assetRequest->allocatedAssets()->count() : ($currentAllocatedCount + $assets->count());
+            $newStatus = ($totalAllocated >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
+
+            $existingNotes = $assetRequest->admin_notes ? $assetRequest->admin_notes . " | " : "";
             $assetRequest->update([
-                'status' => 'allocated',
-                'admin_notes' => "Allocated assets: {$assetCodes} on " . date('d M, Y'),
+                'status' => $newStatus,
+                'admin_notes' => $existingNotes . "Allocated: {$assetCodes} on " . date('d M, Y'),
             ]);
         });
 
@@ -786,14 +962,106 @@ class AssetController extends Controller
             'asset_category_id' => 'required|exists:asset_categories,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
+            'brand' => 'nullable|string|max:255',
+            'model_number' => 'nullable|string|max:255',
+            'purchase_date' => 'nullable|date',
+            'purchase_cost' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string|max:1000',
+            'units' => 'required|array|min:1',
+            'units.*.id' => 'nullable|integer|exists:assets,id',
+            'units.*.asset_code' => 'required|string|max:255',
+            'units.*.serial_number' => 'required|string|max:255',
+            'units.*.condition' => 'required|in:new,good,fair,damaged,scrapped',
         ]);
 
         $category = AssetCategory::findOrFail($validated['asset_category_id']);
-        $validated['company_id'] = $category->company_id;
+        $companyId = $category->company_id;
 
-        $assetItem->update($validated);
+        \DB::transaction(function() use ($assetItem, $validated, $companyId) {
+            $assetItem->update([
+                'company_id' => $companyId,
+                'asset_category_id' => $validated['asset_category_id'],
+                'name' => $validated['name'],
+                'description' => $validated['description'],
+            ]);
 
-        return redirect()->route('hrms.assets.index')->with('success', 'Asset item updated successfully.');
+            $submittedUnitIds = [];
+
+            foreach ($validated['units'] as $unitData) {
+                $existingId = $unitData['id'] ?? null;
+                $assetCode = $unitData['asset_code'];
+                $condition = $unitData['condition'] ?? 'good';
+                $status = 'available';
+                if ($condition === 'damaged') {
+                    $status = 'maintenance';
+                } elseif ($condition === 'scrapped') {
+                    $status = 'scrapped';
+                }
+
+                // Enforce asset code uniqueness
+                $duplicateQuery = Asset::where('asset_code', $assetCode);
+                if ($existingId) {
+                    $duplicateQuery->where('id', '!=', $existingId);
+                }
+                if ($duplicateQuery->exists()) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'units' => ["Asset code '{$assetCode}' is already registered on another asset."]
+                    ]);
+                }
+
+                if ($existingId) {
+                    $asset = Asset::findOrFail($existingId);
+                    $updateData = [
+                        'company_id' => $companyId,
+                        'asset_category_id' => $validated['asset_category_id'],
+                        'asset_code' => $assetCode,
+                        'name' => $validated['name'],
+                        'brand' => $validated['brand'],
+                        'model_number' => $validated['model_number'],
+                        'serial_number' => $unitData['serial_number'],
+                        'purchase_date' => $validated['purchase_date'],
+                        'purchase_cost' => $validated['purchase_cost'],
+                        'condition' => $condition,
+                        'notes' => $validated['notes'],
+                    ];
+
+                    if ($condition === 'damaged' && $asset->status !== 'allocated') {
+                        $updateData['status'] = 'maintenance';
+                    } elseif ($condition === 'scrapped') {
+                        $updateData['status'] = 'scrapped';
+                    } elseif (($condition === 'new' || $condition === 'good' || $condition === 'fair') && ($asset->status === 'maintenance' || $asset->status === 'scrapped')) {
+                        $updateData['status'] = 'available';
+                    }
+
+                    $asset->update($updateData);
+                    $submittedUnitIds[] = $existingId;
+                } else {
+                    $newAsset = Asset::create([
+                        'company_id' => $companyId,
+                        'asset_category_id' => $validated['asset_category_id'],
+                        'asset_item_id' => $assetItem->id,
+                        'asset_code' => $assetCode,
+                        'name' => $validated['name'],
+                        'brand' => $validated['brand'],
+                        'model_number' => $validated['model_number'],
+                        'serial_number' => $unitData['serial_number'],
+                        'purchase_date' => $validated['purchase_date'],
+                        'purchase_cost' => $validated['purchase_cost'],
+                        'condition' => $condition,
+                        'notes' => $validated['notes'],
+                        'status' => $status,
+                    ]);
+                    $submittedUnitIds[] = $newAsset->id;
+                }
+            }
+
+            // Delete assets that were removed from the units table
+            Asset::where('asset_item_id', $assetItem->id)
+                ->whereNotIn('id', $submittedUnitIds)
+                ->delete();
+        });
+
+        return redirect()->route('hrms.assets.index')->with('success', 'Asset item and registered units updated successfully.');
     }
 
     /**
@@ -823,33 +1091,49 @@ class AssetController extends Controller
     public function bulkAllocate(Request $request): RedirectResponse
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $this->ensureRequestStatusColumnIsVarchar();
 
         $request->validate([
             'allocations' => 'required|array',
-            'allocations.*' => 'nullable|exists:assets,id',
             'allocated_at' => 'required|date',
             'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
         ]);
 
         $allocatedAt = $request->input('allocated_at');
         $expectedReturnDate = $request->input('expected_return_date');
-        $allocatedCount = 0;
+        $hasRequestColumn = \Illuminate\Support\Facades\Schema::hasColumn('assets', 'asset_request_id');
+        $totalAllocatedUnits = 0;
 
-        foreach ($request->input('allocations') as $requestId => $assetId) {
-            if (empty($assetId)) {
+        foreach ($request->input('allocations') as $requestId => $assetIds) {
+            $assetIds = (array) $assetIds;
+            $assetIds = array_filter($assetIds);
+            if (empty($assetIds)) {
                 continue;
             }
 
             $assetRequest = AssetRequest::find($requestId);
-            $asset = Asset::find($assetId);
+            if (!$assetRequest || !in_array($assetRequest->status, ['pending', 'partially_allocated'])) {
+                continue;
+            }
 
-            if ($assetRequest && $asset && $asset->status === 'available') {
-                $asset->update([
+            $assets = Asset::whereIn('id', $assetIds)->where('status', 'available')->get();
+            if ($assets->isEmpty()) {
+                continue;
+            }
+
+            $allocatedCodes = [];
+            foreach ($assets as $asset) {
+                $updateData = [
                     'status' => 'allocated',
                     'assigned_employee_id' => $assetRequest->employee_id,
                     'allocated_at' => $allocatedAt,
                     'expected_return_date' => $expectedReturnDate,
-                ]);
+                ];
+                if ($hasRequestColumn) {
+                    $updateData['asset_request_id'] = $assetRequest->id;
+                }
+
+                $asset->update($updateData);
 
                 $asset->allocations()->create([
                     'employee_id' => $assetRequest->employee_id,
@@ -858,18 +1142,30 @@ class AssetController extends Controller
                     'notes' => $asset->notes,
                 ]);
 
-                $assetRequest->update([
-                    'status' => 'allocated',
-                    'allocated_asset_id' => $asset->id,
-                    'admin_notes' => 'Allocated asset ' . $asset->asset_code . ' (' . $asset->name . ') on ' . date('d M, Y') . ' via bulk allocation.',
-                ]);
-
-                $allocatedCount++;
+                $allocatedCodes[] = $asset->asset_code;
+                $totalAllocatedUnits++;
             }
+
+            $currentAllocatedCount = $hasRequestColumn
+                ? Asset::where('asset_request_id', $assetRequest->id)->count()
+                : count($allocatedCodes);
+
+            $requestedQty = (int) ($assetRequest->quantity ?? 1);
+            $newStatus = ($currentAllocatedCount >= $requestedQty) ? 'allocated' : 'partially_allocated';
+
+            $noteText = 'Allocated: ' . implode(', ', $allocatedCodes) . ' on ' . date('d M, Y') . ' via bulk allocation.';
+            $existingNotes = $assetRequest->admin_notes;
+            $updatedNotes = $existingNotes ? ($existingNotes . ' | ' . $noteText) : $noteText;
+
+            $assetRequest->update([
+                'status' => $newStatus,
+                'allocated_asset_id' => $assets->first()->id,
+                'admin_notes' => $updatedNotes,
+            ]);
         }
 
-        if ($allocatedCount > 0) {
-            return redirect()->back()->with('success', "Successfully allocated {$allocatedCount} asset(s).");
+        if ($totalAllocatedUnits > 0) {
+            return redirect()->back()->with('success', "Successfully allocated {$totalAllocatedUnits} physical asset unit(s).");
         }
 
         return redirect()->back()->with('error', "No assets were allocated. Make sure selected assets are available.");
@@ -1172,9 +1468,23 @@ class AssetController extends Controller
                     $status = 'scrapped';
                 }
 
+                // Find or create matching AssetItem master
+                $assetItem = AssetItem::firstOrCreate(
+                    [
+                        'company_id' => $companyId,
+                        'asset_category_id' => $category->id,
+                        'name' => $rowData['name'],
+                    ],
+                    [
+                        'model_number' => $rowData['model_number'] ?: null,
+                        'description' => 'Automatically created via Excel Asset Import',
+                    ]
+                );
+
                 Asset::create([
                     'company_id' => $companyId,
                     'asset_category_id' => $category->id,
+                    'asset_item_id' => $assetItem->id,
                     'asset_code' => $rowData['asset_code'],
                     'name' => $rowData['name'],
                     'brand' => $rowData['brand'] ?: null,
@@ -1360,6 +1670,20 @@ class AssetController extends Controller
  
         } catch (\Exception $e) {
             return redirect()->back()->with('error', __('hrms.assets.error_import_failed', ['message' => $e->getMessage()]));
+        }
+    }
+
+    /**
+     * Ensure asset_requests status column supports string values like partially_allocated.
+     */
+    private function ensureRequestStatusColumnIsVarchar(): void
+    {
+        try {
+            if (\DB::getDriverName() === 'mysql') {
+                \DB::statement("ALTER TABLE asset_requests MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending'");
+            }
+        } catch (\Throwable $e) {
+            // Ignore if column is already VARCHAR or permission restricted
         }
     }
 }

@@ -9,7 +9,7 @@
         <x-ui.button href="{{ route('hrms.employees.index') }}" variant="light" icon="feather-arrow-left">
             {{ __('hrms.employees.back_to_registry') }}
         </x-ui.button>
-        <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this employee?');" style="display: inline;">
+        <form action="{{ route('hrms.employees.destroy', $employee->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this employee?', { title: 'Delete Employee', variant: 'danger', confirmButtonText: 'Delete' });" style="display: inline;">
             @csrf
             @method('DELETE')
             <x-ui.button type="submit" variant="danger" icon="feather-trash-2">
@@ -1342,7 +1342,7 @@
                                                          </td>
                                                          <td class="text-end fw-semibold">₹{{ number_format($adhoc->amount, 2) }}</td>
                                                          <td class="text-end">
-                                                             <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirm('{{ __('hrms.employees.confirm_delete_adhoc') }}');">
+                                                             <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_adhoc') }}', { title: 'Delete Adhoc Component', variant: 'danger', confirmButtonText: 'Delete' });">
                                                                  @csrf
                                                                  @method('DELETE')
                                                                  <button type="submit" class="btn btn-link text-danger p-1 m-0" style="text-decoration: none !important; box-shadow: none !important;"><i class="feather-trash-2"></i></button>
@@ -1560,7 +1560,7 @@
                                                         <td><code>{{ $penalty->payroll_month }}</code></td>
                                                         <td class="text-end fw-bold text-danger">{{ floatval($penalty->penalty_amount) }} Days / Amt</td>
                                                         <td class="text-end">
-                                                            <form action="{{ route('hrms.employees.penalties.destroy', $penalty->id) }}" method="POST" onsubmit="return confirm('Delete this penalty log?');">
+                                                            <form action="{{ route('hrms.employees.penalties.destroy', $penalty->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Delete this penalty log?', { title: 'Delete Penalty Log', variant: 'danger', confirmButtonText: 'Delete' });">
                                                                 @csrf
                                                                 @method('DELETE')
                                                                 <button type="submit" class="btn btn-link text-danger p-1 m-0" style="text-decoration: none !important; box-shadow: none !important;"><i class="feather-trash-2"></i></button>
@@ -1866,7 +1866,7 @@
                                                         @else
                                                             <div class="d-flex justify-content-center gap-2">
                                                                 @if(auth()->user()->hasHrPermission('hr.settings.manage'))
-                                                                    <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this document record?');">
+                                                                    <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this document record?', { title: 'Delete Document Record', variant: 'danger', confirmButtonText: 'Delete' });">
                                                                         @csrf
                                                                         @method('DELETE')
                                                                         <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-1 px-3" style="border-radius: 6px; font-size: 11px;">
@@ -1939,7 +1939,7 @@
                                                 @endif
                                             </div>
                                             @if(auth()->user()->hasHrPermission('hr.settings.manage'))
-                                                <form action="{{ route('hrms.employees.history.destroy', [$employee->id, $history->id]) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this record?');">
+                                                <form action="{{ route('hrms.employees.history.destroy', [$employee->id, $history->id]) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this record?', { title: 'Delete Employment History', variant: 'danger', confirmButtonText: 'Delete' });">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-1 px-3" style="border-radius: 6px; font-size: 11px;">
@@ -2027,55 +2027,63 @@
                             <table class="table table-hover align-middle mb-0 text-center assigned-assets-table">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="text-start" style="width: 150px; padding-left: 20px;">{{ __('hrms.employees.tbl_asset_tag') }}</th>
-                                        <th class="text-start">{{ __('hrms.employees.tbl_asset_name') }}</th>
+                                        <th class="text-start" style="padding-left: 20px;">{{ __('hrms.employees.tbl_asset_name') }}</th>
                                         <th>{{ __('hrms.employees.tbl_category') }}</th>
-                                        <th>{{ __('hrms.employees.lbl_serial_number') }}</th>
                                         <th>Assigned At</th>
                                         <th class="text-end" style="width: 180px; padding-right: 20px;">{{ __('hrms.employees.tbl_actions') }}</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    @forelse($employee->assets as $asset)
                                         @php
+                                        $groupedAssets = $employee->assets->groupBy('asset_item_id');
+                                    @endphp
+                                    @forelse($groupedAssets as $assetItemId => $assets)
+                                        @php
+                                            $firstAsset = $assets->first();
+                                            $itemObj = $firstAsset->item;
+                                            $assetCodes = $assets->pluck('asset_code')->join(' ');
+                                            $serialNumbers = $assets->pluck('serial_number')->filter()->join(' ');
                                             $assetSearchText = trim(implode(' ', array_filter([
-                                                $asset->asset_code,
-                                                $asset->name,
-                                                $asset->brand,
-                                                $asset->model_number,
-                                                $asset->category?->name,
-                                                $asset->serial_number,
+                                                $itemObj?->name,
+                                                $firstAsset->brand,
+                                                $firstAsset->model_number,
+                                                $firstAsset->category?->name,
+                                                $assetCodes,
+                                                $serialNumbers,
                                             ])));
+                                            $encodedAllocatedAssets = base64_encode($assets->toJson());
                                         @endphp
                                         <tr class="assigned-asset-row"
-                                            data-name="{{ \Illuminate\Support\Str::lower($asset->name) }}"
+                                            data-name="{{ \Illuminate\Support\Str::lower($itemObj?->name) }}"
                                             data-search="{{ \Illuminate\Support\Str::lower($assetSearchText) }}"
-                                            data-category="{{ \Illuminate\Support\Str::lower($asset->category?->name) }}"
-                                            data-has-serial="{{ $asset->serial_number ? '1' : '0' }}"
-                                            data-assigned="{{ $asset->allocated_at ? $asset->allocated_at->timestamp : '' }}">
-                                            <td class="text-start" style="padding-left: 20px;"><code class="fw-bold fs-13">{{ $asset->asset_code }}</code></td>
-                                            <td class="text-start">
-                                                <div class="fw-bold text-dark fs-13">{{ $asset->name }}</div>
-                                                <small class="text-muted fs-11">{{ $asset->brand }} {{ $asset->model_number }}</small>
+                                            data-category="{{ \Illuminate\Support\Str::lower($itemObj?->category?->name) }}"
+                                            data-has-serial="{{ $assets->first(fn($a) => !empty($a->serial_number)) ? '1' : '0' }}"
+                                            data-assigned="{{ $firstAsset->allocated_at ? $firstAsset->allocated_at->timestamp : '' }}">
+                                            <td class="text-start" style="padding-left: 20px;">
+                                                <div class="fw-bold text-dark fs-13">{{ $itemObj?->name }}</div>
+                                                <small class="text-muted fs-11">{{ $firstAsset->brand }} {{ $firstAsset->model_number }}</small>
                                             </td>
                                             <td>
-                                                <span class="badge bg-soft-primary text-primary">{{ $asset->category->name }}</span>
+                                                <span class="badge bg-soft-primary text-primary">{{ $itemObj?->category?->name }}</span>
                                             </td>
-                                            <td><span class="text-dark fw-semibold fs-13">{{ $asset->serial_number ?: 'N/A' }}</span></td>
-                                            <td><span class="text-secondary fs-13">{{ $asset->allocated_at ? $asset->allocated_at->format('d M, Y') : 'N/A' }}</span></td>
+                                            <td>
+                                                <span class="text-secondary fs-13">{{ $firstAsset->allocated_at ? $firstAsset->allocated_at->format('d M, Y') : 'N/A' }}</span>
+                                            </td>
                                             <td class="text-end" style="padding-right: 20px;">
-                                                @if(auth()->user()->hasHrPermission('hr.settings.manage'))
-                                                    <button type="button" class="btn btn-sm btn-light border text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center" style="border-color: #cbd5e1; background-color: #ffffff; color: #475569; font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-asset-id="{{ $asset->id }}" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})">
-                                                         {{ __('hrms.employees.btn_return_asset') }}
+                                                <div class="d-flex justify-content-end align-items-center gap-2">
+                                                    <button type="button" class="btn btn-sm btn-icon btn-light border" style="border-radius: 8px; width: 32px; height: 32px;" data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" data-item-name="{{ $itemObj?->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}" title="View Details">
+                                                        <i class="feather-eye" style="font-size: 14px; color: #475569;"></i>
                                                     </button>
-                                                @else
-                                                    <span class="text-muted fs-12">-</span>
-                                                @endif
+                                                    @if(auth()->user()->hasHrPermission('hr.settings.manage'))
+                                                        <button type="button" class="btn btn-sm btn-light border text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center" style="border-color: #cbd5e1; background-color: #ffffff; color: #475569; font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $itemObj?->id }}" data-item-name="{{ $itemObj?->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}">
+                                                             {{ __('hrms.employees.btn_return_asset') }}
+                                                         </button>
+                                                    @endif
+                                                </div>
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                            <td colspan="4" class="text-center py-5 text-muted fs-12">
                                                 <i class="feather-package fs-24 d-block mb-2 text-secondary"></i>
                                                 {{ __('hrms.employees.lbl_no_assets_assigned') }}
                                             </td>
@@ -2083,7 +2091,7 @@
                                     @endforelse
                                     @if($employee->assets->isNotEmpty())
                                         <tr id="assignedAssetNoResultsRow" class="d-none">
-                                            <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                            <td colspan="4" class="text-center py-5 text-muted fs-12">
                                                 <i class="feather-search fs-24 d-block mb-2 text-secondary"></i>
                                                 {{ __('hrms.employees.lbl_no_assets_match') }}
                                             </td>
@@ -2517,11 +2525,19 @@
                 </div>
                 <form id="returnAssetForm" method="POST">
                     @csrf
+                    <input type="hidden" name="employee_id" value="{{ $employee->id }}">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">
                                 <label class="info-label mb-1">{{ __('hrms.employees.mdl_asset_to_return') }}</label>
                                 <input type="text" id="return_asset_name_display" class="form-control bg-light" readonly>
+                            </div>
+                            <div class="col-12">
+                                <label class="info-label mb-2 fw-bold text-dark d-block">Select Serialized Assets to Return</label>
+                                <div id="return_assets_checklist" class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
+                                    <!-- Checklist populated via JS -->
+                                </div>
+                                <small class="text-muted mt-1 d-block">Select the specific physical units being returned.</small>
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_return_date') }}" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
@@ -2549,9 +2565,48 @@
         </div>
     </div>
 
+    <!-- VIEW ASSET DETAILS MODAL -->
+    <div class="modal fade" id="viewAssetDetailsModal" tabindex="-1" aria-labelledby="viewAssetDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark" id="viewAssetDetailsModalLabel">
+                        <i class="feather-info me-2 text-primary"></i>Assigned Asset Units Details
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="info-label mb-1">Asset Item</label>
+                        <input type="text" id="detail_asset_item_name" class="form-control bg-light fw-bold text-dark" readonly>
+                    </div>
+                    <div class="table-responsive border rounded bg-white">
+                        <table class="table table-hover align-middle mb-0 text-center">
+                            <thead class="table-light text-uppercase fs-11">
+                                <tr>
+                                    <th class="text-start py-2.5 px-3">Asset Code</th>
+                                    <th class="py-2.5">Serial Number</th>
+                                    <th class="py-2.5">Assigned Date</th>
+                                    <th class="py-2.5">Condition</th>
+                                    <th class="py-2.5 px-3">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detail_assets_table_body" style="font-size: 13px;">
+                                <!-- Dynamically populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- REQUEST ASSET MODAL FOR PROFILE TAB -->
     <div class="modal fade" id="requestAssetModal" aria-labelledby="requestAssetModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 520px;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="requestAssetModalLabel">
@@ -2559,7 +2614,7 @@
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="{{ route('hrms.assets.requests.store') }}" method="POST" novalidate>
+                <form action="{{ route('hrms.assets.requests.store') }}" method="POST" id="requestAssetMultiForm" novalidate>
                     @csrf
                     <input type="hidden" name="employee_id" value="{{ $employee->id }}">
                     <div class="modal-body">
@@ -2568,17 +2623,43 @@
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_emp_requesting') }}" name="employee_name_display" value="{{ $employee->display_name }} ({{ $employee->employee_id }})" :readonly="true" />
                             </div>
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Select Item to Request" name="asset_item_id" id="req_asset_item_id" :required="true" select2-selector="default">
-                                    <option value="">Select Item</option>
-                                    @foreach(\App\Domains\HRMS\Models\AssetItem::where('company_id', $employee->company_id)->get() as $item)
-                                        <option value="{{ $item->id }}">{{ $item->name }} (Category: {{ $item->category->name ?? 'N/A' }})</option>
-                                    @endforeach
-                                </x-ui.odoo-form-ui>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <label class="info-label fw-bold text-dark mb-0">Requested Item(s) & Quantities *</label>
+                                    <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="btn-add-req-item-row" style="font-size: 11px;">
+                                        <i class="feather-plus me-1"></i>Add Another Item
+                                    </button>
+                                </div>
+                                <div class="table-responsive border rounded bg-white req-item-table-container">
+                                    <table class="table table-sm align-middle mb-0" id="req-items-table">
+                                        <thead class="table-light text-uppercase fs-11">
+                                            <tr>
+                                                <th class="py-2 px-3 text-start">Item *</th>
+                                                <th class="py-2 text-center" style="width: 85px;">Quantity *</th>
+                                                <th class="py-2 text-center px-2" style="width: 45px;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="req-items-tbody">
+                                            <tr>
+                                                <td class="py-2 px-3">
+                                                    <select name="items[0][asset_item_id]" class="form-select form-select-sm req-item-select" required>
+                                                        <option value="">Select Item</option>
+                                                        @foreach(\App\Domains\HRMS\Models\AssetItem::whereHas('category', function($q) use ($employee) { $q->where('company_id', $employee->company_id); })->get() as $item)
+                                                            <option value="{{ $item->id }}">{{ $item->name }} (Category: {{ $item->category->name ?? 'N/A' }})</option>
+                                                        @endforeach
+                                                    </select>
+                                                </td>
+                                                <td class="py-2 text-center">
+                                                    <input type="number" name="items[0][quantity]" class="form-control form-control-sm text-center req-qty-input" min="1" value="1" required style="width: 65px; height: 32px; margin: 0 auto; font-weight: 600;">
+                                                </td>
+                                                <td class="py-2 text-center px-2">
+                                                    <button type="button" class="btn btn-sm btn-soft-danger btn-remove-req-item-row" disabled style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-trash-2"></i></button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <div class="col-12">
-                                <x-ui.odoo-form-ui type="input" label="Requested Quantity" name="quantity" inputType="number" min="1" value="1" :required="true" />
-                            </div>
-                            <div class="col-12">
+                            <div class="col-12 mt-3">
                                 <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.employees.mdl_reason_req') }}" name="reason" placeholder="{{ __('hrms.employees.mdl_reason_placeholder') }}" :required="true" />
                             </div>
                         </div>
@@ -2593,6 +2674,7 @@
     </div>
 
     @push('scripts')
+        <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
         <script>
             $(document).ready(function() {
                 // Move modals to body root to prevent Bootstrap backdrop overlay issues inside tabs
@@ -2603,16 +2685,230 @@
                 $('#uploadDocumentModal').appendTo('body');
                 $('#addHistoryModal').appendTo('body');
                 $('#returnAssetModal').appendTo('body');
+                $('#viewAssetDetailsModal').appendTo('body');
                 $('#requestAssetModal').appendTo('body');
+
+                // Theme Select2 initializer for Request Asset Modal
+                function initReqModalSelect2(modal) {
+                    modal.find('.req-item-select, select[select2-selector="default"]').each(function() {
+                        if ($(this).hasClass('select2-hidden-accessible')) {
+                            $(this).select2('destroy');
+                        }
+                        $(this).select2({
+                            theme: 'bootstrap-5',
+                            dropdownParent: modal,
+                            placeholder: $(this).attr('placeholder') || "Select Item",
+                            width: '100%'
+                        });
+                    });
+                }
+
+                $('#requestAssetModal').on('shown.bs.modal', function() {
+                    initReqModalSelect2($(this));
+                });
+
+                // Dynamic row management for Multi-Item Asset Request
+                let reqItemIndex = 1;
+
+                $('#btn-add-req-item-row').on('click', function() {
+                    let tbody = $('#req-items-tbody');
+                    let firstSelect = tbody.find('select').first();
+                    let firstSelectOptions = '';
+
+                    if (firstSelect.hasClass('select2-hidden-accessible')) {
+                        firstSelect.select2('destroy');
+                        firstSelectOptions = firstSelect.html();
+                        initReqModalSelect2($('#requestAssetModal'));
+                    } else {
+                        firstSelectOptions = firstSelect.html();
+                    }
+
+                    let rowHtml = `
+                        <tr>
+                            <td class="py-2 px-3">
+                                <select name="items[${reqItemIndex}][asset_item_id]" class="form-select form-select-sm req-item-select" required>
+                                    ${firstSelectOptions}
+                                </select>
+                            </td>
+                            <td class="py-2 text-center">
+                                <input type="number" name="items[${reqItemIndex}][quantity]" class="form-control form-control-sm text-center req-qty-input" min="1" value="1" required style="width: 65px; height: 32px; margin: 0 auto; font-weight: 600;">
+                            </td>
+                            <td class="py-2 text-center px-2">
+                                <button type="button" class="btn btn-sm btn-soft-danger btn-remove-req-item-row" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;"><i class="feather-trash-2"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.append(rowHtml);
+                    reqItemIndex++;
+                    toggleReqItemRemoveButtons();
+                    initReqModalSelect2($('#requestAssetModal'));
+                });
+
+                $(document).on('click', '.btn-remove-req-item-row', function() {
+                    let tbody = $('#req-items-tbody');
+                    if (tbody.children('tr').length > 1) {
+                        $(this).closest('tr').remove();
+                        toggleReqItemRemoveButtons();
+                    }
+                });
+
+                function toggleReqItemRemoveButtons() {
+                    let rows = $('#req-items-tbody tr');
+                    if (rows.length <= 1) {
+                        rows.find('.btn-remove-req-item-row').prop('disabled', true);
+                    } else {
+                        rows.find('.btn-remove-req-item-row').prop('disabled', false);
+                    }
+                }
+
+                // Inline validation for Multi-Item Request Form
+                $('#requestAssetMultiForm').on('submit', function(e) {
+                    let form = $(this);
+                    let invalid = false;
+
+                    form.find('select[name*="[asset_item_id]"]').each(function() {
+                        let parent = $(this).parent();
+                        if (!$(this).val()) {
+                            invalid = true;
+                            $(this).addClass('is-invalid');
+                            if (parent.find('.invalid-feedback').length === 0) {
+                                $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">Please select an item.</div>');
+                            }
+                        } else {
+                            $(this).removeClass('is-invalid');
+                            parent.find('.invalid-feedback').remove();
+                        }
+                    });
+
+                    form.find('input[name*="[quantity]"]').each(function() {
+                        let parent = $(this).parent();
+                        let val = parseInt($(this).val());
+                        if (isNaN(val) || val < 1) {
+                            invalid = true;
+                            $(this).addClass('is-invalid');
+                            if (parent.find('.invalid-feedback').length === 0) {
+                                $(this).after('<div class="invalid-feedback fs-11 text-center mt-1">Min quantity is 1.</div>');
+                            }
+                        } else {
+                            $(this).removeClass('is-invalid');
+                            parent.find('.invalid-feedback').remove();
+                        }
+                    });
+
+                    let reasonInput = form.find('textarea[name="reason"]');
+                    if (!reasonInput.val() || !reasonInput.val().trim()) {
+                        invalid = true;
+                        reasonInput.addClass('is-invalid');
+                        if (reasonInput.parent().find('.invalid-feedback').length === 0) {
+                            reasonInput.after('<div class="invalid-feedback fs-11 text-start mt-1">Reason is required.</div>');
+                        }
+                    } else {
+                        reasonInput.removeClass('is-invalid');
+                        reasonInput.parent().find('.invalid-feedback').remove();
+                    }
+
+                    if (invalid) {
+                        e.preventDefault();
+                        return false;
+                    }
+                });
+
+                $(document).on('change input', '#requestAssetMultiForm select, #requestAssetMultiForm input, #requestAssetMultiForm textarea', function() {
+                    if ($(this).val()) {
+                        $(this).removeClass('is-invalid');
+                        $(this).parent().find('.invalid-feedback').remove();
+                    }
+                });
+
                 // Handle return modal details binding
                 $('#returnAssetModal').on('show.bs.modal', function(event) {
                     var button = $(event.relatedTarget);
-                    var assetId = button.data('asset-id');
-                    var assetName = button.data('asset-name');
+                    var itemId = button.data('item-id');
+                    var itemName = button.data('item-name');
+                    var rawAssets = button.data('allocated-assets');
 
                     var modal = $(this);
-                    modal.find('form').attr('action', '/hrms/assets/' + assetId + '/return');
-                    modal.find('#return_asset_name_display').val(assetName);
+                    modal.find('form').attr('action', '/hrms/assets/item/' + itemId + '/return');
+                    modal.find('#return_asset_name_display').val(itemName);
+
+                    var checklistDiv = modal.find('#return_assets_checklist');
+                    checklistDiv.empty();
+
+                    var assets = [];
+                    if (rawAssets) {
+                        assets = JSON.parse(atob(rawAssets));
+                    }
+
+                    if (assets.length === 0) {
+                        checklistDiv.html('<span class="text-danger fs-12"><i class="feather-alert-triangle me-1"></i>No active allocations found.</span>');
+                    } else {
+                        assets.forEach(function(asset) {
+                            var checkboxId = 'emp_return_asset_check_' + asset.id;
+                            var itemHtml = `
+                                <div class="form-check py-1 border-bottom-dashed d-flex align-items-center">
+                                    <input class="form-check-input return-allocated-asset-checkbox" type="checkbox" name="allocated_asset_ids[]" value="${asset.id}" id="${checkboxId}" style="cursor: pointer;">
+                                    <label class="form-check-label fs-12 ms-2 text-dark mb-0" for="${checkboxId}" style="cursor: pointer;">
+                                        <strong>Code:</strong> ${asset.asset_code} | <strong>Serial:</strong> ${asset.serial_number || 'N/A'}
+                                    </label>
+                                </div>
+                            `;
+                            checklistDiv.append(itemHtml);
+                        });
+                    }
+
+                    modal.find('form').off('submit').on('submit', function(e) {
+                        var checkedCount = modal.find('.return-allocated-asset-checkbox:checked').length;
+                        if (checkedCount === 0) {
+                            e.preventDefault();
+                            alert('Please select at least one physical asset/serial number to return.');
+                        }
+                    });
+                });
+
+                // Handle view asset details modal binding
+                $('#viewAssetDetailsModal').on('show.bs.modal', function(event) {
+                    var button = $(event.relatedTarget);
+                    var itemName = button.data('item-name');
+                    var rawAssets = button.data('allocated-assets');
+
+                    var modal = $(this);
+                    modal.find('#detail_asset_item_name').val(itemName);
+
+                    var tbody = modal.find('#detail_assets_table_body');
+                    tbody.empty();
+
+                    var assets = [];
+                    if (rawAssets) {
+                        assets = JSON.parse(atob(rawAssets));
+                    }
+
+                    if (assets.length === 0) {
+                        tbody.append('<tr><td colspan="5" class="py-3 text-muted">No units assigned.</td></tr>');
+                    } else {
+                        assets.forEach(function(asset) {
+                            var dateStr = asset.allocated_at ? new Date(asset.allocated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A';
+                            var condBadge = {
+                                'new': 'bg-soft-success text-success',
+                                'good': 'bg-soft-info text-info',
+                                'fair': 'bg-soft-warning text-warning',
+                                'damaged': 'bg-soft-danger text-danger',
+                                'scrapped': 'bg-soft-secondary text-secondary'
+                            };
+                            var badgeClass = condBadge[asset.condition] || 'bg-light text-muted';
+                            var rowHtml = `
+                                <tr>
+                                    <td class="text-start py-2 px-3 fw-bold text-dark"><code>${asset.asset_code}</code></td>
+                                    <td class="py-2">${asset.serial_number || 'N/A'}</td>
+                                    <td class="py-2 text-muted">${dateStr}</td>
+                                    <td class="py-2">
+                                        <span class="badge ${badgeClass} rounded-pill px-2 py-0.5" style="font-size: 11px;">${asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1)}</span>
+                                    </td>
+                                    <td class="py-2 px-3 text-muted text-truncate" style="max-width: 150px;" title="${asset.notes || ''}">${asset.notes || '-'}</td>
+                                </tr>
+                            `;
+                            tbody.append(rowHtml);
+                        });
+                    }
                 });
 
                 // Keep active tab on refresh / redirect
@@ -3036,9 +3332,38 @@
 @endsection
 
 @push('styles')
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
         #requestAssetModal .odoo-form-label {
             width: 180px !important;
+        }
+        .req-item-table-container .select2-container--bootstrap-5 .select2-selection {
+            min-height: 34px !important;
+            height: 34px !important;
+            padding-top: 2px !important;
+            padding-bottom: 2px !important;
+            font-size: 12.5px !important;
+            border-radius: 0.375rem !important;
+        }
+        .req-item-table-container .select2-container--bootstrap-5 .select2-selection__rendered {
+            line-height: 28px !important;
+            font-size: 12.5px !important;
+        }
+        .select2-container--bootstrap-5 .select2-selection {
+            min-height: 38px !important;
+            border-color: #dee2e6 !important;
+            border-radius: 0.375rem !important;
+        }
+        .select2-container--bootstrap-5 .select2-dropdown {
+            border-color: var(--bs-primary) !important;
+            border-radius: 0.375rem !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+            z-index: 9999 !important;
+        }
+        .select2-container--bootstrap-5 .select2-results__option--highlighted {
+            background-color: var(--bs-primary) !important;
+            color: #fff !important;
         }
     </style>
 @endpush

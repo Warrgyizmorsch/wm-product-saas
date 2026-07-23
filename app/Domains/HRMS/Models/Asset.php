@@ -13,6 +13,7 @@ class Asset extends BaseModel
         'company_id',
         'asset_category_id',
         'asset_item_id',
+        'asset_request_id',
         'asset_code',
         'name',
         'brand',
@@ -73,5 +74,13 @@ class Asset extends BaseModel
     public function allocations(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(AssetAllocation::class)->orderBy('allocated_at', 'desc');
+    }
+
+    /**
+     * Get the request that allocated this asset.
+     */
+    public function request(): BelongsTo
+    {
+        return $this->belongsTo(AssetRequest::class, 'asset_request_id');
     }
 }

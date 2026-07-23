@@ -47,7 +47,7 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('hrms.org.confirm_delete_shift') }}');">
+                                <form action="{{ route('hrms.shift.destroy', $sf->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_shift') }}', { title: 'Delete Shift', variant: 'danger', confirmButtonText: 'Delete' });">
                                     @csrf
                                     @method('DELETE')
                                     <div class="hstack gap-2 justify-content-end">
@@ -58,7 +58,6 @@
                                                     <span>{{ __('hrms.assets.edit') }}</span>
                                                 </a>
                                             </li>
-                                            <li class="dropdown-divider"></li>
                                             <li>
                                                 <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
                                                     <i class="feather feather-trash-2 me-3"></i>

@@ -54,4 +54,9 @@ class AssetRequest extends BaseModel
     {
         return $this->belongsTo(Asset::class, 'requested_asset_id');
     }
+
+    public function allocatedAssets(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Asset::class, 'asset_request_id');
+    }
 }
