@@ -129,6 +129,20 @@ class MesController extends Controller
         }
     }
 
+    public function logProgress(MesCompleteOperationRequest $request, int $op)
+    {
+        abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $data = $request->validated();
+
+        try {
+            $this->mesService->logPartialProgress($op, $data, auth()->id());
+            return redirect()->back()->with('success', 'Daily progress logged successfully.');
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
     public function hold(Request $request, int $op)
     {
         abort_unless(auth()->user()->hasProductionPermission('production.mes.execute'), 403);

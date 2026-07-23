@@ -76,10 +76,11 @@
                 <tr>
                     <th style="width: 15%">Rework Number</th>
                     <th style="width: 15%">Linked NCR</th>
-                    <th style="width: 15%">Status</th>
-                    <th style="width: 15%" class="text-end">Estimated Cost</th>
-                    <th style="width: 15%" class="text-end">Actual Cost</th>
-                    <th style="width: 15%">Labor Hours</th>
+                    <th style="width: 25%">Production Order &amp; Product</th>
+                    <th style="width: 10%">Status</th>
+                    <th style="width: 12%" class="text-end">Estimated Cost</th>
+                    <th style="width: 12%" class="text-end">Actual Cost</th>
+                    <th style="width: 11%">Labor Hours</th>
                     <th class="text-end" style="width: 10%">Actions</th>
                 </tr>
             </thead>
@@ -101,6 +102,22 @@
                             @endif
                         </td>
                         <td>
+                            @if($rwk->originalOrder)
+                                <div class="d-flex flex-column">
+                                    <a href="{{ route('production.orders.show', $rwk->originalOrder->id) }}" class="fw-bold text-primary">
+                                        {{ $rwk->originalOrder->order_number }}
+                                    </a>
+                                    @if($rwk->originalOrder->product)
+                                        <span class="text-muted fs-11 text-truncate" style="max-width: 180px;">
+                                            {{ $rwk->originalOrder->product->name }}
+                                        </span>
+                                    @endif
+                                </div>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                        <td>
                             @if($rwk->status === 'completed')
                                 <span class="erp-badge-active">Completed</span>
                             @elseif($rwk->status === 'running')
@@ -111,7 +128,6 @@
                         </td>
                         <td class="text-end text-muted">{{ format_currency($rwk->cost_estimate) }}</td>
                         <td class="text-end fw-bold text-dark">{{ format_currency($rwk->actual_cost) }}</td>
-
                         <td class="text-dark">{{ number_format($rwk->labor_hours_actual, 2) }} hrs</td>
                         <td class="text-end">
                             <x-ui.action-dropdown :viewUrl="route('production.rework.show', $rwk->id)" />

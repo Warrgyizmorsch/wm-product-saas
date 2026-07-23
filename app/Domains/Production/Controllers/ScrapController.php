@@ -19,7 +19,7 @@ class ScrapController extends Controller
         $this->authorize('view', ProductionScrapDisposal::class);
         $tenantId = require_tenant_id();
         $scraps = ProductionScrapDisposal::where('tenant_id', $tenantId)
-            ->with(['ncr', 'disposer'])
+            ->with(['ncr.order.product', 'disposer'])
             ->orderBy('id', 'desc')
             ->paginate(15)
             ->withQueryString();

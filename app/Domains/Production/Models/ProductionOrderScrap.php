@@ -49,6 +49,20 @@ class ProductionOrderScrap extends BaseModel
         return $this->belongsTo(User::class, 'recorded_by');
     }
 
+    public function getNcrAttribute()
+    {
+        return \App\Domains\Production\Models\ProductionNcr::where('production_order_id', $this->production_order_id)
+            ->where('production_order_operation_id', $this->production_order_operation_id)
+            ->where('disposition_type', 'scrap')
+            ->first();
+    }
+
+    public function getDisposalAttribute()
+    {
+        $ncr = $this->ncr;
+        return $ncr ? \App\Domains\Production\Models\ProductionScrapDisposal::where('ncr_id', $ncr->id)->first() : null;
+    }
+
     /**
      * The stock outflow transaction that recorded this scrap.
      * If null, the stock has not yet been posted (or was posted before this column existed).

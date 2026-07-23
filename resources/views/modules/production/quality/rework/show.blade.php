@@ -35,6 +35,23 @@
                         @endif
                     </strong>
                 </div>
+                <div class="text-muted fs-12 mt-1">
+                    Original Production Order: 
+                    <strong class="text-dark">
+                        @if($rework->originalOrder)
+                            <a href="{{ route('production.orders.show', $rework->originalOrder->id) }}" class="text-primary fw-bold">
+                                {{ $rework->originalOrder->order_number }}
+                            </a>
+                            @if($rework->originalOrder->product)
+                                <span class="text-muted fw-normal ms-1">
+                                    (Product: <strong>{{ $rework->originalOrder->product->name }}</strong> — {{ $rework->originalOrder->product->sku }})
+                                </span>
+                            @endif
+                        @else
+                            —
+                        @endif
+                    </strong>
+                </div>
             </div>
             <div>
                 <span class="badge bg-soft-primary text-primary px-3 py-1.5 rounded-pill text-uppercase">{{ $rework->status }}</span>

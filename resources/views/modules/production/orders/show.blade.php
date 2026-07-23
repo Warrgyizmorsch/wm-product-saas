@@ -487,14 +487,15 @@
                     <thead>
                         <tr>
                             <th style="width:5%" class="text-center">{{ __('production.seq') }}</th>
-                            <th style="width:20%">{{ __('production.operation') }}</th>
-                            <th style="width:15%">{{ __('production.work_center') }}</th>
-                            <th style="width:12%">{{ __('production.machine') }}</th>
-                            <th style="width:12%" class="text-center">{{ __('production.planned_setup_run') }}</th>
-                            <th style="width:12%" class="text-center">{{ __('production.actual_setup_run') }}</th>
-                            <th style="width:12%" class="text-center">{{ __('production.produced_scrap') }}</th>
+                            <th style="width:18%">{{ __('production.operation') }}</th>
+                            <th style="width:12%">{{ __('production.work_center') }}</th>
+                            <th style="width:10%">{{ __('production.machine') }}</th>
+                            <th style="width:15%">Operator</th>
+                            <th style="width:10%" class="text-center">{{ __('production.planned_setup_run') }}</th>
+                            <th style="width:10%" class="text-center">{{ __('production.actual_setup_run') }}</th>
+                            <th style="width:10%" class="text-center">{{ __('production.produced_scrap') }}</th>
                             <th style="width:7%">{{ __('production.status') }}</th>
-                            <th style="width:5%" class="text-end">{{ __('production.log') }}</th>
+                            <th style="width:3%" class="text-end">{{ __('production.log') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -507,6 +508,40 @@
                                 </td>
                                 <td>{{ $op->workCenter->name }}</td>
                                 <td>{{ $op->machine->name ?? 'Any' }}</td>
+                                <td>
+                                    @php
+                                        $activeAssignment = $op->operatorAssignments->whereIn('status', ['assigned', 'accepted'])->first();
+                                    @endphp
+                                    @if($activeAssignment)
+                                        <div class="d-flex align-items-center gap-1.5">
+                                            <span class="fw-semibold text-dark fs-12">{{ $activeAssignment->user->name }}</span>
+                                            @if($activeAssignment->status === 'accepted')
+                                                <span class="badge bg-soft-success text-success fs-9 py-0.5 px-1">Accepted</span>
+                                            @else
+                                                <span class="badge bg-soft-warning text-warning fs-9 py-0.5 px-1">Pending</span>
+                                            @endif
+                                            @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
+                                                <button type="button" class="btn btn-xs btn-outline-secondary p-0.5 border-0" 
+                                                        title="Reassign"
+                                                        data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
+                                                        onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
+                                                    <i class="feather-edit fs-11"></i>
+                                                </button>
+                                            @endif
+                                        </div>
+                                    @else
+                                        <div class="d-flex align-items-center gap-1.5">
+                                            <span class="text-muted fs-12">—</span>
+                                            @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
+                                                <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-1.5"
+                                                        data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
+                                                        onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
+                                                    <i class="feather-user-plus me-1"></i> Assign
+                                                </button>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </td>
                                 <td class="text-center text-muted">{{ $op->setup_time_planned }}m / {{ $op->processing_time_planned }}m</td>
                                 <td class="text-center fw-semibold text-dark">{{ $op->setup_time_actual }}m / {{ $op->processing_time_actual }}m</td>
                                 <td class="text-center">
@@ -527,6 +562,15 @@
                                         <span class="badge bg-success text-white">{{ __('production.completed') }}</span>
                                     @else
                                         <span class="badge bg-light text-dark">{{ $op->status }}</span>
+                                    @endif
+
+                                    @if($op->scheduleOperation && ($op->scheduleOperation->status === 'running' || $op->scheduleOperation->status === 'paused'))
+                                        <div class="live-timer" 
+                                             data-status="{{ $op->scheduleOperation->status }}"
+                                             data-start="{{ $op->scheduleOperation->actual_start ? $op->scheduleOperation->actual_start->toIso8601String() : '' }}"
+                                             data-paused-at="{{ $op->scheduleOperation->last_paused_at ? $op->scheduleOperation->last_paused_at->toIso8601String() : '' }}"
+                                             data-accumulated-paused="{{ $op->scheduleOperation->accumulated_paused_seconds ?? 0 }}">
+                                        </div>
                                     @endif
                                 </td>
                                 <td class="text-end">
@@ -776,17 +820,24 @@
 
         {{-- Tab 7: Scrap & Rework --}}
         <div class="tab-pane fade {{ $activeTab === 'vtab-scrap' ? 'show active' : '' }}" id="vtab-scrap" role="tabpanel" aria-labelledby="vtab-scrap-tab">
-            <div class="row g-4">
-                <div class="col-md-6">
-                    <h5 class="fw-bold text-dark mb-3">{{ __('production.scrap_log_entries') }}</h5>
+            {{-- Horizontal Sub-tabs Navigation --}}
+            <x-ui.horizontal-tabs id="scrapReworkSubTabs" class="mb-4" :tabs="[
+                ['id' => 'scrap-subtab', 'label' => __('production.scrap_log_entries'), 'active' => true, 'icon' => 'feather-trash-2 text-danger'],
+                ['id' => 'rework-subtab', 'label' => __('production.rework_events_track'), 'active' => false, 'icon' => 'feather-refresh-cw text-warning']
+            ]" />
+
+            <div class="tab-content border-0 p-0" id="scrapReworkSubTabsContent">
+                {{-- Scrap Logs Sub-tab --}}
+                <div class="tab-pane fade show active" id="scrap-subtab" role="tabpanel" aria-labelledby="scrap-subtab-tab">
                     <div class="table-responsive">
                         <table class="erp-thin-table">
                             <thead>
                                 <tr>
-                                    <th style="width:20%">{{ __('production.date') }}</th>
-                                    <th style="width:30%">{{ __('production.item_component') }}</th>
-                                    <th style="width:15%" class="text-center">{{ __('production.ordered_qty') }}</th>
-                                    <th>{{ __('production.reason') }}</th>
+                                    <th style="width:15%">{{ __('production.date') }}</th>
+                                    <th style="width:25%">{{ __('production.item_component') }}</th>
+                                    <th style="width:12%" class="text-center">{{ __('production.ordered_qty') }}</th>
+                                    <th style="width:28%">{{ __('production.reason') }}</th>
+                                    <th style="width:20%">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -801,10 +852,23 @@
                                         </td>
                                         <td class="text-center text-danger fw-bold">{{ number_format($scr->quantity, 2) }}</td>
                                         <td class="text-muted fs-12">{{ $scr->reason ?? '—' }}</td>
+                                        <td>
+                                            @if($scr->disposal)
+                                                @if($scr->disposal->status === 'approved')
+                                                    <span class="badge bg-success text-white">Approved</span>
+                                                @elseif($scr->disposal->status === 'pending_approval')
+                                                    <span class="badge bg-warning text-dark">Pending Approval</span>
+                                                @else
+                                                    <span class="badge bg-secondary text-white">{{ ucfirst($scr->disposal->status) }}</span>
+                                                @endif
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="text-center py-4 text-muted">{{ __('production.no_scrap_logged') }}</td>
+                                        <td colspan="5" class="text-center py-4 text-muted">{{ __('production.no_scrap_logged') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -812,8 +876,8 @@
                     </div>
                 </div>
 
-                <div class="col-md-6">
-                    <h5 class="fw-bold text-dark mb-3">{{ __('production.rework_events_track') }}</h5>
+                {{-- Rework Events Sub-tab --}}
+                <div class="tab-pane fade" id="rework-subtab" role="tabpanel" aria-labelledby="rework-subtab-tab">
                     <div class="table-responsive">
                         <table class="erp-thin-table">
                             <thead>
@@ -1352,6 +1416,37 @@
                 @endforeach
             </x-ui.odoo-form-ui>
 
+            {{-- Operation Stats Block --}}
+            <div id="op_stats_container" class="mb-3 bg-light border p-3 rounded d-none text-start">
+                <div class="row g-3 fs-12 text-dark">
+                    <div class="col-6">
+                        <span class="text-muted d-block fs-10 text-uppercase fw-bold">Operation Target</span>
+                        <strong class="text-dark fs-14" id="stat_planned_qty">0.00</strong>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted d-block fs-10 text-uppercase fw-bold">Remaining Limit</span>
+                        <strong class="text-info fs-14" id="stat_remaining_qty">0.00</strong>
+                    </div>
+                    <div class="col-4 border-top pt-2">
+                        <span class="text-muted d-block fs-10 text-uppercase fw-bold">Already Produced</span>
+                        <strong class="text-success" id="stat_produced_qty">0.00</strong>
+                    </div>
+                    <div class="col-4 border-top pt-2">
+                        <span class="text-muted d-block fs-10 text-uppercase fw-bold">Already Rejected</span>
+                        <strong class="text-warning" id="stat_rejected_qty">0.00</strong>
+                    </div>
+                    <div class="col-4 border-top pt-2">
+                        <span class="text-muted d-block fs-10 text-uppercase fw-bold">Already Scrapped</span>
+                        <strong class="text-danger" id="stat_scrapped_qty">0.00</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div id="modal_validation_warning" class="alert alert-danger d-none py-2 px-3 fs-12 mb-3 text-start">
+                <i class="feather-alert-triangle me-1"></i>
+                <span>The sum of Entered Quantities exceeds the remaining limit!</span>
+            </div>
+
             <div class="row g-2 mb-1 fs-13 text-dark">
                 <div class="col-4">
                     <x-ui.odoo-form-ui type="input" label="{{ __('production.qty_produced') }}" name="quantity_produced" inputType="number" step="0.0001" value="0" :required="true" />
@@ -1387,9 +1482,166 @@
         </form>
         <x-slot name="footer">
             <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-            <button type="submit" class="btn btn-primary" onclick="document.getElementById('progressForm').submit();">{{ __('production.save_progress_log') }}</button>
+            <button type="submit" class="btn btn-primary" id="btn_save_progress" onclick="document.getElementById('progressForm').submit();">{{ __('production.save_progress_log') }}</button>
         </x-slot>
     </x-ui.modal>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const operationsData = @json($order->operations);
+            const plannedQty = {{ (float) $order->quantity_ordered }};
+            
+            const opSelect = document.getElementById('op_select_id');
+            const statsContainer = document.getElementById('op_stats_container');
+            const statPlanned = document.getElementById('stat_planned_qty');
+            const statRemaining = document.getElementById('stat_remaining_qty');
+            const statProduced = document.getElementById('stat_produced_qty');
+            const statRejected = document.getElementById('stat_rejected_qty');
+            const statScrapped = document.getElementById('stat_scrapped_qty');
+            
+            const inputProduced = document.querySelector('input[name="quantity_produced"]');
+            const inputRejected = document.querySelector('input[name="quantity_rejected"]');
+            const inputScrapped = document.querySelector('input[name="quantity_scrapped"]');
+            const inputSetup = document.querySelector('input[name="setup_minutes_logged"]');
+            const inputRun = document.querySelector('input[name="run_minutes_logged"]');
+            
+            const warningBox = document.getElementById('modal_validation_warning');
+            const submitBtn = document.getElementById('btn_save_progress');
+
+            function updateStatsAndValidation() {
+                const opId = parseInt(opSelect.value);
+                const op = operationsData.find(o => o.id === opId);
+                
+                if (!op) {
+                    statsContainer.classList.add('d-none');
+                    return;
+                }
+                
+                statsContainer.classList.remove('d-none');
+                
+                const produced = parseFloat(op.quantity_produced || 0);
+                const rejected = parseFloat(op.quantity_rejected || 0);
+                const scrapped = parseFloat(op.quantity_scrapped || 0);
+                
+                // Remaining Limit is target - (already produced + already rejected)
+                const processed = produced + rejected;
+                const remaining = Math.max(0, plannedQty - processed);
+                
+                statPlanned.textContent = plannedQty.toFixed(2);
+                statRemaining.textContent = remaining.toFixed(2);
+                statProduced.textContent = produced.toFixed(2);
+                statRejected.textContent = rejected.toFixed(2);
+                statScrapped.textContent = scrapped.toFixed(2);
+                
+                // Autofill run minutes from shopfloor schedule operation
+                if (inputRun && op.schedule_operation && op.schedule_operation.actual_start) {
+                    const startDt = new Date(op.schedule_operation.actual_start);
+                    
+                    let endDt;
+                    if (op.schedule_operation.status === 'completed') {
+                        endDt = op.schedule_operation.actual_finish ? new Date(op.schedule_operation.actual_finish) : new Date();
+                    } else if (op.schedule_operation.status === 'paused') {
+                        endDt = op.schedule_operation.last_paused_at ? new Date(op.schedule_operation.last_paused_at) : new Date();
+                    } else {
+                        endDt = new Date();
+                    }
+                    
+                    const diffSeconds = (endDt.getTime() - startDt.getTime()) / 1000;
+                    const pausedSec = op.schedule_operation.accumulated_paused_seconds || 0;
+                    const activeSeconds = Math.max(0, diffSeconds - pausedSec);
+                    const runMinutes = Math.round(activeSeconds / 60);
+                    inputRun.value = runMinutes;
+                } else if (inputRun) {
+                    inputRun.value = 0;
+                }
+
+                // Validate inputs
+                const inProduced = parseFloat(inputProduced.value || 0);
+                const inRejected = parseFloat(inputRejected.value || 0);
+                const inScrapped = parseFloat(inputScrapped.value || 0);
+                
+                const sum = inProduced + inRejected + inScrapped;
+                
+                if (sum > remaining) {
+                    warningBox.classList.remove('d-none');
+                    warningBox.querySelector('span').textContent = `The sum of Entered Quantities (${sum.toFixed(2)}) exceeds the remaining limit of ${remaining.toFixed(2)}!`;
+                    submitBtn.disabled = true;
+                } else {
+                    warningBox.classList.add('d-none');
+                    submitBtn.disabled = false;
+                }
+            }
+            
+            if (opSelect) {
+                opSelect.addEventListener('change', updateStatsAndValidation);
+                if (window.jQuery) {
+                    window.jQuery(opSelect).on('change', updateStatsAndValidation);
+                }
+                
+                [inputProduced, inputRejected, inputScrapped].forEach(input => {
+                    if (input) {
+                        input.addEventListener('input', updateStatsAndValidation);
+                        input.addEventListener('change', updateStatsAndValidation);
+                    }
+                });
+
+                const progressModalEl = document.getElementById('progressModal');
+                if (progressModalEl) {
+                    progressModalEl.addEventListener('shown.bs.modal', function () {
+                        updateStatsAndValidation();
+                    });
+                }
+                
+                // Initialize
+                updateStatsAndValidation();
+            }
+
+            // Live Timers for Running/Paused Operations in the UI
+            const liveTimers = document.querySelectorAll('.live-timer');
+            if (liveTimers.length > 0) {
+                function updateLiveTimers() {
+                    const now = new Date();
+                    liveTimers.forEach(el => {
+                        const status = el.getAttribute('data-status');
+                        const startVal = el.getAttribute('data-start');
+                        if (!startVal) {
+                            el.textContent = '';
+                            return;
+                        }
+                        
+                        const start = new Date(startVal);
+                        let end;
+                        
+                        if (status === 'running') {
+                            end = now;
+                        } else if (status === 'paused') {
+                            const pausedAtVal = el.getAttribute('data-paused-at');
+                            end = pausedAtVal ? new Date(pausedAtVal) : now;
+                        } else {
+                            el.textContent = '';
+                            return;
+                        }
+                        
+                        const diffSeconds = (end.getTime() - start.getTime()) / 1000;
+                        const pausedSec = parseInt(el.getAttribute('data-accumulated-paused') || 0);
+                        const activeSeconds = Math.max(0, diffSeconds - pausedSec);
+                        
+                        const minutes = Math.floor(activeSeconds / 60);
+                        const seconds = Math.floor(activeSeconds % 60);
+                        
+                        if (status === 'running') {
+                            el.innerHTML = `<span class="badge bg-soft-info text-info border border-info fs-10 py-0.5 px-1.5 d-inline-flex align-items-center gap-1 mt-1"><i class="feather-clock fs-10"></i> ${minutes}m ${seconds}s</span>`;
+                        } else if (status === 'paused') {
+                            el.innerHTML = `<span class="badge bg-soft-warning text-warning border border-warning fs-10 py-0.5 px-1.5 d-inline-flex align-items-center gap-1 mt-1"><i class="feather-pause-circle fs-10"></i> ${minutes}m ${seconds}s</span>`;
+                        }
+                    });
+                }
+                
+                updateLiveTimers();
+                setInterval(updateLiveTimers, 1000);
+            }
+        });
+    </script>
 
     {{-- Issue Materials Modal --}}
     <x-ui.modal id="issueModal" title="{{ __('production.issue_raw_material') }}" class="text-start">
@@ -1736,6 +1988,31 @@
             </x-slot>
         </x-ui.modal>
     @endforeach
+
+    {{-- Assign Operator Modal (for Production Order view) --}}
+    <x-ui.modal id="orderAssignOperatorModal" title="Assign Operator to Operation" class="text-start" :showFooter="true">
+        <form method="POST" action="{{ route('production.mes.assignments.assign') }}" id="orderAssignForm">
+            @csrf
+            
+            <input type="hidden" name="production_order_operation_id" id="assign_op_id" value="">
+            
+            <div class="mb-3 text-start text-dark">
+                <label class="form-label fs-12 fw-semibold text-dark">Select Operator</label>
+                <select name="user_id" class="form-select form-control" required>
+                    <option value="">-- Choose Operator --</option>
+                    @foreach($operators as $operator)
+                        <option value="{{ $operator->id }}">{{ $operator->name }} ({{ ucfirst($operator->role) }})</option>
+                    @endforeach
+                </select>
+            </div>
+            
+            <x-ui.odoo-form-ui type="textarea" label="Remarks / Instructions" name="remarks" placeholder="Provide shift remarks or operation requirements..." rows="3" />
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="document.getElementById('orderAssignForm').submit();">Assign Operator</button>
+        </x-slot>
+    </x-ui.modal>
 
 </div>{{-- end .erp-single-panel --}}
 

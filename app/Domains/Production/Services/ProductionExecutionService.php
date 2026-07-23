@@ -15,6 +15,7 @@ use App\Domains\Production\Models\ProductionOrderRework;
 use App\Domains\Production\Models\ProductionOrderScrap;
 use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionSerialNumber;
+use App\Domains\Production\Models\ProductionNcr;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -55,14 +56,24 @@ class ProductionExecutionService
                 throw new InvalidArgumentException('Cannot log progress on a closed, completed, or cancelled order.');
             }
 
-            // Prevent logging total processed quantity (produced + rejected + scrapped) beyond planned target
+            // Enforce Operation state validity
+            if ($op->status === ProductionOrderOperation::STATUS_COMPLETED) {
+                throw new InvalidArgumentException('Cannot log progress on an already completed operation.');
+            }
+
+            if ($op->quantity_produced >= $order->quantity_ordered) {
+                throw new InvalidArgumentException('Cannot log progress: The planned target has already been fully produced.');
+            }
+
+            // Prevent logging total processed quantity (produced + rejected) beyond planned target.
+            // Scrapped quantities represent discarded material and should not restrict the production limit.
             $plannedTarget = (float) $order->quantity_ordered;
-            $currentProcessed = (float) ($op->quantity_produced + $op->quantity_rejected + $op->quantity_scrapped);
-            $newProcessed = (float) ($produced + $rejected + $scrapped);
+            $currentProcessed = (float) ($op->quantity_produced + $op->quantity_rejected);
+            $newProcessed = (float) ($produced + $rejected);
             
             if (($currentProcessed + $newProcessed) > $plannedTarget) {
                 $maxRemaining = max(0.0, $plannedTarget - $currentProcessed);
-                throw new InvalidArgumentException("Cannot log progress: The total processed quantity (Produced: {$produced}, Rejected: {$rejected}, Scrapped: {$scrapped}) exceeds the remaining planned target limit of {$maxRemaining} (Total Planned: {$plannedTarget}, Already Logged: {$currentProcessed}).");
+                throw new InvalidArgumentException("Cannot log progress: The total processed quantity (Produced: {$produced}, Rejected: {$rejected}) exceeds the remaining planned target limit of {$maxRemaining} (Total Planned: {$plannedTarget}, Already Logged: {$currentProcessed}).");
             }
 
             // 2. Create the progress log entry
@@ -87,6 +98,72 @@ class ProductionExecutionService
             $op->quantity_produced      += $produced;
             $op->quantity_rejected      += $rejected;
             $op->quantity_scrapped      += $scrapped;
+
+            // Handle Scrap automatically if logged
+            if ($scrapped > 0) {
+                $this->logScrap(
+                    $order->id,
+                    $op->id,
+                    null,
+                    $scrapped,
+                    $remarks ?? 'Automatic log scrap from operation execution progress.',
+                    $userId
+                );
+
+                $ncr = ProductionNcr::create([
+                    'tenant_id' => $op->tenant_id,
+                    'ncr_number' => 'NCR-AUTO-'.strtoupper(uniqid()),
+                    'category' => 'process',
+                    'status' => 'open',
+                    'disposition_type' => 'scrap',
+                    'production_order_id' => $order->id,
+                    'production_order_operation_id' => $op->id,
+                    'machine_id' => $machineId ?? $op->machine_id,
+                    'operator_id' => $userId,
+                    'description' => "Automatic NCR generated due to scrapped quantity logged during operation #{$op->operation_number}.",
+                ]);
+
+                app(ScrapService::class)->createScrapDisposal($op->tenant_id, [
+                    'ncr_id' => $ncr->id,
+                    'category' => 'finished_good',
+                    'reason_code' => 'defect',
+                    'quantity' => $scrapped,
+                    'cost' => $scrapped * ($order->product->unit_cost ?? 1.00),
+                ]);
+            }
+
+            // Handle Rework automatically if logged
+            if ($rejected > 0) {
+                $this->logRework(
+                    $order->id,
+                    $op->id,
+                    $rejected,
+                    $remarks ?? 'Automatic log rework from operation execution progress.',
+                    $userId
+                );
+
+                $ncr = ProductionNcr::create([
+                    'tenant_id' => $op->tenant_id,
+                    'ncr_number' => 'NCR-AUTO-'.strtoupper(uniqid()),
+                    'category' => 'process',
+                    'status' => 'open',
+                    'disposition_type' => 'rework',
+                    'production_order_id' => $order->id,
+                    'production_order_operation_id' => $op->id,
+                    'machine_id' => $machineId ?? $op->machine_id,
+                    'operator_id' => $userId,
+                    'description' => "Automatic NCR generated due to rejected quantity logged during operation #{$op->operation_number}.",
+                ]);
+
+                app(ReworkService::class)->createReworkOrder($op->tenant_id, $ncr->id, [
+                    'original_production_order_id' => $order->id,
+                    'work_center_id' => $op->work_center_id,
+                    'cost_estimate' => 50.00,
+                ]);
+
+                $order->quantity_rejected += $rejected;
+                $order->save();
+            }
 
             if ($completeOperation) {
                 $this->ensureQualityGatePassed($op);

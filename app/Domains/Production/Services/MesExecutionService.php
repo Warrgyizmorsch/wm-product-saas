@@ -42,7 +42,7 @@ class MesExecutionService
                 ->lockForUpdate()
                 ->findOrFail($scheduleOpId);
 
-            if (! $schedOp->canStart()) {
+            if (!$schedOp->canStart()) {
                 throw new InvalidArgumentException(
                     "Operation cannot be started. Current status: [{$schedOp->status}]. Only 'ready' operations can be started."
                 );
@@ -207,7 +207,7 @@ class MesExecutionService
         DB::transaction(function () use ($scheduleOpId, $remarks, $operatorId) {
             $schedOp = ProductionScheduleOperation::lockForUpdate()->findOrFail($scheduleOpId);
 
-            if (! $schedOp->isRunning()) {
+            if (!$schedOp->isRunning()) {
                 throw new InvalidArgumentException(
                     "Only running operations can be paused. Current status: [{$schedOp->status}]."
                 );
@@ -282,7 +282,7 @@ class MesExecutionService
         DB::transaction(function () use ($scheduleOpId, $operatorId) {
             $schedOp = ProductionScheduleOperation::lockForUpdate()->findOrFail($scheduleOpId);
 
-            if (! $schedOp->isPaused()) {
+            if (!$schedOp->isPaused()) {
                 throw new InvalidArgumentException(
                     "Only paused operations can be resumed. Current status: [{$schedOp->status}]."
                 );
@@ -372,7 +372,7 @@ class MesExecutionService
                 ->lockForUpdate()
                 ->findOrFail($scheduleOpId);
 
-            if (! $schedOp->isRunning() && ! $schedOp->isPaused()) {
+            if (!$schedOp->isRunning() && !$schedOp->isPaused()) {
                 throw new InvalidArgumentException(
                     "Only running or paused operations can be completed. Current status: [{$schedOp->status}]."
                 );
@@ -406,9 +406,10 @@ class MesExecutionService
                 }
 
                 // Overproduction Limit Check
+                // Scrapped quantities represent discarded material and should not count toward the overproduction limit.
                 $plannedQty = (float) $schedOp->schedule->order->quantity_ordered;
-                $totalProcessedSoFar = $orderOp->quantity_produced + $orderOp->quantity_scrapped;
-                $currentProcessed = $produced + $scrapped;
+                $totalProcessedSoFar = $orderOp->quantity_produced;
+                $currentProcessed = $produced;
                 $totalProcessed = $totalProcessedSoFar + $currentProcessed;
 
                 $tenant = $schedOp->schedule->order->tenant;
@@ -509,7 +510,7 @@ class MesExecutionService
             }
 
             // Check if all schedule operations are terminal — if so, auto-complete schedule
-            $allDone = ! ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+            $allDone = !ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                 ->whereNotIn('status', [
                     ProductionScheduleOperation::STATUS_COMPLETED,
                     ProductionScheduleOperation::STATUS_SKIPPED,
@@ -556,6 +557,90 @@ class MesExecutionService
                 'title' => 'Operation Completed',
                 'description' => 'Operation has been completed successfully.',
                 'severity' => 'success',
+                'event_source' => 'MesExecutionService',
+                'triggered_by' => $operatorId,
+            ]);
+        });
+    }
+
+    /**
+     * Log partial progress on a running or paused operation from the shopfloor.
+     */
+    public function logPartialProgress(int $scheduleOpId, array $data, ?int $operatorId): void
+    {
+        DB::transaction(function () use ($scheduleOpId, $data, $operatorId) {
+            $schedOp = ProductionScheduleOperation::with(['schedule.order.tenant', 'order'])
+                ->lockForUpdate()
+                ->findOrFail($scheduleOpId);
+
+            if (!$schedOp->isRunning() && !$schedOp->isPaused()) {
+                throw new InvalidArgumentException(
+                    "Only running or paused operations can log progress. Current status: [{$schedOp->status}]."
+                );
+            }
+
+            $now = now();
+            
+            // Calculate setup/run minutes automatically from elapsed time if not provided
+            $setupMinutes = (float) ($data['setup_minutes'] ?? 0);
+            $runMinutes = (float) ($data['run_minutes'] ?? 0);
+            
+            if ($runMinutes === 0.0 && $schedOp->actual_start) {
+                $endDt = $schedOp->isPaused() && $schedOp->last_paused_at ? $schedOp->last_paused_at : $now;
+                $pausedSec = $schedOp->accumulated_paused_seconds ?? 0;
+                $diffSeconds = $endDt->timestamp - $schedOp->actual_start->timestamp - $pausedSec;
+                $runMinutes = max(0.0, round($diffSeconds / 60, 2));
+            }
+
+            // Sync with underlying ProductionOrderOperation
+            $orderOp = ProductionOrderOperation::findOrFail($schedOp->production_order_operation_id);
+            
+            $produced = (float) ($data['quantity_produced'] ?? 0);
+            $rejected = (float) ($data['quantity_rejected'] ?? 0);
+            $scrapped = (float) ($data['quantity_scrapped'] ?? 0);
+
+            if ($produced < 0 || $rejected < 0 || $scrapped < 0) {
+                throw new InvalidArgumentException('Quantities cannot be negative.');
+            }
+
+            // Log progress via main ProductionExecutionService
+            app(ProductionExecutionService::class)->logProgress(
+                $orderOp->id,
+                $produced,
+                $rejected,
+                $scrapped,
+                $setupMinutes,
+                $runMinutes,
+                $data['remarks'] ?? null,
+                $schedOp->machine_id,
+                $operatorId,
+                false // Do NOT complete operation
+            );
+
+            // Reset start time and paused seconds for the next work session
+            if ($schedOp->isPaused()) {
+                $schedOp->update([
+                    'actual_start' => $now,
+                    'last_paused_at' => $now,
+                    'accumulated_paused_seconds' => 0,
+                ]);
+            } else {
+                $schedOp->update([
+                    'actual_start' => $now,
+                    'last_paused_at' => null,
+                    'accumulated_paused_seconds' => 0,
+                ]);
+            }
+
+            app(ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
+                'production_order_id' => $schedOp->production_order_id,
+                'production_order_operation_id' => $schedOp->production_order_operation_id,
+                'machine_id' => $schedOp->machine_id,
+                'operator_id' => $operatorId,
+                'event_type' => 'Progress Logged',
+                'title' => 'Shift/Daily Progress Logged',
+                'description' => "Logged partial progress: {$produced} produced, {$rejected} rejected, {$scrapped} scrapped.",
+                'severity' => 'info',
                 'event_source' => 'MesExecutionService',
                 'triggered_by' => $operatorId,
             ]);
@@ -621,7 +706,7 @@ class MesExecutionService
             $schedOp->update(['status' => ProductionScheduleOperation::STATUS_CANCELLED]);
 
             $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
-            if ($orderOp && ! $orderOp->isCompleted()) {
+            if ($orderOp && !$orderOp->isCompleted()) {
                 $orderOp->status = ProductionOrderOperation::STATUS_CANCELLED;
                 $orderOp->save();
             }
@@ -663,11 +748,11 @@ class MesExecutionService
             ->where('tenant_id', $tenantId)
             ->find($machineId);
 
-        if (! $machine) {
+        if (!$machine) {
             throw new InvalidArgumentException("Machine #{$machineId} not found.");
         }
 
-        if (! $machine->isActive()) {
+        if (!$machine->isActive()) {
             throw new InvalidArgumentException(
                 "Machine [{$machine->name}] is not available for production (status: {$machine->status})."
             );
@@ -676,11 +761,11 @@ class MesExecutionService
 
     private function qualityGateIsPendingOrFailed(ProductionOrderOperation $operation): bool
     {
-        if (! $operation->routingOperation?->quality_required) {
+        if (!$operation->routingOperation?->quality_required) {
             return false;
         }
 
-        return ! ProductionQualityInspection::where('tenant_id', $operation->tenant_id)
+        return !ProductionQualityInspection::where('tenant_id', $operation->tenant_id)
             ->where('production_order_operation_id', $operation->id)
             ->where('status', 'approved')
             ->where('result', 'passed')

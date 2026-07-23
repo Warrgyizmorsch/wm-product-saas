@@ -23,7 +23,7 @@ class NcrController extends Controller
         $tenantId = require_tenant_id();
 
         $query = ProductionNcr::where('tenant_id', $tenantId)
-            ->with(['order', 'inspection']);
+            ->with(['order.product', 'inspection']);
 
         if ($request->filled('search')) {
             $search = '%'.$request->input('search').'%';
@@ -82,7 +82,7 @@ class NcrController extends Controller
         $this->authorize('view', ProductionNcr::class);
         $tenantId = require_tenant_id();
         $ncr = ProductionNcr::where('tenant_id', $tenantId)
-            ->with(['order', 'inspection', 'reworkOrder', 'scrapDisposal'])
+            ->with(['order.product', 'inspection', 'reworkOrder', 'scrapDisposal'])
             ->findOrFail($id);
 
         $workCenters = WorkCenter::where('tenant_id', $tenantId)->get();
