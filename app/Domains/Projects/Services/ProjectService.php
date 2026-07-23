@@ -8,6 +8,7 @@ use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Repositories\ProjectRepositoryInterface;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -34,9 +35,9 @@ class ProjectService
     ) {
     }
 
-    public function list(array $filters = []): Collection
+    public function list(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
-        return $this->projects->getAll($filters);
+        return $this->projects->getAll($filters, $perPage);
     }
 
     public function find(int $id): ?Project
@@ -127,7 +128,7 @@ class ProjectService
     public function summary(): array
     {
         return [
-            'total'  => $this->projects->getAll()->count(),
+            'total'  => $this->projects->countAll(),
             'active' => $this->projects->countByStatus(Project::STATUS_ACTIVE),
         ];
     }

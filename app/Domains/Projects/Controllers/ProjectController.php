@@ -46,7 +46,7 @@ class ProjectController extends Controller
         $this->authorize('viewAny', Project::class);
 
         $data = [
-            'projects' => $this->projects->list($request->only(['status', 'search'])),
+            'projects' => $this->projects->list($request->only(['status', 'search', 'sort', 'direction'])),
             'summary'  => $this->projects->summary(),
             'statuses' => Project::STATUSES,
             'filters'  => $request->only(['status', 'search']),

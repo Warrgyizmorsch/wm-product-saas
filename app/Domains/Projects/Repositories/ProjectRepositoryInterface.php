@@ -3,11 +3,11 @@
 namespace App\Domains\Projects\Repositories;
 
 use App\Domains\Projects\Models\Project;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 interface ProjectRepositoryInterface
 {
-    public function getAll(array $filters = []): Collection;
+    public function getAll(array $filters = [], int $perPage = 10): LengthAwarePaginator;
 
     public function find(int $id): ?Project;
 
@@ -18,6 +18,8 @@ interface ProjectRepositoryInterface
     public function delete(int $id): bool;
 
     public function latestCode(): ?string;
+
+    public function countAll(): int;
 
     public function countByStatus(string $status): int;
 }
