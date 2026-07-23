@@ -413,41 +413,53 @@
 
                                                 <!-- Items Rate Cards -->
                                                 <h6 class="fw-bold text-dark fs-12 mb-2 border-bottom pb-1.5"><i class="feather-layers text-primary me-1.5"></i>Items Rates</h6>
+                                                @php $mappedCount = 0; @endphp
                                                 @foreach($rfq->items as $itemIdx => $item)
                                                     @php
-                                                        $quote = $rv->rates->firstWhere('product_id', $item->product_id);
-                                                        $quotedRate = $quote ? (float)$quote->rate : '';
-                                                        $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
-                                                        $quotedDeliv = $quote && $quote->delivery_date ? $quote->delivery_date->format('Y-m-d') : '';
-                                                        $quotedValid = $quote && $quote->validity_date ? $quote->validity_date->format('Y-m-d') : '';
-                                                        $totalCost = ((float)$quotedRate) * ((float)$quotedQty);
+                                                        $isMapped = $item->vendors->contains('id', $rv->vendor_id);
                                                     @endphp
-                                                    <div class="p-2.5 mb-2.5 border rounded bg-white fs-12 shadow-xs">
-                                                        <div class="fw-bold text-dark mb-1"><i class="feather-package text-primary me-1"></i>{{ $itemIdx + 1 }}. {{ $item->product?->name }}</div>
-                                                        <div class="text-muted fs-11 mb-2">Req Qty: <strong class="text-dark">{{ (float)$item->quantity }} {{ $item->product?->uom?->name ?? 'Pcs' }}</strong></div>
+                                                    @if($isMapped)
+                                                        @php
+                                                            $mappedCount++;
+                                                            $quote = $rv->rates->firstWhere('product_id', $item->product_id);
+                                                            $quotedRate = $quote ? (float)$quote->rate : '';
+                                                            $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
+                                                            $quotedDeliv = $quote && $quote->delivery_date ? $quote->delivery_date->format('Y-m-d') : '';
+                                                            $quotedValid = $quote && $quote->validity_date ? $quote->validity_date->format('Y-m-d') : '';
+                                                            $totalCost = ((float)$quotedRate) * ((float)$quotedQty);
+                                                        @endphp
+                                                        <div class="p-2.5 mb-2.5 border rounded bg-white fs-12 shadow-xs">
+                                                            <div class="fw-bold text-dark mb-1"><i class="feather-package text-primary me-1"></i>{{ $itemIdx + 1 }}. {{ $item->product?->name }}</div>
+                                                            <div class="text-muted fs-11 mb-2">Req Qty: <strong class="text-dark">{{ (float)$item->quantity }} {{ $item->product?->uom?->name ?? 'Pcs' }}</strong></div>
 
-                                                        <div class="row g-2">
-                                                            <div class="col-6">
-                                                                <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-dollar-sign me-0.5"></i>Rate/Unit ({{ $currency }})</label>
-                                                                <input type="number" step="0.01" min="0" class="odoo-table-input mob-rate-input matrix-sync-input font-monospace" data-sync="#dt_rate_{{ $rv->id }}_{{ $item->product_id }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" value="{{ $quotedRate }}" placeholder="0.00">
-                                                            </div>
-                                                            <div class="col-6">
-                                                                <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-box me-0.5"></i>Quoted Qty</label>
-                                                                <input type="number" step="0.0001" min="0" class="odoo-table-input mob-qty-input matrix-sync-input font-monospace" data-sync="#dt_qty_{{ $rv->id }}_{{ $item->product_id }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" value="{{ $quotedQty }}" placeholder="0.00">
-                                                            </div>
-                                                            <div class="col-6">
-                                                                <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-calendar me-0.5"></i>Deliv Date</label>
-                                                                <input type="date" class="odoo-table-input matrix-sync-input" data-sync="#dt_deliv_{{ $rv->id }}_{{ $item->product_id }}" value="{{ $quotedDeliv }}">
-                                                            </div>
-                                                            <div class="col-6">
-                                                                <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-trending-up me-0.5"></i>Total ({{ $currency }})</label>
-                                                                <div class="odoo-table-input bg-soft-success fw-bold text-success text-end font-monospace mob-total-val" id="mob_total_{{ $rv->id }}_{{ $item->product_id }}">
-                                                                    {{ number_format($totalCost, 2, '.', '') }}
+                                                            <div class="row g-2">
+                                                                <div class="col-6">
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-dollar-sign me-0.5"></i>Rate/Unit ({{ $currency }})</label>
+                                                                    <input type="number" step="0.01" min="0" class="odoo-table-input mob-rate-input matrix-sync-input font-monospace" data-sync="#dt_rate_{{ $rv->id }}_{{ $item->product_id }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" value="{{ $quotedRate }}" placeholder="0.00">
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-box me-0.5"></i>Quoted Qty</label>
+                                                                    <input type="number" step="0.0001" min="0" class="odoo-table-input mob-qty-input matrix-sync-input font-monospace" data-sync="#dt_qty_{{ $rv->id }}_{{ $item->product_id }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" value="{{ $quotedQty }}" placeholder="0.00">
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-calendar me-0.5"></i>Deliv Date</label>
+                                                                    <input type="date" class="odoo-table-input matrix-sync-input" data-sync="#dt_deliv_{{ $rv->id }}_{{ $item->product_id }}" value="{{ $quotedDeliv }}">
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-trending-up me-0.5"></i>Total ({{ $currency }})</label>
+                                                                    <div class="odoo-table-input bg-soft-success fw-bold text-success text-end font-monospace mob-total-val" id="mob_total_{{ $rv->id }}_{{ $item->product_id }}">
+                                                                        {{ number_format($totalCost, 2, '.', '') }}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                    @endif
                                                 @endforeach
+                                                @if($mappedCount === 0)
+                                                    <div class="text-center py-3 text-muted">
+                                                        <i class="feather-info mb-1"></i> No items assigned to this vendor.
+                                                    </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -547,14 +559,21 @@
                                                 {{ (float)$item->quantity }} <span class="text-muted small">({{ $item->product?->uom?->name ?? 'Pcs' }})</span>
                                             </td>
                                             <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Rate/Unit ({{ $currency }}):</td>
-                                                                                      @foreach($rfq->rfqVendors as $rv)
+                                            @foreach($rfq->rfqVendors as $rv)
                                                 @php
+                                                    $isMapped = $item->vendors->contains('id', $rv->vendor_id);
                                                     $quote = $rv->rates->firstWhere('product_id', $item->product_id);
                                                     $quotedRate = $quote ? (float)$quote->rate : '';
                                                 @endphp
-                                                <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][rate]" id="dt_rate_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-rate-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.01" min="0" value="{{ $quotedRate }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
-                                                </td>
+                                                @if($isMapped)
+                                                    <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
+                                                        <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][rate]" id="dt_rate_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-rate-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.01" min="0" value="{{ $quotedRate }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
+                                                    </td>
+                                                @else
+                                                    <td class="border-start p-2 text-center text-muted align-middle bg-light" style="width: 220px; min-width: 220px; max-width: 220px; background-color: #f8fafc !important; vertical-align: middle;" rowspan="5">
+                                                        <span class="small text-uppercase fw-semibold fs-10 text-muted"><i class="feather-info me-1"></i>Not Invited</span>
+                                                    </td>
+                                                @endif
                                             @endforeach
                                         </tr>
 
@@ -563,12 +582,17 @@
                                             <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Quoted Qty:</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
-                                                    $quote = $rv->rates->firstWhere('product_id', $item->product_id);
-                                                    $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
+                                                    $isMapped = $item->vendors->contains('id', $rv->vendor_id);
                                                 @endphp
-                                                <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][quantity]" id="dt_qty_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-qty-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.0001" min="0" value="{{ $quotedQty }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
-                                                </td>
+                                                @if($isMapped)
+                                                    @php
+                                                        $quote = $rv->rates->firstWhere('product_id', $item->product_id);
+                                                        $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
+                                                    @endphp
+                                                    <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
+                                                        <input type="number" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][quantity]" id="dt_qty_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-qty-input odoo-table-input text-end font-monospace py-1" style="font-size: 11px; background-color: transparent;" step="0.0001" min="0" value="{{ $quotedQty }}" placeholder="0.00" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}">
+                                                    </td>
+                                                @endif
                                             @endforeach
                                         </tr>
 
@@ -577,14 +601,19 @@
                                             <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Total Amount ({{ $currency }}):</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
-                                                    $quote = $rv->rates->firstWhere('product_id', $item->product_id);
-                                                    $quotedRate = $quote ? (float)$quote->rate : 0;
-                                                    $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
-                                                    $totalCost = $quotedRate * $quotedQty;
+                                                    $isMapped = $item->vendors->contains('id', $rv->vendor_id);
                                                 @endphp
-                                                <td class="border-start p-2 bg-white text-end align-middle font-monospace fw-bold text-success fs-11" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <span class="vendor-currency-symbol font-monospace text-muted me-0.5">{{ $currency }}</span><span class="vendor-total-val" id="total_{{ $rv->id }}_{{ $item->product_id }}">{{ number_format($totalCost, 2, '.', '') }}</span>
-                                                </td>
+                                                @if($isMapped)
+                                                    @php
+                                                        $quote = $rv->rates->firstWhere('product_id', $item->product_id);
+                                                        $quotedRate = $quote ? (float)$quote->rate : 0;
+                                                        $quotedQty = $quote ? (float)$quote->quantity : (float)$item->quantity;
+                                                        $totalCost = $quotedRate * $quotedQty;
+                                                    @endphp
+                                                    <td class="border-start p-2 bg-white text-end align-middle font-monospace fw-bold text-success fs-11" style="width: 220px; min-width: 220px; max-width: 220px;">
+                                                        <span class="vendor-currency-symbol font-monospace text-muted me-0.5">{{ $currency }}</span><span class="vendor-total-val" id="total_{{ $rv->id }}_{{ $item->product_id }}">{{ number_format($totalCost, 2, '.', '') }}</span>
+                                                    </td>
+                                                @endif
                                             @endforeach
                                         </tr>
 
@@ -593,12 +622,17 @@
                                             <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Deliv Date:</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
-                                                    $quote = $rv->rates->firstWhere('product_id', $item->product_id);
-                                                    $quotedDeliv = $quote && $quote->delivery_date ? $quote->delivery_date->format('Y-m-d') : '';
+                                                    $isMapped = $item->vendors->contains('id', $rv->vendor_id);
                                                 @endphp
-                                                <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <input type="date" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][delivery_date]" id="dt_deliv_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-deliv-input odoo-table-input py-1" style="font-size: 11px; background-color: transparent;" value="{{ $quotedDeliv }}" data-vendor="{{ $rv->id }}">
-                                                </td>
+                                                @if($isMapped)
+                                                    @php
+                                                        $quote = $rv->rates->firstWhere('product_id', $item->product_id);
+                                                        $quotedDeliv = $quote && $quote->delivery_date ? $quote->delivery_date->format('Y-m-d') : '';
+                                                    @endphp
+                                                    <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
+                                                        <input type="date" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][delivery_date]" id="dt_deliv_{{ $rv->id }}_{{ $item->product_id }}" class="vendor-deliv-input odoo-table-input py-1" style="font-size: 11px; background-color: transparent;" value="{{ $quotedDeliv }}" data-vendor="{{ $rv->id }}">
+                                                    </td>
+                                                @endif
                                             @endforeach
                                         </tr>
 
@@ -607,12 +641,17 @@
                                             <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Valid Date:</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
-                                                    $quote = $rv->rates->firstWhere('product_id', $item->product_id);
-                                                    $quotedValid = $quote && $quote->validity_date ? $quote->validity_date->format('Y-m-d') : '';
+                                                    $isMapped = $item->vendors->contains('id', $rv->vendor_id);
                                                 @endphp
-                                                <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                    <input type="date" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][validity_date]" id="dt_valid_{{ $rv->id }}_{{ $item->product_id }}" class="odoo-table-input py-1" style="font-size: 11px; background-color: transparent;" value="{{ $quotedValid }}">
-                                                </td>
+                                                @if($isMapped)
+                                                    @php
+                                                        $quote = $rv->rates->firstWhere('product_id', $item->product_id);
+                                                        $quotedValid = $quote && $quote->validity_date ? $quote->validity_date->format('Y-m-d') : '';
+                                                    @endphp
+                                                    <td class="border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
+                                                        <input type="date" name="vendor_quotes[{{ $rv->id }}][{{ $item->product_id }}][validity_date]" id="dt_valid_{{ $rv->id }}_{{ $item->product_id }}" class="odoo-table-input py-1" style="font-size: 11px; background-color: transparent;" value="{{ $quotedValid }}">
+                                                    </td>
+                                                @endif
                                             @endforeach
                                         </tr>
                                     @endforeach
@@ -967,6 +1006,23 @@
 
             // ---- Supplier radio ----
             $(document).on('change', '.supplier-select-radio', function() {
+                const selectedVendorId = $(this).attr('data-vendor-id');
+                
+                // Re-enable and reset style for all items first
+                $('.item-select-cb').prop('disabled', false).closest('tr').css('opacity', '1');
+                
+                if (selectedVendorId) {
+                    $('.item-select-cb').each(function() {
+                        const productId = $(this).attr('data-product-id');
+                        const rateInput = $(`.vendor-rate-input[data-vendor="${selectedVendorId}"][data-product="${productId}"]`);
+                        if (!rateInput.length) {
+                            // Supplier not invited for this product
+                            $(this).prop('checked', false).prop('disabled', true);
+                            $(this).closest('tr').css('opacity', '0.5');
+                        }
+                    });
+                }
+                
                 updatePoBtn();
                 syncPoPreview();
             });
@@ -992,6 +1048,23 @@
                 if (!items.length) {
                     e.preventDefault();
                     alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> Please select at least one item.');
+                    return false;
+                }
+
+                // Verify that all checked items are supplied by the selected vendor
+                let unmappedProducts = [];
+                items.each(function() {
+                    const productId = $(this).attr('data-product-id');
+                    const productName = $(this).attr('data-product-name');
+                    const rateInput = $(`.vendor-rate-input[data-vendor="${vendorId}"][data-product="${productId}"]`);
+                    if (!rateInput.length) {
+                        unmappedProducts.push(productName);
+                    }
+                });
+
+                if (unmappedProducts.length > 0) {
+                    e.preventDefault();
+                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> The selected supplier is not invited to quote for the following selected item(s): <strong>' + unmappedProducts.join(', ') + '</strong>. Please uncheck these items first.');
                     return false;
                 }
 
@@ -1086,8 +1159,10 @@
             checked.each(function() {
                 const productId   = $(this).attr('data-product-id');
                 const productName = $(this).attr('data-product-name');
-                const rateVal = vendorId ? (parseFloat($(`.vendor-rate-input[data-vendor="${vendorId}"][data-product="${productId}"]`).val()) || 0) : 0;
-                const qtyVal  = vendorId ? (parseFloat($(`.vendor-qty-input[data-vendor="${vendorId}"][data-product="${productId}"]`).val()) || 0) : 0;
+                const rateInput = $(`.vendor-rate-input[data-vendor="${vendorId}"][data-product="${productId}"]`);
+                const rateVal = rateInput.length ? (parseFloat(rateInput.val()) || 0) : 0;
+                const qtyInput = $(`.vendor-qty-input[data-vendor="${vendorId}"][data-product="${productId}"]`);
+                const qtyVal  = qtyInput.length ? (parseFloat(qtyInput.val()) || 0) : 0;
 
                 tbody.append(`<tr class="item-row" data-product-id="${productId}">
                     <td class="text-muted">${rowNum++}</td>

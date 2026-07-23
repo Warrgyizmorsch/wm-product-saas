@@ -646,7 +646,7 @@
                 $.ajax({
                     url: "{{ route('purchase.orders.get-requisition-items') }}",
                     type: 'GET',
-                    data: { requisition_id: prId },
+                    data: { requisition_id: prId, exclude_po_id: "{{ $order->id }}" },
                     success: function(res) {
                         if (res.success && res.items.length > 0) {
                             if (res.items[0] && res.items[0].warehouse_name && res.items[0].warehouse_name !== '—') {

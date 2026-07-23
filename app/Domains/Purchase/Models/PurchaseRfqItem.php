@@ -39,6 +39,12 @@ class PurchaseRfqItem extends Model
         return $this->belongsTo(Product::class, 'product_id');
     }
 
+    public function vendors(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\App\Domains\Inventory\Models\Vendor::class, 'purchase_rfq_item_vendors', 'purchase_rfq_item_id', 'vendor_id')
+            ->withTimestamps();
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $item) {

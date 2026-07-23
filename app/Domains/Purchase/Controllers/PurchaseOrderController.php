@@ -57,28 +57,103 @@ class PurchaseOrderController extends Controller
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $products = Product::where('tenant_id', $tenantId)->get();
-        $requisitions = PurchaseRequisition::where('tenant_id', $tenantId)
+
+        $allRequisitions = PurchaseRequisition::where('tenant_id', $tenantId)
             ->where('status', 'Approved')
+            ->with('items')
             ->get();
 
+        $requisitions = $allRequisitions->filter(function ($pr) use ($tenantId) {
+            $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
+                ->where('purchase_requisition_id', $pr->id)
+                ->where('status', '!=', 'Cancelled')
+                ->with('items')
+                ->get();
+
+            foreach ($pr->items as $item) {
+                $alreadyOrderedQty = 0.0;
+                foreach ($existingPos as $po) {
+                    $alreadyOrderedQty += (float) $po->items->where('product_id', $item->product_id)->sum('quantity');
+                }
+                $pendingQty = (float) $item->quantity - $alreadyOrderedQty;
+                if ($pendingQty > 0.0001) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
         $selectedRequisitionId = $request->query('requisition_id');
+        $requisitionItemIds = $request->query('requisition_item_ids', []);
         $prefilledItems = [];
 
         if ($selectedRequisitionId) {
             $requisition = PurchaseRequisition::where('tenant_id', $tenantId)
-                ->with('items.product')
+                ->with(['items.product', 'items.warehouse'])
                 ->find($selectedRequisitionId);
             
             if ($requisition) {
+                $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
+                    ->where('purchase_requisition_id', $selectedRequisitionId)
+                    ->where('status', '!=', 'Cancelled')
+                    ->with('items')
+                    ->get();
+
                 foreach ($requisition->items as $item) {
-                    $prefilledItems[] = [
-                        'product_id' => $item->product_id,
-                        'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
-                        'quantity' => (float)$item->quantity,
-                        'warehouse_id' => $item->warehouse_id,
-                        'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
-                        'estimated_cost' => (float)$item->estimated_cost,
-                    ];
+                    $alreadyOrderedQty = 0.0;
+                    foreach ($existingPos as $po) {
+                        $alreadyOrderedQty += (float) $po->items->where('product_id', $item->product_id)->sum('quantity');
+                    }
+                    $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
+
+                    if ($pendingQty > 0.0001) {
+                        $prefilledItems[] = [
+                            'product_id' => $item->product_id,
+                            'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
+                            'quantity' => $pendingQty,
+                            'warehouse_id' => $item->warehouse_id,
+                            'warehouse_name' => $item->warehouse->name ?? '—',
+                            'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
+                            'estimated_cost' => (float)$item->estimated_cost,
+                        ];
+                    }
+                }
+            }
+        } elseif (!empty($requisitionItemIds)) {
+            $items = PurchaseRequisitionItem::whereIn('id', $requisitionItemIds)
+                ->with(['product', 'warehouse', 'requisition'])
+                ->get();
+
+            if ($items->isNotEmpty()) {
+                $requisitionIds = $items->pluck('purchase_requisition_id')->unique()->toArray();
+                $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
+                    ->whereIn('purchase_requisition_id', $requisitionIds)
+                    ->where('status', '!=', 'Cancelled')
+                    ->with('items')
+                    ->get();
+
+                $selectedRequisitionId = $items->first()->purchase_requisition_id;
+
+                foreach ($items as $item) {
+                    $alreadyOrderedQty = (float) $existingPos
+                        ->where('purchase_requisition_id', $item->purchase_requisition_id)
+                        ->flatMap(fn($po) => $po->items)
+                        ->where('product_id', $item->product_id)
+                        ->sum('quantity');
+
+                    $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
+
+                    if ($pendingQty > 0.0001) {
+                        $prefilledItems[] = [
+                            'product_id' => $item->product_id,
+                            'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
+                            'quantity' => $pendingQty,
+                            'warehouse_id' => $item->warehouse_id,
+                            'warehouse_name' => $item->warehouse->name ?? '—',
+                            'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
+                            'estimated_cost' => (float)$item->estimated_cost,
+                        ];
+                    }
                 }
             }
         }
@@ -220,9 +295,34 @@ class PurchaseOrderController extends Controller
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
         $products = Product::where('tenant_id', $tenantId)->get();
-        $requisitions = PurchaseRequisition::where('tenant_id', $tenantId)
+        $allRequisitions = PurchaseRequisition::where('tenant_id', $tenantId)
             ->where('status', 'Approved')
+            ->with('items')
             ->get();
+
+        $requisitions = $allRequisitions->filter(function ($pr) use ($tenantId, $order) {
+            if ($order->purchase_requisition_id == $pr->id) {
+                return true;
+            }
+
+            $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
+                ->where('purchase_requisition_id', $pr->id)
+                ->where('status', '!=', 'Cancelled')
+                ->with('items')
+                ->get();
+
+            foreach ($pr->items as $item) {
+                $alreadyOrderedQty = 0.0;
+                foreach ($existingPos as $po) {
+                    $alreadyOrderedQty += (float) $po->items->where('product_id', $item->product_id)->sum('quantity');
+                }
+                $pendingQty = (float) $item->quantity - $alreadyOrderedQty;
+                if ($pendingQty > 0.0001) {
+                    return true;
+                }
+            }
+            return false;
+        });
 
         return view('modules.purchase.orders.edit', compact('order', 'vendors', 'warehouses', 'products', 'requisitions'));
     }
@@ -360,6 +460,8 @@ class PurchaseOrderController extends Controller
     {
         $tenantId = require_tenant_id();
         $requisitionId = (int) $request->query('requisition_id');
+        $excludePoId = $request->query('exclude_po_id');
+
         $requisition = PurchaseRequisition::where('tenant_id', $tenantId)
             ->with(['items.product', 'items.warehouse'])
             ->find($requisitionId);
@@ -369,16 +471,34 @@ class PurchaseOrderController extends Controller
         }
 
         $items = [];
+        $existingPoQuery = PurchaseOrder::where('tenant_id', $tenantId)
+            ->where('purchase_requisition_id', $requisitionId)
+            ->where('status', '!=', 'Cancelled');
+
+        if ($excludePoId) {
+            $existingPoQuery->where('id', '!=', (int)$excludePoId);
+        }
+
+        $existingPos = $existingPoQuery->with('items')->get();
+
         foreach ($requisition->items as $item) {
-            $items[] = [
-                'product_id' => $item->product_id,
-                'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
-                'quantity' => (float)$item->quantity,
-                'warehouse_id' => $item->warehouse_id,
-                'warehouse_name' => $item->warehouse->name ?? '—',
-                'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
-                'estimated_cost' => (float)$item->estimated_cost,
-            ];
+            $alreadyOrderedQty = 0.0;
+            foreach ($existingPos as $po) {
+                $alreadyOrderedQty += (float) $po->items->where('product_id', $item->product_id)->sum('quantity');
+            }
+            $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
+
+            if ($pendingQty > 0.0001) {
+                $items[] = [
+                    'product_id' => $item->product_id,
+                    'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
+                    'quantity' => $pendingQty,
+                    'warehouse_id' => $item->warehouse_id,
+                    'warehouse_name' => $item->warehouse->name ?? '—',
+                    'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
+                    'estimated_cost' => (float)$item->estimated_cost,
+                ];
+            }
         }
 
         return response()->json([
