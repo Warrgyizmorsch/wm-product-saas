@@ -73,7 +73,7 @@
                     <div class="col-md-3">
                         <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase">1. Choose Bulk Action Type</label>
                         <select id="bulkActionType" name="action_type" class="form-select form-select-sm fw-semibold text-primary" required>
-                            <option value="" selected disabled>-- Select Bulk Action --</option>
+                            <option value="" selected>-- Select Bulk Action --</option>
                             <option value="reserve">Reserve Stock</option>
                             <option value="issue">Issue Stock</option>
                             <option value="indent">Create Indent (Procurement)</option>

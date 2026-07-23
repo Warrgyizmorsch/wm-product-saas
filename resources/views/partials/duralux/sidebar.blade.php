@@ -51,6 +51,7 @@
                 ['label' => 'RFQs', 'route' => 'purchase.rfqs.index'],
                 ['label' => 'Savings Dashboard', 'route' => 'purchase.rfqs.savings'],
                 ['label' => 'Purchase Orders', 'route' => 'purchase.orders.index'],
+                ['label' => 'Pending PR Items', 'route' => 'purchase.requisitions.pending-items'],
                 ['label' => 'Pending GRNs', 'route' => 'purchase.grns.pending'],
                 ['label' => 'All Goods Receipts', 'route' => 'purchase.grns.index'],
                 ['label' => 'Vendor Bills', 'route' => 'purchase.bills.index'],

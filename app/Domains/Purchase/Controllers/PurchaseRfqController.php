@@ -8,6 +8,7 @@ use App\Domains\Purchase\Models\PurchaseRfqItem;
 use App\Domains\Purchase\Models\PurchaseRfqVendor;
 use App\Domains\Purchase\Models\PurchaseRfqVendorRate;
 use App\Domains\Purchase\Models\PurchaseRequisition;
+use App\Domains\Purchase\Models\PurchaseRequisitionItem;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Models\Vendor;
@@ -181,6 +182,7 @@ class PurchaseRfqController extends Controller
             ->get();
 
         $selectedRequisitionId = $request->query('requisition_id');
+        $requisitionItemIds = $request->query('requisition_item_ids', []);
         $prefilledItems = [];
 
         if ($selectedRequisitionId) {
@@ -189,14 +191,107 @@ class PurchaseRfqController extends Controller
                 ->find($selectedRequisitionId);
             
             if ($requisition) {
+                $existingPos = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+                    ->where('purchase_requisition_id', $selectedRequisitionId)
+                    ->where('status', '!=', 'Cancelled')
+                    ->with('items')
+                    ->get();
+
+                $groupedItems = [];
                 foreach ($requisition->items as $item) {
-                    $prefilledItems[] = [
-                        'product_id' => $item->product_id,
-                        'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
-                        'quantity' => $item->quantity,
-                        'estimated_cost' => $item->estimated_cost,
-                    ];
+                    $alreadyOrderedQty = (float) $existingPos
+                        ->flatMap(fn($po) => $po->items)
+                        ->where('product_id', $item->product_id)
+                        ->sum('quantity');
+
+                    $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
+
+                    if ($pendingQty > 0.0001) {
+                        $vendorId = null;
+                        if ($item->product->preferred_vendor_id) {
+                            $vendorId = $item->product->preferred_vendor_id;
+                        } else {
+                            $lastPoItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('tenant_id', $tenantId)
+                                ->where('product_id', $item->product_id)
+                                ->whereHas('order', function ($q) {
+                                    $q->where('status', 'Approved');
+                                })
+                                ->orderBy('id', 'desc')
+                                ->first();
+                            $vendorId = $lastPoItem?->order?->vendor_id;
+                        }
+
+                        if (isset($groupedItems[$item->product_id])) {
+                            $groupedItems[$item->product_id]['quantity'] += $pendingQty;
+                            $groupedItems[$item->product_id]['estimated_cost'] = max($groupedItems[$item->product_id]['estimated_cost'], (float)$item->estimated_cost);
+                        } else {
+                            $groupedItems[$item->product_id] = [
+                                'product_id' => $item->product_id,
+                                'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
+                                'quantity' => $pendingQty,
+                                'estimated_cost' => (float)$item->estimated_cost,
+                                'vendor_id' => $vendorId,
+                            ];
+                        }
+                    }
                 }
+                $prefilledItems = array_values($groupedItems);
+            }
+        } elseif (!empty($requisitionItemIds)) {
+            $items = PurchaseRequisitionItem::whereIn('id', $requisitionItemIds)
+                ->with(['product', 'requisition'])
+                ->get();
+
+            if ($items->isNotEmpty()) {
+                $requisitionIds = $items->pluck('purchase_requisition_id')->unique()->toArray();
+                $existingPos = \App\Domains\Purchase\Models\PurchaseOrder::where('tenant_id', $tenantId)
+                    ->whereIn('purchase_requisition_id', $requisitionIds)
+                    ->where('status', '!=', 'Cancelled')
+                    ->with('items')
+                    ->get();
+
+                $selectedRequisitionId = $items->first()->purchase_requisition_id;
+
+                $groupedItems = [];
+                foreach ($items as $item) {
+                    $alreadyOrderedQty = (float) $existingPos
+                        ->where('purchase_requisition_id', $item->purchase_requisition_id)
+                        ->flatMap(fn($po) => $po->items)
+                        ->where('product_id', $item->product_id)
+                        ->sum('quantity');
+
+                    $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
+
+                    if ($pendingQty > 0.0001) {
+                        $vendorId = null;
+                        if ($item->product->preferred_vendor_id) {
+                            $vendorId = $item->product->preferred_vendor_id;
+                        } else {
+                            $lastPoItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('tenant_id', $tenantId)
+                                ->where('product_id', $item->product_id)
+                                ->whereHas('order', function ($q) {
+                                    $q->where('status', 'Approved');
+                                })
+                                ->orderBy('id', 'desc')
+                                ->first();
+                            $vendorId = $lastPoItem?->order?->vendor_id;
+                        }
+
+                        if (isset($groupedItems[$item->product_id])) {
+                            $groupedItems[$item->product_id]['quantity'] += $pendingQty;
+                            $groupedItems[$item->product_id]['estimated_cost'] = max($groupedItems[$item->product_id]['estimated_cost'], (float)$item->estimated_cost);
+                        } else {
+                            $groupedItems[$item->product_id] = [
+                                'product_id' => $item->product_id,
+                                'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
+                                'quantity' => $pendingQty,
+                                'estimated_cost' => (float)$item->estimated_cost,
+                                'vendor_id' => $vendorId,
+                            ];
+                        }
+                    }
+                }
+                $prefilledItems = array_values($groupedItems);
             }
         }
 
@@ -208,14 +303,14 @@ class PurchaseRfqController extends Controller
         $tenantId = require_tenant_id();
 
         $request->validate([
-            'vendor_ids' => 'required|array|min:1',
-            'vendor_ids.*' => 'exists:vendors,id',
             'rfq_date' => 'required|date',
             'purchase_requisition_id' => 'nullable|exists:purchase_requisitions,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.estimated_cost' => 'nullable|numeric|min:0',
+            'items.*.vendor_ids' => 'required|array|min:1',
+            'items.*.vendor_ids.*' => 'exists:vendors,id',
         ]);
 
         return DB::transaction(function () use ($request, $tenantId) {
@@ -243,18 +338,32 @@ class PurchaseRfqController extends Controller
                 'created_by' => auth()->id() ?: 1,
             ]);
 
-            // Save Inquired Items
-            foreach ($request->input('items') as $item) {
-                PurchaseRfqItem::create([
+            // Save Inquired Items and mapping
+            $uniqueVendorIds = [];
+            foreach ($request->input('items') as $itemData) {
+                $rfqItem = PurchaseRfqItem::create([
                     'purchase_rfq_id' => $rfq->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'estimated_cost' => $item['estimated_cost'] ?? 0.00,
+                    'product_id' => $itemData['product_id'],
+                    'quantity' => $itemData['quantity'],
+                    'estimated_cost' => $itemData['estimated_cost'] ?? 0.00,
                 ]);
+
+                if (isset($itemData['vendor_ids']) && is_array($itemData['vendor_ids'])) {
+                    foreach ($itemData['vendor_ids'] as $vendorId) {
+                        $uniqueVendorIds[$vendorId] = $vendorId;
+                        DB::table('purchase_rfq_item_vendors')->insert([
+                            'tenant_id' => $tenantId,
+                            'purchase_rfq_item_id' => $rfqItem->id,
+                            'vendor_id' => $vendorId,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
             }
 
-            // Bind Vendors with Unique Access Tokens
-            foreach ($request->input('vendor_ids') as $vendorId) {
+            // Bind unique Vendors with Unique Access Tokens
+            foreach (array_values($uniqueVendorIds) as $vendorId) {
                 PurchaseRfqVendor::create([
                     'tenant_id' => $tenantId,
                     'purchase_rfq_id' => $rfq->id,
@@ -273,7 +382,7 @@ class PurchaseRfqController extends Controller
     {
         $tenantId = require_tenant_id();
         $rfq = PurchaseRfq::where('tenant_id', $tenantId)
-            ->with(['requisition', 'items.product', 'rfqVendors.vendor', 'rfqVendors.rates.product'])
+            ->with(['requisition', 'items.product', 'items.vendors', 'rfqVendors.vendor', 'rfqVendors.rates.product'])
             ->findOrFail($id);
 
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
@@ -284,7 +393,7 @@ class PurchaseRfqController extends Controller
     public function edit(int $id)
     {
         $tenantId = require_tenant_id();
-        $rfq = PurchaseRfq::where('tenant_id', $tenantId)->with(['items', 'rfqVendors'])->findOrFail($id);
+        $rfq = PurchaseRfq::where('tenant_id', $tenantId)->with(['items.vendors', 'rfqVendors'])->findOrFail($id);
         
         if ($rfq->status !== 'Draft') {
             return redirect()->route('purchase.rfqs.show', $id)
@@ -315,14 +424,14 @@ class PurchaseRfqController extends Controller
         }
 
         $request->validate([
-            'vendor_ids' => 'required|array|min:1',
-            'vendor_ids.*' => 'exists:vendors,id',
             'rfq_date' => 'required|date',
             'purchase_requisition_id' => 'nullable|exists:purchase_requisitions,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.0001',
             'items.*.estimated_cost' => 'nullable|numeric|min:0',
+            'items.*.vendor_ids' => 'required|array|min:1',
+            'items.*.vendor_ids.*' => 'exists:vendors,id',
         ]);
 
         return DB::transaction(function () use ($request, $rfq, $tenantId) {
@@ -332,20 +441,35 @@ class PurchaseRfqController extends Controller
                 'notes' => $request->input('notes'),
             ]);
 
-            // Re-sync items
+            // Re-sync items (Cascade deletes database records in pivot automatically)
             $rfq->items()->delete();
-            foreach ($request->input('items') as $item) {
-                PurchaseRfqItem::create([
+
+            $uniqueVendorIds = [];
+            foreach ($request->input('items') as $itemData) {
+                $rfqItem = PurchaseRfqItem::create([
                     'purchase_rfq_id' => $rfq->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'estimated_cost' => $item['estimated_cost'] ?? 0.00,
+                    'product_id' => $itemData['product_id'],
+                    'quantity' => $itemData['quantity'],
+                    'estimated_cost' => $itemData['estimated_cost'] ?? 0.00,
                 ]);
+
+                if (isset($itemData['vendor_ids']) && is_array($itemData['vendor_ids'])) {
+                    foreach ($itemData['vendor_ids'] as $vendorId) {
+                        $uniqueVendorIds[$vendorId] = $vendorId;
+                        DB::table('purchase_rfq_item_vendors')->insert([
+                            'tenant_id' => $tenantId,
+                            'purchase_rfq_item_id' => $rfqItem->id,
+                            'vendor_id' => $vendorId,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
             }
 
             // Sync vendors
             $existingVendors = $rfq->rfqVendors;
-            $newVendorIds = $request->input('vendor_ids');
+            $newVendorIds = array_values($uniqueVendorIds);
 
             // Delete removed vendors
             foreach ($existingVendors as $ev) {
@@ -422,6 +546,20 @@ class PurchaseRfqController extends Controller
 
         $items = [];
         foreach ($requisition->items as $item) {
+            $vendorId = null;
+            if ($item->product->preferred_vendor_id) {
+                $vendorId = $item->product->preferred_vendor_id;
+            } else {
+                $lastPoItem = \App\Domains\Purchase\Models\PurchaseOrderItem::where('tenant_id', $tenantId)
+                    ->where('product_id', $item->product_id)
+                    ->whereHas('order', function ($q) {
+                        $q->where('status', 'Approved');
+                    })
+                    ->orderBy('id', 'desc')
+                    ->first();
+                $vendorId = $lastPoItem?->order?->vendor_id;
+            }
+
             $items[] = [
                 'product_id' => $item->product_id,
                 'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
@@ -429,6 +567,7 @@ class PurchaseRfqController extends Controller
                 'warehouse_name' => $item->warehouse->name ?? '—',
                 'quantity' => (float)$item->quantity,
                 'estimated_cost' => (float)$item->estimated_cost,
+                'vendor_id' => $vendorId,
             ];
         }
 
@@ -451,6 +590,20 @@ class PurchaseRfqController extends Controller
         $rfq = $rfqVendor->rfq;
         $vendor = $rfqVendor->vendor;
 
+        // Fetch only items mapped to this vendor in purchase_rfq_item_vendors
+        $mappedItemIds = DB::table('purchase_rfq_item_vendors')
+            ->where('vendor_id', $vendor->id)
+            ->whereIn('purchase_rfq_item_id', $rfq->items->pluck('id'))
+            ->pluck('purchase_rfq_item_id')
+            ->toArray();
+
+        $filteredItems = $rfq->items->filter(function ($item) use ($mappedItemIds) {
+            return in_array($item->id, $mappedItemIds);
+        });
+
+        // Set the filtered collection on the relation
+        $rfq->setRelation('items', $filteredItems);
+
         // Map existing quoted rates if any
         $existingRates = $rfqVendor->rates->keyBy('product_id');
 
@@ -462,6 +615,21 @@ class PurchaseRfqController extends Controller
         $rfqVendor = PurchaseRfqVendor::where('token', $token)
             ->with(['rfq.items'])
             ->firstOrFail();
+
+        $rfq = $rfqVendor->rfq;
+        $vendorId = $rfqVendor->vendor_id;
+
+        // Get allowed product IDs for this vendor
+        $mappedItemIds = DB::table('purchase_rfq_item_vendors')
+            ->where('vendor_id', $vendorId)
+            ->whereIn('purchase_rfq_item_id', $rfq->items->pluck('id'))
+            ->pluck('purchase_rfq_item_id')
+            ->toArray();
+
+        $allowedProductIds = $rfq->items
+            ->filter(fn($item) => in_array($item->id, $mappedItemIds))
+            ->pluck('product_id')
+            ->toArray();
 
         $request->validate([
             'payment_type' => 'nullable|string|max:255',
@@ -476,7 +644,7 @@ class PurchaseRfqController extends Controller
             'rates.*.validity_date' => 'nullable|date',
         ]);
 
-        DB::transaction(function () use ($request, $rfqVendor) {
+        DB::transaction(function () use ($request, $rfqVendor, $allowedProductIds) {
             $attachmentPath = $rfqVendor->attachment_path;
             if ($request->hasFile('attachment')) {
                 $attachmentPath = $request->file('attachment')->store('rfq_attachments', 'public');
@@ -491,17 +659,19 @@ class PurchaseRfqController extends Controller
                 'status' => 'Received',
             ]);
 
-            // Save new Rate Submission (append to historical rate log)
+            // Save new Rate Submission (append to historical rate log) for allowed products only
             foreach ($request->input('rates') as $quote) {
-                PurchaseRfqVendorRate::create([
-                    'tenant_id' => $rfqVendor->tenant_id,
-                    'purchase_rfq_vendor_id' => $rfqVendor->id,
-                    'product_id' => $quote['product_id'],
-                    'rate' => $quote['rate'],
-                    'quantity' => $quote['quantity'],
-                    'delivery_date' => $quote['delivery_date'] ?? null,
-                    'validity_date' => $quote['validity_date'] ?? null,
-                ]);
+                if (in_array($quote['product_id'], $allowedProductIds)) {
+                    PurchaseRfqVendorRate::create([
+                        'tenant_id' => $rfqVendor->tenant_id,
+                        'purchase_rfq_vendor_id' => $rfqVendor->id,
+                        'product_id' => $quote['product_id'],
+                        'rate' => $quote['rate'],
+                        'quantity' => $quote['quantity'],
+                        'delivery_date' => $quote['delivery_date'] ?? null,
+                        'validity_date' => $quote['validity_date'] ?? null,
+                    ]);
+                }
             }
 
             // Check if all vendors have responded to auto-toggle main RFQ status

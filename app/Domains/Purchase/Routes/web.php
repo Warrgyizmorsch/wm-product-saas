@@ -10,6 +10,8 @@ Route::prefix('purchase')
     ->as('purchase.')
     ->group(function (): void {
         Route::get('requisitions/get-source-items', [PurchaseRequisitionController::class, 'getSourceItems'])->name('requisitions.get-source-items');
+        Route::get('requisitions/pending-items', [PurchaseRequisitionController::class, 'pendingItems'])->name('requisitions.pending-items');
+        Route::post('requisitions/pending-items/create-po', [PurchaseRequisitionController::class, 'createPosFromPendingItems'])->name('requisitions.pending-items.create-po');
         Route::post('requisitions/{requisition}/approve', [PurchaseRequisitionController::class, 'approve'])->name('requisitions.approve');
         Route::resource('requisitions', PurchaseRequisitionController::class);
 
