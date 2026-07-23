@@ -401,6 +401,17 @@ class MesExecutionService
                 $setupMinutes = (float) ($data['setup_minutes'] ?? 0);
                 $runMinutes = (float) ($data['run_minutes'] ?? 0);
 
+                if ($runMinutes === 0.0 && $schedOp->actual_start) {
+                    $pausedSec = $schedOp->accumulated_paused_seconds ?? 0;
+                    $diffSeconds = $now->timestamp - $schedOp->actual_start->timestamp - $pausedSec;
+                    $totalElapsedMinutes = max(0.0, round($diffSeconds / 60, 2));
+                    
+                    // Subtract previously logged minutes to get the increment
+                    $previouslyLogged = \App\Domains\Production\Models\ProductionOrderProgressLog::where('operation_id', $orderOp->id)
+                        ->sum('run_minutes_logged');
+                    $runMinutes = max(0.0, $totalElapsedMinutes - $previouslyLogged);
+                }
+
                 if ($produced < 0 || $rejected < 0 || $scrapped < 0) {
                     throw new InvalidArgumentException('Quantities cannot be negative.');
                 }
@@ -581,6 +592,9 @@ class MesExecutionService
 
             $now = now();
             
+            // Sync with underlying ProductionOrderOperation
+            $orderOp = ProductionOrderOperation::findOrFail($schedOp->production_order_operation_id);
+
             // Calculate setup/run minutes automatically from elapsed time if not provided
             $setupMinutes = (float) ($data['setup_minutes'] ?? 0);
             $runMinutes = (float) ($data['run_minutes'] ?? 0);
@@ -589,11 +603,13 @@ class MesExecutionService
                 $endDt = $schedOp->isPaused() && $schedOp->last_paused_at ? $schedOp->last_paused_at : $now;
                 $pausedSec = $schedOp->accumulated_paused_seconds ?? 0;
                 $diffSeconds = $endDt->timestamp - $schedOp->actual_start->timestamp - $pausedSec;
-                $runMinutes = max(0.0, round($diffSeconds / 60, 2));
+                $totalElapsedMinutes = max(0.0, round($diffSeconds / 60, 2));
+                
+                // Subtract previously logged minutes to get the increment
+                $previouslyLogged = \App\Domains\Production\Models\ProductionOrderProgressLog::where('operation_id', $orderOp->id)
+                    ->sum('run_minutes_logged');
+                $runMinutes = max(0.0, $totalElapsedMinutes - $previouslyLogged);
             }
-
-            // Sync with underlying ProductionOrderOperation
-            $orderOp = ProductionOrderOperation::findOrFail($schedOp->production_order_operation_id);
             
             $produced = (float) ($data['quantity_produced'] ?? 0);
             $rejected = (float) ($data['quantity_rejected'] ?? 0);
@@ -616,21 +632,6 @@ class MesExecutionService
                 $operatorId,
                 false // Do NOT complete operation
             );
-
-            // Reset start time and paused seconds for the next work session
-            if ($schedOp->isPaused()) {
-                $schedOp->update([
-                    'actual_start' => $now,
-                    'last_paused_at' => $now,
-                    'accumulated_paused_seconds' => 0,
-                ]);
-            } else {
-                $schedOp->update([
-                    'actual_start' => $now,
-                    'last_paused_at' => null,
-                    'accumulated_paused_seconds' => 0,
-                ]);
-            }
 
             app(ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
                 'production_order_id' => $schedOp->production_order_id,

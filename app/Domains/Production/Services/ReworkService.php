@@ -192,6 +192,7 @@ class ReworkService
                     if ($wip) {
                         $wip->rejected_quantity = max(0.0000, $wip->rejected_quantity - $reworkQty);
                         $wip->completed_quantity += $reworkQty;
+                        $wip->available_quantity += $reworkQty;
                         $wip->save();
                     }
                     

@@ -532,7 +532,7 @@
                                 @csrf
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Qty Produced" name="quantity_produced" inputType="number" step="any" value="0" :required="true" />
+                                        <x-ui.odoo-form-ui type="input" label="Qty Produced" name="quantity_produced" inputType="number" step="any" value="{{ max(0.0, ($activeOp->schedule->order->quantity_ordered ?? 0.0) - ($activeOp->orderOperation->quantity_produced ?? 0.0)) }}" :required="true" />
                                     </div>
                                     <div class="col-md-6">
                                         <x-ui.odoo-form-ui type="input" label="Qty Rejected" name="quantity_rejected" inputType="number" step="any" value="0" />

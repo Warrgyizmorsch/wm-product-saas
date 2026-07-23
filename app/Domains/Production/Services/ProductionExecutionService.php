@@ -61,7 +61,7 @@ class ProductionExecutionService
                 throw new InvalidArgumentException('Cannot log progress on an already completed operation.');
             }
 
-            if ($op->quantity_produced >= $order->quantity_ordered) {
+            if ($produced > 0 && $op->quantity_produced >= $order->quantity_ordered) {
                 throw new InvalidArgumentException('Cannot log progress: The planned target has already been fully produced.');
             }
 
@@ -180,8 +180,37 @@ class ProductionExecutionService
                     $nextOp->status = ProductionOrderOperation::STATUS_READY;
                     $nextOp->save();
                 }
+
+                // Sync with corresponding ProductionScheduleOperation if exists
+                $schedOp = \App\Domains\Production\Models\ProductionScheduleOperation::where('production_order_operation_id', $op->id)->first();
+                if ($schedOp && $schedOp->status !== \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_COMPLETED) {
+                    $now = now();
+                    $pausedSeconds = 0;
+                    if ($schedOp->isPaused() && $schedOp->last_paused_at) {
+                        $pausedSeconds = max(0, $now->timestamp - $schedOp->last_paused_at->timestamp);
+                    }
+                    
+                    $schedOp->update([
+                        'status' => \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_COMPLETED,
+                        'actual_finish' => $now,
+                        'accumulated_paused_seconds' => ($schedOp->accumulated_paused_seconds ?? 0) + $pausedSeconds,
+                        'last_paused_at' => null,
+                    ]);
+
+                    // Also advance the NEXT sequential schedule operation to READY!
+                    $nextSchedOp = \App\Domains\Production\Models\ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+                        ->where('sequence', '>', $schedOp->sequence)
+                        ->orderBy('sequence')
+                        ->first();
+                    if ($nextSchedOp && $nextSchedOp->status === \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_WAITING) {
+                        $nextSchedOp->status = \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_READY;
+                        $nextSchedOp->save();
+                    }
+                }
             } else {
-                $op->status = ProductionOrderOperation::STATUS_RUNNING;
+                if ($op->status !== ProductionOrderOperation::STATUS_PAUSED) {
+                    $op->status = ProductionOrderOperation::STATUS_RUNNING;
+                }
                 if (empty($op->actual_start_time)) {
                     $op->actual_start_time = now();
                 }
