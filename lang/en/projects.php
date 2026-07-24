@@ -186,6 +186,7 @@ return [
     'edit_task' => 'Edit Task',
     'task_details' => 'Task Details',
     'details' => 'Details',
+    'details_and_collaborators' => 'Project Details and Collaborators',
     'progress' => 'Progress',
     'completed' => 'Completed',
     'task_title' => 'Task Title',

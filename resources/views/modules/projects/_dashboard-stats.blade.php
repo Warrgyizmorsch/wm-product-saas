@@ -9,7 +9,7 @@
                 'todo' => $dashboard['tasks']['todo'],
             ]),
             'tone' => 'primary',
-            'tab' => 'tasklists',
+            'tab' => 'summary',
         ],
         [
             'label' => __('projects.milestones'),
@@ -36,7 +36,7 @@
                 ? __('projects.hours_of_budget', ['budget' => number_format($dashboard['hours']['budget'], 1)])
                 : __('projects.no_budget_hours'),
             'tone' => 'warning',
-            'tab' => 'tasklists',
+            'tab' => 'summary',
         ],
     ];
 @endphp

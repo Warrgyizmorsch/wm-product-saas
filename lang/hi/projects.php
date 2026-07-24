@@ -172,6 +172,7 @@ return [
     'edit_task' => 'टास्क संपादित करें',
     'task_details' => 'टास्क विवरण',
     'details' => 'विवरण',
+    'details_and_collaborators' => 'परियोजना विवरण और सहयोगी',
     'progress' => 'प्रगति',
     'completed' => 'पूर्ण',
     'task_title' => 'टास्क शीर्षक',

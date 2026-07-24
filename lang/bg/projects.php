@@ -172,6 +172,7 @@ return [
     'edit_task' => 'Редактиране на задача',
     'task_details' => 'Детайли за задачата',
     'details' => 'Детайли',
+    'details_and_collaborators' => 'Детайли за проекта и сътрудници',
     'progress' => 'Прогрес',
     'completed' => 'Завършени',
     'task_title' => 'Заглавие на задачата',
