@@ -2,6 +2,7 @@
 
 namespace App\Domains\Projects\Requests;
 
+use App\Domains\Projects\Services\ProjectMemberService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -12,7 +13,7 @@ class StoreTaskListRequest extends FormRequest
         return true; // Policy handled in controller
     }
 
-    public function rules(): array
+    public function rules(ProjectMemberService $members): array
     {
         $tenantId = require_tenant_id();
         $project = $this->route('project');
@@ -23,7 +24,7 @@ class StoreTaskListRequest extends FormRequest
             'owner_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->where('tenant_id', $tenantId),
+                $members->activeCollaboratorRule($project),
             ],
             'milestone_id' => [
                 'nullable',

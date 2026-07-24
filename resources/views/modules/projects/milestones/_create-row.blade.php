@@ -39,8 +39,8 @@
                     <div style="min-width: 180px; width: 200px;">
                         <select class="form-select form-select-sm milestone-create-owner" data-select2-selector="user">
                             <option value="">{{ __('projects.select_user') }}</option>
-                            @foreach ($tenantUsers as $tenantUser)
-                                <option value="{{ $tenantUser->id }}">{{ $tenantUser->name }}</option>
+                            @foreach ($activeMemberOptions as $memberOption)
+                                <option value="{{ $memberOption->id }}">{{ $memberOption->name }}</option>
                             @endforeach
                         </select>
                         <div class="invalid-feedback d-block fs-11 milestone-create-error" data-field="owner_id"></div>

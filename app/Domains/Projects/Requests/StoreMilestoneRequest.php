@@ -3,6 +3,7 @@
 namespace App\Domains\Projects\Requests;
 
 use App\Domains\Projects\Models\Milestone;
+use App\Domains\Projects\Services\ProjectMemberService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,9 +14,9 @@ class StoreMilestoneRequest extends FormRequest
         return true; // Policy handled in controller
     }
 
-    public function rules(): array
+    public function rules(ProjectMemberService $members): array
     {
-        $tenantId = require_tenant_id();
+        $project = $this->route('project');
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -23,7 +24,7 @@ class StoreMilestoneRequest extends FormRequest
             'owner_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->where('tenant_id', $tenantId),
+                $members->activeCollaboratorRule($project),
             ],
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],

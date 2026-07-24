@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domains\CRM\Models\Customer;
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Models\ProjectMember;
 use App\Models\Access\Role;
 use App\Models\Access\UserRole;
 use App\Models\Tenant;
@@ -102,6 +103,7 @@ class ProjectInlineFieldRelationTest extends TestCase
         $newOwner = User::create([
             'tenant_id' => $this->tenant->id, 'name' => 'New Owner', 'email' => 'new-owner@example.com', 'password' => bcrypt('password'),
         ]);
+        ProjectMember::create(['tenant_id' => $this->tenant->id, 'project_id' => $project->id, 'user_id' => $newOwner->id]);
 
         $response = $this->actingAs($this->tenantOwner)
             ->withHeader('X-Tenant', 'test-tenant')
@@ -147,6 +149,7 @@ class ProjectInlineFieldRelationTest extends TestCase
             'tenant_id' => $this->tenant->id, 'name' => 'Manager', 'email' => 'manager@example.com', 'password' => bcrypt('password'),
         ]);
         $project = $this->createProject();
+        ProjectMember::create(['tenant_id' => $this->tenant->id, 'project_id' => $project->id, 'user_id' => $manager->id]);
 
         $set = $this->actingAs($this->tenantOwner)
             ->withHeader('X-Tenant', 'test-tenant')

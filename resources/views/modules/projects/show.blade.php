@@ -138,10 +138,14 @@
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
-                                @php
-                                    $ownerOptions = $users->pluck('name', 'id');
-                                @endphp
-                                <x-ui.inline-edit field="owner_id" :value="$project->owner_id" :url="route('projects.field', $project)" type="select2" :options="$ownerOptions" :label="__('projects.project_owner')" />
+                                @if ($activeMemberOptions->isEmpty())
+                                    @include('modules.projects._no_collaborators_notice')
+                                @else
+                                    @php
+                                        $ownerOptions = $activeMemberOptions->pluck('name', 'id');
+                                    @endphp
+                                    <x-ui.inline-edit field="owner_id" :value="$project->owner_id" :url="route('projects.field', $project)" type="select2" :options="$ownerOptions" :label="__('projects.project_owner')" />
+                                @endif
                             @else
                                 {{ $project->owner?->name ?: '—' }}
                             @endif
@@ -154,11 +158,15 @@
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
-                                @php
-                                    $managerOptions = $users->pluck('name', 'id')
-                                        ->prepend(__('projects.none_option'), '');
-                                @endphp
-                                <x-ui.inline-edit field="manager_id" :value="$project->manager_id" :url="route('projects.field', $project)" type="select2" :options="$managerOptions" :label="__('projects.project_manager')" />
+                                @if ($activeMemberOptions->isEmpty())
+                                    @include('modules.projects._no_collaborators_notice')
+                                @else
+                                    @php
+                                        $managerOptions = $activeMemberOptions->pluck('name', 'id')
+                                            ->prepend(__('projects.none_option'), '');
+                                    @endphp
+                                    <x-ui.inline-edit field="manager_id" :value="$project->manager_id" :url="route('projects.field', $project)" type="select2" :options="$managerOptions" :label="__('projects.project_manager')" />
+                                @endif
                             @else
                                 {{ $project->manager?->name ?: '—' }}
                             @endif
@@ -355,6 +363,7 @@
         <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
         <script src="{{ asset('assets/js/milestones/inline-create.js') }}"></script>
         <script src="{{ asset('assets/js/tasklists/inline-create.js') }}"></script>
+        <script src="{{ asset('assets/js/projects/collaborators.js') }}"></script>
         <script>
             function openActivityDrawer(url) {
                 var drawerEl = document.getElementById('activityLogDrawer');

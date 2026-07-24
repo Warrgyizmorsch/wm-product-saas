@@ -28,6 +28,29 @@ class ProjectRepository implements ProjectRepositoryInterface
 
     public function getAll(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
+        return $this->baseQuery($filters)->paginate($perPage)->withQueryString();
+    }
+
+    /**
+     * Same filtered, sorted query as getAll(), without pagination applied —
+     * for consumers (e.g. exports) that need every matching row rather than
+     * one page of it. Ordering (including the tiebreaker in applySort()) is
+     * guaranteed identical to getAll() for the same $filters, so an export
+     * taken from this method always matches what the listing page shows.
+     */
+    public function getQuery(array $filters = []): Builder
+    {
+        return $this->baseQuery($filters);
+    }
+
+    /**
+     * The single place that builds the filtered, sorted Project query.
+     * getAll() (paginated) and getQuery() (unpaginated) both call this so
+     * search/status/priority/client/owner/date-range/sort logic never has to
+     * be duplicated between the listing page and any other consumer.
+     */
+    private function baseQuery(array $filters): Builder
+    {
         $query = Project::query()->with(['customer', 'owner', 'manager']);
 
         $startDate = $this->parseDateOrNull($filters['start_date'] ?? null);
@@ -48,7 +71,7 @@ class ProjectRepository implements ProjectRepositoryInterface
 
         $this->applySort($query, $filters['sort'] ?? null, $filters['direction'] ?? null);
 
-        return $query->paginate($perPage)->withQueryString();
+        return $query;
     }
 
     /**
@@ -72,12 +95,16 @@ class ProjectRepository implements ProjectRepositoryInterface
     /**
      * Applies server-side sorting from a whitelisted column map, joining
      * only the relation table a given sort actually needs. Falls back to
-     * newest-first when no (or an unknown) sort column is requested.
+     * newest-first when no (or an unknown) sort column is requested. Always
+     * appends 'projects.id' as a secondary sort so rows with equal values in
+     * the primary sort column come back in a stable, deterministic order —
+     * without this, ties could be ordered differently between the paginated
+     * listing and an unpaginated export of the same filters.
      */
     private function applySort(Builder $query, ?string $sort, ?string $direction): void
     {
         if ($sort === null || !array_key_exists($sort, self::SORTABLE_COLUMNS)) {
-            $query->orderByDesc('projects.created_at');
+            $query->orderByDesc('projects.created_at')->orderBy('projects.id');
 
             return;
         }
@@ -92,7 +119,7 @@ class ProjectRepository implements ProjectRepositoryInterface
             $query->leftJoin('users', 'users.id', '=', 'projects.owner_id');
         }
 
-        $query->orderBy(self::SORTABLE_COLUMNS[$sort], $direction);
+        $query->orderBy(self::SORTABLE_COLUMNS[$sort], $direction)->orderBy('projects.id');
     }
 
     public function find(int $id): ?Project

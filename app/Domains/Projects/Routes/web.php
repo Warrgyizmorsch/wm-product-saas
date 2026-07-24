@@ -17,6 +17,8 @@ Route::prefix('projects')
         Route::post('/', [ProjectController::class, 'store'])->name('store');
         Route::post('bulk-action', [ProjectController::class, 'bulkAction'])->name('bulk-action');
 
+        Route::get('export', [ProjectController::class, 'export'])->name('export');
+
         Route::get('lookups/clients', [ProjectController::class, 'searchClients'])->name('lookups.clients');
         Route::get('lookups/owners', [ProjectController::class, 'searchOwners'])->name('lookups.owners');
 
@@ -36,6 +38,14 @@ Route::prefix('projects')
                 Route::put('{member}', [ProjectMemberController::class, 'update'])->name('update');
                 Route::patch('{member}/toggle-active', [ProjectMemberController::class, 'toggleActive'])->name('toggle-active');
                 Route::delete('{member}', [ProjectMemberController::class, 'destroy'])->name('destroy');
+            });
+
+        Route::prefix('{project}/collaborators')
+            ->as('collaborators.')
+            ->group(function (): void {
+                Route::get('search', [ProjectMemberController::class, 'searchCollaborators'])->name('search');
+                Route::post('/', [ProjectMemberController::class, 'storeCollaborator'])->name('store');
+                Route::delete('{member}', [ProjectMemberController::class, 'destroyCollaborator'])->name('destroy');
             });
 
         Route::prefix('{project}/milestones')

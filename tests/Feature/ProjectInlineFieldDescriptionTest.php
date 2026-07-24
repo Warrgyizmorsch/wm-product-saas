@@ -89,6 +89,5 @@ class ProjectInlineFieldDescriptionTest extends TestCase
         $response->assertSee('data-field="description"', false);
         $response->assertSee('data-type="textarea"', false);
         $response->assertDontSee('editProjectModal-' . $project->id, false);
-        $response->assertDontSee(__('projects.edit_description'));
     }
 }

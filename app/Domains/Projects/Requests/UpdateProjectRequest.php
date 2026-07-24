@@ -3,6 +3,7 @@
 namespace App\Domains\Projects\Requests;
 
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Services\ProjectMemberService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,9 +14,10 @@ class UpdateProjectRequest extends FormRequest
         return true; // Policy handled in controller
     }
 
-    public function rules(): array
+    public function rules(ProjectMemberService $members): array
     {
         $tenantId = require_tenant_id();
+        $project = $this->route('project');
 
         return [
             'name'           => ['required', 'string', 'max:255'],
@@ -25,11 +27,11 @@ class UpdateProjectRequest extends FormRequest
             ],
             'owner_id'       => [
                 'required', 'integer',
-                Rule::exists('users', 'id')->where('tenant_id', $tenantId),
+                $members->activeCollaboratorRule($project),
             ],
             'manager_id'     => [
                 'nullable', 'integer',
-                Rule::exists('users', 'id')->where('tenant_id', $tenantId),
+                $members->activeCollaboratorRule($project),
             ],
             'start_date'     => ['required', 'date'],
             'end_date'       => ['nullable', 'date', 'after_or_equal:start_date'],

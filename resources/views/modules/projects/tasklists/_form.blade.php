@@ -16,12 +16,19 @@
         </option>
     @endforeach
 </x-ui.odoo-form-ui>
-<x-ui.odoo-form-ui type="select" id="tasklist_owner_id" label="{{ __('projects.tasklist_owner') }}" name="owner_id"
-    select2Selector="user" :errorText="$errors->first('owner_id')">
-    <option value="">{{ __('projects.select_user') }}</option>
-    @foreach ($tenantUsers as $tenantUser)
-        <option value="{{ $tenantUser->id }}" @selected((int) old('owner_id') === $tenantUser->id)>
-            {{ $tenantUser->name }}
-        </option>
-    @endforeach
-</x-ui.odoo-form-ui>
+@if ($activeMemberOptions->isEmpty())
+    <div class="mb-3">
+        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.tasklist_owner') }}</label>
+        @include('modules.projects._no_collaborators_notice')
+    </div>
+@else
+    <x-ui.odoo-form-ui type="select" id="tasklist_owner_id" label="{{ __('projects.tasklist_owner') }}" name="owner_id"
+        select2Selector="user" :errorText="$errors->first('owner_id')">
+        <option value="">{{ __('projects.select_user') }}</option>
+        @foreach ($activeMemberOptions as $memberOption)
+            <option value="{{ $memberOption->id }}" @selected((int) old('owner_id') === $memberOption->id)>
+                {{ $memberOption->name }}
+            </option>
+        @endforeach
+    </x-ui.odoo-form-ui>
+@endif
