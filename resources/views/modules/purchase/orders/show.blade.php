@@ -7,24 +7,45 @@
 @endsection
 
 @section('page-actions')
-    <div class="d-flex gap-2 flex-wrap text-dark">
-        <a href="{{ route('purchase.orders.index') }}" class="btn btn-light border fs-12">
-            <i class="feather-arrow-left me-2"></i>Back to Orders
+    <div class="d-flex align-items-center gap-0">
+        <a href="{{ route('purchase.orders.index') }}" class="action-dropdown-btn me-2" title="Back to Orders" data-bs-toggle="tooltip">
+            <i class="feather feather-arrow-left"></i>
         </a>
-        <a href="{{ route('purchase.orders.download', $order->id) }}" class="btn btn-light border fs-12">
-            <i class="feather-printer me-2"></i>Download PDF
+        <a href="{{ route('purchase.orders.download', $order->id) }}" class="action-dropdown-btn me-2" title="Download PDF" data-bs-toggle="tooltip">
+            <i class="feather feather-download"></i>
         </a>
 
         @if($order->status === 'Draft')
-            <a href="{{ route('purchase.orders.edit', $order->id) }}" class="btn btn-warning fs-12">
-                <i class="feather-edit me-2"></i>Edit Draft
-            </a>
-            <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to approve this purchase order?')">
+            <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST" class="d-inline me-2" onsubmit="return confirm('Are you sure you want to approve this purchase order?')">
                 @csrf
-                <button type="submit" class="btn btn-success text-white fs-12">
+                <button type="submit" class="btn btn-success">
                     <i class="feather-check-circle me-2"></i>Approve Order
                 </button>
             </form>
+
+            <form action="{{ route('purchase.orders.reject', $order->id) }}" method="POST" class="d-inline me-2" onsubmit="return confirm('Are you sure you want to reject this purchase order?')">
+                @csrf
+                <button type="submit" class="btn btn-danger">
+                    <i class="feather-x-circle me-2"></i>Reject Order
+                </button>
+            </form>
+
+            <x-ui.action-dropdown id="poDetailsActions-{{ $order->id }}">
+                <li>
+                    <a class="dropdown-item py-2" href="{{ route('purchase.orders.edit', $order->id) }}">
+                        <i class="feather-edit me-1.5 text-muted"></i> Edit Draft
+                    </a>
+                </li>
+                <li>
+                    <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this purchase order?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="dropdown-item py-2 text-danger">
+                            <i class="feather-trash-2 me-1.5"></i> Delete
+                        </button>
+                    </form>
+                </li>
+            </x-ui.action-dropdown>
         @endif
     </div>
 @endsection
@@ -32,6 +53,25 @@
 @once
     @push('styles')
         <style>
+            .action-dropdown-btn {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 32px !important;
+                height: 32px !important;
+                border-radius: 8px !important;
+                border: 1.5px solid #cbd5e1 !important;
+                background-color: #ffffff !important;
+                color: #475569 !important;
+                transition: all 0.28s ease !important;
+                text-decoration: none !important;
+                cursor: pointer !important;
+            }
+            .action-dropdown-btn:hover {
+                background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
+                border-color: var(--bs-primary) !important;
+                color: var(--bs-primary) !important;
+            }
             .so-status-pipeline {
                 display: inline-flex;
                 align-items: center;
@@ -322,7 +362,28 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach($order->items as $index => $item)
+                                    @php
+                                        $groupedItems = $order->items->groupBy('product_id')->map(function($items) {
+                                            $first = $items->first();
+                                            return (object) [
+                                                'id' => $first->id,
+                                                'product' => $first->product,
+                                                'product_id' => $first->product_id,
+                                                'quantity' => $items->sum('quantity'),
+                                                'rate' => $first->rate,
+                                                'amount' => $items->sum('amount'),
+                                                'discount_percent' => $first->discount_percent,
+                                                'discount_amount' => $items->sum('discount_amount'),
+                                                'tax_percent' => $first->tax_percent,
+                                                'cgst_percent' => $first->cgst_percent,
+                                                'sgst_percent' => $first->sgst_percent,
+                                                'igst_percent' => $first->igst_percent,
+                                                'tax_amount' => $items->sum('tax_amount'),
+                                                'total_amount' => $items->sum('total_amount'),
+                                            ];
+                                        })->values();
+                                    @endphp
+                                    @foreach($groupedItems as $index => $item)
                                         <tr>
                                             <td class="text-center fw-semibold text-muted ps-3">{{ $index + 1 }}</td>
                                             <td>

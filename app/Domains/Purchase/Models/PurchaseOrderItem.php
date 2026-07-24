@@ -18,6 +18,7 @@ class PurchaseOrderItem extends Model
     protected $fillable = [
         'purchase_order_id',
         'product_id',
+        'requisition_item_allocations',
         'quantity',
         'received_qty',
         'rate',
@@ -38,6 +39,7 @@ class PurchaseOrderItem extends Model
     protected $casts = [
         'purchase_order_id' => 'integer',
         'product_id' => 'integer',
+        'requisition_item_allocations' => 'array',
         'quantity' => 'decimal:4',
         'received_qty' => 'decimal:4',
         'rate' => 'decimal:2',

@@ -170,10 +170,15 @@
                                             @else
                                                 <select
                                                     id="warehouse-select-{{ $item->id }}"
-                                                    class="odoo-table-select"
+                                                    class="form-select form-select-sm"
                                                     onchange="changeWarehouse({{ $item->id }}, this)"
                                                     {{ $isLocked ? 'disabled' : '' }}
+                                                    data-select2-selector="default"
+                                                    data-master="warehouse"
+                                                    style="width: 100%;"
                                                 >
+                                                    <option value="">Select Warehouse...</option>
+                                                    <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="warehouse">+ Add New Warehouse</option>
                                                     @foreach ($warehouses as $w)
                                                         <option value="{{ $w->id }}" {{ ($item->warehouse_id ?: $defaultWarehouseId) == $w->id ? 'selected' : '' }}>
                                                             {{ $w->name }}
@@ -230,17 +235,17 @@
                                                                 ><i class="feather-file-text me-1"></i>Indent</button>
                                                             @endif
                                                         @elseif ($method === 'manufacture')
-                                                            @if ($item->status === 'Pending')
+                                                            @if ($item->status === 'Waiting Production')
+                                                                <x-ui.badge :soft="true" variant="warning" class="fs-11 px-2 w-100 text-center">
+                                                                    <i class="feather-clock me-1"></i>MO Raised
+                                                                </x-ui.badge>
+                                                            @else
                                                                 <button
                                                                     type="button"
                                                                     class="btn btn-sm btn-soft-danger px-2 py-1 fs-11 fw-semibold w-100"
                                                                     data-bs-toggle="modal"
                                                                     data-bs-target="#generateMoModal-{{ $item->id }}"
                                                                 ><i class="feather-cpu me-1"></i>Gen MO</button>
-                                                            @else
-                                                                <x-ui.badge :soft="true" variant="warning" class="fs-11 px-2">
-                                                                    <i class="feather-clock me-1"></i>MO Raised
-                                                                </x-ui.badge>
                                                             @endif
                                                         @endif
                                                     @else
@@ -445,7 +450,7 @@
 
         @endif
 
-        @if ($method === 'manufacture' && $item->status === 'Pending')
+        @if ($method === 'manufacture' && $item->status !== 'Waiting Production')
 
             {{-- ─── Generate MO Modal ─── --}}
             <x-ui.modal
@@ -538,6 +543,7 @@
     @endif
     </div>
 
+    <x-ui.master-modals :masters="['warehouse']" />
 @endsection
 
 

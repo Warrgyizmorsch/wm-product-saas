@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Warehouses Master | SaaS ERP')
-@section('page-title', 'Warehouses')
-@section('breadcrumb', 'Inventory / Warehouses')
+@section('title', __('inventory.warehouses_master'))
+@section('page-title', __('inventory.warehouses'))
+@section('breadcrumb', __('inventory.inventory_warehouses'))
 
 @section('content')
     @if (session('success'))
@@ -12,7 +12,7 @@
                     <i class="feather-check-circle"></i>
                 </div>
                 <div>
-                    <h6 class="alert-heading fw-bold mb-1">Success!</h6>
+                    <h6 class="alert-heading fw-bold mb-1">{{ __('inventory.success') }}</h6>
                     <p class="fs-12 mb-0">{{ session('success') }}</p>
                 </div>
             </div>
@@ -27,7 +27,7 @@
                     <i class="feather-alert-triangle"></i>
                 </div>
                 <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
+                    <h6 class="alert-heading fw-bold mb-1">{{ __('inventory.error') }}</h6>
                     <p class="fs-12 mb-0">{{ session('error') }}</p>
                 </div>
             </div>
@@ -38,17 +38,17 @@
     <div class="row">
         <!-- Left: Warehouse List Table -->
         <div class="col-lg-8">
-            <x-ui.card title="Warehouse Directory">
+            <x-ui.card :title="__('inventory.warehouse_directory')">
                 <div class="table-responsive">
                     <table class="erp-thin-table">
                         <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                             <tr>
-                                <th class="ps-4">Code</th>
-                                <th>Name</th>
-                                <th>Address</th>
-                                <th>Default</th>
-                                <th>Status</th>
-                                <th class="text-end pe-4">Actions</th>
+                                <th class="ps-4">{{ __('inventory.code') }}</th>
+                                <th>{{ __('inventory.name') }}</th>
+                                <th>{{ __('inventory.address') }}</th>
+                                <th>{{ __('inventory.default') }}</th>
+                                <th>{{ __('inventory.status') }}</th>
+                                <th class="text-end pe-4">{{ __('inventory.actions') }}</th>
                             </tr>
                         </thead>
                         <tbody class="fs-13 text-dark">
@@ -63,21 +63,21 @@
                                     </td>
                                     <td>
                                         @if ($warehouse->is_default)
-                                            <span class="badge bg-soft-primary text-primary px-2 py-0.5 fs-11 fw-semibold">Default</span>
+                                            <span class="badge bg-soft-primary text-primary px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.default') }}</span>
                                         @else
                                             <span class="text-muted">—</span>
                                         @endif
                                     </td>
                                     <td>
                                         @if ($warehouse->status === 'active')
-                                            <span class="erp-badge-active">Active</span>
+                                            <span class="erp-badge-active">{{ __('inventory.active') }}</span>
                                         @else
-                                            <span class="erp-badge-draft">Inactive</span>
+                                            <span class="erp-badge-draft">{{ __('inventory.inactive') }}</span>
                                         @endif
                                     </td>
                                     <td class="text-end pe-4">
                                         <div class="d-inline-flex gap-1 justify-content-end align-items-center">
-                                            <x-ui.icon-btn type="button" class="edit-warehouse-btn" variant="soft-primary" icon="feather-edit" title="Edit Warehouse"
+                                            <x-ui.icon-btn type="button" class="edit-warehouse-btn" variant="soft-primary" icon="feather-edit" title="{{ __('inventory.edit_warehouse') }}"
                                                     data-id="{{ $warehouse->id }}"
                                                     data-name="{{ $warehouse->name }}"
                                                     data-code="{{ $warehouse->code }}"
@@ -85,10 +85,10 @@
                                                     data-is-default="{{ $warehouse->is_default ? '1' : '0' }}"
                                                     data-status="{{ $warehouse->status }}" />
                                             
-                                            <form action="{{ route('inventory.warehouses.destroy', $warehouse) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this warehouse? All stock associations will be deleted.');" class="d-inline">
+                                            <form action="{{ route('inventory.warehouses.destroy', $warehouse) }}" method="POST" onsubmit="return confirm('{{ __('inventory.confirm_delete_warehouse') }}');" class="d-inline">
                                                 @csrf
                                                 @method('DELETE')
-                                                <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="Delete" />
+                                                <x-ui.icon-btn type="submit" variant="soft-danger" icon="feather-trash-2" title="{{ __('inventory.delete') }}" />
                                             </form>
                                         </div>
                                     </td>
@@ -96,7 +96,7 @@
                             @empty
                                 <tr>
                                     <td colspan="6" class="text-center py-4 text-muted">
-                                        <i class="feather-info me-2"></i>No warehouses configured. Set up your first location.
+                                        <i class="feather-info me-2"></i>{{ __('inventory.no_warehouses_configured') }}
                                     </td>
                                 </tr>
                             @endforelse
@@ -108,24 +108,24 @@
 
         <!-- Right: Create/Edit Form Card -->
         <div class="col-lg-4">
-            <x-ui.card title="New Warehouse" id="warehouseFormCard">
+            <x-ui.card :title="__('inventory.new_warehouse')" id="warehouseFormCard">
                 <form action="{{ route('inventory.warehouses.store') }}" method="POST" id="warehouseForm">
                     @csrf
                     <div id="methodContainer"></div>
 
                     <!-- Name -->
-                    <x-ui.input label="Warehouse Name" name="name" id="whName" required="true" placeholder="e.g. Main Warehouse" />
+                    <x-ui.input :label="__('inventory.warehouse_name')" name="name" id="whName" required="true" :placeholder="__('inventory.placeholder_wh_name')" />
 
                     <!-- Code -->
-                    <x-ui.input label="Warehouse Code" name="code" id="whCode" required="true" placeholder="e.g. WH-MAIN" />
+                    <x-ui.input :label="__('inventory.warehouse_code')" name="code" id="whCode" required="true" :placeholder="__('inventory.placeholder_wh_code')" />
 
                     <!-- Status (Visible only during Edit) -->
                     <div id="statusField" style="display: none;">
-                        <x-ui.select label="Status" name="status" id="whStatus" :options="['active' => 'Active', 'inactive' => 'Inactive']" />
+                        <x-ui.select :label="__('inventory.status')" name="status" id="whStatus" :options="['active' => __('inventory.active'), 'inactive' => __('inventory.inactive')]" />
                     </div>
 
                     <!-- Address -->
-                    <x-ui.textarea label="Address" name="address" id="whAddress" placeholder="Warehouse physical address..." rows="4" />
+                    <x-ui.textarea :label="__('inventory.address')" name="address" id="whAddress" :placeholder="__('inventory.placeholder_wh_address')" rows="4" />
 
                     <!-- Is Default Checkbox -->
                     <div class="mb-3 row">
@@ -134,15 +134,15 @@
                             <div class="form-check">
                                 <input type="checkbox" name="is_default" value="1" id="whDefault" class="form-check-input">
                                 <label class="form-check-label fs-12 text-dark" for="whDefault">
-                                    Set as default warehouse
+                                    {{ __('inventory.set_as_default_warehouse') }}
                                 </label>
                             </div>
                         </div>
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <button type="button" class="btn btn-sm btn-light border" id="resetWhForm" style="display: none;">Cancel</button>
-                        <button type="submit" class="btn btn-sm btn-primary" id="whSubmitBtn">Create Warehouse</button>
+                        <button type="button" class="btn btn-sm btn-light border" id="resetWhForm" style="display: none;">{{ __('inventory.cancel') }}</button>
+                        <button type="submit" class="btn btn-sm btn-primary" id="whSubmitBtn">{{ __('inventory.create_warehouse') }}</button>
                     </div>
                 </form>
             </x-ui.card>
@@ -153,6 +153,11 @@
 @push('scripts')
     <script>
         $(document).ready(function() {
+            const transEditWarehouse = '{{ __('inventory.edit_warehouse') }}';
+            const transNewWarehouse = '{{ __('inventory.new_warehouse') }}';
+            const transUpdateWarehouse = '{{ __('inventory.update_warehouse') }}';
+            const transCreateWarehouse = '{{ __('inventory.create_warehouse') }}';
+
             // Edit Button Action
             $('.edit-warehouse-btn').on('click', function() {
                 const id = $(this).data('id');
@@ -163,7 +168,7 @@
                 const status = $(this).data('status');
 
                 // Update Form Header
-                $('#warehouseFormCard').find('.card-title').html('<i class="feather-edit me-2 text-primary"></i>Edit Warehouse');
+                $('#warehouseFormCard').find('.card-title').html('<i class="feather-edit me-2 text-primary"></i>' + transEditWarehouse);
                 
                 // Update Form Action and Method
                 $('#warehouseForm').attr('action', `/inventory/warehouses/${id}`);
@@ -179,13 +184,13 @@
                 // Show Status Field and Cancel Button
                 $('#statusField').slideDown();
                 $('#resetWhForm').fadeIn();
-                $('#whSubmitBtn').html('Update Warehouse');
+                $('#whSubmitBtn').html(transUpdateWarehouse);
             });
 
             // Cancel Edit Action
             $('#resetWhForm').on('click', function() {
                 // Reset Form Header
-                $('#warehouseFormCard').find('.card-title').html('<i class="feather-plus-circle me-2 text-primary"></i>New Warehouse');
+                $('#warehouseFormCard').find('.card-title').html('<i class="feather-plus-circle me-2 text-primary"></i>' + transNewWarehouse);
                 
                 // Reset Form Action and Method
                 $('#warehouseForm').attr('action', `{{ route('inventory.warehouses.store') }}`);
@@ -197,7 +202,7 @@
                 // Hide Status Field and Cancel Button
                 $('#statusField').slideUp();
                 $('#resetWhForm').fadeOut();
-                $('#whSubmitBtn').html('Create Warehouse');
+                $('#whSubmitBtn').html(transCreateWarehouse);
             });
         });
     </script>

@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Edit Inventory Item | SaaS ERP')
-@section('page-title', 'Edit Item')
-@section('breadcrumb', 'Inventory / Items / Edit')
+@section('title', __('inventory.edit_inventory_item') . ' | SaaS ERP')
+@section('page-title', __('inventory.edit_item'))
+@section('breadcrumb', __('inventory.inventory_items_edit'))
 
 @push('styles')
     <!-- Select2 Theme Styles -->
@@ -38,7 +38,7 @@
 
 @section('page-actions')
     <a href="{{ route('inventory.products.index') }}" class="btn btn-light">
-        <i class="feather-arrow-left me-2"></i>Back
+        <i class="feather-arrow-left me-2"></i>{{ __('inventory.back') }}
     </a>
 @endsection
 
@@ -52,52 +52,52 @@
                     @method('PUT')
 
                     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
-                        <h3 class="fw-bold text-dark mb-0">Edit Item: {{ $product->name }}</h3>
+                        <h3 class="fw-bold text-dark mb-0">{{ __('inventory.edit_item_title', ['name' => $product->name]) }}</h3>
                         <div class="d-flex gap-2">
-                            <a href="{{ route('inventory.products.index') }}" class="btn btn-sm btn-light border">Cancel</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Update Product</button>
+                            <a href="{{ route('inventory.products.index') }}" class="btn btn-sm btn-light border">{{ __('inventory.cancel') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('inventory.update_product') }}</button>
                         </div>
                     </div>
 
                     <!-- Radio Type Selector in Zoho style (Readonly in edit mode to preserve references) -->
                     <div class="custom-radio-group mb-3">
-                        <span class="custom-radio-label">Item Type</span>
+                        <span class="custom-radio-label">{{ __('inventory.item_type') }}</span>
                         <span class="fw-semibold text-dark">{{ $product->item_type }}</span>
                         <input type="hidden" name="item_type" value="{{ $product->item_type }}">
                     </div>
 
                     <!-- Variation type (Readonly) -->
                     <div class="custom-radio-group mb-4">
-                        <span class="custom-radio-label">Variation</span>
+                        <span class="custom-radio-label">{{ __('inventory.variation') }}</span>
                         <span class="fw-semibold text-dark">{{ $product->variation_type }}</span>
                         <input type="hidden" name="variation_type" value="{{ $product->variation_type }}">
                     </div>
 
                     <!-- Supplier Method Selector -->
                     <div class="custom-radio-group mb-4">
-                        <span class="custom-radio-label">Supplier Method <span class="text-danger">*</span></span>
-                        <x-ui.radio name="supplier_method" value="buy" label="Buy" :checked="$product->supplier_method === 'buy' || is_null($product->supplier_method)" />
-                        <x-ui.radio name="supplier_method" value="manufacture" label="Manufacture" :checked="$product->supplier_method === 'manufacture'" />
+                        <span class="custom-radio-label">{{ __('inventory.supplier_method') }} <span class="text-danger">*</span></span>
+                        <x-ui.radio name="supplier_method" value="buy" :label="__('inventory.buy')" :checked="$product->supplier_method === 'buy' || is_null($product->supplier_method)" />
+                        <x-ui.radio name="supplier_method" value="manufacture" :label="__('inventory.manufacture')" :checked="$product->supplier_method === 'manufacture'" />
                     </div>
 
                     <div class="row g-4 mb-4 fs-13 text-dark">
                         <!-- Left Column: Primary details -->
                         <div class="col-lg-6 border-end">
-                            <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-2"></i>Primary Details</h6>
+                            <h6 class="fw-bold text-primary mb-3"><i class="feather-info me-2"></i>{{ __('inventory.primary_details') }}</h6>
                             
-                            <x-ui.odoo-form-ui type="input" label="Item Name" name="name" value="{{ $product->name }}" required="true" placeholder="Enter Product/Service Name" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.item_name')" name="name" value="{{ $product->name }}" required="true" placeholder="Enter Product/Service Name" />
 
                             @if($product->variation_type === 'Single')
-                                <x-ui.odoo-form-ui type="input" label="SKU" name="sku" value="{{ $product->sku }}" required="true" placeholder="Enter Unique SKU Code" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.sku')" name="sku" value="{{ $product->sku }}" required="true" placeholder="Enter Unique SKU Code" />
                             @else
                                 <div class="odoo-form-group">
-                                    <label class="odoo-form-label">SKU</label>
+                                    <label class="odoo-form-label">{{ __('inventory.sku') }}</label>
                                     <span class="fw-semibold text-dark">{{ $product->sku }}</span>
                                     <input type="hidden" name="sku" value="{{ $product->sku }}">
                                 </div>
                             @endif
 
-                            <x-ui.odoo-form-ui type="select" label="Unit" name="uom_id" required="true">
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.unit')" name="uom_id" required="true">
                                 @foreach($uoms as $uom)
                                     <option value="{{ $uom->id }}" {{ $product->uom_id == $uom->id ? 'selected' : '' }}>
                                         {{ $uom->name }} ({{ $uom->code }})
@@ -106,61 +106,61 @@
                             </x-ui.odoo-form-ui>
 
                             @if($product->item_type === 'Goods')
-                                <x-ui.odoo-form-ui type="select" label="Material Type" name="type" required="true">
-                                    <option value="finished_good" {{ old('type', $product->type) === 'finished_good' ? 'selected' : '' }}>Finished Good (Standard Sales/Assembly)</option>
-                                    <option value="semi_finished" {{ old('type', $product->type) === 'semi_finished' ? 'selected' : '' }}>Semi-Finished Good (Assembly Components)</option>
-                                    <option value="raw_material" {{ old('type', $product->type) === 'raw_material' ? 'selected' : '' }}>Raw Material (Purchase Only)</option>
-                                    <option value="component" {{ old('type', $product->type) === 'component' ? 'selected' : '' }}>Component (Spare / Standard Part)</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('inventory.material_type')" name="type" required="true">
+                                    <option value="finished_good" {{ old('type', $product->type) === 'finished_good' ? 'selected' : '' }}>{{ __('inventory.finished_good_std') }}</option>
+                                    <option value="semi_finished" {{ old('type', $product->type) === 'semi_finished' ? 'selected' : '' }}>{{ __('inventory.semi_finished_comp') }}</option>
+                                    <option value="raw_material" {{ old('type', $product->type) === 'raw_material' ? 'selected' : '' }}>{{ __('inventory.raw_material_purch') }}</option>
+                                    <option value="component" {{ old('type', $product->type) === 'component' ? 'selected' : '' }}>{{ __('inventory.component_spare') }}</option>
                                 </x-ui.odoo-form-ui>
                             @else
                                 <input type="hidden" name="type" value="service">
                             @endif
 
-                            <x-ui.odoo-form-ui type="select" label="Status" name="status" required="true">
-                                <option value="active" {{ $product->status === 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="inactive" {{ $product->status === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.status')" name="status" required="true">
+                                <option value="active" {{ $product->status === 'active' ? 'selected' : '' }}>{{ __('inventory.active') }}</option>
+                                <option value="inactive" {{ $product->status === 'inactive' ? 'selected' : '' }}>{{ __('inventory.inactive') }}</option>
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" label="Brand" name="brand" value="{{ $product->brand }}" placeholder="e.g. Apple, Nike" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.brand')" name="brand" value="{{ $product->brand }}" placeholder="e.g. Apple, Nike" />
                             
-                            <x-ui.odoo-form-ui type="input" label="Manufacturer" name="manufacturer" value="{{ $product->manufacturer }}" placeholder="Manufacturer Name" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.manufacturer')" name="manufacturer" value="{{ $product->manufacturer }}" placeholder="Manufacturer Name" />
                             
-                            <x-ui.odoo-form-ui type="input" label="MPN" name="mpn" value="{{ $product->mpn }}" placeholder="Manufacturer Part Number" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.mpn')" name="mpn" value="{{ $product->mpn }}" placeholder="Manufacturer Part Number" />
 
                             <div class="border-top pt-3 mt-3">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>Identifiers</h6>
-                                <x-ui.odoo-form-ui type="input" label="Barcode" name="barcode" value="{{ $product->barcode }}" placeholder="Barcode (EAN/UPC)" />
-                                <x-ui.odoo-form-ui type="input" label="UPC" name="upc" value="{{ $product->upc }}" placeholder="Universal Product Code" />
-                                <x-ui.odoo-form-ui type="input" label="EAN" name="ean" value="{{ $product->ean }}" placeholder="European Article Number" />
-                                <x-ui.odoo-form-ui type="input" label="ISBN" name="isbn" value="{{ $product->isbn }}" placeholder="International Standard Book Number" />
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>{{ __('inventory.identifiers') }}</h6>
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.barcode')" name="barcode" value="{{ $product->barcode }}" placeholder="Barcode (EAN/UPC)" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.upc')" name="upc" value="{{ $product->upc }}" placeholder="Universal Product Code" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.ean')" name="ean" value="{{ $product->ean }}" placeholder="European Article Number" />
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.isbn')" name="isbn" value="{{ $product->isbn }}" placeholder="International Standard Book Number" />
                             </div>
                         </div>
 
                         <!-- Right Column: Sales & Purchase Accounts -->
                         <div class="col-lg-6">
-                            <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-2"></i>Sales & Purchase Information</h6>
+                            <h6 class="fw-bold text-primary mb-3"><i class="feather-dollar-sign me-2"></i>{{ __('inventory.sales_purchase_info') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" label="Selling Price" name="selling_price" value="{{ $product->selling_price }}" inputType="number" step="0.01" placeholder="Selling Price (₹)" required="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" value="{{ $product->selling_price }}" inputType="number" step="0.01" placeholder="Selling Price (₹)" required="true" />
 
-                            <x-ui.odoo-form-ui type="select" label="Sales Account" name="sales_account" required="true">
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" required="true">
                                 <option value="Sales Income" {{ $product->sales_account === 'Sales Income' ? 'selected' : '' }}>Sales Income Account</option>
                                 <option value="General Income" {{ $product->sales_account === 'General Income' ? 'selected' : '' }}>General Income Account</option>
                                 <option value="Interest Income" {{ $product->sales_account === 'Interest Income' ? 'selected' : '' }}>Interest Income Account</option>
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" label="Cost Price" name="cost_price" value="{{ $product->cost_price }}" inputType="number" step="0.01" placeholder="Purchase Cost (₹)" required="true" />
+                            <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" value="{{ $product->cost_price }}" inputType="number" step="0.01" placeholder="Purchase Cost (₹)" required="true" />
 
-                            <x-ui.odoo-form-ui type="select" label="Purchase Account" name="purchase_account" required="true">
+                            <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" required="true">
                                 <option value="Cost of Goods Sold" {{ $product->purchase_account === 'Cost of Goods Sold' ? 'selected' : '' }}>Cost of Goods Sold (COGS)</option>
                                 <option value="Purchases" {{ $product->purchase_account === 'Purchases' ? 'selected' : '' }}>Purchases Expense Account</option>
                                 <option value="Job Costs" {{ $product->purchase_account === 'Job Costs' ? 'selected' : '' }}>Job Costs Expense Account</option>
                             </x-ui.odoo-form-ui>
 
                             <div class="border-top pt-3 mt-3">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-percent me-2"></i>Taxation & Preferred Vendor</h6>
-                                <x-ui.odoo-form-ui type="input" label="HSN/SAC Code" name="hsn_sac" value="{{ $product->hsn_sac }}" placeholder="e.g. 8471 (HSN) or 9983 (SAC)" />
+                                <h6 class="fw-bold text-primary mb-3"><i class="feather-percent me-2"></i>{{ __('inventory.taxation_preferred_vendor') }}</h6>
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.hsn_sac_code')" name="hsn_sac" value="{{ $product->hsn_sac }}" placeholder="e.g. 8471 (HSN) or 9983 (SAC)" />
 
-                                <x-ui.odoo-form-ui type="select" label="GST Rate" name="gst_rate">
+                                <x-ui.odoo-form-ui type="select" :label="__('inventory.gst_rate')" name="gst_rate">
                                     <option value="0" {{ $product->gst_rate == 0 ? 'selected' : '' }}>GST @ 0% (Exempt)</option>
                                     <option value="5" {{ $product->gst_rate == 5 ? 'selected' : '' }}>GST @ 5%</option>
                                     <option value="12" {{ $product->gst_rate == 12 ? 'selected' : '' }}>GST @ 12%</option>
@@ -168,8 +168,8 @@
                                     <option value="28" {{ $product->gst_rate == 28 ? 'selected' : '' }}>GST @ 28%</option>
                                 </x-ui.odoo-form-ui>
 
-                                <x-ui.odoo-form-ui type="select" label="Preferred Vendor" name="preferred_vendor_id" searchable="true">
-                                    <option value="">Select Preferred Supplier...</option>
+                                <x-ui.odoo-form-ui type="select" :label="__('inventory.preferred_vendor')" name="preferred_vendor_id" searchable="true">
+                                    <option value="">{{ __('inventory.select_preferred_vendor') }}</option>
                                     @foreach($vendors as $vendor)
                                         <option value="{{ $vendor->id }}" {{ $product->preferred_vendor_id == $vendor->id ? 'selected' : '' }}>
                                             {{ $vendor->name }}

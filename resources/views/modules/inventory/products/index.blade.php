@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Items List | SaaS ERP')
-@section('page-title', 'Items Management')
-@section('breadcrumb', 'Inventory / Items')
+@section('title', __('inventory.items_list') . ' | SaaS ERP')
+@section('page-title', __('inventory.items_management'))
+@section('breadcrumb', __('inventory.inventory_items'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -16,7 +16,7 @@
 
 @section('page-actions')
     <x-ui.button href="{{ route('inventory.products.create') }}" variant="primary" icon="feather-plus">
-        New Item
+        {{ __('inventory.new_item') }}
     </x-ui.button>
 @endsection
 
@@ -43,70 +43,70 @@
 
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">Items Listing</h5>
+            <h5 class="fw-bold text-dark mb-0">{{ __('inventory.items_listing') }}</h5>
             <div class="d-flex gap-2 ms-auto">
                 <!-- Custom Sort Component -->
-                <x-ui.sort-dropdown label="Sort">
+                <x-ui.sort-dropdown :label="__('inventory.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Item Name (A-Z)</span>
+                        <span>{{ __('inventory.sort_item_name_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Item Name (Z-A)</span>
+                        <span>{{ __('inventory.sort_item_name_za') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'sku', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'sku' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>SKU (A-Z)</span>
+                        <span>{{ __('inventory.sort_sku_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'sku', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'sku' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>SKU (Z-A)</span>
+                        <span>{{ __('inventory.sort_sku_za') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'selling_price', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'selling_price' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Selling Price (High to Low)</span>
+                        <span>{{ __('inventory.sort_selling_price_desc') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'selling_price', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'selling_price' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Selling Price (Low to High)</span>
+                        <span>{{ __('inventory.sort_selling_price_asc') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'cost_price', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'cost_price' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Cost Price (High to Low)</span>
+                        <span>{{ __('inventory.sort_cost_price_desc') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'cost_price', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'cost_price' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Cost Price (Low to High)</span>
+                        <span>{{ __('inventory.sort_cost_price_asc') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- Custom Filter Component -->
                 <form method="GET" action="{{ route('inventory.products.index') }}" class="d-inline">
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('inventory.filter')" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('inventory.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search by name, SKU..." value="{{ request('search') }}" />
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.search_keywords') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('inventory.search_placeholder_products')" value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Item Type</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.item_type') }}</label>
                             <x-ui.odoo-form-ui type="select" name="item_type">
-                                <option value="">All Item Types</option>
-                                <option value="Goods" {{ request('item_type') === 'Goods' ? 'selected' : '' }}>Goods (Physical)</option>
-                                <option value="Service" {{ request('item_type') === 'Service' ? 'selected' : '' }}>Service</option>
+                                <option value="">{{ __('inventory.all_item_types') }}</option>
+                                <option value="Goods" {{ request('item_type') === 'Goods' ? 'selected' : '' }}>{{ __('inventory.goods_physical') }}</option>
+                                <option value="Service" {{ request('item_type') === 'Service' ? 'selected' : '' }}>{{ __('inventory.service') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('inventory.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                                <option value="">{{ __('inventory.all_statuses') }}</option>
+                                <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>{{ __('inventory.active') }}</option>
+                                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>{{ __('inventory.inactive') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('inventory.products.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('inventory.products.index') }}" class="btn btn-sm btn-light border">{{ __('inventory.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('inventory.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -121,14 +121,14 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
-                        <th>Item Name / SKU</th>
-                        <th>Type</th>
-                        <th>Variation</th>
-                        <th class="text-end">Selling Price</th>
-                        <th class="text-end">Cost Price</th>
-                        <th class="text-end">Stock on Hand</th>
-                        <th>Status</th>
-                        <th class="text-end pe-4">Action</th>
+                        <th>{{ __('inventory.item_name_sku') }}</th>
+                        <th>{{ __('inventory.type') }}</th>
+                        <th>{{ __('inventory.variation') }}</th>
+                        <th class="text-end">{{ __('inventory.selling_price') }}</th>
+                        <th class="text-end">{{ __('inventory.cost_price') }}</th>
+                        <th class="text-end">{{ __('inventory.stock_on_hand') }}</th>
+                        <th>{{ __('inventory.status') }}</th>
+                        <th class="text-end pe-4">{{ __('inventory.action') }}</th>
                     </tr>
                 </thead>
                 <tbody class="fs-13 text-dark">
@@ -147,18 +147,18 @@
                             </td>
                             <td>
                                 @if($product->item_type === 'Goods')
-                                    <span class="badge bg-soft-info text-info px-2 py-0.5 fs-11 fw-semibold">Goods</span>
+                                    <span class="badge bg-soft-info text-info px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.goods') }}</span>
                                 @else
-                                    <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold">Service</span>
+                                    <span class="badge bg-soft-warning text-warning px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.service') }}</span>
                                 @endif
                             </td>
                             <td>
                                 @if($product->variation_type === 'Variant')
                                     <span class="badge bg-soft-primary text-primary px-2 py-0.5 fs-11 fw-semibold">
-                                        {{ $product->variants->count() }} Variants
+                                        {{ $product->variants->count() }} {{ __('inventory.variants') }}
                                     </span>
                                 @else
-                                    <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11 fw-semibold">Single</span>
+                                    <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.single') }}</span>
                                 @endif
                             </td>
                             <td class="text-end fw-bold">
@@ -182,25 +182,25 @@
                             </td>
                             <td>
                                 @if ($product->status === 'active')
-                                    <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold">Active</span>
+                                    <span class="badge bg-soft-success text-success px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.active') }}</span>
                                 @else
-                                    <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11 fw-semibold">Inactive</span>
+                                    <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-11 fw-semibold">{{ __('inventory.inactive') }}</span>
                                 @endif
                             </td>
                             <td class="text-end pe-4">
                                 <x-ui.action-dropdown :viewUrl="route('inventory.products.show', $product)">
                                     <li>
                                         <a href="{{ route('inventory.products.edit', $product) }}" class="dropdown-item">
-                                            <i class="feather-edit me-2 text-muted fs-12"></i>Edit Item
+                                            <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('inventory.edit_item') }}
                                         </a>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <form action="{{ route('inventory.products.destroy', $product) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this product?');" class="d-inline">
+                                        <form action="{{ route('inventory.products.destroy', $product) }}" method="POST" onsubmit="return confirm('{{ __('inventory.confirm_delete_product') }}');" class="d-inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="dropdown-item text-danger">
-                                                <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Item
+                                                <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('inventory.delete_item') }}
                                             </button>
                                         </form>
                                     </li>
@@ -211,7 +211,7 @@
                         <tr>
                             <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="feather-box fs-1 d-block mb-3 text-light"></i>
-                                No items or products found in this workspace.
+                                {{ __('inventory.no_items_found') }}
                             </td>
                         </tr>
                     @endforelse

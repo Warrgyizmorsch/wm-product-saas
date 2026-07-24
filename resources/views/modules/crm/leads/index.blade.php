@@ -197,19 +197,31 @@
                                 @endif
                             </td>
                             <td>
-                                <span class="badge bg-soft-secondary text-secondary">{{ $lead->source }}</span>
-                            </td>
-                            <td>
-                                @if ($lead->priority == 'High' || $lead->priority == 'Urgent')
-                                    <span class="badge bg-soft-danger text-danger">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
-                                @elseif ($lead->priority == 'Medium')
-                                    <span class="badge bg-soft-warning text-warning">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                @if($lead->source && $lead->source !== 'Select an Option')
+                                    <span class="badge bg-soft-secondary text-secondary">{{ $lead->source }}</span>
                                 @else
-                                    <span class="badge bg-soft-success text-success">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                    <span class="text-muted">—</span>
                                 @endif
                             </td>
                             <td>
-                                <span class="badge bg-soft-info text-info">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span>
+                                @if($lead->priority && $lead->priority !== 'Select an Option')
+                                    @if ($lead->priority == 'High' || $lead->priority == 'Urgent')
+                                        <span class="badge bg-soft-danger text-danger">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                    @elseif ($lead->priority == 'Medium')
+                                        <span class="badge bg-soft-warning text-warning">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                    @else
+                                        <span class="badge bg-soft-success text-success">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                    @endif
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($lead->segment && $lead->segment !== 'Select an Option')
+                                    <span class="badge bg-soft-info text-info">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
                             </td>
                             <td>
                                 @if ($lead->is_customer || $lead->status === 'Converted')

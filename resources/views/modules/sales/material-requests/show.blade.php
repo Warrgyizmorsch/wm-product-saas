@@ -6,6 +6,55 @@
     <a href="{{ route('sales.material-requests.index') }}">Material Requests</a> &gt; Details
 @endsection
 
+@push('styles')
+    <style>
+        .action-dropdown-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 8px !important;
+            border: 1.5px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            color: #475569 !important;
+            transition: all 0.28s ease !important;
+            text-decoration: none !important;
+            cursor: pointer !important;
+        }
+        .action-dropdown-btn:hover {
+            background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+        }
+        
+        /* Force Duralux theme white container style with border on select2 selection box */
+        #bulkWarehouseSelect + .select2-container .select2-selection,
+        #bulkActionType + .select2-container .select2-selection {
+            background-color: #ffffff !important;
+            border: 1.5px solid #cbd5e1 !important;
+            border-radius: 8px !important;
+            height: 38px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+        }
+        #bulkWarehouseSelect + .select2-container .select2-selection__rendered,
+        #bulkActionType + .select2-container .select2-selection__rendered {
+            color: var(--bs-primary) !important;
+            font-weight: 600 !important;
+            padding-left: 12px !important;
+        }
+    </style>
+@endpush
+
+@section('page-actions')
+    <div class="d-flex align-items-center gap-0">
+        <a href="{{ route('sales.material-requests.index') }}" class="action-dropdown-btn me-2" title="Back to Slips" data-bs-toggle="tooltip">
+            <i class="feather feather-arrow-left"></i>
+        </a>
+    </div>
+@endsection
+
 @section('content')
     <div class="erp-single-panel">
         <!-- Toast Notifications -->
@@ -17,50 +66,40 @@
         @endif
 
         <x-ui.odoo-form-ui type="sheet">
-            <!-- Header section with back button -->
-            <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+            <!-- Header bar with title and status badge next to it -->
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-3 mb-4 border-bottom">
                 <div>
-                    <h4 class="fw-bold text-dark mb-0">{{ $slip->requisition_number }}</h4>
-                    <small class="text-muted fs-12">Generated on {{ date('d-m-Y', strtotime($slip->requisition_date)) }}</small>
+                    <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">Material Requisition Slip</span>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <h4 class="fw-bold text-dark mb-0">{{ $slip->requisition_number }}</h4>
+                        @php
+                            $statusClass = 'danger';
+                            if ($slip->status === 'completed') $statusClass = 'success';
+                            elseif ($slip->status === 'partial') $statusClass = 'warning';
+                        @endphp
+                        <x-ui.badge :soft="true" :variant="$statusClass" class="px-2.5 py-1 fs-11 fw-bold">
+                            {{ $slip->status === 'completed' ? 'Fully Issued' : ($slip->status === 'partial' ? 'Partially Issued' : 'Pending Issue') }}
+                        </x-ui.badge>
+                    </div>
+                    <span class="fs-13 text-muted">
+                        Generated on:&nbsp;<strong class="text-dark">{{ date('d-M-Y', strtotime($slip->requisition_date)) }}</strong>
+                    </span>
                 </div>
-                <a href="{{ route('sales.material-requests.index') }}" class="btn btn-sm btn-light border">
-                    <i class="feather-arrow-left me-1"></i> Back to Slips
-                </a>
             </div>
 
-            <!-- Slip Summary Widgets -->
-            <div class="row g-3 mb-4">
+            <!-- Metadata Row -->
+            <div class="row g-3 mb-4 fs-13 text-dark pb-3 border-bottom">
                 <div class="col-md-3">
-                    <div class="card border bg-light py-2 px-3">
-                        <div class="fs-11 text-muted text-uppercase fw-semibold">Production Order</div>
-                        <div class="fs-15 fw-bold text-dark">{{ $slip->order->order_number ?? 'MO #' . $slip->production_order_id }}</div>
-                    </div>
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">Production Order</span>
+                    <strong class="fs-14 font-monospace text-primary">{{ $slip->order->order_number ?? 'MO #' . $slip->production_order_id }}</strong>
                 </div>
-                <div class="col-md-5">
-                    <div class="card border bg-light py-2 px-3">
-                        <div class="fs-11 text-muted text-uppercase fw-semibold">Target Product (to Manufacture)</div>
-                        <div class="fs-14 fw-bold text-dark">{{ $slip->order->product->name ?? '—' }} ({{ $slip->order->product->sku ?? '—' }})</div>
-                    </div>
+                <div class="col-md-6">
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">Target Product (to Manufacture)</span>
+                    <strong>{{ $slip->order->product->name ?? '—' }} ({{ $slip->order->product->sku ?? '—' }})</strong>
                 </div>
-                <div class="col-md-2">
-                    <div class="card border bg-light py-2 px-3">
-                        <div class="fs-11 text-muted text-uppercase fw-semibold">Qty Ordered</div>
-                        <div class="fs-15 fw-bold text-dark">{{ (float) ($slip->order->quantity_ordered ?? 0.0) }}</div>
-                    </div>
-                </div>
-                <div class="col-md-2">
-                    <div class="card border bg-light py-2 px-3">
-                        <div class="fs-11 text-muted text-uppercase fw-semibold">Slip Status</div>
-                        <div>
-                            @if($slip->status === 'completed')
-                                <span class="badge bg-success-soft text-success px-2 py-1 fs-12 mt-1">Completed</span>
-                            @elseif($slip->status === 'partial')
-                                <span class="badge bg-warning-soft text-warning px-2 py-1 fs-12 mt-1">Partial</span>
-                            @else
-                                <span class="badge bg-danger-soft text-danger px-2 py-1 fs-12 mt-1">Pending</span>
-                            @endif
-                        </div>
-                    </div>
+                <div class="col-md-3">
+                    <span class="text-muted d-block fs-11 text-uppercase fw-bold mb-1">Qty Ordered</span>
+                    <strong class="fs-14 font-monospace">{{ (float) ($slip->order->quantity_ordered ?? 0.0) }}</strong>
                 </div>
             </div>
 
@@ -72,7 +111,7 @@
                 <div class="row align-items-center g-3">
                     <div class="col-md-3">
                         <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase">1. Choose Bulk Action Type</label>
-                        <select id="bulkActionType" name="action_type" class="form-select form-select-sm fw-semibold text-primary" required>
+                        <select id="bulkActionType" name="action_type" class="form-select form-select-sm" data-select2-selector="default" required style="width: 100%;">
                             <option value="" selected>-- Select Bulk Action --</option>
                             <option value="reserve">Reserve Stock</option>
                             <option value="issue">Issue Stock</option>
@@ -82,7 +121,9 @@
                     
                     <div class="col-md-3">
                         <label class="form-label fs-11 fw-bold text-muted mb-1 text-uppercase" id="warehouseLabel">2. Select Warehouse</label>
-                        <select id="bulkWarehouseSelect" name="warehouse_id" class="form-select form-select-sm">
+                        <select id="bulkWarehouseSelect" name="warehouse_id" class="form-select form-select-sm" data-select2-selector="default" data-master="warehouse" style="width: 100%;">
+                            <option value="">Select Warehouse...</option>
+                            <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="warehouse">+ Add New Warehouse</option>
                             @foreach($warehouses as $wh)
                                 <option value="{{ $wh->id }}" @selected($wh->is_default)>
                                     {{ $wh->name }} {{ $wh->is_default ? '(Default)' : '' }}
@@ -363,12 +404,15 @@
         </div>
     </x-ui.modal>
 
+    <x-ui.master-modals :masters="['warehouse']" />
 @endsection
 
 @push('scripts')
     <script>
         function updateReserveQtyLimit(itemId, select, remainingToReserve) {
+            if (!select || select.selectedIndex === -1) return;
             const selectedOption = select.options[select.selectedIndex];
+            if (!selectedOption) return;
             const avail = parseFloat(selectedOption.getAttribute('data-avail')) || 0.0;
             
             // Limit reserve quantity: min of remaining to reserve and warehouse available stock
@@ -381,7 +425,9 @@
         }
 
         function updateIssueQtyLimit(itemId, select, remainingToIssue, reservedQty) {
+            if (!select || select.selectedIndex === -1) return;
             const selectedOption = select.options[select.selectedIndex];
+            if (!selectedOption) return;
             const avail = parseFloat(selectedOption.getAttribute('data-avail')) || 0.0;
             
             // Limit issue quantity: min of remaining to issue and (reserved stock + warehouse available stock)
@@ -540,6 +586,10 @@
             function updateGridStates() {
                 const action = $bulkActionType.val();
                 const warehouseId = $bulkWarehouseSelect.val();
+
+                if (warehouseId === '__ADD_NEW__') {
+                    return;
+                }
 
                 if (!action) {
                     $('.id-notes-field').addClass('d-none');

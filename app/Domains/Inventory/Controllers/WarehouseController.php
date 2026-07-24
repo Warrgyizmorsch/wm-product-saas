@@ -130,4 +130,36 @@ class WarehouseController extends Controller
         return redirect()->route('inventory.warehouses.index')
             ->with('success', 'Warehouse deleted successfully.');
     }
+
+    public function quickCreate(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('create', Warehouse::class);
+
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'code' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('warehouses', 'code')->where(fn($q) => $q->where('tenant_id', $tenantId))
+            ],
+            'address' => 'nullable|string|max:1000',
+        ]);
+
+        $warehouse = Warehouse::create([
+            'tenant_id' => $tenantId,
+            'name' => $validated['name'],
+            'code' => strtoupper($validated['code']),
+            'address' => $validated['address'] ?? null,
+            'is_default' => Warehouse::query()->count() === 0,
+            'status' => 'active',
+        ]);
+
+        return response()->json([
+            'id' => $warehouse->id,
+            'name' => $warehouse->name,
+        ]);
+    }
 }

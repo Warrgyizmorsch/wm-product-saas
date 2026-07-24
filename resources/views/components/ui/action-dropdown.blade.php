@@ -51,14 +51,16 @@
         </a>
     @endif
 
-    <div class="dropdown" id="{{ $dropdownId }}">
-        <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" data-offset="{{ $offset }}" title="More Actions" data-bs-toggle="tooltip">
-            <i class="feather feather-more-horizontal"></i>
-        </a>
-        <ul class="dropdown-menu dropdown-menu-end" style="margin: 0;">
-            {{ $slot }}
-        </ul>
-    </div>
+    @if(isset($slot) && trim($slot) !== '')
+        <div class="dropdown" id="{{ $dropdownId }}">
+            <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" data-offset="{{ $offset }}" title="More Actions" data-bs-toggle="tooltip">
+                <i class="feather feather-more-horizontal"></i>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" style="margin: 0;">
+                {{ $slot }}
+            </ul>
+        </div>
+    @endif
 </div>
 
 @once
