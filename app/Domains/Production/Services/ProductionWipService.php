@@ -195,7 +195,7 @@ class ProductionWipService
                 $wip->completed_quantity += $goodQty;
                 $wip->available_quantity = $wip->completed_quantity;
             } else {
-                $wip->available_quantity = max(0.0000, $wip->available_quantity - $scrapQty);
+                $wip->available_quantity = max(0.0000, $wip->available_quantity - $scrapQty - $rejectedQty);
             }
             $wip->rejected_quantity += $rejectedQty;
             $wip->scrap_quantity += $scrapQty;

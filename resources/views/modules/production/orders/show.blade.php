@@ -113,6 +113,13 @@
                 </button>
             </form>
 
+            @if($order->schedules->isEmpty())
+                {{-- Generate Schedule Button --}}
+                <button type="button" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+                    <i class="feather-calendar"></i> {{ __('production.generate_schedule') }}
+                </button>
+            @endif
+
             {{-- Grouped Actions Dropdown --}}
             <x-ui.action-dropdown id="headerActionsDropdown">
                 <li>
@@ -315,6 +322,46 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <h6 class="fw-bold text-muted text-uppercase fs-11 mb-3 mt-4">{{ __('production.production_schedules') ?? 'Production Schedules' }}</h6>
+                            @if($order->schedules && $order->schedules->isNotEmpty())
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered fs-12 text-dark">
+                                        <thead class="bg-light">
+                                            <tr>
+                                                <th>Schedule #</th>
+                                                <th>Type</th>
+                                                <th>Status</th>
+                                                <th>Scheduled At</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($order->schedules as $schedule)
+                                                <tr>
+                                                    <td class="fw-bold font-monospace">{{ $schedule->schedule_number }}</td>
+                                                    <td>{{ ucfirst($schedule->scheduling_type) }}</td>
+                                                    <td>
+                                                        <span class="badge bg-soft-{{ $schedule->status === 'released' ? 'success' : ($schedule->status === 'cancelled' ? 'danger' : 'secondary') }} text-{{ $schedule->status === 'released' ? 'success' : ($schedule->status === 'cancelled' ? 'danger' : 'secondary') }}">
+                                                            {{ ucfirst($schedule->status) }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ $schedule->scheduled_at ? $schedule->scheduled_at->format('Y-m-d H:i') : '—' }}</td>
+                                                    <td>
+                                                        <a href="{{ route('production.schedules.show', $schedule->id) }}" class="btn btn-xs btn-outline-primary py-0 px-1.5 fs-11">
+                                                            <i class="feather-eye"></i> View
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <div class="alert alert-warning py-2 px-3 fs-12 mb-0">
+                                    <i class="feather-alert-triangle me-1"></i> No schedule has been generated for this production order yet.
+                                </div>
+                            @endif
                         </div>
 
                         <div class="col-md-4">
@@ -2017,6 +2064,58 @@
         <x-slot name="footer">
             <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">Cancel</button>
             <button type="button" class="btn btn-primary" onclick="document.getElementById('orderAssignForm').submit();">Assign Operator</button>
+        </x-slot>
+    </x-ui.modal>
+
+    {{-- Generate Schedule Modal --}}
+    <x-ui.modal id="scheduleModal" title="{{ __('production.generate_schedule') }}" class="text-start">
+        <form method="POST" action="{{ route('production.schedules.store') }}" id="scheduleForm">
+            @csrf
+            
+            <input type="hidden" name="production_order_id" value="{{ $order->id }}">
+            
+            <div class="mb-3">
+                <label class="form-label fw-semibold text-muted fs-12">{{ __('production.production_order') }}</label>
+                <div class="p-2.5 bg-light rounded text-dark fs-13 border">
+                    <strong>ID:</strong> {{ $order->id }} <br>
+                    <strong>{{ __('production.order_number') }}:</strong> {{ $order->order_number }}
+                </div>
+            </div>
+
+            <x-ui.odoo-form-ui 
+                type="input" 
+                :label="__('production.schedule_start_date')" 
+                name="start_date" 
+                inputType="datetime-local" 
+                :value="old('start_date', now()->format('Y-m-d\TH:i'))" 
+                :required="true" 
+            />
+
+            <x-ui.odoo-form-ui 
+                type="select" 
+                :label="__('production.scheduling_type')" 
+                name="scheduling_type" 
+                :required="true"
+            >
+                <option value="forward" {{ old('scheduling_type', 'forward') === 'forward' ? 'selected' : '' }}>
+                    {{ __('production.forward_scheduling') }}
+                </option>
+                <option value="backward" {{ old('scheduling_type') === 'backward' ? 'selected' : '' }}>
+                    {{ __('production.backward_scheduling') }}
+                </option>
+            </x-ui.odoo-form-ui>
+
+            <x-ui.odoo-form-ui 
+                type="textarea" 
+                :label="__('production.description') ?? 'Notes'" 
+                name="notes" 
+                placeholder="Optional scheduling notes or remarks..." 
+                :value="old('notes')" 
+            />
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+            <button type="submit" class="btn btn-primary text-white" onclick="document.getElementById('scheduleForm').submit();">{{ __('production.generate_schedule') }}</button>
         </x-slot>
     </x-ui.modal>
 

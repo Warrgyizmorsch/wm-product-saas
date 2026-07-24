@@ -62,9 +62,9 @@ class ProductionOrderAndWipUiTest extends TestCase
             'tenant_id'            => $this->tenantId,
             'production_order_id'  => $this->order->id,
             'product_id'           => $this->product->id,
-            'quantity_total'       => 50,
-            'available_quantity'    => 40,
-            'quantity_completed'   => 10,
+            'quantity'             => 50,
+            'available_quantity'   => 40,
+            'completed_quantity'   => 10,
             'status'               => 'active',
         ]);
     }
@@ -191,9 +191,9 @@ class ProductionOrderAndWipUiTest extends TestCase
             'tenant_id'           => $otherTenantId,
             'production_order_id' => $otherOrder->id,
             'product_id'          => $otherProduct->id,
-            'quantity_total'      => 10,
+            'quantity'            => 10,
             'available_quantity'  => 10,
-            'quantity_completed'  => 0,
+            'completed_quantity'  => 0,
             'status'              => 'active',
         ]);
 
@@ -201,5 +201,37 @@ class ProductionOrderAndWipUiTest extends TestCase
             ->get(route('production.wip.show', $otherWip->id));
 
         $response->assertStatus(404);
+    }
+
+    /** @test */
+    public function production_order_show_page_renders_generate_schedule_button_and_schedules_list()
+    {
+        // 1. Initially there are no schedules, verify the message is present
+        $response = $this->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('production.orders.show', $this->order->id));
+
+        $response->assertStatus(200);
+        $response->assertSee('Generate Schedule');
+        $response->assertSee('No schedule has been generated for this production order yet.');
+
+        // 2. Create a schedule for this production order
+        $schedule = \App\Domains\Production\Models\ProductionSchedule::create([
+            'tenant_id' => $this->tenantId,
+            'schedule_number' => 'SCH-TEST-99',
+            'production_order_id' => $this->order->id,
+            'scheduling_type' => 'forward',
+            'status' => 'scheduled',
+            'scheduled_at' => now(),
+            'created_by' => $this->user->id,
+        ]);
+
+        // 3. Verify that the schedule is listed under the Overview tab and the button is hidden
+        $response = $this->withHeader('X-Tenant', 'test-tenant')
+            ->get(route('production.orders.show', $this->order->id));
+
+        $response->assertStatus(200);
+        $response->assertSee('SCH-TEST-99');
+        $response->assertDontSee('No schedule has been generated for this production order yet.');
+        $response->assertDontSee('Generate Schedule');
     }
 }

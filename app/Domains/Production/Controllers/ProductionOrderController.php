@@ -148,6 +148,7 @@ class ProductionOrderController extends Controller
             'reworks.operation', 'reworks.user',
             'wips.currentRoutingOperation', 'wips.currentWorkCenter', 'wips.transactions.fromOperation', 'wips.transactions.toOperation',
             'requisitionSlips.items.product', 'requisitionSlips.items.uom', 'requisitionSlips.purchaseRequisitions.items',
+            'schedules',
         ])->findOrFail($id);
 
         Gate::authorize('view', $order);
