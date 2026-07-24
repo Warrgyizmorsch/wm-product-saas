@@ -364,8 +364,7 @@
                                                 <x-ui.action-dropdown>
                                                     <li>
                                                         <a class="dropdown-item edit-plan-btn" href="javascript:void(0)" data-plan="{{ base64_encode($selectedPlan->toJson()) }}">
-                                                            <i class="feather feather-edit-3 me-3"></i>
-                                                            <span>{{ __('hrms.leave.edit_plan') }}</span>
+                                                            <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.leave.edit_plan') }}
                                                         </a>
                                                     </li>
                                                     <li>
@@ -381,15 +380,12 @@
                                                                    'max_carry' => floatval($t->rules['yearend']['max_carry'] ?? 0.0),
                                                                ];
                                                            }))) }}">
-                                                            <i class="feather feather-refresh-cw me-3"></i>
-                                                            <span>{{ __('hrms.leave.renew_plan_balances') }}</span>
+                                                            <i class="feather-refresh-cw me-2 text-muted fs-12"></i>{{ __('hrms.leave.renew_plan_balances') }}
                                                         </a>
                                                     </li>
-                                                    <li class="dropdown-divider"></li>
                                                     <li>
-                                                        <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                            <i class="feather feather-trash-2 me-3"></i>
-                                                            <span>{{ __('hrms.leave.delete_plan') }}</span>
+                                                        <button type="submit" class="dropdown-item text-danger">
+                                                            <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.leave.delete_plan') }}
                                                         </button>
                                                     </li>
                                                 </x-ui.action-dropdown>
@@ -457,12 +453,12 @@
                                         </div>
 
                                         <div class="border rounded bg-white">
-                                            <table class="table table-hover mb-0 align-middle" style="font-size: 13px;" id="leaveTypesTable">
+                                            <table class="table table-hover mb-0 align-middle" style="table-layout: fixed; width: 100%; font-size: 13px;" id="leaveTypesTable">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th>{{ __('hrms.leave.leave_types') }}</th>
-                                                        <th>{{ __('hrms.leave.yearly_quota') }}</th>
-                                                        <th width="120" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
+                                                        <th style="width: 55%;">{{ __('hrms.leave.leave_types') }}</th>
+                                                        <th style="width: 25%;">{{ __('hrms.leave.yearly_quota') }}</th>
+                                                        <th style="width: 110px; white-space: nowrap;" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -471,7 +467,7 @@
                                                             data-name="{{ strtolower($type->name) }}"
                                                             data-type="{{ strtolower($type->type) }}"
                                                             data-quota="{{ floatval($type->quota) }}">
-                                                            <td>
+                                                            <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                                                 <div class="d-flex align-items-center gap-2">
                                                                     <span class="badge text-uppercase px-2 py-1 fw-bold" style="background-color: {{ $type->color }}22; color: {{ $type->color }}; border: 1px solid {{ $type->color }}; font-size: 10px;">
                                                                         {{ $type->code }}
@@ -482,28 +478,26 @@
                                                                     @endif
                                                                 </div>
                                                             </td>
-                                                            <td>
+                                                            <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                                                 <span class="fw-bold text-dark">{{ floatval($type->quota) }} {{ __('hrms.leave.days') }}</span>
+                                                            </td>
                                                             <td class="text-end">
                                                                 <form action="{{ route('hrms.leave-structure.type.destroy', $type->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.delete_type_confirm') }}', { title: 'Delete Leave Type', variant: 'danger', confirmButtonText: 'Delete' });">
                                                                     @csrf
                                                                     @method('DELETE')
-                                                                    <div class="hstack gap-2 justify-content-end">
-                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-type-quota="{{ floatval($type->quota) }}" data-rules="{{ json_encode($type->rules) }}" title="{{ __('hrms.leave.configure_rules') }}" data-bs-toggle="tooltip">
+                                                                    <div class="hstack gap-2 justify-content-end align-items-center">
+                                                                        <a href="javascript:void(0)" class="action-dropdown-btn configure-rules-btn" data-type-id="{{ $type->id }}" data-type-name="{{ $type->name }}" data-type-quota="{{ floatval($type->quota) }}" data-rules="{{ json_encode($type->rules) }}" title="{{ __('hrms.leave.configure_rules') }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
                                                                             <i class="feather feather-settings"></i>
                                                                         </a>
                                                                         <x-ui.action-dropdown>
                                                                             <li>
                                                                                 <a class="dropdown-item edit-type-btn" href="javascript:void(0)" data-type="{{ base64_encode($type->toJson()) }}">
-                                                                                    <i class="feather feather-edit-3 me-3"></i>
-                                                                                    <span>{{ __('hrms.leave.edit_type') }}</span>
+                                                                                    <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.leave.edit_type') }}
                                                                                 </a>
                                                                             </li>
-                                                                            <li class="dropdown-divider"></li>
                                                                             <li>
-                                                                                <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                                                    <i class="feather feather-trash-2 me-3"></i>
-                                                                                    <span>{{ __('hrms.leave.delete_type') }}</span>
+                                                                                <button type="submit" class="dropdown-item text-danger">
+                                                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.leave.delete_type') }}
                                                                                 </button>
                                                                             </li>
                                                                         </x-ui.action-dropdown>

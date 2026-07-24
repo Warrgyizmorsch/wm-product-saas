@@ -152,7 +152,7 @@ class AssetApiController extends Controller
 
         $validated = $request->validate([
             'asset_category_id' => 'required|exists:asset_categories,id',
-            'asset_code'        => 'required|string|max:255|unique:assets,asset_code',
+            'asset_code'        => 'required|string|max:255',
             'name'              => 'required|string|max:255',
             'brand'             => 'nullable|string|max:255',
             'model_number'      => 'nullable|string|max:255',
@@ -188,7 +188,13 @@ class AssetApiController extends Controller
 
         $validated = $request->validate([
             'asset_category_id' => 'required|exists:asset_categories,id',
-            'asset_code'        => ['required', 'string', 'max:255', Rule::unique('assets', 'asset_code')->ignore($asset->id)],
+            'asset_code'        => [
+                'required', 'string', 'max:255',
+                Rule::unique('assets', 'asset_code')
+                    ->where('asset_item_id', $asset->asset_item_id)
+                    ->where('tenant_id', $asset->tenant_id)
+                    ->ignore($asset->id)
+            ],
             'name'              => 'required|string|max:255',
             'brand'             => 'nullable|string|max:255',
             'model_number'      => 'nullable|string|max:255',
@@ -221,6 +227,10 @@ class AssetApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
+        }
+
+        if ($asset->status === 'allocated' || $asset->assigned_employee_id !== null) {
+            return $this->sendError("Cannot delete asset '{$asset->asset_code}' because it is currently allocated to an employee. Please return or deallocate it first.", [], 422);
         }
 
         $asset->delete();

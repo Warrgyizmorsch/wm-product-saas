@@ -581,6 +581,52 @@ class EmployeeController extends Controller
             // Safe fallback
         }
 
+        // Load employee leave applications/requests for the Leaves & Plans tab
+        $leaveRequests = \App\Domains\HRMS\Models\LeaveRequest::query()
+            ->where('employee_id', $employee->id)
+            ->with('leaveType')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Load employee leave encashment requests
+        $leaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::query()
+            ->where('employee_id', $employee->id)
+            ->with('leaveType')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Load leave balances with leave type for the modals
+        $empBalancesList = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)
+            ->with('leaveType')
+            ->get();
+
+        // Prepare employee data map for dynamic leave type + rules population (matching Leave Application module)
+        $allEmployees = Employee::where('status', true)->get();
+        $employeeDataMap = [];
+        foreach ([$employee] as $emp) {
+            $dynBalances = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $emp->id)
+                ->whereHas('leaveType.plan', function($q) {
+                    $q->where('status', true);
+                })
+                ->whereHas('leaveType', function($q) {
+                    $q->where('status', true);
+                })
+                ->with('leaveType')
+                ->get();
+            $typesList = [];
+            foreach ($dynBalances as $bal) {
+                $typesList[] = [
+                    'id' => $bal->leaveType->id,
+                    'name' => $bal->leaveType->name,
+                    'quota' => floatval($bal->allocated),
+                    'remaining' => floatval($bal->remaining),
+                    'type' => $bal->leaveType->type,
+                    'rules' => $bal->leaveType->rules ?? [],
+                ];
+            }
+            $employeeDataMap[$emp->id] = $typesList;
+        }
+
         return view('modules.hrms.employees.show', compact(
             'employee',
             'salaryStructure',
@@ -590,7 +636,12 @@ class EmployeeController extends Controller
             'adhocComponents',
             'penalties',
             'availableAdhocComponents',
-            'availableAssets'
+            'availableAssets',
+            'leaveRequests',
+            'leaveEncashments',
+            'empBalancesList',
+            'allEmployees',
+            'employeeDataMap'
         ));
     }
 

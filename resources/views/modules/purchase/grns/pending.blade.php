@@ -4,6 +4,30 @@
 @section('page-title', 'Pending Goods Receipts')
 @section('breadcrumb', 'Purchase / Goods Receipt Notes / Pending Receipts')
 
+@push('styles')
+    <style>
+        .action-icon-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 8px !important;
+            border: 1.5px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            color: #475569 !important;
+            transition: all 0.28s ease !important;
+            text-decoration: none !important;
+            cursor: pointer !important;
+        }
+        .action-icon-btn.grn-btn:hover {
+            background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+        }
+    </style>
+@endpush
+
 @section('page-actions')
     <div class="d-flex gap-2 flex-wrap">
         <x-ui.button href="{{ route('purchase.grns.index') }}" variant="light" icon="feather-list" class="border">
@@ -57,18 +81,18 @@
         <!-- Listing Table using Common Odoo Table Component -->
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="pendingGrnTable">
-                <thead class="bg-light text-secondary">
+                <thead>
                     <tr>
-                        <th class="ps-4">PO Number</th>
-                        <th>Vendor</th>
-                        <th>Warehouse</th>
-                        <th>PO Date</th>
-                        <th class="text-end">Total Amount</th>
-                        <th class="text-center">Ordered Qty</th>
-                        <th class="text-center">Received Qty</th>
-                        <th class="text-center">Remaining Qty</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-end pe-4">Action</th>
+                        <th style="width: 12%">PO Number</th>
+                        <th style="width: 16%">Vendor</th>
+                        <th style="width: 14%">Warehouse</th>
+                        <th style="width: 10%">PO Date</th>
+                        <th style="width: 12%" class="text-end">Total Amount</th>
+                        <th style="width: 8%" class="text-center">Ordered Qty</th>
+                        <th style="width: 8%" class="text-center">Received Qty</th>
+                        <th style="width: 8%" class="text-center">Remaining Qty</th>
+                        <th style="width: 10%" class="text-center">Status</th>
+                        <th style="width: 12%" class="text-end">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -84,16 +108,14 @@
                             };
                         @endphp
                         <tr>
-                            <td class="ps-4 fw-bold">
+                            <td class="fw-bold">
                                 <a href="{{ route('purchase.orders.show', $order->id) }}" class="text-primary font-monospace">
                                     {{ $order->purchase_order_number }}
                                 </a>
                             </td>
                             <td class="fw-semibold text-dark">{{ $order->vendor?->name ?? 'N/A' }}</td>
                             <td>
-                                <span class="badge bg-soft-secondary text-dark fs-11">
-                                    <i class="feather-archive me-1 text-muted"></i>{{ $order->location ?? $order->warehouse?->name ?? 'Main Warehouse' }}
-                                </span>
+                                <i class="feather-archive me-1 text-muted"></i>{{ $order->location ?? $order->warehouse?->name ?? 'Main Warehouse' }}
                             </td>
                             <td>{{ $order->date ? $order->date->format('d-M-Y') : '—' }}</td>
                             <td class="text-end fw-bold text-dark font-monospace">{{ $currency }} {{ number_format($order->grand_total, 2) }}</td>
@@ -103,10 +125,10 @@
                             <td class="text-center">
                                 <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $order->status }}</span>
                             </td>
-                            <td class="text-end pe-4">
-                                <x-ui.button href="{{ route('purchase.grns.create', ['po_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus-circle">
-                                    Create GRN
-                                </x-ui.button>
+                            <td class="text-end">
+                                <a href="{{ route('purchase.grns.create', ['po_id' => $order->id]) }}" class="action-icon-btn grn-btn" title="Create GRN" data-bs-toggle="tooltip">
+                                    <i class="feather feather-plus-circle"></i>
+                                </a>
                             </td>
                         </tr>
                     @empty

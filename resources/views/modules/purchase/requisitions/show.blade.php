@@ -6,6 +6,47 @@
     <a href="{{ route('purchase.requisitions.index') }}">Purchase Requests</a> &gt; Details
 @endsection
 
+@section('page-actions')
+    <div class="d-flex align-items-center gap-0">
+        <a href="{{ route('purchase.requisitions.index') }}" class="action-dropdown-btn me-2" title="Back to List" data-bs-toggle="tooltip">
+            <i class="feather feather-arrow-left"></i>
+        </a>
+
+        @if($requisition->status === 'Draft')
+            <form action="{{ route('purchase.requisitions.approve', $requisition->id) }}" method="POST" class="d-inline me-2" onsubmit="return confirm('Are you sure you want to approve this purchase request?')">
+                @csrf
+                <button type="submit" class="btn btn-success">
+                    <i class="feather-check-circle me-2"></i>Approve PR
+                </button>
+            </form>
+
+            <form action="{{ route('purchase.requisitions.reject', $requisition->id) }}" method="POST" class="d-inline me-2" onsubmit="return confirm('Are you sure you want to reject this purchase request?')">
+                @csrf
+                <button type="submit" class="btn btn-danger">
+                    <i class="feather-x-circle me-2"></i>Reject PR
+                </button>
+            </form>
+
+            <x-ui.action-dropdown id="reqDetailsActions-{{ $requisition->id }}">
+                <li>
+                    <a class="dropdown-item py-2" href="{{ route('purchase.requisitions.edit', $requisition->id) }}">
+                        <i class="feather-edit me-1.5 text-muted"></i> Edit
+                    </a>
+                </li>
+                <li>
+                    <form action="{{ route('purchase.requisitions.destroy', $requisition->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this requisition?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="dropdown-item py-2 text-danger">
+                            <i class="feather-trash-2 me-1.5"></i> Delete
+                        </button>
+                    </form>
+                </li>
+            </x-ui.action-dropdown>
+        @endif
+    </div>
+@endsection
+
 @section('content')
     <div class="erp-single-panel">
         <!-- Toast Notifications -->
@@ -17,51 +58,25 @@
         @endif
 
         <x-ui.odoo-form-ui type="sheet" class="p-0">
-            <!-- Header bar with buttons -->
+            <!-- Header bar -->
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 px-4 pt-4 pb-3 border-bottom">
                 <div>
                     <span class="fs-11 text-muted text-uppercase fw-bold d-block mb-1 letter-spacing-1">Purchase Request</span>
-                    <h4 class="fw-bold text-dark mb-1">{{ $requisition->requisition_number }}</h4>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <h4 class="fw-bold text-dark mb-0">{{ $requisition->requisition_number }}</h4>
+                        @php
+                            $statusClass = 'warning';
+                            if ($requisition->status === 'Approved') $statusClass = 'success';
+                            elseif ($requisition->status === 'Cancelled') $statusClass = 'danger';
+                        @endphp
+                        <x-ui.badge :soft="true" :variant="$statusClass" class="px-2.5 py-1 fs-11 fw-bold">
+                            {{ $requisition->status }}
+                        </x-ui.badge>
+                    </div>
                     <span class="fs-13 text-muted">
                         Requested By:&nbsp;<strong class="text-dark">{{ $requisition->requester->name ?? 'System' }}</strong>
                         &nbsp;·&nbsp;Date:&nbsp;<strong class="text-dark">{{ $requisition->requisition_date ? $requisition->requisition_date->format('d-m-Y') : '—' }}</strong>
                     </span>
-                </div>
-
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    @php
-                        $statusClass = 'warning';
-                        if ($requisition->status === 'Approved') $statusClass = 'success';
-                        elseif ($requisition->status === 'Cancelled') $statusClass = 'danger';
-                    @endphp
-                    <x-ui.badge :soft="true" :variant="$statusClass" class="px-3 py-1.5 fs-12 fw-semibold me-2">
-                        {{ $requisition->status }}
-                    </x-ui.badge>
-
-                    <x-ui.button href="{{ route('purchase.requisitions.index') }}" variant="light" size="sm" icon="feather-arrow-left">
-                        Back to List
-                    </x-ui.button>
-
-                    @if($requisition->status === 'Draft')
-                        <x-ui.button href="{{ route('purchase.requisitions.edit', $requisition->id) }}" variant="info" size="sm" icon="feather-edit">
-                            Edit
-                        </x-ui.button>
-
-                        <form action="{{ route('purchase.requisitions.approve', $requisition->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to approve this purchase request?')">
-                            @csrf
-                            <x-ui.button type="submit" variant="success" size="sm" icon="feather-check-circle">
-                                Approve PR
-                            </x-ui.button>
-                        </form>
-
-                        <form action="{{ route('purchase.requisitions.destroy', $requisition->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this purchase request?')">
-                            @csrf
-                            @method('DELETE')
-                            <x-ui.button type="submit" variant="danger" size="sm" icon="feather-trash-2">
-                                Delete
-                            </x-ui.button>
-                        </form>
-                    @endif
                 </div>
             </div>
 
@@ -158,3 +173,5 @@
         </x-ui.odoo-form-ui>
     </div>
 @endsection
+
+

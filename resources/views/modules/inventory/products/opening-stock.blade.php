@@ -1,13 +1,13 @@
 @extends('layouts.duralux')
 
-@section('title', 'Opening Stock | ' . $product->name . ' | SaaS ERP')
-@section('page-title', 'Update Opening Stock')
-@section('breadcrumb', 'Inventory / Items / Opening Stock')
+@section('title', __('inventory.opening_stock') . ' | ' . $product->name . ' | SaaS ERP')
+@section('page-title', __('inventory.update_opening_stock'))
+@section('breadcrumb', __('inventory.inventory_items_opening_stock'))
 
 @section('page-actions')
     <div class="d-flex gap-2">
         <x-ui.button variant="light-brand" href="{{ route('inventory.products.show', $product) }}" icon="feather-x">
-            Cancel
+            {{ __('inventory.cancel') }}
         </x-ui.button>
     </div>
 @endsection
@@ -40,7 +40,7 @@
                             @if($product->variation_type === 'Variant')
                                 <span class="text-muted fs-12">·</span>
                                 <span class="text-primary fw-semibold fs-12">
-                                    <i class="feather-git-branch me-1"></i>{{ $product->variants->count() }} variants
+                                    <i class="feather-git-branch me-1"></i>{{ $product->variants->count() }} {{ __('inventory.variants') }}
                                 </span>
                             @endif
                         </div>
@@ -49,7 +49,7 @@
             </div>
             {{-- As Of Date --}}
             <div class="col-md-3 ms-auto">
-                <label class="form-label fw-semibold text-muted fs-12 mb-1 text-uppercase">As of Date</label>
+                <label class="form-label fw-semibold text-muted fs-12 mb-1 text-uppercase">{{ __('inventory.as_of_date') }}</label>
                 <x-ui.odoo-form-ui
                     type="input"
                     inputType="date"
@@ -71,33 +71,33 @@
                     <tr>
                         @if($product->variation_type === 'Variant')
                         <th class="ps-4 py-3 text-muted fw-semibold fs-12 text-uppercase" style="min-width:210px;">
-                            Variant / Item
+                            {{ __('inventory.variant_item') }}
                         </th>
                         @endif
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="min-width:190px;">
-                            Warehouse
+                            {{ __('inventory.warehouse') }}
                         </th>
                         @if($product->track_batch)
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="width:160px;">
-                            Batch Number
+                            {{ __('inventory.batch_number') }}
                         </th>
                         @endif
                         @if($product->track_serial_number)
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="min-width:200px;">
-                            Serial Numbers
+                            {{ __('inventory.serial_numbers') }}
                         </th>
                         @endif
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="width:160px;">
-                            Opening Qty
+                            {{ __('inventory.opening_qty') }}
                             @if($product->uom)
                                 <span class="text-muted fw-normal text-lowercase">({{ $product->uom->code }})</span>
                             @endif
                         </th>
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="width:160px;">
-                            Rate per Unit (₹)
+                            {{ __('inventory.rate_per_unit') }}
                         </th>
                         <th class="py-3 text-muted fw-semibold fs-12 text-uppercase" style="width:140px;">
-                            Amount (₹)
+                            {{ __('inventory.amount') }}
                         </th>
                         <th class="py-3" style="width:48px;"></th>
                     </tr>
@@ -158,9 +158,9 @@
                         <td colspan="{{ $product->variation_type === 'Variant' ? 6 : 5 }}" class="text-center py-5 text-muted">
                             <i class="feather-inbox d-block fs-1 mb-2 text-muted" style="opacity:.4;"></i>
                             @if($warehouses->isEmpty())
-                                No active warehouses found. Please create warehouses first.
+                                {{ __('inventory.no_active_warehouses') }}
                             @else
-                                No variants found. Please add variants to this product first.
+                                {{ __('inventory.no_variants_found') }}
                             @endif
                         </td>
                     </tr>
@@ -173,7 +173,7 @@
         <div class="px-4 py-3 border-top" style="border-color:#e9ecef !important;">
             <button type="button" id="addLineBtn"
                     class="btn btn-link text-primary fw-semibold fs-13 p-0 text-decoration-none">
-                <i class="feather-plus-circle me-1"></i>Add Another Line
+                <i class="feather-plus-circle me-1"></i>{{ __('inventory.add_another_line') }}
             </button>
         </div>
         @endif
@@ -183,10 +183,10 @@
              style="background:#f7f8fa; border-color:#e2e8f0 !important; border-radius:0 0 8px 8px;">
             <div class="text-muted fs-13">
                 <i class="feather-info me-1 text-primary"></i>
-                Set quantity to <strong>0</strong> or leave blank to remove stock from a warehouse.
+                {{ __('inventory.opening_stock_help') }}
             </div>
             <div class="d-flex align-items-center gap-3">
-                <span class="text-muted fw-semibold fs-13">Total Inventory Value</span>
+                <span class="text-muted fw-semibold fs-13">{{ __('inventory.total_inventory_value') }}</span>
                 <span id="grand-total-display" class="fw-bold fs-4 text-dark">
                     ₹<span id="grand-total-value">0.00</span>
                 </span>
@@ -199,10 +199,10 @@
 {{-- Action Footer --}}
 <div class="d-flex justify-content-end gap-2 mt-4">
     <x-ui.button variant="light-brand" href="{{ route('inventory.products.show', $product) }}" icon="feather-x">
-        Cancel
+        {{ __('inventory.cancel') }}
     </x-ui.button>
     <x-ui.button type="submit" variant="primary" icon="feather-save">
-        Save Opening Stock
+        {{ __('inventory.save_changes') }}
     </x-ui.button>
 </div>
 
@@ -214,7 +214,7 @@
         @if($product->variation_type === 'Variant')
         <td class="ps-4 py-2 align-middle">
             <select name="__variant_name__" class="odoo-table-select variant-selector" data-row="__IDX__" style="min-width:190px;">
-                <option value="">— Select Variant —</option>
+                <option value="">— {{ __('inventory.select_variant') }} —</option>
                 @foreach($product->variants as $v)
                     <option value="{{ $v->id }}" data-cost="{{ $v->cost_price }}">
                         {{ $v->variant_values['label'] ?? $v->name }}
@@ -225,7 +225,7 @@
         @endif
         <td class="py-2 align-middle">
             <select name="__wh_name__" class="odoo-table-select wh-selector" data-row="__IDX__" style="min-width:170px;">
-                <option value="">— Select Warehouse —</option>
+                <option value="">— {{ __('inventory.select_warehouse') }} —</option>
                 @foreach($warehouses as $wh)
                     <option value="{{ $wh->id }}">{{ $wh->name }} ({{ $wh->code }})</option>
                 @endforeach
@@ -235,14 +235,14 @@
         <td class="py-2 align-middle">
             <input type="text" name="__batch_name__"
                    class="odoo-table-input batch-input" data-row="__IDX__"
-                   value="" placeholder="Batch #" style="max-width:140px;">
+                   value="" placeholder="{{ __('inventory.batch_placeholder') }}" style="max-width:140px;">
         </td>
         @endif
         @if($product->track_serial_number)
         <td class="py-2 align-middle">
             <input type="text" name="__serials_name__"
                    class="odoo-table-input serials-input" data-row="__IDX__"
-                   value="" placeholder="S/Ns (comma separated)" style="min-width:180px;">
+                   value="" placeholder="{{ __('inventory.serials_placeholder') }}" style="min-width:180px;">
         </td>
         @endif
         <td class="py-2 align-middle">

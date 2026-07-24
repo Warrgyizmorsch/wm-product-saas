@@ -66,7 +66,7 @@ return [
         'empty_requests_title' => 'No Asset Requests',
         'empty_requests_desc' => 'Pending request tickets from employees will be shown here.',
         'import_instructions_title' => 'Excel Template Instructions',
-        'import_instructions_desc' => 'Please download the Excel template, populate your asset details, and upload the completed file. Ensure mandatory columns (asset_code, name, category_name, and company_name) are filled correctly. New categories will be auto-created during the import.',
+        'import_instructions_desc' => 'Please download the Excel template, populate your asset details, and upload the completed file. Ensure mandatory columns (asset_code, name, category_name) are filled correctly. Categories must exist in Category Settings before importing.',
         'import_cat_instructions_desc' => 'Please download the Excel template, populate your category details, and upload the completed file. Ensure mandatory columns (name and company_name) are filled correctly.',
         'download_template' => 'Download Template',
         'select_excel_file' => 'Select Excel (.xlsx) File',

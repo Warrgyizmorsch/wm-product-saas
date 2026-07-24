@@ -3,25 +3,44 @@
 @section('title', 'MES Operator Console | SaaS ERP')
 @section('page-title', 'MES Operator Console')
 @section('breadcrumb', 'Operator Console')
-
 @push('styles')
     <style>
         .touch-card {
             border-radius: 12px;
             transition: transform 0.2s, box-shadow 0.2s;
             cursor: pointer;
+            position: relative;
+            overflow: hidden;
         }
         .touch-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
         }
-        .btn-touch {
-            min-height: 48px;
-            font-size: 15px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
+        .status-ribbon {
+            position: absolute;
+            top: 20px;
+            right: -32px;
+            width: 120px;
+            padding: 3px 0;
+            text-align: center;
+            font-size: 8.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #fff;
+            transform: rotate(45deg);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+            letter-spacing: 0.5px;
+        }
+        .status-ribbon-running {
+            background: linear-gradient(135deg, #25D366, #128C7E);
+        }
+        .status-ribbon-paused {
+            background: linear-gradient(135deg, #ffc107, #e0a800);
+            color: #212529;
+        }
+        .status-ribbon-completed {
+            background: linear-gradient(135deg, #6c757d, #495057);
         }
     </style>
 @endpush
@@ -89,20 +108,38 @@
                     <div class="card-body pt-3">
                         <div class="row g-3">
                             @forelse($myAssignments->take(6) as $assign)
+                                @php
+                                    $opStatus = $assign->operation->status ?? 'waiting';
+                                    $opStatusClass = match($opStatus) {
+                                        'running' => 'bg-soft-success text-success',
+                                        'paused' => 'bg-soft-warning text-warning',
+                                        'completed' => 'bg-soft-secondary text-secondary',
+                                        default => 'bg-soft-primary text-primary',
+                                    };
+                                @endphp
                                 <div class="col-md-6">
                                     <div class="card border border-light shadow-sm touch-card h-100">
-                                        <div class="card-body p-3 d-flex flex-column justify-content-between">
+                                        @if(in_array($opStatus, ['completed', 'running', 'paused']))
+                                            <div class="status-ribbon status-ribbon-{{ $opStatus }}">
+                                                {{ $opStatus }}
+                                            </div>
+                                        @endif
+                                        <div class="card-body p-3 d-flex flex-column justify-content-around">
                                             <div>
-                                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                                    <span class="badge bg-soft-secondary font-monospace">{{ $assign->operation->operation_number ?? 'OP-??' }}</span>
+                                                <div class="d-flex align-items-center gap-2 mb-2">
+                                                    <span class="badge bg-soft-secondary font-monospace text-secondary">{{ $assign->operation->operation_number ?? 'OP-??' }}</span>
+                                                    @if(!in_array($opStatus, ['completed', 'running', 'paused']))
+                                                        <span class="badge {{ $opStatusClass }} fs-9">{{ strtoupper($opStatus) }}</span>
+                                                    @endif
+                                                    
                                                     @if($assign->status === 'assigned')
-                                                        <span class="badge bg-soft-primary text-primary">Assigned</span>
+                                                        <span class="badge bg-soft-primary text-primary fs-9">Assigned</span>
                                                     @elseif($assign->status === 'accepted')
-                                                        <span class="badge bg-soft-success text-success">Accepted</span>
+                                                        <span class="badge bg-soft-success text-success fs-9">Accepted</span>
                                                     @elseif($assign->status === 'rejected')
-                                                        <span class="badge bg-soft-danger text-danger">Rejected</span>
+                                                        <span class="badge bg-soft-danger text-danger fs-9">Rejected</span>
                                                     @else
-                                                        <span class="badge bg-soft-secondary text-secondary">Completed</span>
+                                                        <span class="badge bg-soft-secondary text-secondary fs-9">Completed</span>
                                                     @endif
                                                 </div>
                                                 <h6 class="fw-bold text-dark mb-1">{{ $assign->operation->name ?? '—' }}</h6>
@@ -110,20 +147,26 @@
                                                 <div class="fs-11 text-muted"><i class="feather-map-pin me-1"></i> {{ $assign->operation->workCenter->name ?? '—' }}</div>
                                             </div>
 
-                                            <div class="mt-3 pt-3 border-top d-flex gap-2">
+                                            <div class="mt-1 pt-1 border-top d-flex gap-2 justify-content-center">
                                                 @if($assign->status === 'assigned')
                                                     <form method="POST" action="{{ route('production.mes.assignments.accept', $assign->id) }}" class="flex-fill">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-touch btn-success btn-sm w-100"><i class="feather-check me-1"></i> Accept</button>
+                                                        <x-ui.button type="submit" variant="success" size="sm" icon="feather-check" class="w-100 btn-touch">Accept</x-ui.button>
                                                     </form>
                                                     <form method="POST" action="{{ route('production.mes.assignments.reject', $assign->id) }}" class="flex-fill">
                                                         @csrf
-                                                        <button type="submit" class="btn btn-touch btn-outline-danger btn-sm w-100"><i class="feather-x me-1"></i> Reject</button>
+                                                        <x-ui.button type="submit" variant="outline-danger" size="sm" icon="feather-x" class="w-100 btn-touch">Reject</x-ui.button>
                                                     </form>
                                                 @elseif($assign->status === 'accepted')
-                                                    <a href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" class="btn btn-touch btn-primary btn-sm w-100 flex-fill">
-                                                        <i class="feather-play me-1"></i> Go to Execution
-                                                    </a>
+                                                    @if($assign->operation && $assign->operation->status === 'completed')
+                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="secondary" size="sm" icon="feather-eye" class="">
+                                                            View
+                                                        </x-ui.button>
+                                                    @else
+                                                        <x-ui.button href="{{ route('production.mes.operator.execution', $assign->operation->id) }}" variant="primary" size="sm" icon="feather-play" class="">
+                                                            Go to Execution
+                                                        </x-ui.button>
+                                                    @endif
                                                 @endif
                                             </div>
                                         </div>
@@ -154,9 +197,7 @@
                                         <div class="fw-bold text-dark fs-14">{{ $r->orderOperation->name ?? '—' }}</div>
                                         <small class="text-muted">Order: <strong>{{ $r->schedule->order->order_number ?? '—' }}</strong> | WC: {{ $r->workCenter->name ?? '—' }}</small>
                                     </div>
-                                    <a href="{{ route('production.mes.operator.execution', $r->production_order_operation_id) }}" class="btn btn-touch btn-light btn-sm border">
-                                        <i class="feather-arrow-right"></i>
-                                    </a>
+                                    <x-ui.button href="{{ route('production.mes.operator.execution', $r->production_order_operation_id) }}" variant="light" size="sm" icon="feather-arrow-right" class="btn-touch border"></x-ui.button>
                                 </div>
                             @empty
                                 <div class="text-center py-5 text-muted">

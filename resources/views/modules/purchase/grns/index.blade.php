@@ -4,6 +4,35 @@
 @section('page-title', 'Goods Receipt Notes (GRN)')
 @section('breadcrumb', 'Purchase / Goods Receipt Notes')
 
+@push('styles')
+    <style>
+        .action-icon-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 8px !important;
+            border: 1.5px solid #cbd5e1 !important;
+            background-color: #ffffff !important;
+            color: #475569 !important;
+            transition: all 0.28s ease !important;
+            text-decoration: none !important;
+            cursor: pointer !important;
+        }
+        .action-icon-btn.view-btn:hover {
+            background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+        }
+        .action-icon-btn.download-btn:hover {
+            background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
+            border-color: var(--bs-primary) !important;
+            color: var(--bs-primary) !important;
+        }
+    </style>
+@endpush
+
 @section('page-actions')
     <div class="d-flex gap-2 flex-wrap">
         <x-ui.button href="{{ route('purchase.grns.pending') }}" variant="warning" icon="feather-clock" class="text-dark fw-semibold">
@@ -75,17 +104,17 @@
         <!-- Table View using Common Odoo Table Component -->
         <div class="table-responsive">
             <x-ui.odoo-form-ui type="table" id="allGrnTable">
-                <thead class="bg-light text-secondary">
+                <thead>
                     <tr>
-                        <th class="ps-4">GRN Number</th>
-                        <th>PO Number</th>
-                        <th>Vendor</th>
-                        <th>Warehouse</th>
-                        <th>Receipt Date</th>
-                        <th class="text-center">Received Qty</th>
-                        <th class="text-center">Status</th>
-                        <th>Created By</th>
-                        <th class="text-end pe-4">Actions</th>
+                        <th style="width: 12%">GRN Number</th>
+                        <th style="width: 12%">PO Number</th>
+                        <th style="width: 16%">Vendor</th>
+                        <th style="width: 14%">Warehouse</th>
+                        <th style="width: 12%">Receipt Date</th>
+                        <th style="width: 10%" class="text-center">Received Qty</th>
+                        <th style="width: 10%" class="text-center">Status</th>
+                        <th style="width: 12%">Created By</th>
+                        <th style="width: 12%" class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -116,9 +145,7 @@
                             </td>
                             <td class="fw-semibold text-dark">{{ $grn->vendor?->name ?? 'N/A' }}</td>
                             <td>
-                                <span class="badge bg-soft-secondary text-dark fs-11">
-                                    <i class="feather-archive me-1 text-muted"></i>{{ $grn->warehouse?->name ?? 'Main Warehouse' }}
-                                </span>
+                                <i class="feather-archive me-1 text-muted"></i>{{ $grn->warehouse?->name ?? 'Main Warehouse' }}
                             </td>
                             <td>{{ $grn->received_date ? $grn->received_date->format('d-M-Y') : '—' }}</td>
                             <td class="text-center font-monospace fw-bold text-primary">{{ number_format($recQty, 2) }}</td>
@@ -129,26 +156,14 @@
                                 <div class="fs-12 fw-semibold text-dark">{{ $grn->creator?->name ?? 'System' }}</div>
                                 <div class="fs-11 text-muted">{{ $grn->created_at->format('d-M H:i') }}</div>
                             </td>
-                            <td class="text-end pe-4">
-                                <div class="btn-group btn-group-sm">
-                                    <a href="{{ route('purchase.grns.show', $grn->id) }}" class="btn btn-light border" title="View Details">
-                                        <i class="feather-eye text-primary"></i>
+                            <td class="text-end">
+                                <div class="d-flex justify-content-end gap-1">
+                                    <a href="{{ route('purchase.grns.show', $grn->id) }}" class="action-icon-btn view-btn" title="View Details" data-bs-toggle="tooltip">
+                                        <i class="feather feather-eye"></i>
                                     </a>
-                                    <a href="{{ route('purchase.grns.download', $grn->id) }}" class="btn btn-light border" title="Download PDF">
-                                        <i class="feather-printer text-dark"></i>
+                                    <a href="{{ route('purchase.grns.download', $grn->id) }}" class="action-icon-btn download-btn" title="Download PDF" data-bs-toggle="tooltip">
+                                        <i class="feather feather-download"></i>
                                     </a>
-
-                                    @if($grn->status === 'Draft')
-                                        <a href="{{ route('purchase.grns.edit', $grn->id) }}" class="btn btn-light border" title="Edit Draft">
-                                            <i class="feather-edit text-warning"></i>
-                                        </a>
-                                        <form action="{{ route('purchase.grns.approve', $grn->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Approve this GRN and update warehouse stock?')">
-                                            @csrf
-                                            <button type="submit" class="btn btn-light border text-success" title="Approve GRN">
-                                                <i class="feather-check-circle"></i>
-                                            </button>
-                                        </form>
-                                    @endif
                                 </div>
                             </td>
                         </tr>

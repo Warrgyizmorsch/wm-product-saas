@@ -22,10 +22,14 @@ use App\Domains\HRMS\Models\EmployeePenalty;
 use App\Domains\HRMS\Models\EmployeeAdhocComponent;
 use App\Domains\HRMS\Models\ShiftRoster;
 use App\Domains\HRMS\Models\AssetCategory;
+use App\Domains\HRMS\Models\AssetItem;
 use App\Domains\HRMS\Models\Asset;
 use App\Domains\HRMS\Models\AssetAllocation;
 use App\Domains\HRMS\Models\AssetRequest;
 use App\Domains\HRMS\Models\Document;
+use App\Domains\HRMS\Models\LeaveBalance;
+use App\Domains\HRMS\Models\LeaveRequest;
+use App\Domains\HRMS\Models\LeaveEncashment;
 use App\Domains\Production\Models\ProductionShift;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +45,9 @@ class HrmsDemoSeeder extends Seeder
         Schema::disableForeignKeyConstraints();
 
         // Truncate tables to ensure idempotency and prevent duplicate records
+        DB::table('leave_encashments')->truncate();
+        DB::table('leave_requests')->truncate();
+        DB::table('leave_balances')->truncate();
         DB::table('employee_adhoc_components')->truncate();
         DB::table('employee_employment_histories')->truncate();
         DB::table('employee_penalties')->truncate();
@@ -48,6 +55,7 @@ class HrmsDemoSeeder extends Seeder
         DB::table('asset_allocations')->truncate();
         DB::table('asset_requests')->truncate();
         DB::table('assets')->truncate();
+        DB::table('asset_items')->truncate();
         DB::table('asset_categories')->truncate();
         DB::table('documents')->truncate();
         DB::table('employees')->truncate();
@@ -629,6 +637,144 @@ class HrmsDemoSeeder extends Seeder
             'remarks' => 'Excellent safety record and shift coverage bonus.',
         ]);
 
+        // 11.1 Leave Balances
+        LeaveBalance::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeHR->id,
+            'leave_type_id' => $leaveSick->id,
+            'allocated' => 10.0,
+            'used' => 0.0,
+            'encashed' => 0.0,
+        ]);
+
+        LeaveBalance::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeHR->id,
+            'leave_type_id' => $leaveCasual->id,
+            'allocated' => 8.0,
+            'used' => 1.0,
+            'encashed' => 0.0,
+        ]);
+
+        LeaveBalance::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeLead->id,
+            'leave_type_id' => $leaveSick->id,
+            'allocated' => 10.0,
+            'used' => 2.0,
+            'encashed' => 0.0,
+        ]);
+
+        LeaveBalance::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeLead->id,
+            'leave_type_id' => $leaveCasual->id,
+            'allocated' => 8.0,
+            'used' => 3.0,
+            'encashed' => 1.0,
+        ]);
+
+        LeaveBalance::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeOperator->id,
+            'leave_type_id' => $leaveSick->id,
+            'allocated' => 10.0,
+            'used' => 1.0,
+            'encashed' => 0.0,
+        ]);
+
+        LeaveBalance::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeOperator->id,
+            'leave_type_id' => $leaveCasual->id,
+            'allocated' => 8.0,
+            'used' => 2.0,
+            'encashed' => 1.0,
+        ]);
+
+        // 11.2 Leave Requests
+        LeaveRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeOperator->id,
+            'leave_type_id' => $leaveSick->id,
+            'start_date' => '2026-07-05',
+            'end_date' => '2026-07-05',
+            'duration' => 1.0,
+            'start_date_type' => 'full_day',
+            'end_date_type' => 'full_day',
+            'notified_contacts' => [$employeeLead->id],
+            'reason' => 'High fever and doctor advised rest.',
+            'status' => 'approved',
+            'current_level' => 'approved',
+            'approved_by' => $employeeLead->id,
+        ]);
+
+        LeaveRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeLead->id,
+            'leave_type_id' => $leaveCasual->id,
+            'start_date' => '2026-07-15',
+            'end_date' => '2026-07-16',
+            'duration' => 2.0,
+            'start_date_type' => 'full_day',
+            'end_date_type' => 'full_day',
+            'notified_contacts' => [$employeeHR->id],
+            'reason' => 'Personal family event.',
+            'status' => 'pending',
+            'current_level' => '1',
+            'approved_by' => null,
+        ]);
+
+        LeaveRequest::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeHR->id,
+            'leave_type_id' => $leaveCasual->id,
+            'start_date' => '2026-06-20',
+            'end_date' => '2026-06-20',
+            'duration' => 1.0,
+            'start_date_type' => 'full_day',
+            'end_date_type' => 'full_day',
+            'notified_contacts' => [],
+            'reason' => 'Annual health checkup.',
+            'status' => 'approved',
+            'current_level' => 'approved',
+            'approved_by' => $employeeHR->id,
+        ]);
+
+        // 11.3 Leave Encashments
+        LeaveEncashment::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeOperator->id,
+            'leave_type_id' => $leaveCasual->id,
+            'requested_days' => 1.0,
+            'status' => 'approved',
+            'reason' => 'Encashment of unutilized casual leave days.',
+            'approved_by' => $adminUser->id,
+            'approved_at' => now(),
+        ]);
+
+        LeaveEncashment::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'employee_id' => $employeeLead->id,
+            'leave_type_id' => $leaveCasual->id,
+            'requested_days' => 1.0,
+            'status' => 'pending',
+            'reason' => 'Requesting encashment for 1 casual leave day.',
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
+
         // 12. Shift Rosters
         $rosterDates = ['2026-07-10', '2026-07-11', '2026-07-12', '2026-07-13', '2026-07-14'];
         foreach ($rosterDates as $rDate) {
@@ -666,10 +812,35 @@ class HrmsDemoSeeder extends Seeder
             'description' => 'Welding masks, fireproof suits, and specialized toolsets.',
         ]);
 
+        $itemMacBook = AssetItem::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $assetCatElectronics->id,
+            'name' => 'MacBook Pro 16 Inch M3',
+            'description' => 'High performance Apple workstation for senior staff.',
+        ]);
+
+        $itemWeldingMask = AssetItem::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $assetCatSafety->id,
+            'name' => 'Auto-Darkening Welding Helmet',
+            'description' => 'Industrial protective helmet for factory floor welders.',
+        ]);
+
+        $itemDellLaptop = AssetItem::create([
+            'tenant_id' => $tenant->id,
+            'company_id' => $company->id,
+            'asset_category_id' => $assetCatElectronics->id,
+            'name' => 'Dell Latitude 5440',
+            'description' => 'Enterprise Dell laptop for business & technical team.',
+        ]);
+
         $assetLaptop = Asset::create([
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatElectronics->id,
+            'asset_item_id' => $itemMacBook->id,
             'asset_code' => 'AST-LAP-001',
             'name' => 'MacBook Pro 16 Inch M3',
             'brand' => 'Apple',
@@ -689,6 +860,7 @@ class HrmsDemoSeeder extends Seeder
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatSafety->id,
+            'asset_item_id' => $itemWeldingMask->id,
             'asset_code' => 'AST-SAF-002',
             'name' => 'Auto-Darkening Welding Helmet',
             'brand' => '3M Speedglas',
@@ -708,6 +880,7 @@ class HrmsDemoSeeder extends Seeder
             'tenant_id' => $tenant->id,
             'company_id' => $company->id,
             'asset_category_id' => $assetCatElectronics->id,
+            'asset_item_id' => $itemDellLaptop->id,
             'asset_code' => 'AST-LAP-003',
             'name' => 'Dell Latitude 5440',
             'brand' => 'Dell',
@@ -750,6 +923,8 @@ class HrmsDemoSeeder extends Seeder
             'company_id' => $company->id,
             'employee_id' => $employeeOperator->id,
             'asset_category_id' => $assetCatElectronics->id,
+            'asset_item_id' => $itemDellLaptop->id,
+            'quantity' => 1,
             'reason' => 'Need a computing device to access shift logs, training portals, and payroll slips.',
             'request_date' => '2026-07-08',
             'status' => 'pending',
@@ -762,6 +937,8 @@ class HrmsDemoSeeder extends Seeder
             'company_id' => $company->id,
             'employee_id' => $employeeLead->id,
             'asset_category_id' => $assetCatElectronics->id,
+            'asset_item_id' => $itemDellLaptop->id,
+            'quantity' => 1,
             'reason' => 'Supervisor mobile phone for coordination of shop floor issues.',
             'request_date' => '2026-07-01',
             'status' => 'approved',

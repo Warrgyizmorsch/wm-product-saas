@@ -91,15 +91,15 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input select-all">
                         </th>
-                        <th style="width: 15%">PO Number</th>
-                        <th style="width: 20%">Supplier Name</th>
-                        <th style="width: 15%">Ref Document</th>
-                        <th style="width: 12%">PO Date</th>
-                        <th style="width: 12%" class="text-end">Subtotal</th>
-                        <th style="width: 10%" class="text-end">Total Tax</th>
+                        <th style="width: 12%">PO Number</th>
+                        <th style="width: 18%">Supplier Name</th>
+                        <th style="width: 12%">Ref Document</th>
+                        <th style="width: 10%">PO Date</th>
+                        <th style="width: 10%" class="text-end">Subtotal</th>
+                        <th style="width: 9%" class="text-end">Total Tax</th>
                         <th style="width: 12%" class="text-end">Grand Total</th>
-                        <th style="width: 10%" class="text-center">Status</th>
-                        <th style="width: 8%" class="text-end">Actions</th>
+                        <th style="width: 12%" class="text-center">Status</th>
+                        <th style="width: 12%" class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -138,17 +138,28 @@
                                 </x-ui.badge>
                             </td>
                             <td class="text-end">
-                                <x-ui.action-dropdown id="poActions-{{ $order->id }}">
-                                    <li>
-                                        <a class="dropdown-item py-2" href="{{ route('purchase.orders.show', $order->id) }}">
-                                            <i class="feather-eye me-1.5 text-muted"></i> View Details
-                                        </a>
-                                    </li>
+                                <x-ui.action-dropdown :viewUrl="route('purchase.orders.show', $order->id)" id="poActions-{{ $order->id }}">
                                     @if($order->status === 'Draft')
                                         <li>
                                             <a class="dropdown-item py-2" href="{{ route('purchase.orders.edit', $order->id) }}">
                                                 <i class="feather-edit me-1.5 text-muted"></i> Edit Draft
                                             </a>
+                                        </li>
+                                        <li>
+                                            <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to approve this purchase order?')">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item py-2 text-success">
+                                                    <i class="feather-check-circle me-1.5"></i> Approve
+                                                </button>
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <form action="{{ route('purchase.orders.reject', $order->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to reject this purchase order?')">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item py-2 text-danger">
+                                                    <i class="feather-x-circle me-1.5"></i> Reject
+                                                </button>
+                                            </form>
                                         </li>
                                         <li>
                                             <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this purchase order?')">

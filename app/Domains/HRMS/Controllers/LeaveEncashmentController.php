@@ -74,7 +74,7 @@ class LeaveEncashmentController extends Controller
             'reason' => $request->reason,
         ]);
 
-        return redirect()->route('hrms.leaves.index', ['tab' => 'encashments'])
+        return redirect()->back()
             ->with('success', __('hrms.leave.encashment_app.submitted_successfully'));
     }
 
@@ -90,7 +90,7 @@ class LeaveEncashmentController extends Controller
 
         $this->reconcileEncashedBalance($leaveEncashment->employee_id, $leaveEncashment->leave_type_id);
 
-        return redirect()->route('hrms.leaves.index', ['tab' => 'encashments'])
+        return redirect()->back()
             ->with('success', __('hrms.leave.encashment_app.approved_successfully'));
     }
 
@@ -105,7 +105,7 @@ class LeaveEncashmentController extends Controller
 
         $this->reconcileEncashedBalance($leaveEncashment->employee_id, $leaveEncashment->leave_type_id);
 
-        return redirect()->route('hrms.leaves.index', ['tab' => 'encashments'])
+        return redirect()->back()
             ->with('success', __('hrms.leave.encashment_app.rejected_successfully'));
     }
 
@@ -120,7 +120,7 @@ class LeaveEncashmentController extends Controller
 
         $this->reconcileEncashedBalance($empId, $typeId);
 
-        return redirect()->route('hrms.leaves.index', ['tab' => 'encashments'])
+        return redirect()->back()
             ->with('success', __('hrms.leave.encashment_app.deleted_successfully'));
     }
 

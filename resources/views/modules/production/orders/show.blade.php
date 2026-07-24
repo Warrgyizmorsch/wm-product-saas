@@ -513,21 +513,23 @@
                                         $activeAssignment = $op->operatorAssignments->whereIn('status', ['assigned', 'accepted'])->first();
                                     @endphp
                                     @if($activeAssignment)
-                                        <div class="d-flex align-items-center gap-1.5">
+                                        <div>
                                             <span class="fw-semibold text-dark fs-12">{{ $activeAssignment->user->name }}</span>
-                                            @if($activeAssignment->status === 'accepted')
-                                                <span class="badge bg-soft-success text-success fs-9 py-0.5 px-1">Accepted</span>
-                                            @else
-                                                <span class="badge bg-soft-warning text-warning fs-9 py-0.5 px-1">Pending</span>
-                                            @endif
-                                            @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
-                                                <button type="button" class="btn btn-xs btn-outline-secondary p-0.5 border-0" 
-                                                        title="Reassign"
-                                                        data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
-                                                        onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
-                                                    <i class="feather-edit fs-11"></i>
-                                                </button>
-                                            @endif
+                                            <div class="d-flex align-items-center gap-1.5">
+                                                @if($activeAssignment->status === 'accepted')
+                                                    <span class="badge bg-soft-success text-success fs-9 py-0.5 px-1">Accepted</span>
+                                                @else
+                                                    <span class="badge bg-soft-warning text-warning fs-9 py-0.5 px-1">Pending</span>
+                                                @endif
+                                                @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
+                                                    <button type="button" class="btn btn-xs btn-outline-secondary p-0.5 border-0" 
+                                                            title="Reassign"
+                                                            data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
+                                                            onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
+                                                        <i class="feather-edit fs-11"></i>
+                                                    </button>
+                                                @endif
+                                            </div>
                                         </div>
                                     @else
                                         <div class="d-flex align-items-center gap-1.5">
@@ -1508,7 +1510,7 @@
             const warningBox = document.getElementById('modal_validation_warning');
             const submitBtn = document.getElementById('btn_save_progress');
 
-            function updateStatsAndValidation() {
+            function updateStatsAndValidation(shouldAutofill = false) {
                 const opId = parseInt(opSelect.value);
                 const op = operationsData.find(o => o.id === opId);
                 
@@ -1533,6 +1535,10 @@
                 statRejected.textContent = rejected.toFixed(2);
                 statScrapped.textContent = scrapped.toFixed(2);
                 
+                if (shouldAutofill && inputProduced) {
+                    inputProduced.value = remaining.toFixed(4);
+                }
+                
                 // Autofill run minutes from shopfloor schedule operation
                 if (inputRun && op.schedule_operation && op.schedule_operation.actual_start) {
                     const startDt = new Date(op.schedule_operation.actual_start);
@@ -1554,7 +1560,7 @@
                 } else if (inputRun) {
                     inputRun.value = 0;
                 }
-
+ 
                 // Validate inputs
                 const inProduced = parseFloat(inputProduced.value || 0);
                 const inRejected = parseFloat(inputRejected.value || 0);
@@ -1573,27 +1579,27 @@
             }
             
             if (opSelect) {
-                opSelect.addEventListener('change', updateStatsAndValidation);
+                opSelect.addEventListener('change', () => updateStatsAndValidation(true));
                 if (window.jQuery) {
-                    window.jQuery(opSelect).on('change', updateStatsAndValidation);
+                    window.jQuery(opSelect).on('change', () => updateStatsAndValidation(true));
                 }
                 
                 [inputProduced, inputRejected, inputScrapped].forEach(input => {
                     if (input) {
-                        input.addEventListener('input', updateStatsAndValidation);
-                        input.addEventListener('change', updateStatsAndValidation);
+                        input.addEventListener('input', () => updateStatsAndValidation(false));
+                        input.addEventListener('change', () => updateStatsAndValidation(false));
                     }
                 });
-
+ 
                 const progressModalEl = document.getElementById('progressModal');
                 if (progressModalEl) {
                     progressModalEl.addEventListener('shown.bs.modal', function () {
-                        updateStatsAndValidation();
+                        updateStatsAndValidation(true);
                     });
                 }
                 
                 // Initialize
-                updateStatsAndValidation();
+                updateStatsAndValidation(true);
             }
 
             // Live Timers for Running/Paused Operations in the UI

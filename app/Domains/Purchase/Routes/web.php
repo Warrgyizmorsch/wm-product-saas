@@ -13,6 +13,7 @@ Route::prefix('purchase')
         Route::get('requisitions/pending-items', [PurchaseRequisitionController::class, 'pendingItems'])->name('requisitions.pending-items');
         Route::post('requisitions/pending-items/create-po', [PurchaseRequisitionController::class, 'createPosFromPendingItems'])->name('requisitions.pending-items.create-po');
         Route::post('requisitions/{requisition}/approve', [PurchaseRequisitionController::class, 'approve'])->name('requisitions.approve');
+        Route::post('requisitions/{requisition}/reject', [PurchaseRequisitionController::class, 'reject'])->name('requisitions.reject');
         Route::resource('requisitions', PurchaseRequisitionController::class);
 
         Route::get('rfqs/{rfq}/enter-quotes', [PurchaseRfqController::class, 'enterQuotes'])->name('rfqs.enter-quotes');
@@ -28,8 +29,10 @@ Route::prefix('purchase')
 
         Route::get('orders/get-requisition-items', [PurchaseOrderController::class, 'getRequisitionItems'])->name('orders.get-requisition-items');
         Route::post('orders/{order}/approve', [PurchaseOrderController::class, 'approve'])->name('orders.approve');
+        Route::post('orders/{order}/reject', [PurchaseOrderController::class, 'reject'])->name('orders.reject');
         Route::get('orders/{order}/download', [PurchaseOrderController::class, 'downloadPdf'])->name('orders.download');
         Route::post('orders/advance-payments', [\App\Domains\Purchase\Controllers\PurchaseAdvancePaymentController::class, 'store'])->name('orders.advance-payments.store');
+        Route::match(['get', 'post'], 'orders/create', [PurchaseOrderController::class, 'create'])->name('orders.create');
         Route::resource('orders', PurchaseOrderController::class);
 
         Route::get('grns/pending', [GoodsReceiptNoteController::class, 'indexPending'])->name('grns.pending');

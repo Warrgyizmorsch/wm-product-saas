@@ -220,7 +220,7 @@ class MesController extends Controller
         $tenantId = require_tenant_id();
         $userId   = auth()->id();
 
-        $assignments = ProductionOperatorAssignment::with(['operation.productionOrder.product', 'operation.workCenter'])
+        $assignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])
             ->where('tenant_id', $tenantId)
             ->where('user_id', $userId)
             ->orderBy('id', 'desc')

@@ -185,18 +185,20 @@ class ProductionWipService
             $wip->overhead_cost += $overheadCost;
             $wip->total_value += $totalCostAdded;
 
-            // Update quantity states
-            $wip->completed_quantity += $goodQty;
-            $wip->rejected_quantity += $rejectedQty;
-            $wip->scrap_quantity += $scrapQty;
-
-            // Adjust available balance
-            $wip->available_quantity = max(0.0000, $wip->available_quantity - $scrapQty);
-
             // If this was the last routing operation and the operation is completed, transition WIP to completed status
             $nextOpExists = ProductionOrderOperation::where('production_order_id', $wip->production_order_id)
                 ->where('sequence', '>', $orderOp->sequence)
                 ->exists();
+
+            // Update quantity states
+            if (!$nextOpExists) {
+                $wip->completed_quantity += $goodQty;
+                $wip->available_quantity = $wip->completed_quantity;
+            } else {
+                $wip->available_quantity = max(0.0000, $wip->available_quantity - $scrapQty);
+            }
+            $wip->rejected_quantity += $rejectedQty;
+            $wip->scrap_quantity += $scrapQty;
 
             if (!$nextOpExists && $orderOp->status === ProductionOrderOperation::STATUS_COMPLETED) {
                 $wip->status = 'completed';

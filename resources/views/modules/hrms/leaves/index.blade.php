@@ -15,10 +15,182 @@
     </div>
 @endsection
 
+@php
+    $formatLeaveRulePoints = static function (?array $rules): array {
+        if (empty($rules)) {
+            return [];
+        }
+
+        $humanize = static fn ($value) => strtolower(str_replace('_', ' ', (string) $value));
+        $formatNumber = static fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
+        $sections = [];
+
+        if (!empty($rules['application'])) {
+            $application = $rules['application'];
+            $points = [];
+
+            if (!empty($application['apply_in_advance'])) {
+                $points[] = 'You have to apply for this leave at least ' . ($application['advance_days'] ?? 0) . ' day(s) in advance.';
+            } else {
+                $points[] = 'You can apply for this leave without an advance-day restriction.';
+            }
+
+            $points[] = 'One request can be from ' . ($application['min_duration'] ?? 1) . ' to ' . ($application['max_duration'] ?? 10) . ' day(s).';
+
+            if (!empty($application['require_attachment'])) {
+                $points[] = 'You must attach supporting documents when the leave duration is more than ' . ($application['attachment_days'] ?? 0) . ' day(s).';
+            }
+
+            $sections[] = ['title' => 'Application Rules', 'icon' => 'feather-file-text', 'points' => $points];
+        }
+
+        if (!empty($rules['approval'])) {
+            $approval = $rules['approval'];
+            $points = [];
+
+            if (($approval['workflow_level'] ?? null) === 'auto') {
+                $points[] = 'This leave is approved automatically after submission.';
+            } elseif (($approval['workflow_level'] ?? null) === '2_level') {
+                $points[] = 'This leave needs two approvals: first by ' . $humanize($approval['first_approver'] ?? 'reporting_manager') . ', then by ' . $humanize($approval['second_approver'] ?? 'hr_manager') . '.';
+            } else {
+                $points[] = 'This leave needs approval from ' . $humanize($approval['first_approver'] ?? 'reporting_manager') . '.';
+            }
+
+            $sections[] = ['title' => 'Approval Rules', 'icon' => 'feather-check-square', 'points' => $points];
+        }
+
+        if (!empty($rules['accrual'])) {
+            $accrual = $rules['accrual'];
+            $points = [];
+            $unit = $humanize($accrual['calculate_in'] ?? 'days');
+
+            if (($accrual['quota_type'] ?? 'fixed') === 'unlimited') {
+                $points[] = 'This leave has unlimited quota.';
+            } else {
+                $points[] = 'You get ' . $formatNumber($accrual['quota_value'] ?? 0) . ' ' . $unit . ' of this leave.';
+            }
+
+            $rate = $accrual['rate'] ?? 'immediate';
+            if ($rate === 'attendance') {
+                $points[] = 'Leave is earned based on attendance: ' . ($accrual['attendance_earn'] ?? 1) . ' day for every ' . ($accrual['attendance_period'] ?? 20) . ' present day(s).';
+            } elseif ($rate === 'periodic') {
+                $points[] = 'Leave is credited periodically as configured in the leave policy.';
+            } else {
+                $points[] = 'Leave is credited immediately.';
+            }
+
+            if (!empty($accrual['limit_carry'])) {
+                $points[] = 'Maximum accumulated balance is limited to ' . ($accrual['max_accum'] ?? 0) . ' day(s).';
+            }
+
+            $sections[] = ['title' => 'Accrual Rules', 'icon' => 'feather-calendar', 'points' => $points];
+        }
+
+        if (!empty($rules['yearend'])) {
+            $yearend = $rules['yearend'];
+            $points = [];
+
+            if (($yearend['action'] ?? 'lapse') === 'carry_forward') {
+                $points[] = 'Unused leave can be carried forward at year end.';
+                $points[] = 'Maximum carry-forward limit is ' . ($yearend['max_carry'] ?? 0) . ' day(s).';
+            } elseif (($yearend['action'] ?? null) === 'encash') {
+                $points[] = 'Unused leave can be encashed at year end.';
+                $points[] = 'Maximum encashment limit is ' . ($yearend['max_encash'] ?? 0) . ' day(s).';
+            } else {
+                $points[] = 'Unused leave lapses at year end.';
+            }
+
+            $sections[] = ['title' => 'Year-End Rules', 'icon' => 'feather-refresh-cw', 'points' => $points];
+        }
+
+        if (!empty($rules['probation'])) {
+            $probation = $rules['probation'];
+            $point = match ($probation['rule'] ?? 'allow') {
+                'disallow' => 'You cannot apply for this leave during probation.',
+                'allow_after_months' => 'You can apply for this leave after completing ' . ($probation['months'] ?? 0) . ' month(s) from joining.',
+                default => 'You can apply for this leave during the probation.',
+            };
+            $sections[] = ['title' => 'Probation Rules', 'icon' => 'feather-shield', 'points' => [$point]];
+        }
+
+        if (!empty($rules['notice'])) {
+            $notice = $rules['notice'];
+            $point = match ($notice['rule'] ?? 'allow') {
+                'disallow' => 'You cannot apply for this leave during the notice period.',
+                'special_approval' => 'You need special HR approval to apply during the notice period.',
+                default => 'You can apply for this leave during the notice period.',
+            };
+            $sections[] = ['title' => 'Notice Period Rules', 'icon' => 'feather-alert-triangle', 'points' => [$point]];
+        }
+
+        return $sections;
+    };
+@endphp
+
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2-theme.min.css') }}">
     <style>
+        .text-primary {
+            color: var(--bs-primary) !important;
+        }
+        .leave-rules-icon-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            border: 1px solid rgba(var(--bs-primary-rgb), 0.18) !important;
+            background-color: rgba(var(--bs-primary-rgb), 0.08) !important;
+            color: var(--bs-primary) !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .leave-rules-icon-btn:hover {
+            background-color: var(--bs-primary) !important;
+            color: #fff !important;
+            box-shadow: 0 8px 18px rgba(var(--bs-primary-rgb), 0.22) !important;
+        }
+        .leave-rule-detail-section {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 16px;
+            background: #fff;
+            height: 100%;
+        }
+        .leave-rule-detail-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #0f172a;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .leave-rule-points {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 10px;
+        }
+        .leave-rule-point {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+        .leave-rule-point::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background-color: var(--bs-primary);
+            box-shadow: 0 0 0 4px rgba(var(--bs-primary-rgb), 0.1);
+            margin-top: 7px;
+            flex: 0 0 auto;
+        }
         .leave-balance-card {
             border-radius: 12px;
             border: 1px solid #e2e8f0;
@@ -225,6 +397,7 @@
                     document.body.appendChild(el);
                 }
             });
+            $('[id^="leaveRulesModal"]').appendTo('body');
 
             $('button[data-bs-toggle="tab"]').on('shown.bs.tab click', function (e) {
                 var target = $(this).attr('data-bs-target') || $(this).attr('id');
@@ -939,46 +1112,179 @@
             updateEncashmentsPagination();
         }
     </script>
+
+    <script>
+        // ── Leave Detail Offcanvas (index page) ─────────────────────────────────
+        $(document).on('click', '.open-leave-detail-idx', function () {
+            var $row = $(this).closest('tr.leave-row');
+            var d    = $row.data();
+
+            // Employee (admin view)
+            if ($('#lid-emp-name').length) {
+                var empName = d.employeeName || '';
+                $('#lid-emp-name').text(empName);
+                $('#lid-emp-code').text(d.employeeCode || '');
+                $('#lid-emp-avatar').text(empName.charAt(0).toUpperCase() || 'E');
+            }
+
+            // Leave type banner
+            $('#lid-color-dot').css('background', d.leaveColor || '#3b82f6');
+            $('#lid-leave-type').text(d.leaveType || '—');
+            $('#lid-balance-inline').text('Remaining: ' + (d.remaining !== undefined ? d.remaining : '0') + ' / ' + (d.allocated !== undefined ? d.allocated : '0') + ' Days');
+
+            // Status badge
+            $('#lid-status-badge')
+                .attr('class', 'badge rounded-pill px-2 py-1 fs-11 flex-shrink-0 ' + (d.statusCls || ''))
+                .html('<i class="' + (d.statusIcon || '') + ' me-1"></i>' + (d.statusLabel || ''));
+
+            // Period
+            $('#lid-date-range').text(d.dateRange || '—');
+            $('#lid-session-info').text(d.sessionInfo || '');
+
+            // Duration
+            var dur = parseFloat(d.duration) || 0;
+            $('#lid-duration').text(dur + (dur === 1 ? ' Day' : ' Days'));
+
+            // Reason / Workflow / Applied
+            $('#lid-reason').text(d.reason || '—');
+            $('#lid-workflow').text(d.workflow || '—');
+            $('#lid-applied').text(d.applied || '—');
+
+            // Rejection
+            if (d.rejection) {
+                $('#lid-rejection-wrap').removeClass('d-none');
+                $('#lid-rejection').text(d.rejection);
+            } else {
+                $('#lid-rejection-wrap').addClass('d-none');
+            }
+
+            // Attachment
+            if (d.attachment) {
+                $('#lid-attach-wrap').removeClass('d-none');
+                $('#lid-attach-link').attr('href', d.attachment);
+            } else {
+                $('#lid-attach-wrap').addClass('d-none');
+            }
+
+            // Notified contacts
+            if (d.notifiedNames) {
+                $('#lid-notified-wrap').removeClass('d-none');
+                $('#lid-notified-names').text(d.notifiedNames);
+            } else {
+                $('#lid-notified-wrap').addClass('d-none');
+            }
+
+            // Status form action
+            $('#lid-status-form').attr('action', d.updateUrl || '');
+            $('#lid-status-select').val(d.status).trigger('change');
+
+            if (d.status === 'rejected') {
+                $('#lid-rejection-input-wrap').removeClass('d-none');
+                $('#lid-rejection-reason-input').val(d.rejection || '');
+            } else {
+                $('#lid-rejection-input-wrap').addClass('d-none');
+                $('#lid-rejection-reason-input').val('');
+            }
+        });
+
+        $(document).on('change', '#lid-status-select', function() {
+            if ($(this).val() === 'rejected') {
+                $('#lid-rejection-input-wrap').removeClass('d-none');
+            } else {
+                $('#lid-rejection-input-wrap').addClass('d-none');
+            }
+        });
+    </script>
 @endpush
 
 @section('content')
     <div class="row pt-4 px-4">
-        <!-- Leave Balances Section (Visible to logged-in employee) -->
-        @if($employee)
+        <!-- Leave Balances Section (Visible to logged-in employee when plan exists) -->
+        @if($employee && $employee->leavePlan && !$employee->leavePlan->types->isEmpty())
             <div class="col-12 mb-4">
                 <div class="card border-0 shadow-sm rounded-3">
-                    <div class="card-header bg-white border-0 pt-4">
-                        <h5 class="fw-bold text-dark mb-0">{{ __('hrms.leave.app.your_leave_balances') }}</h5>
-                        <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.leave_plan') }} <span class="badge bg-secondary fw-semibold">{{ $employee->leavePlan ? $employee->leavePlan->name : __('hrms.leave.app.no_active_plan') }}</span></p>
+                    <div class="card-header bg-white border-0 pt-4 d-flex align-items-center justify-content-between">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0"><i class="feather-info text-primary me-1.5"></i> {{ __('hrms.employees.lbl_assigned_leave_plan') ?? 'Assigned Leave Plan' }}</h5>
+                            <p class="text-muted fs-12 mb-0">{{ __('hrms.leave.app.leave_plan') }} <span class="badge bg-secondary fw-semibold">{{ $employee->leavePlan ? $employee->leavePlan->name : __('hrms.leave.app.no_active_plan') }}</span></p>
+                        </div>
+                        @if($employee->leavePlan)
+                            @if(!$employee->leavePlan->status)
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-10 px-2 py-0.5 rounded">Inactive</span>
+                            @else
+                                <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 px-2 py-0.5 rounded">Active</span>
+                            @endif
+                        @endif
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            @forelse ($balances as $balance)
-                                <div class="col-md-3 col-sm-6 mb-3">
-                                    <div class="leave-balance-card p-4 text-center">
-                                        <h6 class="text-muted text-uppercase fs-11 fw-bolder mb-2">{{ $balance->leaveType->name }}</h6>
-                                        <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
-                                            <span class="fs-1 fw-bold text-primary">{{ $balance->remaining }}</span>
-                                            <span class="text-muted fs-13">/ {{ $balance->allocated }} {{ __('hrms.leave.days') }}</span>
-                                        </div>
-                                        <div class="progress progress-sm" style="height: 6px;">
-                                            @php
-                                                $pct = $balance->allocated > 0 ? ($balance->used / $balance->allocated) * 100 : 0;
-                                            @endphp
-                                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ 100 - $pct }}%"></div>
-                                        </div>
-                                        <div class="d-flex justify-content-between mt-3 fs-12 text-muted">
-                                            <span>{{ __('hrms.leave.app.used') }} <strong>{{ $balance->used }}</strong></span>
-                                            <span>{{ __('hrms.leave.app.type') }} <strong>{{ $balance->leaveType->type === 'paid' ? __('hrms.leave.paid') : __('hrms.leave.unpaid') }}</strong></span>
-                                        </div>
-                                    </div>
+                        @if($employee->leavePlan)
+                            @if(!$employee->leavePlan->status)
+                                <div class="alert alert-warning py-1.5 px-3 mb-3 fs-12 d-flex align-items-center gap-2 border-0" style="background-color: #fef3c7; color: #92400e;">
+                                    <i class="feather-alert-triangle"></i>
+                                    <span>This leave plan is currently inactive.</span>
                                 </div>
-                            @empty
-                                <div class="col-12 text-center py-4">
-                                    <p class="text-muted mb-0">{{ __('hrms.leave.app.no_balances_found') }}</p>
+                            @endif
+                            <div class="mb-3">
+                                <p class="text-muted fs-13 mb-0">{{ $employee->leavePlan->description ?: 'No description provided.' }}</p>
+                                <small class="text-muted fs-11 text-uppercase fw-semibold d-block mt-2">{{ __('hrms.employees.lbl_effective_from') ?? 'Effective From' }}: <strong class="text-dark">{{ $employee->leavePlan->effective_from ? $employee->leavePlan->effective_from->format('d M, Y') : 'N/A' }}</strong></small>
+                            </div>
+
+                            @if(!$employee->leavePlan->types->isEmpty())
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover align-middle mb-0 fs-12 border">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="py-2 ps-3">TYPE NAME</th>
+                                                <th class="text-center py-2">BALANCE</th>
+                                                <th class="text-end py-2 pe-3">RULES</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($employee->leavePlan->types as $ltype)
+                                                @php
+                                                    $balance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)
+                                                        ->where('leave_type_id', $ltype->id)
+                                                        ->first();
+                                                    $balanceVal = $balance ? floatval($balance->remaining) : 0.0;
+                                                    $allocatedVal = $balance ? floatval($balance->allocated) : floatval($ltype->quota);
+                                                @endphp
+                                                <tr>
+                                                    <td class="py-2 ps-3">
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <span class="d-inline-block rounded-circle flex-shrink-0 me-1" style="width: 8px; height: 8px; background-color: {{ $ltype->color ?: '#3b82f6' }};"></span>
+                                                            <span class="fw-bold text-dark fs-12">{{ $ltype->name }}</span>
+                                                            <span class="text-muted fs-10 text-uppercase ms-1" style="font-size: 10px;">{{ $ltype->code }}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="text-center py-2" style="white-space: nowrap;">
+                                                        <span class="fw-bold text-dark fs-12">{{ $balanceVal }}</span>
+                                                        <span class="text-muted fs-10">/ {{ $allocatedVal }}</span>
+                                                    </td>
+                                                    <td class="text-end py-2 pe-3">
+                                                        <button
+                                                            type="button"
+                                                            class="leave-rules-icon-btn btn btn-light border d-inline-flex align-items-center justify-content-center p-0 rounded"
+                                                            style="width: 22px; height: 22px;"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#leaveRulesModal{{ $ltype->id }}"
+                                                            title="View leave rules"
+                                                            aria-label="View rules for {{ $ltype->name }}"
+                                                        >
+                                                            <i class="feather-sliders text-primary" style="font-size: 10px;"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
                                 </div>
-                            @endforelse
-                        </div>
+                            @endif
+                        @else
+                            <div class="text-center py-4 text-muted fs-13">
+                                <i class="feather-alert-circle d-block fs-24 mb-2 text-warning"></i>
+                                {{ __('hrms.employees.lbl_no_leave_plan') ?? 'No Leave Plan assigned.' }}
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -1085,141 +1391,125 @@
                         
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
+                                <table class="table table-hover align-middle mb-0" id="leavesTable">
                                     <thead class="table-light">
                                         <tr>
                                             @if($isAdmin)
-                                                <th>{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
+                                                <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="min-width:150px;">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
                                             @endif
-                                            <th>{{ __('hrms.leave.leave_types') }}</th>
-                                            <th>{{ __('hrms.leave.app.duration_timeline') }}</th>
-                                            <th>{{ __('hrms.leave.app.reason') }}</th>
-                                            <th>{{ __('hrms.leave.app.workflow_level') }}</th>
-                                            <th>{{ __('ui.status') ?? 'Status' }}</th>
-                                            <th class="text-end">{{ __('hrms.leave.app.actions') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="min-width:130px;">{{ __('hrms.leave.leave_types') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:160px;">{{ __('hrms.leave.app.duration_timeline') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:75px;">{{ __('hrms.leave.days') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:95px;">{{ __('ui.status') ?? 'Status' }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:65px;">File</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width:70px;">Detail</th>
                                         </tr>
                                     </thead>
                                     <tbody id="leavesTableBody">
                                         @forelse($leaveRequests as $req)
-                                            <tr class="leave-row" 
+                                            @php
+                                                $sameYear = $req->start_date->format('Y') === $req->end_date->format('Y');
+                                                $startStr = $req->start_date->format($sameYear ? 'd M' : 'd M Y');
+                                                $endStr   = $req->end_date->format('d M Y');
+                                                $dateRange = $req->start_date->isSameDay($req->end_date)
+                                                    ? $req->start_date->format('d M Y')
+                                                    : $startStr . ' – ' . $endStr;
+
+                                                $rowBalance   = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $req->employee_id)->where('leave_type_id', $req->leave_type_id)->first();
+                                                $rowRemaining = $rowBalance ? floatval($rowBalance->remaining) : 0.0;
+                                                $rowAllocated = $rowBalance ? floatval($rowBalance->allocated) : floatval($req->leaveType->quota);
+
+                                                $notifiedNames = '';
+                                                if (!empty($req->notified_contacts)) {
+                                                    $contacts = \App\Domains\HRMS\Models\Employee::whereIn('id', $req->notified_contacts)->pluck('full_name')->toArray();
+                                                    $notifiedNames = implode(', ', $contacts);
+                                                }
+
+                                                $statusBadge = match($req->status) {
+                                                    'approved'     => ['cls' => 'bg-soft-success text-success',    'icon' => 'feather-check-circle', 'lbl' => __('hrms.leave.app.status_approved')],
+                                                    'pending'      => ['cls' => 'bg-soft-warning text-warning',    'icon' => 'feather-clock',         'lbl' => __('hrms.leave.app.status_pending')],
+                                                    'rejected'     => ['cls' => 'bg-soft-danger text-danger',      'icon' => 'feather-x-circle',      'lbl' => __('hrms.leave.app.status_rejected')],
+                                                    'unauthorized' => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',         'lbl' => __('hrms.leave.app.status_unauthorized')],
+                                                    'unpaid'       => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-alert-circle',  'lbl' => __('hrms.leave.app.status_unpaid')],
+                                                    default        => ['cls' => 'bg-light text-secondary',         'icon' => 'feather-circle',        'lbl' => ucfirst($req->status)],
+                                                };
+
+                                                $sessionInfo = '';
+                                                if ($req->start_date_type !== 'full_day' || $req->end_date_type !== 'full_day') {
+                                                    $sessionInfo = ucwords(str_replace('_', ' ', $req->start_date_type));
+                                                    if (!$req->start_date->isSameDay($req->end_date) && $req->end_date_type !== 'full_day') {
+                                                        $sessionInfo .= ' → ' . ucwords(str_replace('_', ' ', $req->end_date_type));
+                                                    }
+                                                }
+                                            @endphp
+                                            <tr class="leave-row"
                                                 data-employee="{{ strtolower($req->employee->full_name) }} {{ strtolower($req->employee->employee_id) }}"
                                                 data-employee-id="{{ $req->employee_id }}"
                                                 data-status="{{ $req->status }}"
                                                 data-duration="{{ $req->duration }}"
-                                                data-created-at="{{ $req->created_at->timestamp }}">
+                                                data-created-at="{{ $req->created_at->timestamp }}"
+                                                data-leave-type="{{ $req->leaveType->name }}"
+                                                data-leave-code="{{ $req->leaveType->code }}"
+                                                data-leave-color="{{ $req->leaveType->color ?: '#3b82f6' }}"
+                                                data-date-range="{{ $dateRange }}"
+                                                data-session-info="{{ $sessionInfo }}"
+                                                data-remaining="{{ $rowRemaining }}"
+                                                data-allocated="{{ $rowAllocated }}"
+                                                data-reason="{{ addslashes($req->reason) }}"
+                                                data-status-cls="{{ $statusBadge['cls'] }}"
+                                                data-status-icon="{{ $statusBadge['icon'] }}"
+                                                data-status-label="{{ $statusBadge['lbl'] }}"
+                                                data-workflow="{{ $req->status === 'approved' ? __('hrms.leave.app.status_approved') : ($req->status === 'rejected' ? __('hrms.leave.app.status_rejected') : (in_array($req->status,['unauthorized','unpaid']) ? __('hrms.leave.app.processed') : __('hrms.leave.app.level_n', ['level' => $req->current_level]))) }}"
+                                                data-applied="{{ $req->created_at->format('d M Y, h:i A') }}"
+                                                data-rejection="{{ addslashes($req->rejection_reason ?? '') }}"
+                                                data-attachment="{{ $req->attachment_path ? asset('storage/'.$req->attachment_path) : '' }}"
+                                                data-update-url="{{ route('hrms.leaves.update-status', $req->id) }}"
+                                                data-notified-names="{{ $notifiedNames }}"
+                                                data-employee-name="{{ $req->employee->full_name }}"
+                                                data-employee-code="{{ $req->employee->employee_id }}"
+                                            >
                                                 @if($isAdmin)
-                                                    <td>
-                                                        <div class="d-flex align-items-center gap-2">
-                                                            <div>
-                                                                <h6 class="fw-bold mb-0 fs-13 text-dark">{{ $req->employee->full_name }}</h6>
-                                                                <small class="text-muted fs-11">{{ $req->employee->employee_id }}</small>
-                                                            </div>
-                                                        </div>
+                                                    <td class="ps-3">
+                                                        <div class="fw-semibold text-dark fs-13">{{ $req->employee->full_name }}</div>
+                                                        <div class="text-muted fs-11">{{ $req->employee->employee_id }}</div>
                                                     </td>
                                                 @endif
-                                                <td>
-                                                    <span class="badge bg-light text-primary fw-semibold fs-12 mb-1">{{ $req->leaveType->name }}</span>
-                                                    @php
-                                                        $rowBalance = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $req->employee_id)
-                                                            ->where('leave_type_id', $req->leave_type_id)
-                                                            ->first();
-                                                        $rowRemaining = $rowBalance ? floatval($rowBalance->remaining) : 0.0;
-                                                        $rowAllocated = $rowBalance ? floatval($rowBalance->allocated) : floatval($req->leaveType->quota);
-                                                    @endphp
-                                                    <div class="text-muted fs-11" style="white-space: nowrap;">
-                                                        {{ __('hrms.leave.app.remaining') }}: <strong>{{ $rowRemaining }}</strong> / {{ $rowAllocated }} {{ __('hrms.leave.days') }}
+                                                <td class="{{ !$isAdmin ? 'ps-3' : '' }}">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="flex-shrink-0 rounded-circle" style="width:9px;height:9px;background:{{ $req->leaveType->color ?: '#3b82f6' }};display:inline-block;"></span>
+                                                        <div>
+                                                            <div class="fw-semibold text-dark fs-13">{{ $req->leaveType->name }}</div>
+                                                            <div class="text-muted fs-11">Rem: {{ $rowRemaining }} / {{ $rowAllocated }} {{ __('hrms.leave.days') }}</div>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    @php
-                                                        $startFormat = $req->start_date->format('Y') === $req->end_date->format('Y') ? 'd M' : 'd M Y';
-                                                        $startStr = $req->start_date->format($startFormat);
-                                                        $endStr = $req->end_date->format('d M Y');
-                                                        
-                                                        if ($req->start_date->isSameDay($req->end_date)) {
-                                                            $dateRange = $req->start_date->format('d M Y');
-                                                        } else {
-                                                            $dateRange = $startStr . ' - ' . $endStr;
-                                                        }
-                                                    @endphp
-                                                    <div class="fs-13 text-dark fw-bold">
-                                                        {{ $dateRange }} <span class="text-secondary fs-12 fw-normal">({{ __('hrms.leave.app.duration_days', ['duration' => floatval($req->duration)]) }})</span>
-                                                    </div>
-                                                    @if($req->start_date_type !== 'full_day' || $req->end_date_type !== 'full_day')
-                                                        <small class="text-muted fs-11">
-                                                            {{ __('hrms.leave.app.session') }} <span class="text-capitalize">{{ __('hrms.leave.app.' . $req->start_date_type) }}</span> 
-                                                            @if(!$req->start_date->isSameDay($req->end_date))
-                                                                {{ __('hrms.leave.app.to') }} <span class="text-capitalize">{{ __('hrms.leave.app.' . $req->end_date_type) }}</span>
-                                                            @endif
-                                                        </small>
-                                                    @endif
+                                                    <div class="fs-13 text-dark">{{ $dateRange }}</div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="fw-bold fs-13 text-dark">{{ floatval($req->duration) }}</span>
                                                 </td>
                                                 <td>
-                                                    @if(strlen($req->reason) > 25)
-                                                        <span class="text-secondary fs-13" 
-                                                              style="cursor: pointer; border-bottom: 1px dashed #cbd5e1;" 
-                                                              data-bs-toggle="popover" 
-                                                              data-bs-trigger="click" 
-                                                              data-bs-placement="top" 
-                                                              title="{{ __('hrms.leave.app.application_reason') }}" 
-                                                              data-bs-content="{{ $req->reason }}">
-                                                            {{ Str::limit($req->reason, 25) }} <i class="feather-zoom-in fs-11 text-muted"></i>
-                                                        </span>
+                                                    <span class="badge {{ $statusBadge['cls'] }} rounded-pill px-2 py-1 fs-11">
+                                                        <i class="{{ $statusBadge['icon'] }} me-1"></i>{{ $statusBadge['lbl'] }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-center">
+                                                    @if($req->attachment_path)
+                                                        <i class="feather-paperclip text-primary fs-13" title="{{ __('hrms.leave.app.view_attachment') }}" data-bs-toggle="tooltip"></i>
                                                     @else
-                                                        <span class="fs-13 text-secondary">{{ $req->reason }}</span>
+                                                        <span class="text-muted">—</span>
                                                     @endif
                                                 </td>
-                                                <td>
-                                                     <span class="text-secondary fs-12">
-                                                         @if($req->status === 'approved')
-                                                             {{ __('hrms.leave.app.status_approved') }}
-                                                         @elseif($req->status === 'rejected')
-                                                             {{ __('hrms.leave.app.status_rejected') }}
-                                                         @elseif($req->status === 'unauthorized' || $req->status === 'unpaid')
-                                                             {{ __('hrms.leave.app.processed') }}
-                                                         @else
-                                                             {{ __('hrms.leave.app.level_n', ['level' => $req->current_level]) }}
-                                                         @endif
-                                                     </span>
-                                                 </td>
-                                                 <td>
-                                                     @if($req->status === 'rejected' && $req->rejection_reason)
-                                                         <span class="badge rounded-pill fw-semibold px-3 py-2 fs-11 badge-rejected" 
-                                                               style="cursor: pointer;" 
-                                                               data-bs-toggle="popover" 
-                                                               data-bs-trigger="click" 
-                                                               data-bs-placement="top" 
-                                                               title="{{ __('hrms.leave.app.rejection_reason') }}" 
-                                                               data-bs-content="{{ $req->rejection_reason }}">
-                                                             {{ __('hrms.leave.app.status_rejected') }} <i class="feather-help-circle fs-10"></i>
-                                                         </span>
-                                                     @else
-                                                         <span class="badge rounded-pill fw-semibold px-3 py-2 fs-11 badge-{{ $req->status }}">
-                                                             {{ __('hrms.leave.app.status_' . $req->status) }}
-                                                         </span>
-                                                     @endif
-                                                 </td>
-                                                 <td class="text-end">
-                                                     <div class="d-flex align-items-center justify-content-end gap-2">
-                                                         @if($req->attachment_path)
-                                                             <a href="{{ asset('storage/' . $req->attachment_path) }}" target="_blank" class="btn btn-light btn-sm" title="{{ __('hrms.leave.app.view_attachment') }}">
-                                                                 <i class="feather-paperclip text-secondary"></i>
-                                                             </a>
-                                                         @endif
-                                                         @if($isAdmin)
-                                                             <form method="POST" action="{{ route('hrms.leaves.update-status', $req->id) }}" class="m-0 p-0">
-                                                                 @csrf
-                                                                 <select name="status" class="form-select form-select-sm status-dropdown fw-semibold fs-11" data-id="{{ $req->id }}" style="width: 130px; border-radius: 6px;">
-                                                                     <option value="pending" {{ $req->status === 'pending' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_pending') }}</option>
-                                                                     <option value="approved" {{ $req->status === 'approved' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_approved') }}</option>
-                                                                     <option value="rejected" {{ $req->status === 'rejected' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_rejected') }}</option>
-                                                                     <option value="unauthorized" {{ $req->status === 'unauthorized' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_unauthorized') }}</option>
-                                                                     <option value="unpaid" {{ $req->status === 'unpaid' ? 'selected' : '' }}>{{ __('hrms.leave.app.status_unpaid') }}</option>
-                                                                 </select>
-                                                             </form>
-                                                         @endif
-                                                     </div>
-                                                 </td>
+                                                <td class="text-end pe-3">
+                                                    <button type="button"
+                                                        class="btn btn-sm btn-light border open-leave-detail-idx px-2 py-1"
+                                                        title="View Details"
+                                                        data-bs-toggle="offcanvas"
+                                                        data-bs-target="#leaveDetailDrawerIdx">
+                                                        <i class="feather-eye fs-12 text-primary"></i>
+                                                    </button>
+                                                </td>
                                             </tr>
                                         @empty
                                             <tr>
@@ -1245,7 +1535,7 @@
                                 <div class="erp-pagination-info">
                                     {!! __('hrms.leave.app.showing_entries', [
                                         'start' => '<span id="leaves_showing_start">0</span>',
-                                        'end' => '<span id="leaves_showing_end">0</span>',
+                                        'end'   => '<span id="leaves_showing_end">0</span>',
                                         'total' => '<strong id="leaves_total_count">0</strong>'
                                     ]) !!}
                                 </div>
@@ -1253,6 +1543,114 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- Leave Detail Offcanvas Drawer (for Leave Applications index) --}}
+                <x-ui.drawer id="leaveDetailDrawerIdx" title="{{ __('hrms.leave.app.title') }} Detail" style="width:440px;max-width:100%;">
+                    {{-- Merged Employee & Leave Type Card --}}
+                    <div class="mb-3 p-3 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                        @if($isAdmin)
+                            <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom" style="border-color: #e2e8f0 !important;">
+                                <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold" style="width:34px;height:34px;font-size:13px;" id="lid-emp-avatar">E</div>
+                                <div>
+                                    <div class="fw-bold fs-13 text-dark" id="lid-emp-name">—</div>
+                                    <div class="fs-11 text-muted" id="lid-emp-code"></div>
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="d-flex align-items-start gap-3">
+                            <span id="lid-color-dot" class="rounded-circle flex-shrink-0 mt-1" style="width:12px;height:12px;display:inline-block;"></span>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold fs-14 text-dark" id="lid-leave-type">—</div>
+                                <div class="fs-12 text-muted mt-1" id="lid-balance-inline"></div>
+                                <div class="fs-11 text-muted mt-1">Applied On: <span class="fw-semibold text-dark" id="lid-applied">—</span></div>
+                            </div>
+                            <span class="badge rounded-pill px-2 py-1 fs-11 flex-shrink-0" id="lid-status-badge"></span>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    {{-- Period & Duration --}}
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.duration_timeline') }}</div>
+                            <div class="fw-semibold text-dark fs-13" id="lid-date-range">—</div>
+                            <div class="text-muted fs-12 mt-1" id="lid-session-info"></div>
+                        </div>
+                        <div class="text-end">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Duration</div>
+                            <div class="fw-bold fs-22 text-primary" id="lid-duration">—</div>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    {{-- Reason --}}
+                    <div class="mb-3">
+                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.reason') }}</div>
+                        <div class="fs-13 text-dark" id="lid-reason" style="white-space:pre-line;">—</div>
+                    </div>
+
+                    {{-- Workflow Level & Attachment --}}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.workflow_level') }}</div>
+                            <div class="fs-13 text-dark" id="lid-workflow">—</div>
+                        </div>
+                        <div class="d-none text-end" id="lid-attach-wrap">
+                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.view_attachment') }}</div>
+                            <a id="lid-attach-link" href="#" target="_blank" class="btn btn-sm btn-soft-primary d-inline-flex align-items-center gap-1">
+                                <i class="feather-paperclip fs-12"></i> {{ __('hrms.leave.app.view_attachment') }}
+                            </a>
+                        </div>
+                    </div>
+
+                    {{-- Rejection Reason --}}
+                    <div class="mb-3 d-none" id="lid-rejection-wrap">
+                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.rejection_reason') }}</div>
+                        <div class="alert alert-soft-danger py-2 px-3 fs-13 mb-0" id="lid-rejection"></div>
+                    </div>
+
+                    {{-- Notified Members --}}
+                    <div class="mb-3 d-none" id="lid-notified-wrap">
+                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.notify_members') ?? 'Notified Members' }}</div>
+                        <div class="fs-13 text-dark" id="lid-notified-names">—</div>
+                    </div>
+
+                    {{-- Status Change --}}
+                    @if($isAdmin)
+                        <hr class="my-3">
+                        <div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-2" style="letter-spacing:.5px;">Update Status</div>
+                            <form method="POST" id="lid-status-form" action="">
+                                @csrf
+                                <div class="d-flex gap-2 align-items-center">
+                                    <div class="flex-grow-1" style="margin-bottom: -1rem;">
+                                        <x-ui.select name="status" id="lid-status-select" class="odoo-select2">
+                                            <option value="pending">Pending</option>
+                                            <option value="approved">Approved</option>
+                                            <option value="rejected">Rejected</option>
+                                            <option value="unauthorized">Unauthorized</option>
+                                            <option value="unpaid">Unpaid</option>
+                                        </x-ui.select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm fw-bold px-3 d-flex align-items-center gap-1" style="height: 38px; border-radius: 6px;">
+                                        <i class="feather-check fs-12"></i> Apply
+                                    </button>
+                                </div>
+                                <div class="mt-2 d-none" id="lid-rejection-input-wrap">
+                                    <div class="text-muted fs-11 text-uppercase fw-semibold mb-2 mt-2" style="letter-spacing:.5px;">Rejection Reason</div>
+                                    <x-ui.textarea name="rejection_reason" id="lid-rejection-reason-input" rows="2" placeholder="Enter reason for rejection..." />
+                                </div>
+                            </form>
+                        </div>
+                    @endif
+
+                    <x-slot:footer>
+                        <button type="button" class="btn btn-light border fw-semibold text-uppercase" data-bs-dismiss="offcanvas">CLOSE PANEL</button>
+                    </x-slot:footer>
+                </x-ui.drawer>
 
                 <!-- Pane 2: Leave Encashments -->
                 <div class="tab-pane fade" id="pane-leave-encashments" role="tabpanel">
@@ -1524,9 +1922,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="attachment" class="form-label fw-bold text-secondary fs-13">{{ __('hrms.leave.app.upload_attachment') }}</label>
-                            <input type="file" name="attachment" id="attachment" class="form-control">
-                            <small class="text-muted fs-11">{{ __('hrms.leave.app.formats_allowed') }}</small>
+                            <x-ui.odoo-form-ui type="file" :label="__('hrms.leave.app.upload_attachment')" name="attachment" id="attachment" :required="false" helperText="{{ __('hrms.leave.app.formats_allowed') }}" />
                             <div id="attachment_required_warning" class="text-danger fs-12 mt-1 d-none fw-semibold">
                                 <i class="feather-alert-triangle"></i> {{ __('hrms.leave.app.attachment_required_warning') }}
                             </div>
@@ -1555,7 +1951,7 @@
     <div class="modal fade" id="applyEncashmentModal" tabindex="-1" aria-labelledby="applyEncashmentModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
-                <div class="modal-header bg-light px-4 py-3 border-bottom">
+                <div class="modal-header border-bottom py-3">
                     <h5 class="modal-title fw-bold text-dark" id="applyEncashmentModalLabel">{{ __('hrms.leave.encashment_app.apply_for_encashment') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -1564,43 +1960,39 @@
                     <div class="modal-body p-4">
                         @if($isAdmin)
                             <div class="mb-3">
-                                <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.leave.encashment_app.select_employee') }} <span class="text-danger">*</span></label>
-                                <select name="employee_id" id="encashment_employee_id" class="form-select odoo-select2-custom" required>
+                                <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.encashment_app.select_employee')" name="employee_id" id="encashment_employee_id" :required="true" class="odoo-select2-custom">
                                     <option value="">{{ __('hrms.leave.encashment_app.select_employee') }}...</option>
                                     @foreach($allEmployees as $emp)
                                         <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                                     @endforeach
-                                </select>
+                                </x-ui.odoo-form-ui>
                             </div>
                         @else
                             <input type="hidden" name="employee_id" value="{{ $employee ? $employee->id : '' }}">
                         @endif
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.leave.encashment_app.select_leave_type') }} <span class="text-danger">*</span></label>
-                            <select name="leave_type_id" id="encashment_leave_type_id" class="form-select odoo-select2-custom" required>
+                            <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.encashment_app.select_leave_type')" name="leave_type_id" id="encashment_leave_type_id" :required="true" class="odoo-select2-custom">
                                 <option value="">{{ __('hrms.leave.encashment_app.select_leave_type') }}...</option>
                                 @if($employee && isset($employeeDataMap[$employee->id]))
                                     @foreach($employeeDataMap[$employee->id] as $t)
                                         <option value="{{ $t['id'] }}">{{ $t['name'] }} ({{ __('hrms.leave.app.remaining') }}: {{ $t['remaining'] }} {{ __('hrms.leave.days') }})</option>
                                     @endforeach
                                 @endif
-                            </select>
+                            </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.leave.encashment_app.requested_days') }} <span class="text-danger">*</span></label>
-                            <input type="number" name="requested_days" class="form-control" step="0.5" min="0.5" placeholder="e.g. 2.5" required>
+                            <x-ui.odoo-form-ui type="input" inputType="number" :label="__('hrms.leave.encashment_app.requested_days')" name="requested_days" id="encashment_requested_days" :required="true" class="odoo-underline-input" step="0.5" min="0.5" placeholder="e.g. 2.5" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.leave.encashment_app.reason') }}</label>
-                            <textarea name="reason" class="form-control" rows="3" placeholder="{{ __('hrms.leave.encashment_app.reason_placeholder') }}"></textarea>
+                            <x-ui.odoo-form-ui type="textarea" :label="__('hrms.leave.encashment_app.reason')" name="reason" id="encashment_reason" :required="false" class="odoo-underline-input" :placeholder="__('hrms.leave.encashment_app.reason_placeholder')" />
                         </div>
                     </div>
-                    <div class="modal-footer bg-light px-4 py-3 border-top">
-                        <button type="button" class="btn btn-light border fw-semibold" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
-                        <button type="submit" class="btn btn-primary fw-semibold px-4"><i class="feather-check me-1"></i> {{ __('hrms.leave.encashment_app.submit_encashment') }}</button>
+                    <div class="modal-header border-top py-3 d-flex justify-content-end gap-2" style="border-bottom: none;">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.common.cancel') }}</button>
+                        <button type="submit" class="btn btn-primary text-dark"><i class="feather-check me-1"></i> {{ __('hrms.leave.encashment_app.submit_encashment') }}</button>
                     </div>
                 </form>
             </div>
@@ -1629,6 +2021,56 @@
                     </div>
                 </form>
             </div>
-        </div>
-    </div>
+    @if($employee && $employee->leavePlan && $employee->leavePlan->types->isNotEmpty())
+        @foreach($employee->leavePlan->types as $ltype)
+            @php($rulePoints = $formatLeaveRulePoints($ltype->rules ?? []))
+            <div class="modal fade" id="leaveRulesModal{{ $ltype->id }}" tabindex="-1" aria-labelledby="leaveRulesModalLabel{{ $ltype->id }}" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content border-0 shadow-lg">
+                        <div class="modal-header">
+                            <div>
+                                <h5 class="modal-title fw-bold" id="leaveRulesModalLabel{{ $ltype->id }}">
+                                    <i class="feather-sliders text-primary me-2"></i>{{ $ltype->name }} {{ __('hrms.employees.mdl_leave_rules_title') ?? 'Leave Rules' }}
+                                </h5>
+                                <div class="text-muted fs-12 mt-1">
+                                    {{ $ltype->code }} · {{ ucfirst($ltype->type) }} · {{ floatval($ltype->quota) }} {{ __('hrms.employees.mdl_yearly_quota') ?? 'Yearly Quota' }}
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body bg-light">
+                            @if(empty($rulePoints))
+                                <div class="text-center py-5 text-muted">
+                                    <i class="feather-check-circle d-block fs-32 mb-3 text-success"></i>
+                                    <div class="fw-bold text-dark mb-1">{{ __('hrms.employees.mdl_std_rules') ?? 'Standard Rules' }}</div>
+                                    <div>{{ __('hrms.employees.mdl_no_custom_rules') ?? 'No custom rules defined.' }}</div>
+                                </div>
+                            @else
+                                <div class="row g-3">
+                                    @foreach($rulePoints as $section)
+                                        <div class="col-md-6 col-12">
+                                            <div class="leave-rule-detail-section">
+                                                <div class="leave-rule-detail-title">
+                                                    <i class="{{ $section['icon'] }} text-primary"></i>
+                                                    <span>{{ $section['title'] }}</span>
+                                                </div>
+                                                <ul class="leave-rule-points">
+                                                    @foreach($section['points'] as $point)
+                                                        <li class="leave-rule-point">{{ $point }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                        <div class="modal-footer bg-white">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.employees.mdl_btn_close') ?? 'Close' }}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    @endif
 @endsection

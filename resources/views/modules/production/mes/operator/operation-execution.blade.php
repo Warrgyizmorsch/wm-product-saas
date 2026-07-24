@@ -15,15 +15,6 @@
             align-items: center;
             justify-content: center;
         }
-        .btn-touch-large {
-            min-height: 64px;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 12px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
         .touch-tab {
             min-height: 48px;
             font-weight: 600;
@@ -79,44 +70,60 @@
                     <h5 class="fw-bold text-dark mb-0">Touch Controls</h5>
                 </div>
                 <div class="card-body d-flex flex-column justify-content-center p-4">
+                    @if($scheduleOp && ($scheduleOp->status === 'running' || $scheduleOp->status === 'paused'))
+                        <div class="text-center mb-4 bg-light py-3 rounded">
+                            <div class="text-muted fs-11 uppercase font-semibold mb-1">Active Execution Time</div>
+                            <h1 class="display-6 fw-bold text-dark font-monospace mb-0" id="opLiveTimer"
+                                 data-status="{{ $scheduleOp->status }}"
+                                 data-start="{{ $scheduleOp->actual_start ? $scheduleOp->actual_start->toIso8601String() : '' }}"
+                                 data-paused-at="{{ $scheduleOp->last_paused_at ? $scheduleOp->last_paused_at->toIso8601String() : '' }}"
+                                 data-accumulated-paused="{{ $scheduleOp->accumulated_paused_seconds ?? 0 }}">
+                                 00:00:00
+                            </h1>
+                        </div>
+                    @endif
+
                     <div class="row g-3">
-                        @if($op->status !== 'running' && $op->status !== 'completed')
+                        @if($op->status !== 'running' && $op->status !== 'paused' && $op->status !== 'completed')
                             <div class="col-12">
                                 <form method="POST" action="{{ route('production.mes.start', optional($scheduleOp)->id ?? $op->id) }}">
                                     @csrf
-                                    <button type="submit" class="btn btn-touch-large btn-success w-100">
-                                        <i class="feather-play me-2 fs-20"></i> START OPERATION
-                                    </button>
+                                    <x-ui.button type="submit" variant="success" icon="feather-play" class="btn-touch-large w-100">
+                                        START OPERATION
+                                    </x-ui.button>
                                 </form>
                             </div>
                         @endif
 
                         @if($op->status === 'running')
                             <div class="col-4">
-                                <button class="btn btn-touch-large btn-warning w-100" data-bs-toggle="modal" data-bs-target="#pauseModal">
-                                    <i class="feather-pause me-2 fs-18"></i> PAUSE
-                                </button>
-                            </div>
-                            <div class="col-4">
-                                <button class="btn btn-touch-large btn-info text-white w-100" data-bs-toggle="modal" data-bs-target="#logProgressModal">
-                                    <i class="feather-edit-3 me-2 fs-18"></i> LOG PROGRESS
-                                </button>
-                            </div>
-                            <div class="col-4">
-                                <button class="btn btn-touch-large btn-primary w-100" data-bs-toggle="modal" data-bs-target="#completeModal">
-                                    <i class="feather-check-circle me-2 fs-18"></i> COMPLETE
-                                </button>
+                                <x-ui.button variant="warning" icon="feather-pause" class="btn-touch-large w-100" data-bs-toggle="modal" data-bs-target="#pauseModal">
+                                    PAUSE
+                                </x-ui.button>
                             </div>
                         @endif
 
                         @if($op->status === 'paused')
-                            <div class="col-12">
-                                <form method="POST" action="{{ route('production.mes.resume', optional($scheduleOp)->id ?? $op->id) }}">
+                            <div class="col-4">
+                                <form method="POST" action="{{ route('production.mes.resume', optional($scheduleOp)->id ?? $op->id) }}" class="w-100">
                                     @csrf
-                                    <button type="submit" class="btn btn-touch-large btn-success w-100">
-                                        <i class="feather-play me-2 fs-20"></i> RESUME WORK
-                                    </button>
+                                    <x-ui.button type="submit" variant="success" icon="feather-play" class="btn-touch-large w-100">
+                                        RESUME
+                                    </x-ui.button>
                                 </form>
+                            </div>
+                        @endif
+
+                        @if($op->status === 'running' || $op->status === 'paused')
+                            <div class="col-4">
+                                <x-ui.button variant="info" icon="feather-edit-3" class="btn-touch-large w-100 text-white" data-bs-toggle="modal" data-bs-target="#logProgressModal">
+                                    LOG PROGRESS
+                                </x-ui.button>
+                            </div>
+                            <div class="col-4">
+                                <x-ui.button variant="primary" icon="feather-check-circle" class="btn-touch-large w-100" data-bs-toggle="modal" data-bs-target="#completeModal">
+                                    COMPLETE
+                                </x-ui.button>
                             </div>
                         @endif
 
@@ -278,7 +285,7 @@
         <div class="col-md-5 ps-md-4">
             <div class="mb-3">
                 <label class="form-label uppercase font-semibold fs-11 text-muted">Quantity Produced</label>
-                <input type="number" step="0.0001" class="form-control form-control-lg fw-bold text-success text-center" id="producedInput" name="quantity_produced" value="{{ $order->quantity_ordered }}" required>
+                <input type="number" step="0.0001" class="form-control form-control-lg fw-bold text-success text-center" id="producedInput" name="quantity_produced" value="{{ max(0, $order->quantity_ordered - ($op->quantity_produced ?? 0)) }}" required>
             </div>
             <div class="mb-3">
                 <label class="form-label uppercase font-semibold fs-11 text-muted">Quantity Rejected</label>
@@ -434,6 +441,50 @@
                 compModal.addEventListener('shown.bs.modal', function () {
                     currentField = 'produced';
                 });
+            }
+
+            // Live Operation Timer (HH:MM:SS format)
+            const liveTimerEl = document.getElementById('opLiveTimer');
+            if (liveTimerEl) {
+                function updateOpLiveTimer() {
+                    const now = new Date();
+                    const status = liveTimerEl.getAttribute('data-status');
+                    const startVal = liveTimerEl.getAttribute('data-start');
+                    if (!startVal) {
+                        liveTimerEl.textContent = '00:00:00';
+                        return;
+                    }
+                    
+                    const start = new Date(startVal);
+                    let end;
+                    
+                    if (status === 'running') {
+                        end = now;
+                    } else if (status === 'paused') {
+                        const pausedAtVal = liveTimerEl.getAttribute('data-paused-at');
+                        end = pausedAtVal ? new Date(pausedAtVal) : now;
+                    } else {
+                        liveTimerEl.textContent = '00:00:00';
+                        return;
+                    }
+                    
+                    const diffSeconds = (end.getTime() - start.getTime()) / 1000;
+                    const pausedSec = parseInt(liveTimerEl.getAttribute('data-accumulated-paused') || 0);
+                    const activeSeconds = Math.max(0, diffSeconds - pausedSec);
+                    
+                    const hrs = Math.floor(activeSeconds / 3600);
+                    const mins = Math.floor((activeSeconds % 3600) / 60);
+                    const secs = Math.floor(activeSeconds % 60);
+                    
+                    const hrsStr = hrs.toString().padStart(2, '0');
+                    const minsStr = mins.toString().padStart(2, '0');
+                    const secsStr = secs.toString().padStart(2, '0');
+                    
+                    liveTimerEl.textContent = `${hrsStr}:${minsStr}:${secsStr}`;
+                }
+                
+                updateOpLiveTimer();
+                setInterval(updateOpLiveTimer, 1000);
             }
         });
     </script>

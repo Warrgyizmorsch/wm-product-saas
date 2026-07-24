@@ -215,7 +215,7 @@ class OperatorAssignmentService
             }
 
             // Check generic skill match (e.g. check if skill code matches operation name/type)
-            if ($skill->skill_code !== '') {
+            if (!empty($skill->skill_code)) {
                 $code = strtolower($skill->skill_code);
                 $opName = strtolower($op->name);
                 if (str_contains($opName, $code) || str_contains($code, $opName)) {
@@ -224,8 +224,9 @@ class OperatorAssignmentService
                 }
             }
             
-            // Generic catch-all: if skill matches nothing specific but is general
-            if ($skill->skill_code === 'GENERAL' || $skill->skill_code === 'ALL') {
+            // Generic catch-all: if skill matches nothing specific but is general, empty, or 'all'/'general' case-insensitively
+            $codeUpper = strtoupper(trim($skill->skill_code ?? ''));
+            if ($codeUpper === 'GENERAL' || $codeUpper === 'ALL' || $codeUpper === '' || str_contains($codeUpper, 'ALL') || str_contains($codeUpper, 'GENERAL')) {
                 $qualified = true;
                 break;
             }
