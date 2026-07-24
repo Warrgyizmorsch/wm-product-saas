@@ -139,7 +139,7 @@ class AssetController extends Controller
 
         // 5. Requests Search & Filter
         $requestsQuery = AssetRequest::query()
-            ->with(['company', 'employee', 'category', 'item', 'allocatedAsset', 'requestedAsset']);
+            ->with(['company', 'employee', 'category', 'item', 'allocatedAsset', 'requestedAsset', 'allocatedAssets']);
 
         if ($hasRequestColumn) {
             $requestsQuery->withCount('allocatedAssets');
@@ -222,10 +222,30 @@ class AssetController extends Controller
             'purchase_cost' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string|max:1000',
             'units' => 'required|array|min:1',
-            'units.*.asset_code' => 'required|string|max:255|unique:assets,asset_code',
+            'units.*.asset_code' => 'required|string|max:255',
             'units.*.serial_number' => 'required|string|max:255',
             'units.*.condition' => 'required|string|in:new,good,fair,damaged,scrapped',
         ];
+
+        // Check for intra-unit duplicates within the same item creation request
+        $submittedCodes = [];
+        $submittedSerials = [];
+        foreach ($request->input('units', []) as $u) {
+            $code = trim($u['asset_code'] ?? '');
+            $serial = trim($u['serial_number'] ?? '');
+            if ($code !== '') {
+                if (in_array($code, $submittedCodes)) {
+                    return redirect()->back()->withInput()->with('error', "Asset code '{$code}' is duplicated within the unit list.");
+                }
+                $submittedCodes[] = $code;
+            }
+            if ($serial !== '') {
+                if (in_array($serial, $submittedSerials)) {
+                    return redirect()->back()->withInput()->with('error', "Serial number '{$serial}' is duplicated within the unit list.");
+                }
+                $submittedSerials[] = $serial;
+            }
+        }
 
         $validated = $request->validate($rules);
 
@@ -279,7 +299,13 @@ class AssetController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $rules = [
-            'asset_code' => ['required', 'string', 'max:255', Rule::unique('assets', 'asset_code')->ignore($asset->id)],
+            'asset_code' => [
+                'required', 'string', 'max:255',
+                Rule::unique('assets', 'asset_code')
+                    ->where('asset_item_id', $asset->asset_item_id)
+                    ->where('tenant_id', $asset->tenant_id)
+                    ->ignore($asset->id)
+            ],
             'brand' => 'nullable|string|max:255',
             'model_number' => 'nullable|string|max:255',
             'serial_number' => 'required|string|max:255',
@@ -328,6 +354,11 @@ class AssetController extends Controller
     public function destroy(Asset $asset): RedirectResponse
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        if ($asset->status === 'allocated' || $asset->assigned_employee_id !== null) {
+            return redirect()->back()->with('error', "Cannot delete asset '{$asset->asset_code}' because it is currently allocated to an employee. Please return or deallocate it first.");
+        }
+
         $asset->delete();
  
         return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_deleted'));
@@ -986,10 +1017,13 @@ class AssetController extends Controller
             ]);
 
             $submittedUnitIds = [];
+            $submittedCodes = [];
+            $submittedSerials = [];
 
             foreach ($validated['units'] as $unitData) {
                 $existingId = $unitData['id'] ?? null;
-                $assetCode = $unitData['asset_code'];
+                $assetCode = trim($unitData['asset_code'] ?? '');
+                $serialNumber = trim($unitData['serial_number'] ?? '');
                 $condition = $unitData['condition'] ?? 'good';
                 $status = 'available';
                 if ($condition === 'damaged') {
@@ -998,14 +1032,34 @@ class AssetController extends Controller
                     $status = 'scrapped';
                 }
 
-                // Enforce asset code uniqueness
-                $duplicateQuery = Asset::where('asset_code', $assetCode);
+                // Check for intra-list duplicates
+                if ($assetCode !== '') {
+                    if (in_array($assetCode, $submittedCodes)) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'units' => ["Asset code '{$assetCode}' is duplicated within this item's unit list."]
+                        ]);
+                    }
+                    $submittedCodes[] = $assetCode;
+                }
+
+                if ($serialNumber !== '') {
+                    if (in_array($serialNumber, $submittedSerials)) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'units' => ["Serial number '{$serialNumber}' is duplicated within this item's unit list."]
+                        ]);
+                    }
+                    $submittedSerials[] = $serialNumber;
+                }
+
+                // Enforce asset code uniqueness scoped to THIS asset item master
+                $duplicateQuery = Asset::where('asset_item_id', $assetItem->id)
+                    ->where('asset_code', $assetCode);
                 if ($existingId) {
                     $duplicateQuery->where('id', '!=', $existingId);
                 }
                 if ($duplicateQuery->exists()) {
                     throw \Illuminate\Validation\ValidationException::withMessages([
-                        'units' => ["Asset code '{$assetCode}' is already registered on another asset."]
+                        'units' => ["Asset code '{$assetCode}' is already registered for this item."]
                     ]);
                 }
 
@@ -1071,18 +1125,34 @@ class AssetController extends Controller
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
-        if ($assetItem->assets()->count() > 0) {
-            return redirect()->back()->with('error', 'Cannot delete item because it has registered assets.');
+        // Check if any registered unit under this item is currently allocated to an employee
+        $allocatedCount = $assetItem->assets()
+            ->where(function($q) {
+                $q->where('status', 'allocated')
+                  ->orWhereNotNull('assigned_employee_id');
+            })->count();
+
+        if ($allocatedCount > 0) {
+            return redirect()->back()->with('error', "Cannot delete item '{$assetItem->name}' because {$allocatedCount} unit(s) are currently allocated to employees. Please deallocate or return them first.");
         }
 
-        $requestCount = AssetRequest::where('asset_item_id', $assetItem->id)->count();
-        if ($requestCount > 0) {
-            return redirect()->back()->with('error', 'Cannot delete item because it has asset requests.');
-        }
+        \DB::transaction(function() use ($assetItem) {
+            // Auto-reject any pending/partial requests for this item so employee profiles show clean status
+            AssetRequest::where('asset_item_id', $assetItem->id)
+                ->whereIn('status', ['pending', 'partially_allocated'])
+                ->update([
+                    'status' => 'rejected',
+                    'admin_notes' => 'Item removed from asset catalog by HR on ' . date('d M, Y'),
+                ]);
 
-        $assetItem->delete();
+            // Delete all registered units (since all are available/unallocated)
+            $assetItem->assets()->delete();
 
-        return redirect()->route('hrms.assets.index')->with('success', 'Asset item deleted successfully.');
+            // Delete the item master record
+            $assetItem->delete();
+        });
+
+        return redirect()->route('hrms.assets.index')->with('success', "Asset item '{$assetItem->name}' and its available units deleted successfully.");
     }
 
     /**
@@ -1312,13 +1382,15 @@ class AssetController extends Controller
             'notes'
         ];
 
-        $sampleCategory = AssetCategory::first();
+        $activeCategories = AssetCategory::pluck('name')->toArray();
+        $cat1 = $activeCategories[0] ?? 'Laptops';
+        $cat2 = $activeCategories[1] ?? 'Monitors';
 
         $data = [
             [
                 'AST-0001',
                 'Dell Latitude 5420',
-                $sampleCategory ? $sampleCategory->name : 'Laptops',
+                $cat1,
                 'Dell',
                 'Latitude 5420',
                 'SN123456789',
@@ -1326,6 +1398,18 @@ class AssetController extends Controller
                 '1200.00',
                 'new',
                 'Developer work laptop.'
+            ],
+            [
+                'AST-0002',
+                'Dell P2422H Monitor',
+                $cat2,
+                'Dell',
+                'P2422H',
+                'DP987654321',
+                '2026-07-16',
+                '250.00',
+                'good',
+                'Office desktop monitor.'
             ]
         ];
 
@@ -1361,6 +1445,9 @@ class AssetController extends Controller
                 if (str_starts_with($h, 'category') || $h === 'cat') {
                     return 'category_name';
                 }
+                if ($h === 'asset_name' || $h === 'assetname' || $h === 'item_name') {
+                    return 'name';
+                }
                 if (str_starts_with($h, 'model')) {
                     return 'model_number';
                 }
@@ -1372,6 +1459,12 @@ class AssetController extends Controller
                 }
                 if ($h === 'purchase_c' || $h === 'purchase_amt' || $h === 'purchase_val' || $h === 'purchase_price' || str_starts_with($h, 'purchase_cost')) {
                     return 'purchase_cost';
+                }
+                if (str_starts_with($h, 'holder') || str_starts_with($h, 'current_holder') || str_starts_with($h, 'assigned_to')) {
+                    return 'current_holder';
+                }
+                if (str_starts_with($h, 'stat')) {
+                    return 'status';
                 }
 
                 return $h;
@@ -1412,42 +1505,36 @@ class AssetController extends Controller
                     continue;
                 }
 
-                if (Asset::where('asset_code', $rowData['asset_code'])->exists()) {
-                    $errors[] = "Row {$rowNum}: Asset Code '{$rowData['asset_code']}' already exists.";
-                    continue;
-                }
-
-                $categoryInput = $rowData['category_name'];
-                $category = AssetCategory::whereRaw('LOWER(name) = ?', [strtolower($categoryInput)])
-                    ->first();
-
+                // Resolve Category with case-insensitive, singular/plural, and space/hyphen tolerance
+                $categoryInput = trim($rowData['category_name']);
+                $category = AssetCategory::whereRaw('LOWER(TRIM(name)) = ?', [strtolower($categoryInput)])->first();
                 if (!$category) {
-                    $singularName = \Illuminate\Support\Str::singular($categoryInput);
-                    $category = AssetCategory::whereRaw('LOWER(name) = ?', [strtolower($singularName)])
-                        ->first();
+                    $category = AssetCategory::whereRaw('LOWER(TRIM(name)) = ?', [strtolower(\Illuminate\Support\Str::singular($categoryInput))])->first();
                 }
-
                 if (!$category) {
-                    $pluralName = \Illuminate\Support\Str::plural($categoryInput);
-                    $category = AssetCategory::whereRaw('LOWER(name) = ?', [strtolower($pluralName)])
-                        ->first();
+                    $category = AssetCategory::whereRaw('LOWER(TRIM(name)) = ?', [strtolower(\Illuminate\Support\Str::plural($categoryInput))])->first();
                 }
-
                 if (!$category) {
-                    $fallbackCompany = Company::where('status', true)->first();
-                    if (!$fallbackCompany) {
-                        $errors[] = "Row {$rowNum}: No active company found to assign the category '{$categoryInput}'.";
-                        continue;
+                    $cleanInput = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $categoryInput));
+                    $allCategories = AssetCategory::all();
+                    foreach ($allCategories as $cat) {
+                        $cleanCat = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $cat->name));
+                        if ($cleanCat === $cleanInput) {
+                            $category = $cat;
+                            break;
+                        }
                     }
-                    $category = AssetCategory::create([
-                        'company_id' => $fallbackCompany->id,
-                        'name' => $categoryInput,
-                        'description' => 'Automatically created via Excel Asset Import',
-                    ]);
+                }
+
+                if (!$category) {
+                    $existingCatNames = AssetCategory::pluck('name')->implode(', ');
+                    $errors[] = "Row {$rowNum}: Category '{$categoryInput}' does not exist in system. New categories must be created in Category Settings before importing. Please check for spelling mistakes or use an existing category" . ($existingCatNames ? " ({$existingCatNames})" : "") . ".";
+                    continue;
                 }
 
                 $companyId = $category->company_id;
 
+                // Optional Purchase Date parsing
                 $purchaseDate = null;
                 if (!empty($rowData['purchase_date'])) {
                     $parsed = strtotime($rowData['purchase_date']);
@@ -1456,19 +1543,49 @@ class AssetController extends Controller
                     }
                 }
 
+                // Optional Condition parsing
                 $condition = strtolower($rowData['condition'] ?? 'good');
                 if (!in_array($condition, ['new', 'good', 'fair', 'damaged', 'scrapped'])) {
                     $condition = 'good';
                 }
 
-                $status = 'available';
-                if ($condition === 'damaged') {
-                    $status = 'maintenance';
-                } elseif ($condition === 'scrapped') {
-                    $status = 'scrapped';
+                // Optional Current Holder & Status Resolution
+                $assignedEmployeeId = null;
+                $statusInput = strtolower($rowData['status'] ?? '');
+                $holderInput = trim($rowData['current_holder'] ?? '');
+
+                if (!empty($holderInput) && !in_array(strtolower($holderInput), ['in inventory', 'inventory', 'none', 'unassigned', '-'])) {
+                    $employee = Employee::where('company_id', $companyId)
+                        ->where(function($q) use ($holderInput) {
+                            $q->where('display_name', 'like', "%{$holderInput}%")
+                              ->orWhere('employee_id', $holderInput)
+                              ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$holderInput}%"]);
+                        })
+                        ->first();
+
+                    if (!$employee) {
+                        // Fallback search without company filter
+                        $employee = Employee::where('display_name', 'like', "%{$holderInput}%")
+                            ->orWhere('employee_id', $holderInput)
+                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$holderInput}%"])
+                            ->first();
+                    }
+
+                    if ($employee) {
+                        $assignedEmployeeId = $employee->id;
+                    }
                 }
 
-                // Find or create matching AssetItem master
+                // Determine final status
+                if ($assignedEmployeeId) {
+                    $status = 'allocated';
+                } elseif (in_array($statusInput, ['available', 'allocated', 'maintenance', 'scrapped'])) {
+                    $status = ($statusInput === 'allocated') ? 'available' : $statusInput;
+                } else {
+                    $status = ($condition === 'damaged') ? 'maintenance' : (($condition === 'scrapped') ? 'scrapped' : 'available');
+                }
+
+                // Find or create matching AssetItem master (Groups identical items together)
                 $assetItem = AssetItem::firstOrCreate(
                     [
                         'company_id' => $companyId,
@@ -1481,7 +1598,12 @@ class AssetController extends Controller
                     ]
                 );
 
-                Asset::create([
+                if (Asset::where('asset_item_id', $assetItem->id)->where('asset_code', $rowData['asset_code'])->exists()) {
+                    $errors[] = "Row {$rowNum}: Asset Code '{$rowData['asset_code']}' already exists for item '{$assetItem->name}'.";
+                    continue;
+                }
+
+                $createdAsset = Asset::create([
                     'company_id' => $companyId,
                     'asset_category_id' => $category->id,
                     'asset_item_id' => $assetItem->id,
@@ -1494,8 +1616,20 @@ class AssetController extends Controller
                     'purchase_cost' => is_numeric($rowData['purchase_cost']) ? $rowData['purchase_cost'] : null,
                     'condition' => $condition,
                     'status' => $status,
+                    'assigned_employee_id' => $assignedEmployeeId,
+                    'allocated_at' => $assignedEmployeeId ? ($purchaseDate ?: date('Y-m-d')) : null,
                     'notes' => $rowData['notes'] ?: null,
                 ]);
+
+                // Create initial allocation audit log if imported as assigned to an employee
+                if ($assignedEmployeeId) {
+                    $createdAsset->allocations()->create([
+                        'employee_id' => $assignedEmployeeId,
+                        'allocated_at' => $purchaseDate ?: date('Y-m-d'),
+                        'allocation_condition' => $condition,
+                        'notes' => 'Assigned during Excel asset import',
+                    ]);
+                }
 
                 $importedCount++;
             }

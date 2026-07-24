@@ -294,15 +294,12 @@
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item edit-pay-group-btn" href="javascript:void(0)" data-pay-group="{{ base64_encode($selectedPayGroup->toJson()) }}">
-                                                        <i class="feather feather-edit-3 me-3"></i>
-                                                        <span>{{ __('hrms.org.edit_pay_group') }}</span>
+                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.org.edit_pay_group') }}
                                                     </a>
                                                 </li>
-                                                <li class="dropdown-divider"></li>
                                                 <li>
-                                                    <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                        <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>{{ __('hrms.org.delete_pay_group') }}</span>
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.org.delete_pay_group') }}
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>

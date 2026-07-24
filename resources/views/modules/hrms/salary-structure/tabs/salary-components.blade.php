@@ -116,23 +116,23 @@
                     </div>
  
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle" id="recurringComponentsTable">
+                        <table class="table table-hover mb-0 align-middle" id="recurringComponentsTable" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light">
                                 <tr>
-                                    <th width="60">#</th>
-                                    <th>{{ __('hrms.org.component_name') }}</th>
-                                    <th>{{ __('hrms.org.tbl_code') }}</th>
-                                    <th>{{ __('hrms.org.type') }}</th>
-                                    <th>{{ __('hrms.org.status') }}</th>
-                                    <th width="150" class="text-end">{{ __('hrms.assets.actions') }}</th>
+                                    <th style="width: 45px;">#</th>
+                                    <th style="width: 35%;">{{ __('hrms.org.component_name') }}</th>
+                                    <th style="width: 18%;">{{ __('hrms.org.tbl_code') }}</th>
+                                    <th style="width: 20%;">{{ __('hrms.org.type') }}</th>
+                                    <th style="width: 95px; white-space: nowrap;">{{ __('hrms.org.status') }}</th>
+                                    <th style="width: 95px; white-space: nowrap;" class="text-end">{{ __('hrms.assets.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($recurringComponents as $sc)
                                 <tr class="recurring-component-row">
                                     <td>{{ ($recurringComponents instanceof \Illuminate\Pagination\LengthAwarePaginator) ? ($recurringComponents->currentPage() - 1) * $recurringComponents->perPage() + $loop->iteration : $loop->iteration }}</td>
-                                    <td><span class="fw-bold text-dark component-name">{{ $sc->name }}</span></td>
-                                    <td><code class="component-code">{{ $sc->code }}</code></td>
+                                    <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;"><span class="fw-bold text-dark component-name">{{ $sc->name }}</span></td>
+                                    <td style="word-break: break-word; overflow-wrap: anywhere;"><code class="component-code" style="word-break: break-all; white-space: normal;">{{ $sc->code }}</code></td>
                                     <td>
                                         @if($sc->type == 'earning')
                                             <x-ui.badge variant="success" soft>{{ __('hrms.org.earning') }}</x-ui.badge>
@@ -154,15 +154,12 @@
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item btn-edit-salary-component" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}">
-                                                        <i class="feather feather-edit-3 me-3"></i>
-                                                        <span>{{ __('hrms.assets.edit') }}</span>
+                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.assets.edit') }}
                                                     </a>
                                                 </li>
-                                                <li class="dropdown-divider"></li>
                                                 <li>
-                                                    <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                        <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>{{ __('hrms.assets.delete') }}</span>
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.assets.delete') }}
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -278,23 +275,23 @@
                     </div>
 
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle" id="adhocComponentsTable">
+                        <table class="table table-hover mb-0 align-middle" id="adhocComponentsTable" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light">
                                 <tr>
-                                    <th width="60">#</th>
-                                    <th>{{ __('hrms.org.component_name') }}</th>
-                                    <th>{{ __('hrms.org.tbl_code') }}</th>
-                                    <th>{{ __('hrms.org.type') }}</th>
-                                    <th>{{ __('hrms.org.status') }}</th>
-                                    <th width="150" class="text-end">{{ __('hrms.assets.actions') }}</th>
+                                    <th style="width: 45px;">#</th>
+                                    <th style="width: 35%;">{{ __('hrms.org.component_name') }}</th>
+                                    <th style="width: 18%;">{{ __('hrms.org.tbl_code') }}</th>
+                                    <th style="width: 20%;">{{ __('hrms.org.type') }}</th>
+                                    <th style="width: 95px; white-space: nowrap;">{{ __('hrms.org.status') }}</th>
+                                    <th style="width: 95px; white-space: nowrap;" class="text-end">{{ __('hrms.assets.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($adhocComponents as $sc)
                                 <tr class="adhoc-component-row">
                                     <td>{{ ($adhocComponents instanceof \Illuminate\Pagination\LengthAwarePaginator) ? ($adhocComponents->currentPage() - 1) * $adhocComponents->perPage() + $loop->iteration : $loop->iteration }}</td>
-                                    <td><span class="fw-bold text-dark component-name">{{ $sc->name }}</span></td>
-                                    <td><code class="component-code">{{ $sc->code }}</code></td>
+                                    <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;"><span class="fw-bold text-dark component-name">{{ $sc->name }}</span></td>
+                                    <td style="word-break: break-word; overflow-wrap: anywhere;"><code class="component-code" style="word-break: break-all; white-space: normal;">{{ $sc->code }}</code></td>
                                     <td>
                                         @if($sc->type == 'earning')
                                             <x-ui.badge variant="success" soft>{{ __('hrms.org.earning') }}</x-ui.badge>
@@ -316,15 +313,12 @@
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item btn-edit-salary-component" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}">
-                                                        <i class="feather feather-edit-3 me-3"></i>
-                                                        <span>{{ __('hrms.assets.edit') }}</span>
+                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.assets.edit') }}
                                                     </a>
                                                 </li>
-                                                <li class="dropdown-divider"></li>
                                                 <li>
-                                                    <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                        <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>{{ __('hrms.assets.delete') }}</span>
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.assets.delete') }}
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
