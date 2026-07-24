@@ -17,6 +17,9 @@ Route::prefix('projects')
         Route::post('/', [ProjectController::class, 'store'])->name('store');
         Route::post('bulk-action', [ProjectController::class, 'bulkAction'])->name('bulk-action');
 
+        Route::get('lookups/clients', [ProjectController::class, 'searchClients'])->name('lookups.clients');
+        Route::get('lookups/owners', [ProjectController::class, 'searchOwners'])->name('lookups.owners');
+
         Route::get('milestones', [MilestoneController::class, 'index'])->name('milestones.index');
 
         Route::get('{project}', [ProjectController::class, 'show'])->name('show');

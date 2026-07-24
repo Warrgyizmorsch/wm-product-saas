@@ -13,6 +13,8 @@ return [
     'active_projects' => 'सक्रिय प्रोजेक्ट्स',
     'project_directory' => 'प्रोजेक्ट निर्देशिका',
     'search_placeholder' => 'नाम या कोड खोजें',
+    'search_client_placeholder' => 'क्लाइंट खोजें...',
+    'search_owner_placeholder' => 'स्वामी खोजें...',
     'all_statuses' => 'सभी स्थितियां',
     'all_priorities' => 'सभी प्राथमिकताएं',
     'all_assignees' => 'सभी असाइनी',

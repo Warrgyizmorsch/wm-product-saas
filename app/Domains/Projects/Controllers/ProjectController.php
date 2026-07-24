@@ -45,11 +45,23 @@ class ProjectController extends Controller
     {
         $this->authorize('viewAny', Project::class);
 
+        $filters = $request->only([
+            'status', 'search', 'sort', 'direction',
+            'priority', 'client_id', 'owner_id', 'start_date', 'end_date',
+        ]);
+
         $data = [
-            'projects' => $this->projects->list($request->only(['status', 'search'])),
-            'summary'  => $this->projects->summary(),
-            'statuses' => Project::STATUSES,
-            'filters'  => $request->only(['status', 'search']),
+            'projects'       => $this->projects->list($filters),
+            'summary'        => $this->projects->summary(),
+            'statuses'       => Project::STATUSES,
+            'priorities'     => Project::PRIORITIES,
+            'filters'        => $filters,
+            'selectedClient' => $filters['client_id'] ?? null
+                ? Customer::query()->find($filters['client_id'], ['id', 'name'])
+                : null,
+            'selectedOwner'  => $filters['owner_id'] ?? null
+                ? User::query()->where('tenant_id', require_tenant_id())->find($filters['owner_id'], ['id', 'name'])
+                : null,
         ];
 
         $canCreate = auth()->user()->can('create', Project::class);
@@ -59,6 +71,37 @@ class ProjectController extends Controller
         }
 
         return view('modules.projects.index', $data);
+    }
+
+    public function searchClients(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Project::class);
+
+        $results = Customer::query()
+            ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%' . $request->query('q') . '%'))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name']);
+
+        return response()->json([
+            'results' => $results->map(fn (Customer $customer) => ['id' => $customer->id, 'text' => $customer->name]),
+        ]);
+    }
+
+    public function searchOwners(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Project::class);
+
+        $results = User::query()
+            ->where('tenant_id', require_tenant_id())
+            ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%' . $request->query('q') . '%'))
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name']);
+
+        return response()->json([
+            'results' => $results->map(fn (User $user) => ['id' => $user->id, 'text' => $user->name]),
+        ]);
     }
 
     public function store(StoreProjectRequest $request): RedirectResponse

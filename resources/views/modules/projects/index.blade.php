@@ -115,6 +115,44 @@
                     );
                 });
             });
+
+            document.querySelectorAll('#project-filter-form [data-ajax-url]').forEach(function (select) {
+                if (!window.jQuery || !jQuery.fn.select2) {
+                    return;
+                }
+
+                jQuery(select).select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    placeholder: select.getAttribute('data-placeholder') || '',
+                    allowClear: true,
+                    minimumInputLength: 2,
+                    dropdownParent: jQuery(select).closest('.erp-filter-dropdown'),
+                    ajax: {
+                        url: select.getAttribute('data-ajax-url'),
+                        dataType: 'json',
+                        delay: 250,
+                        data: function (params) {
+                            return { q: params.term };
+                        },
+                        processResults: function (data) {
+                            return { results: data.results };
+                        },
+                    },
+                });
+            });
+
+            document.querySelectorAll('#project-filter-form [data-local-select2]').forEach(function (select) {
+                if (!window.jQuery || !jQuery.fn.select2) {
+                    return;
+                }
+
+                jQuery(select).select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    dropdownParent: jQuery(select).closest('.erp-filter-dropdown'),
+                });
+            });
         });
     </script>
 @endpush
@@ -129,20 +167,8 @@
 
 @section('content')
     @php
-        $sortBy = request('sort_by', 'project_code');
-        $sortOrder = request('sort_order', 'asc');
-
-        $sortedProjects = match ($sortBy) {
-            'name' => $sortOrder === 'desc' ? $projects->sortByDesc('name') : $projects->sortBy('name'),
-            'start_date' => $sortOrder === 'desc' ? $projects->sortByDesc('start_date') : $projects->sortBy('start_date'),
-            default => $sortOrder === 'desc' ? $projects->sortByDesc('project_code') : $projects->sortBy('project_code'),
-        };
-
-        $currentPage = (int) request('page', 1);
-        $perPage = 10;
-        $totalResults = $sortedProjects->count();
-        $totalPages = (int) ceil($totalResults / $perPage);
-        $paginatedProjects = $sortedProjects->slice(($currentPage - 1) * $perPage, $perPage);
+        $sortBy = request('sort');
+        $sortOrder = strtolower((string) request('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
     @endphp
 
     <div class="erp-single-panel">
@@ -165,29 +191,29 @@
                 </div>
 
                 <x-ui.sort-dropdown :label="__('projects.sort')">
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'project_code', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'project_code' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'code', 'direction' => 'asc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'code' && $sortOrder === 'asc' ? 'active' : '' }}">
                         <span>{{ __('projects.sort_code_asc') }}</span>
                     </a>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'project_code', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'project_code' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'code', 'direction' => 'desc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'code' && $sortOrder === 'desc' ? 'active' : '' }}">
                         <span>{{ __('projects.sort_code_desc') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'name', 'direction' => 'asc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
                         <span>{{ __('projects.sort_name_asc') }}</span>
                     </a>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'name', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'name', 'direction' => 'desc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'desc' ? 'active' : '' }}">
                         <span>{{ __('projects.sort_name_desc') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'start_date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'start_date' && $sortOrder === 'asc' ? 'active' : '' }}">
+                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'start_date', 'direction' => 'asc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'start_date' && $sortOrder === 'asc' ? 'active' : '' }}">
                         <span>{{ __('projects.sort_start_date_asc') }}</span>
                     </a>
-                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'start_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'start_date' && $sortOrder === 'desc' ? 'active' : '' }}">
+                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'start_date', 'direction' => 'desc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'start_date' && $sortOrder === 'desc' ? 'active' : '' }}">
                         <span>{{ __('projects.sort_start_date_desc') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
-                <form method="GET" action="{{ route('projects.index') }}" class="d-inline">
+                <form id="project-filter-form" method="GET" action="{{ route('projects.index') }}" class="d-inline">
                     <x-ui.filter :label="__('ui.filter')" offset="0, 5">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('projects.filter_options') }}</h6>
 
@@ -197,13 +223,53 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.client') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="client_id"
+                                :searchable="false" data-ajax-url="{{ route('projects.lookups.clients') }}"
+                                data-placeholder="{{ __('projects.search_client_placeholder') }}">
+                                @if ($selectedClient)
+                                    <option value="{{ $selectedClient->id }}" selected>{{ $selectedClient->name }}</option>
+                                @endif
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.owner') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="owner_id"
+                                :searchable="false" data-ajax-url="{{ route('projects.lookups.owners') }}"
+                                data-placeholder="{{ __('projects.search_owner_placeholder') }}">
+                                @if ($selectedOwner)
+                                    <option value="{{ $selectedOwner->id }}" selected>{{ $selectedOwner->name }}</option>
+                                @endif
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.status') }}</label>
-                            <x-ui.odoo-form-ui type="select" name="status">
+                            <x-ui.odoo-form-ui type="select" name="status" :searchable="false" data-local-select2="1">
                                 <option value="">{{ __('projects.all_statuses') }}</option>
                                 @foreach ($statuses as $status)
                                     <option value="{{ $status }}" @selected(request('status') === $status)>{{ __('projects.statuses.' . $status) }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.priority') }}</label>
+                            <x-ui.odoo-form-ui type="select" name="priority" :searchable="false" data-local-select2="1">
+                                <option value="">{{ __('projects.all_priorities') }}</option>
+                                @foreach ($priorities as $priority)
+                                    <option value="{{ $priority }}" @selected(request('priority') === $priority)>{{ __('projects.priorities.' . $priority) }}</option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.start_date') }} / {{ __('projects.end_date') }}</label>
+                            <div class="d-flex gap-2">
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="start_date" value="{{ request('start_date') }}" />
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="end_date" value="{{ request('end_date') }}" />
+                            </div>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
@@ -223,19 +289,19 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" id="check-all-projects" class="form-check-input">
                         </th>
-                        <th style="width: 12%" class="fw-bold text-dark">{{ __('projects.code') }}</th>
-                        <th style="width: 20%" class="fw-bold text-dark">{{ __('projects.name') }}</th>
-                        <th style="width: 15%" class="fw-bold text-dark">{{ __('projects.client') }}</th>
-                        <th style="width: 13%" class="fw-bold text-dark">{{ __('projects.owner') }}</th>
-                        <th style="width: 10%" class="fw-bold text-dark">{{ __('projects.priority') }}</th>
-                        <th style="width: 10%" class="fw-bold text-dark">{{ __('projects.status') }}</th>
-                        <th style="width: 8%" class="fw-bold text-dark">{{ __('projects.start_date') }}</th>
-                        <th style="width: 9%" class="fw-bold text-dark">{{ __('projects.end_date') }}</th>
+                        <x-table.sort-header column="code" label="{{ __('projects.code') }}" style="width: 12%" />
+                        <x-table.sort-header column="name" label="{{ __('projects.name') }}" style="width: 20%" />
+                        <x-table.sort-header column="client" label="{{ __('projects.client') }}" style="width: 15%" />
+                        <x-table.sort-header column="owner" label="{{ __('projects.owner') }}" style="width: 13%" />
+                        <x-table.sort-header column="priority" label="{{ __('projects.priority') }}" style="width: 10%" />
+                        <x-table.sort-header column="status" label="{{ __('projects.status') }}" style="width: 10%" />
+                        <x-table.sort-header column="start_date" label="{{ __('projects.start_date') }}" style="width: 8%" />
+                        <x-table.sort-header column="end_date" label="{{ __('projects.end_date') }}" style="width: 9%" />
                         <th class="text-end fw-bold text-dark" style="width: 10%">{{ __('projects.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($paginatedProjects as $project)
+                    @forelse ($projects as $project)
                         <tr>
                             <td class="text-center">
                                 <input type="checkbox" class="form-check-input project-checkbox" value="{{ $project->id }}">
@@ -303,7 +369,7 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <x-ui.pagination :currentPage="$currentPage" :totalPages="$totalPages" :totalResults="$totalResults" :perPage="$perPage" />
+        <x-ui.pagination :currentPage="$projects->currentPage()" :totalPages="$projects->lastPage()" :totalResults="$projects->total()" :perPage="$projects->perPage()" />
     </div>
 
     @can('create', \App\Domains\Projects\Models\Project::class)
