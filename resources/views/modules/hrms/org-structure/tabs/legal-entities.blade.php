@@ -60,16 +60,16 @@
             </x-slot>
 
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
+                <table class="table table-hover mb-0 align-middle" style="table-layout: fixed; width: 100%;">
                     <thead class="table-light">
                         <tr>
-                            <th width="60">{{ __('hrms.org.tbl_hash') }}</th>
-                            <th width="80">{{ __('hrms.org.tbl_logo') }}</th>
-                            <th>{{ __('hrms.org.tbl_co_name') }}</th>
-                            <th>{{ __('hrms.org.tbl_legal_name') }}</th>
-                            <th>{{ __('hrms.org.tbl_email') }}</th>
-                            <th>{{ __('hrms.org.tbl_status') }}</th>
-                            <th width="150" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
+                            <th style="width: 45px;">{{ __('hrms.org.tbl_hash') }}</th>
+                            <th style="width: 60px;">{{ __('hrms.org.tbl_logo') }}</th>
+                            <th style="width: 25%;">{{ __('hrms.org.tbl_co_name') }}</th>
+                            <th style="width: 25%;">{{ __('hrms.org.tbl_legal_name') }}</th>
+                            <th style="width: 25%;">{{ __('hrms.org.tbl_email') }}</th>
+                            <th style="width: 95px; white-space: nowrap;">{{ __('hrms.org.tbl_status') }}</th>
+                            <th style="width: 110px; white-space: nowrap;" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="companiesTableBody">
@@ -93,9 +93,9 @@
                                     @endif
                                 </div>
                             </td>
-                            <td><span class="fw-bold text-dark">{{ $company->company_name }}</span></td>
-                            <td>{{ $company->legal_name }}</td>
-                            <td>{{ $company->email ?? 'N/A' }}</td>
+                            <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;"><span class="fw-bold text-dark">{{ $company->company_name }}</span></td>
+                            <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $company->legal_name }}</td>
+                            <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $company->email ?? 'N/A' }}</td>
                             <td>
                                 @if($company->status)
                                     <x-ui.badge variant="success" soft>{{ __('hrms.employees.frm_status_active') }}</x-ui.badge>
@@ -107,25 +107,22 @@
                                 <form action="{{ route('hrms.company.destroy', $company->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.org.confirm_delete_co') }}', { title: 'Delete Legal Entity', variant: 'danger', confirmButtonText: 'Delete' });">
                                     @csrf
                                     @method('DELETE')
-                                    <div class="hstack gap-2 justify-content-end">
-                                        <a href="javascript:void(0)" class="action-dropdown-btn btn-view-company" data-bs-toggle="modal" data-bs-target="#viewCompanyModal" data-company="{{ base64_encode($company->toJson()) }}" title="{{ __('hrms.employees.view_profile') }}" data-bs-toggle="tooltip">
-                                            <i class="feather feather-eye"></i>
-                                        </a>
-                                        <x-ui.action-dropdown>
-                                            <li>
-                                                <a class="dropdown-item btn-edit-company" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editCompanyModal" data-company="{{ base64_encode($company->toJson()) }}">
-                                                    <i class="feather feather-edit-3 me-3"></i>
-                                                    <span>{{ __('hrms.assets.edit') }}</span>
-                                                </a>
-                                            </li>
-                                            <li class="dropdown-divider"></li>
-                                            <li>
-                                                <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                    <i class="feather feather-trash-2 me-3"></i>
-                                                    <span>{{ __('hrms.assets.delete') }}</span>
-                                                </button>
-                                            </li>
-                                        </x-ui.action-dropdown>
+                                    <div class="hstack gap-2 justify-content-end align-items-center">
+                                         <a href="javascript:void(0)" class="action-dropdown-btn btn-view-company" data-bs-toggle="modal" data-bs-target="#viewCompanyModal" data-company="{{ base64_encode($company->toJson()) }}" title="{{ __('hrms.common.view') ?? 'View' }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
+                                             <i class="feather feather-eye"></i>
+                                         </a>
+                                         <x-ui.action-dropdown>
+                                             <li>
+                                                 <a class="dropdown-item btn-edit-company" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editCompanyModal" data-company="{{ base64_encode($company->toJson()) }}">
+                                                     <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.assets.edit') }}
+                                                 </a>
+                                             </li>
+                                             <li>
+                                                 <button type="submit" class="dropdown-item text-danger">
+                                                     <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.assets.delete') }}
+                                                 </button>
+                                             </li>
+                                         </x-ui.action-dropdown>
                                     </div>
                                 </form>
                             </td>

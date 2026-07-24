@@ -80,35 +80,29 @@
             </div>
 
             <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle" id="salaryStructuresTable">
+                <table class="table table-hover mb-0 align-middle" id="salaryStructuresTable" style="table-layout: fixed; width: 100%;">
                     <thead class="table-light">
                         <tr>
-                            <th width="60">#</th>
+                            <th style="width: 45px;">#</th>
                             <th>{{ __('hrms.salary.structure_name') }}</th>
-                            <th>{{ __('hrms.salary.min_yearly_ctc') }}</th>
-                            <th>{{ __('hrms.salary.max_yearly_ctc') }}</th>
-                            <th>{{ __('hrms.salary.rules_count') }}</th>
-                            <th>{{ __('hrms.org.status') }}</th>
-                            <th width="150" class="text-end">{{ __('hrms.assets.actions') }}</th>
+                            <th style="width: 100px; white-space: nowrap;">{{ __('hrms.org.status') }}</th>
+                            <th style="width: 110px; white-space: nowrap;" class="text-end">{{ __('hrms.assets.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($salaryStructures as $structure)
                             <tr class="structure-row">
                                 <td>{{ $loop->iteration }}</td>
-                                <td>
-                                    <span class="fw-bold text-dark structure-name">{{ $structure->name }}</span>
-                                </td>
-                                <td>
-                                    <span class="fw-semibold">₹{{ number_format($structure->min_ctc, 2) }}</span>
-                                </td>
-                                <td>
-                                    <span class="fw-semibold">₹{{ number_format($structure->max_ctc, 2) }}</span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-soft-info text-info rounded-pill px-2">
-                                        {{ $structure->items->count() }} {{ __('hrms.salary.salary_components_tab') }}
-                                    </span>
+                                <td style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
+                                    <div class="fw-bold text-dark structure-name fs-14">{{ $structure->name }}</div>
+                                    <div class="fs-12 text-muted mt-1">
+                                        ₹{{ number_format($structure->min_ctc, 2) }} - ₹{{ number_format($structure->max_ctc, 2) }}
+                                    </div>
+                                    <div class="mt-1">
+                                        <span class="badge bg-soft-info text-info rounded-pill px-2 fs-11">
+                                            {{ $structure->items->count() }} {{ __('hrms.salary.salary_components_tab') }}
+                                        </span>
+                                    </div>
                                 </td>
                                 <td>
                                     @if($structure->status)
@@ -121,22 +115,19 @@
                                     <form action="{{ route('hrms.salary-structure.structure.destroy', $structure->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.salary.delete_structure_confirm') }}', { title: 'Delete Salary Structure', variant: 'danger', confirmButtonText: 'Delete' });">
                                         @csrf
                                         @method('DELETE')
-                                        <div class="hstack gap-2 justify-content-end">
-                                            <a href="javascript:void(0)" class="action-dropdown-btn toggle-structure-details text-secondary p-2" data-target="#structure-details-{{ $structure->id }}" title="{{ __('hrms.salary.show_components') }}" data-bs-toggle="tooltip">
+                                        <div class="hstack gap-2 justify-content-end align-items-center">
+                                            <a href="javascript:void(0)" class="action-dropdown-btn toggle-structure-details text-secondary" data-target="#structure-details-{{ $structure->id }}" title="{{ __('hrms.salary.show_components') }}" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px solid #cbd5e1; background-color: #ffffff; color: #475569;">
                                                 <i class="feather feather-chevron-down"></i>
                                             </a>
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item edit-structure-btn" href="javascript:void(0)" data-structure="{{ base64_encode($structure->toJson()) }}">
-                                                        <i class="feather feather-edit-3 me-3"></i>
-                                                        <span>{{ __('hrms.salary.edit') }}</span>
+                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.salary.edit') }}
                                                     </a>
                                                 </li>
-                                                <li class="dropdown-divider"></li>
                                                 <li>
-                                                    <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start d-flex align-items-center">
-                                                        <i class="feather feather-trash-2 me-3"></i>
-                                                        <span>{{ __('hrms.salary.delete') }}</span>
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.salary.delete') }}
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -146,7 +137,7 @@
                             </tr>
                             <tr id="structure-details-{{ $structure->id }}" class="table-light d-none">
                                 <td></td>
-                                <td colspan="7" class="p-3">
+                                <td colspan="3" class="p-3">
                                     <div class="card border-0 shadow-none m-0 bg-light">
                                         <div class="card-body p-3">
                                             <div class="row g-3">
@@ -161,33 +152,31 @@
                                                         };
                                                         $typeBadge = $item->component->type == 'earning' 
                                                             ? '<span class="badge bg-soft-success text-success">' . __('hrms.org.earning') . '</span>' 
-                                                            : '<span class="badge bg-soft-danger text-danger">' . __('hrms.org.deduction') . '</span>';
+                                                            : '<span class="badge bg-soft-warning text-warning">' . __('hrms.org.deduction') . '</span>';
                                                     @endphp
-                                                    <div class="col-xl-3 col-lg-4 col-md-6 col-12">
-                                                        <div class="p-3 border rounded bg-white shadow-sm h-100 d-flex flex-column justify-content-between">
-                                                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                                                <span class="fw-bold text-dark text-uppercase" style="font-size: 14px; letter-spacing: 0.5px;">{{ $item->component->code }}</span>
+                                                    <div class="col-md-6 col-lg-4">
+                                                        <div class="p-2 border rounded bg-white">
+                                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                <span class="fw-bold text-dark fs-13">{{ $item->component->name }}</span>
                                                                 {!! $typeBadge !!}
                                                             </div>
-                                                            <div class="border-top pt-2 mt-auto">
-                                                                <div class="d-flex align-items-center overflow-hidden">
-                                                                    <span class="fw-bold text-primary flex-shrink-0" style="font-size: 14px;">
-                                                                        @if($item->calculation_type === 'fixed')
-                                                                            ₹{{ number_format($item->value, 2) }}
-                                                                        @elseif($item->calculation_type === 'percentage_of_ctc' || $item->calculation_type === 'percentage_of_basic')
-                                                                            {{ floatval($item->value) }}%
-                                                                        @else
-                                                                            <span class="text-secondary">-</span>
-                                                                        @endif
-                                                                    </span>
-                                                                    <span class="text-muted ms-1 text-truncate flex-grow-1" style="font-size: 12px;" title="{{ $calcTypeLabel }}">{{ $calcTypeLabel }}</span>
-                                                                </div>
+                                                            <div class="d-flex justify-content-between align-items-center text-muted fs-12">
+                                                                <span>{{ $calcTypeLabel }}:</span>
+                                                                <span class="fw-bold text-dark">
+                                                                    @if($item->calculation_type == 'fixed')
+                                                                        ₹{{ number_format($item->value, 2) }}
+                                                                    @elseif(in_array($item->calculation_type, ['percentage_of_ctc', 'percentage_of_basic']))
+                                                                        {{ $item->value }}%
+                                                                    @else
+                                                                        Balancing
+                                                                    @endif
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 @empty
-                                                    <div class="col-12 text-muted text-center py-2">
-                                                        <i class="feather-alert-circle me-1"></i>{{ __('hrms.salary.no_components_for_structure') }}
+                                                    <div class="col-12 text-muted fs-12">
+                                                        {{ __('hrms.salary.no_components_configured') }}
                                                     </div>
                                                 @endforelse
                                             </div>
@@ -197,7 +186,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
+                                <td colspan="4" class="text-center py-5 text-muted">
                                     <i class="feather-alert-circle fs-32 mb-2 d-block text-secondary"></i>
                                     {{ __('hrms.salary.no_structures_defined') }}
                                 </td>

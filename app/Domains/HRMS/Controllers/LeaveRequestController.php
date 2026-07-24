@@ -484,7 +484,7 @@ class LeaveRequestController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $request->validate([
-            'status' => 'required|string|in:approved,rejected,unauthorized,unpaid',
+            'status' => 'required|string|in:pending,approved,rejected,unauthorized,unpaid',
             'rejection_reason' => 'nullable|string|max:500'
         ]);
 
@@ -542,11 +542,11 @@ class LeaveRequestController extends Controller
                 'rejection_reason' => $request->input('rejection_reason', 'Rejected by Admin')
             ]);
         } else {
-            // unauthorized or unpaid
+            // unauthorized or unpaid or pending
             $leaveRequest->update([
                 'status' => $status,
-                'current_level' => $status,
-                'approved_by' => $adminEmployee ? $adminEmployee->id : null,
+                'current_level' => $status === 'pending' ? '1' : $status,
+                'approved_by' => $status === 'pending' ? null : ($adminEmployee ? $adminEmployee->id : null),
                 'rejection_reason' => null
             ]);
         }
