@@ -2,6 +2,7 @@
 
 namespace App\Domains\Production\Controllers;
 
+use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionQualityPlan;
 use App\Domains\Production\Requests\QualityInspectionResultsRequest;
@@ -21,32 +22,26 @@ class QualityInspectionController extends Controller
         $this->authorize('view', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
 
-        $query = ProductionQualityInspection::where('tenant_id', $tenantId)
-            ->with(['plan', 'order']);
+        $sortBy = $request->input('sort_by', 'id');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        $query = ProductionQualityInspection::with(['plan', 'order.product'])
+            ->where('tenant_id', $tenantId);
 
         if ($request->filled('search')) {
-            $search = '%'.$request->input('search').'%';
-            $query->whereHas('plan', function ($pq) use ($search) {
-                $pq->where('name', 'like', $search);
+            $search = $request->input('search');
+            $query->where(function($q) use ($search) {
+                $q->where('inspection_number', 'like', "%{$search}%")
+                  ->orWhere('remarks', 'like', "%{$search}%");
             });
-        }
-
-        if ($request->filled('stage')) {
-            $query->where('stage', $request->input('stage'));
         }
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }
 
-        $sortBy = $request->input('sort_by', 'id');
-        $sortOrder = $request->input('sort_order', 'desc');
-
-        if (! in_array($sortBy, ['id', 'stage', 'status', 'result'])) {
-            $sortBy = 'id';
-        }
-        if (! in_array($sortOrder, ['asc', 'desc'])) {
-            $sortOrder = 'desc';
+        if ($request->filled('result')) {
+            $query->where('result', $request->input('result'));
         }
 
         $inspections = $query->orderBy($sortBy, $sortOrder)->paginate(15)->withQueryString();
@@ -59,8 +54,12 @@ class QualityInspectionController extends Controller
         $this->authorize('manage', ProductionQualityInspection::class);
         $tenantId = require_tenant_id();
         $plans = ProductionQualityPlan::where('tenant_id', $tenantId)->get();
+        $orders = ProductionOrder::where('tenant_id', $tenantId)
+            ->whereIn('status', [ProductionOrder::STATUS_IN_PROGRESS, ProductionOrder::STATUS_COMPLETED])
+            ->orderBy('id', 'desc')
+            ->get();
 
-        return view('modules.production.quality.inspections.create', compact('plans'));
+        return view('modules.production.quality.inspections.create', compact('plans', 'orders'));
     }
 
     public function store(StoreQualityInspectionRequest $request)

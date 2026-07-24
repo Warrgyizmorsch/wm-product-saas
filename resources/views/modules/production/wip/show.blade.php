@@ -40,7 +40,7 @@
             icon="feather-sliders">
             {{ __('production.adjust') }}
         </x-ui.button>
-        @if($wip->status === 'completed' || $wip->available_quantity > 0)
+        @if($wip->status === 'completed')
             <x-ui.button variant="primary" data-bs-toggle="modal" data-bs-target="#convertToFgModal"
                 icon="feather-check-circle">
                 {{ __('production.convert') }}

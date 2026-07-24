@@ -58,7 +58,14 @@
 
                     {{-- Right Column --}}
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui type="input" label="Production Order ID (Optional)" name="production_order_id" placeholder="e.g. 1024" :value="old('production_order_id')" :error-text="$errors->first('production_order_id')" />
+                        <x-ui.odoo-form-ui type="select" label="Production Order (Optional)" name="production_order_id" :error-text="$errors->first('production_order_id')">
+                            <option value="">No Production Order Restriction</option>
+                            @foreach($orders as $order)
+                                <option value="{{ $order->id }}" @selected(old('production_order_id') == $order->id)>
+                                    {{ $order->order_number }} - {{ $order->product->name }} (Qty: {{ number_format($order->quantity_ordered, 0) }}, {{ ucfirst(str_replace('_', ' ', $order->status)) }})
+                                </option>
+                            @endforeach
+                        </x-ui.odoo-form-ui>
                     </div>
                 </div>
 
