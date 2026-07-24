@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Purchase\Models\PurchaseRequisition;
+use App\Domains\Purchase\Models\PurchaseRequisitionItem;
 use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Models\Vendor;
@@ -83,8 +84,8 @@ class PurchaseOrderController extends Controller
             return false;
         });
 
-        $selectedRequisitionId = $request->query('requisition_id');
-        $requisitionItemIds = $request->query('requisition_item_ids', []);
+        $selectedRequisitionId = $request->input('requisition_id');
+        $requisitionItemIds = $request->input('requisition_item_ids', []);
         $prefilledItems = [];
 
         if ($selectedRequisitionId) {
@@ -126,39 +127,38 @@ class PurchaseOrderController extends Controller
 
             if ($items->isNotEmpty()) {
                 $requisitionIds = $items->pluck('purchase_requisition_id')->unique()->toArray();
-                $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
-                    ->whereIn('purchase_requisition_id', $requisitionIds)
-                    ->where('status', '!=', 'Cancelled')
-                    ->with('items')
-                    ->get();
+                
+                // If items are selected from different PRs, do not select any PR (leave it blank)
+                $selectedRequisitionId = count($requisitionIds) === 1 ? $requisitionIds[0] : null;
 
-                $selectedRequisitionId = $items->first()->purchase_requisition_id;
-
+                $groupedPrefilled = [];
                 foreach ($items as $item) {
-                    $alreadyOrderedQty = (float) $existingPos
-                        ->where('purchase_requisition_id', $item->purchase_requisition_id)
-                        ->flatMap(fn($po) => $po->items)
-                        ->where('product_id', $item->product_id)
-                        ->sum('quantity');
+                    $alreadyOrderedQty = (float) $item->ordered_qty;
 
                     $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
 
                     if ($pendingQty > 0.0001) {
-                        $prefilledItems[] = [
-                            'product_id' => $item->product_id,
-                            'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
-                            'quantity' => $pendingQty,
-                            'warehouse_id' => $item->warehouse_id,
-                            'warehouse_name' => $item->warehouse->name ?? '—',
-                            'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
-                            'estimated_cost' => (float)$item->estimated_cost,
-                        ];
+                        $prodId = $item->product_id;
+                        if (isset($groupedPrefilled[$prodId])) {
+                            $groupedPrefilled[$prodId]['quantity'] += $pendingQty;
+                        } else {
+                            $groupedPrefilled[$prodId] = [
+                                'product_id' => $item->product_id,
+                                'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
+                                'quantity' => $pendingQty,
+                                'warehouse_id' => $item->warehouse_id,
+                                'warehouse_name' => $item->warehouse->name ?? '—',
+                                'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
+                                'estimated_cost' => (float)$item->estimated_cost,
+                            ];
+                        }
                     }
                 }
+                $prefilledItems = array_values($groupedPrefilled);
             }
         }
 
-        return view('modules.purchase.orders.create', compact('vendors', 'warehouses', 'products', 'requisitions', 'selectedRequisitionId', 'prefilledItems'));
+        return view('modules.purchase.orders.create', compact('vendors', 'warehouses', 'products', 'requisitions', 'selectedRequisitionId', 'prefilledItems', 'requisitionItemIds'));
     }
 
     public function store(Request $request)
@@ -203,7 +203,7 @@ class PurchaseOrderController extends Controller
             'items.*.total_amount' => 'nullable|numeric|min:0',
         ]);
 
-        return DB::transaction(function () use ($validated, $tenantId) {
+        return DB::transaction(function () use ($validated, $tenantId, $request) {
             // Generate sequence number YYYY-000001
             $year = now()->format('Y');
             $prefix = "PO-{$year}-";
@@ -218,11 +218,21 @@ class PurchaseOrderController extends Controller
             }
             $poNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
 
+            $requisitionItemIds = $request->input('requisition_item_ids', []);
+            $prItems = collect();
+            if (!empty($requisitionItemIds)) {
+                $prItems = PurchaseRequisitionItem::whereIn('id', $requisitionItemIds)->get();
+            }
+
+            // Determine if the selected items are from a single PR or multiple
+            $prIds = $prItems->pluck('purchase_requisition_id')->unique();
+            $headerPrId = $prIds->count() === 1 ? $prIds->first() : null;
+
             $po = PurchaseOrder::create([
                 'tenant_id' => $tenantId,
                 'purchase_order_number' => $poNumber,
-                'purchase_requisition_id' => $validated['purchase_requisition_id'] ?? null,
-                'source_type' => $validated['source_type'] ?? (!empty($validated['purchase_requisition_id']) ? 'requisition' : 'direct'),
+                'purchase_requisition_id' => $headerPrId ?: ($validated['purchase_requisition_id'] ?? null),
+                'source_type' => $validated['source_type'] ?? (!empty($headerPrId) || !empty($validated['purchase_requisition_id']) ? 'requisition' : 'direct'),
                 'vendor_id' => $validated['vendor_id'],
                 'location' => $validated['location'] ?? null,
                 'reference' => $validated['reference'] ?? null,
@@ -245,10 +255,49 @@ class PurchaseOrderController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
+                $productId = $item['product_id'];
+                $totalQty = (float)$item['quantity'];
+
+                // Find matching PR items for this product
+                $matchingPrItems = $prItems->where('product_id', $productId)->sortBy('id');
+
+                $allocations = [];
+                if ($matchingPrItems->isNotEmpty()) {
+                    $remainingQty = $totalQty;
+
+                    foreach ($matchingPrItems as $prItem) {
+                        if ($remainingQty <= 0) break;
+
+                        // Calculate pending quantity for this specific PR item
+                        $alreadyOrdered = (float)$prItem->ordered_qty;
+                        $pending = max(0.0, (float)$prItem->quantity - $alreadyOrdered);
+
+                        if ($pending > 0.0001) {
+                            $qtyToAlloc = min($remainingQty, $pending);
+                            $remainingQty -= $qtyToAlloc;
+
+                            // Add to allocations JSON
+                            $allocations[] = [
+                                'pr_item_id' => $prItem->id,
+                                'quantity' => $qtyToAlloc,
+                            ];
+                        }
+                    }
+
+                    // Save any remaining/excess quantity without incrementing any PR (direct excess)
+                    if ($remainingQty > 0.0001) {
+                        $allocations[] = [
+                            'pr_item_id' => null,
+                            'quantity' => $remainingQty,
+                        ];
+                    }
+                }
+
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $po->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
+                    'product_id' => $productId,
+                    'requisition_item_allocations' => empty($allocations) ? null : $allocations,
+                    'quantity' => $totalQty,
                     'rate' => $item['rate'],
                     'amount' => $item['amount'],
                     'discount_percent' => $item['discount_percent'] ?? 0.00,
@@ -396,14 +445,70 @@ class PurchaseOrderController extends Controller
                 'notes' => $validated['notes'] ?? null,
             ]);
 
+            // Keep a copy of old allocations to re-allocate if items are updated
+            $oldAllocationsByProduct = [];
+            foreach ($order->items as $oldItem) {
+                if (!empty($oldItem->requisition_item_allocations)) {
+                    $oldAllocationsByProduct[$oldItem->product_id] = $oldItem->requisition_item_allocations;
+                }
+            }
+
             // Re-create items
             $order->items()->delete();
 
             foreach ($validated['items'] as $item) {
+                $productId = $item['product_id'];
+                $totalQty = (float)$item['quantity'];
+
+                // Reconstruct allocations based on previous ones, or check header link
+                $prItemIds = [];
+                if (isset($oldAllocationsByProduct[$productId])) {
+                    $prItemIds = collect($oldAllocationsByProduct[$productId])->pluck('pr_item_id')->filter()->toArray();
+                }
+
+                $prItems = collect();
+                if (!empty($prItemIds)) {
+                    $prItems = PurchaseRequisitionItem::whereIn('id', $prItemIds)->get();
+                } elseif (!empty($validated['purchase_requisition_id'])) {
+                    $prItems = PurchaseRequisitionItem::where('purchase_requisition_id', $validated['purchase_requisition_id'])
+                        ->where('product_id', $productId)
+                        ->get();
+                }
+
+                $allocations = [];
+                if ($prItems->isNotEmpty()) {
+                    $remainingQty = $totalQty;
+
+                    foreach ($prItems as $prItem) {
+                        if ($remainingQty <= 0) break;
+
+                        $alreadyOrdered = (float)$prItem->fresh()->ordered_qty;
+                        $pending = max(0.0, (float)$prItem->quantity - $alreadyOrdered);
+
+                        if ($pending > 0.0001) {
+                            $qtyToAlloc = min($remainingQty, $pending);
+                            $remainingQty -= $qtyToAlloc;
+
+                            $allocations[] = [
+                                'pr_item_id' => $prItem->id,
+                                'quantity' => $qtyToAlloc,
+                            ];
+                        }
+                    }
+
+                    if ($remainingQty > 0.0001) {
+                        $allocations[] = [
+                            'pr_item_id' => null,
+                            'quantity' => $remainingQty,
+                        ];
+                    }
+                }
+
                 PurchaseOrderItem::create([
                     'purchase_order_id' => $order->id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
+                    'product_id' => $productId,
+                    'requisition_item_allocations' => empty($allocations) ? null : $allocations,
+                    'quantity' => $totalQty,
                     'rate' => $item['rate'],
                     'amount' => $item['amount'],
                     'discount_percent' => $item['discount_percent'] ?? 0.00,
@@ -447,13 +552,44 @@ class PurchaseOrderController extends Controller
         $order = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
 
         if ($order->status === 'Draft') {
-            $order->update(['status' => 'Approved']);
+            DB::transaction(function () use ($order) {
+                // Increment ordered_qty on allocated PR items
+                foreach ($order->items as $item) {
+                    if (!empty($item->requisition_item_allocations)) {
+                        foreach ($item->requisition_item_allocations as $alloc) {
+                            if (!empty($alloc['pr_item_id'])) {
+                                DB::table('purchase_requisition_items')
+                                    ->where('id', $alloc['pr_item_id'])
+                                    ->increment('ordered_qty', (float)$alloc['quantity']);
+                            }
+                        }
+                    }
+                }
+                $order->update(['status' => 'Approved']);
+            });
+
             return redirect()->route('purchase.orders.show', $id)
                 ->with('success', 'Purchase Order approved successfully.');
         }
 
         return redirect()->route('purchase.orders.show', $id)
             ->with('error', 'Only Draft Purchase Orders can be approved.');
+    }
+
+    public function reject(int $id)
+    {
+        $tenantId = require_tenant_id();
+        $order = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
+
+        if ($order->status === 'Draft') {
+            $order->update(['status' => 'Cancelled']);
+
+            return redirect()->route('purchase.orders.show', $id)
+                ->with('success', 'Purchase Order rejected successfully.');
+        }
+
+        return redirect()->route('purchase.orders.show', $id)
+            ->with('error', 'Only Draft Purchase Orders can be rejected.');
     }
 
     public function getRequisitionItems(Request $request)

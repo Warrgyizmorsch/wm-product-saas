@@ -52,6 +52,9 @@
             <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">
                 <form action="{{ route('purchase.orders.store') }}" method="POST" id="createPoForm" class="odoo-sheet">
                     @csrf
+                    @foreach($requisitionItemIds ?? [] as $itemId)
+                        <input type="hidden" name="requisition_item_ids[]" value="{{ $itemId }}">
+                    @endforeach
 
                     <!-- Actions Top bar -->
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
@@ -87,7 +90,7 @@
                             <x-ui.odoo-form-ui type="select" label="Location / Warehouse" name="location" id="locationSelect" required="true">
                                 <option value="">Select Warehouse...</option>
                                 @foreach($warehouses as $w)
-                                    <option value="{{ $w->name }}" @selected(old('location') == $w->name)>{{ $w->name }}</option>
+                                    <option value="{{ $w->name }}" @selected(old('location', request('location')) == $w->name || request('warehouse_id') == $w->id)>{{ $w->name }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
@@ -99,7 +102,7 @@
                                         data-phone="{{ $v->phone }}" 
                                         data-email="{{ $v->email }}"
                                         data-address="{{ $v->address }}"
-                                        @selected(old('vendor_id') == $v->id)>
+                                        @selected(old('vendor_id', request('vendor_id')) == $v->id)>
                                         {{ $v->name }} {{ $v->code ? '('.$v->code.')' : '' }}
                                     </option>
                                 @endforeach

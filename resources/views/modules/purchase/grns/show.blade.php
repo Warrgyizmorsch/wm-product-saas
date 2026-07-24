@@ -7,16 +7,16 @@
 @endsection
 
 @section('page-actions')
-    <div class="d-flex gap-2 flex-wrap text-dark">
-        <x-ui.button href="{{ route('purchase.grns.index') }}" variant="light" icon="feather-arrow-left" class="border">
-            Back to GRNs
-        </x-ui.button>
-        <x-ui.button href="{{ route('purchase.grns.download', $grn->id) }}" variant="light" icon="feather-printer" class="border">
-            Download PDF
-        </x-ui.button>
+    <div class="d-flex align-items-center gap-0">
+        <a href="{{ route('purchase.grns.index') }}" class="action-dropdown-btn me-2" title="Back to GRNs" data-bs-toggle="tooltip">
+            <i class="feather feather-arrow-left"></i>
+        </a>
+        <a href="{{ route('purchase.grns.download', $grn->id) }}" class="action-dropdown-btn me-2" title="Download PDF" data-bs-toggle="tooltip">
+            <i class="feather feather-download"></i>
+        </a>
 
         @if($grn->status === 'Draft')
-            <x-ui.button href="{{ route('purchase.grns.edit', $grn->id) }}" variant="warning" icon="feather-edit">
+            <x-ui.button href="{{ route('purchase.grns.edit', $grn->id) }}" variant="warning" icon="feather-edit" class="me-2">
                 Edit Draft
             </x-ui.button>
             <form action="{{ route('purchase.grns.approve', $grn->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Approve this GRN? This will update warehouse inventory stock and PO status.')">
@@ -36,6 +36,25 @@
 @once
     @push('styles')
         <style>
+            .action-dropdown-btn {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 32px !important;
+                height: 32px !important;
+                border-radius: 8px !important;
+                border: 1.5px solid #cbd5e1 !important;
+                background-color: #ffffff !important;
+                color: #475569 !important;
+                transition: all 0.28s ease !important;
+                text-decoration: none !important;
+                cursor: pointer !important;
+            }
+            .action-dropdown-btn:hover {
+                background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
+                border-color: var(--bs-primary) !important;
+                color: var(--bs-primary) !important;
+            }
             .so-status-pipeline {
                 display: inline-flex;
                 align-items: center;
@@ -293,8 +312,24 @@
                                 <tbody>
                                     @php
                                         $totRec = 0; $totRej = 0; $totAcc = 0; $totAmt = 0;
+                                        $groupedItems = $grn->items->groupBy('product_id')->map(function($items) {
+                                            $first = $items->first();
+                                            return (object) [
+                                                'id' => $first->id,
+                                                'product' => $first->product,
+                                                'product_id' => $first->product_id,
+                                                'ordered_qty' => $items->sum('ordered_qty'),
+                                                'previous_received_qty' => $items->sum('previous_received_qty'),
+                                                'received_qty' => $items->sum('received_qty'),
+                                                'rejected_qty' => $items->sum('rejected_qty'),
+                                                'accepted_qty' => $items->sum('accepted_qty'),
+                                                'unit_rate' => $first->unit_rate,
+                                                'total_amount' => $items->sum('total_amount'),
+                                                'remarks' => $items->pluck('remarks')->filter()->implode(', '),
+                                            ];
+                                        })->values();
                                     @endphp
-                                    @foreach($grn->items as $idx => $item)
+                                    @foreach($groupedItems as $idx => $item)
                                         @php
                                             $totRec += (float)$item->received_qty;
                                             $totRej += (float)$item->rejected_qty;

@@ -301,6 +301,26 @@ class PurchaseRequisitionController extends Controller
             ->with('success', 'Purchase Requisition has been successfully approved.');
     }
 
+    public function reject(int $id)
+    {
+        $tenantId = require_tenant_id();
+
+        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)
+            ->findOrFail($id);
+
+        if ($requisition->status !== 'Draft') {
+            return redirect()->route('purchase.requisitions.index')
+                ->with('error', 'Only Draft Purchase Requisitions can be rejected.');
+        }
+
+        $requisition->update([
+            'status' => 'Cancelled',
+        ]);
+
+        return redirect()->route('purchase.requisitions.index')
+            ->with('success', 'Purchase Requisition has been successfully cancelled/rejected.');
+    }
+
     public function pendingItems(Request $request)
     {
         $tenantId = require_tenant_id();
@@ -323,12 +343,8 @@ class PurchaseRequisitionController extends Controller
 
         foreach ($requisitions as $pr) {
             foreach ($pr->items as $item) {
-                // Sum ordered qty for this product in POs linked to this PR
-                $alreadyOrderedQty = (float) $existingPos
-                    ->where('purchase_requisition_id', $pr->id)
-                    ->flatMap(fn($po) => $po->items)
-                    ->where('product_id', $item->product_id)
-                    ->sum('quantity');
+                // Sum ordered qty for this specific requisition item from the PO items table
+                $alreadyOrderedQty = (float) $item->ordered_qty;
 
                 $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
 
@@ -553,6 +569,12 @@ class PurchaseRequisitionController extends Controller
                         \App\Domains\Purchase\Models\PurchaseOrderItem::create([
                             'purchase_order_id' => $po->id,
                             'product_id' => $item->product_id,
+                            'requisition_item_allocations' => [
+                                [
+                                    'pr_item_id' => $item->id,
+                                    'quantity' => $qty,
+                                ]
+                            ],
                             'quantity' => $qty,
                             'rate' => $rate,
                             'amount' => $amount,

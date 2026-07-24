@@ -28,3 +28,5 @@ Route::post('products/quick-create', [ProductController::class, 'quickCreate'])
     ->name('products.quick-create');
 Route::post('uoms/quick-create', [UomController::class, 'quickCreate'])
     ->name('uoms.quick-create');
+Route::post('warehouses/quick-create', [WarehouseController::class, 'quickCreate'])
+    ->name('warehouses.quick-create');

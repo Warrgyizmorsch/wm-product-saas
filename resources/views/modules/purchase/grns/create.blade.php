@@ -34,7 +34,7 @@
                         </div>
                         <div>
                             <x-ui.button type="submit" variant="primary" icon="feather-save" class="fw-bold px-4 py-2">
-                                Save Draft GRN
+                                Save GRN
                             </x-ui.button>
                         </div>
                     </div>

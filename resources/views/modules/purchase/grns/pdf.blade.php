@@ -171,8 +171,23 @@
         <tbody>
             @php
                 $totRec = 0; $totRej = 0; $totAcc = 0; $totAmt = 0;
+                $groupedItems = $grn->items->groupBy('product_id')->map(function($items) {
+                    $first = $items->first();
+                    return (object) [
+                        'id' => $first->id,
+                        'product' => $first->product,
+                        'product_id' => $first->product_id,
+                        'ordered_qty' => $items->sum('ordered_qty'),
+                        'previous_received_qty' => $items->sum('previous_received_qty'),
+                        'received_qty' => $items->sum('received_qty'),
+                        'rejected_qty' => $items->sum('rejected_qty'),
+                        'accepted_qty' => $items->sum('accepted_qty'),
+                        'total_amount' => $items->sum('total_amount'),
+                        'remarks' => $items->pluck('remarks')->filter()->implode(', '),
+                    ];
+                })->values();
             @endphp
-            @foreach($grn->items as $idx => $item)
+            @foreach($groupedItems as $idx => $item)
                 @php
                     $totRec += (float)$item->received_qty;
                     $totRej += (float)$item->rejected_qty;

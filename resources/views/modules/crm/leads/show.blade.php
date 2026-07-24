@@ -245,21 +245,21 @@
                                                 <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.segmentation_sources') }}</h6>
 
                                                 <x-ui.odoo-form-ui type="select" :label="__('crm.lead_source')" name="source" :errorText="$errors->first('source')">
-                                                    <option value="Select an Option">{{ __('crm.select_an_option') }}</option>
+                                                    <option value="">{{ __('crm.select_an_option') }}</option>
                                                     @foreach (['Cold Call', 'Employee Referral', 'Partner', 'Web Search', 'Advertisement', 'Trade Show'] as $srcOption)
                                                         <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ __('crm.sources.' . $srcOption) ?? $srcOption }}</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
 
                                                 <x-ui.odoo-form-ui type="select" :label="__('crm.priority')" name="priority" :errorText="$errors->first('priority')">
-                                                    <option value="Select an Option">{{ __('crm.select_an_option') }}</option>
+                                                    <option value="">{{ __('crm.select_an_option') }}</option>
                                                     @foreach (['Low', 'Medium', 'High'] as $prioOption)
                                                         <option value="{{ $prioOption }}" @selected(old('priority', $lead->priority) === $prioOption)>{{ __('crm.priorities.' . $prioOption) ?? $prioOption }}</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
 
                                                 <x-ui.odoo-form-ui type="select" :label="__('crm.segment')" name="segment" :errorText="$errors->first('segment')">
-                                                    <option value="Select an Option">{{ __('crm.select_an_option') }}</option>
+                                                    <option value="">{{ __('crm.select_an_option') }}</option>
                                                     @foreach (['SMB', 'Mid-Market', 'Enterprise'] as $segOption)
                                                         <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ __('crm.segments.' . $segOption) ?? $segOption }}</option>
                                                     @endforeach
@@ -327,7 +327,7 @@
                                                 <div class="zoho-field-row">
                                                     <div class="zoho-field-label">{{ __('crm.lead_source') }}</div>
                                                     <div class="zoho-field-value">
-                                                        <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ $lead->source ? __('crm.sources.' . $lead->source) : '—' }}</span>
+                                                        <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ ($lead->source && $lead->source !== 'Select an Option') ? __('crm.sources.' . $lead->source) : '—' }}</span>
                                                     </div>
                                                 </div>
                                                 <div class="zoho-field-row">
@@ -336,7 +336,7 @@
                                                 </div>
                                                 <div class="zoho-field-row">
                                                     <div class="zoho-field-label">{{ __('crm.segment') }}</div>
-                                                    <div class="zoho-field-value text-dark">{{ $lead->segment ? __('crm.segments.' . $lead->segment) : '—' }}</div>
+                                                    <div class="zoho-field-value text-dark">{{ ($lead->segment && $lead->segment !== 'Select an Option') ? __('crm.segments.' . $lead->segment) : '—' }}</div>
                                                 </div>
                                             </div>
                                             <div class="col-md-6 ps-md-4">
@@ -378,7 +378,7 @@
                                                             elseif($lead->priority === 'Medium') $prioBadge = 'bg-warning text-dark';
                                                             elseif($lead->priority === 'Low') $prioBadge = 'bg-info text-white';
                                                         @endphp
-                                                        <span class="badge {{ $prioBadge }} px-2 py-0.5" style="font-size: 11px;">{{ $lead->priority ? __('crm.priorities.' . $lead->priority) : '—' }}</span>
+                                                        <span class="badge {{ $prioBadge }} px-2 py-0.5" style="font-size: 11px;">{{ ($lead->priority && $lead->priority !== 'Select an Option') ? __('crm.priorities.' . $lead->priority) : '—' }}</span>
                                                     </div>
                                                 </div>
                                                 <div class="zoho-field-row">

@@ -154,21 +154,22 @@ class GoodsReceiptNoteController extends Controller
             ->with(['vendor', 'warehouse', 'items.product.uom'])
             ->findOrFail($poId);
 
-        $items = $order->items->map(function ($item) {
-            $orderedQty = (float)$item->quantity;
-            $prevReceived = (float)($item->received_qty ?? 0);
+        $items = $order->items->groupBy('product_id')->map(function ($productItems) {
+            $first = $productItems->first();
+            $orderedQty = (float)$productItems->sum('quantity');
+            $prevReceived = (float)$productItems->sum('received_qty');
             $remainingQty = max(0.0, $orderedQty - $prevReceived);
 
             return [
-                'purchase_order_item_id' => $item->id,
-                'product_id' => $item->product_id,
-                'product_name' => $item->product?->name ?? 'Product #' . $item->product_id,
-                'product_code' => $item->product?->sku ?? $item->product?->code ?? '',
-                'uom_name' => $item->product?->uom?->name ?? 'Pcs',
+                'purchase_order_item_id' => $first->id,
+                'product_id' => $first->product_id,
+                'product_name' => $first->product?->name ?? 'Product #' . $first->product_id,
+                'product_code' => $first->product?->sku ?? $first->product?->code ?? '',
+                'uom_name' => $first->product?->uom?->name ?? 'Pcs',
                 'ordered_qty' => $orderedQty,
                 'previous_received_qty' => $prevReceived,
                 'remaining_qty' => $remainingQty,
-                'unit_rate' => (float)$item->rate,
+                'unit_rate' => (float)$first->rate,
             ];
         })->values();
 
@@ -212,12 +213,18 @@ class GoodsReceiptNoteController extends Controller
 
         $po = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($request->purchase_order_id);
 
-        // Validation: Ensure received qty does not exceed remaining qty for each item
+        // Validation: Ensure received qty does not exceed remaining qty for each item (consolidated)
         $hasPositiveReceive = false;
         foreach ($request->items as $idx => $itemData) {
             $poItem = PurchaseOrderItem::findOrFail($itemData['purchase_order_item_id']);
-            $orderedQty = (float)$poItem->quantity;
-            $prevReceived = (float)($poItem->received_qty ?? 0);
+            
+            // Get all items of the same product in this PO to sum their totals
+            $matchingPoItems = PurchaseOrderItem::where('purchase_order_id', $poItem->purchase_order_id)
+                ->where('product_id', $itemData['product_id'])
+                ->get();
+
+            $orderedQty = (float)$matchingPoItems->sum('quantity');
+            $prevReceived = (float)$matchingPoItems->sum('received_qty');
             $remainingQty = max(0.0, $orderedQty - $prevReceived);
 
             $recQty = (float)$itemData['received_qty'];
@@ -244,7 +251,7 @@ class GoodsReceiptNoteController extends Controller
         $count = GoodsReceiptNote::where('tenant_id', $tenantId)->count() + 1;
         $grnNumber = 'GRN-' . date('Y') . '-' . str_pad($count, 6, '0', STR_PAD_LEFT);
 
-        DB::transaction(function () use ($tenantId, $request, $grnNumber, $po) {
+        $grn = DB::transaction(function () use ($tenantId, $request, $grnNumber, $po) {
             $grn = GoodsReceiptNote::create([
                 'tenant_id' => $tenantId,
                 'grn_number' => $grnNumber,
@@ -257,43 +264,209 @@ class GoodsReceiptNoteController extends Controller
                 'vehicle_number' => $request->vehicle_number,
                 'transporter_name' => $request->transporter_name,
                 'lr_number' => $request->lr_number,
-                'status' => 'Draft',
+                'status' => 'Approved',
                 'notes' => $request->notes,
                 'created_by' => auth()->id(),
+                'approved_by' => auth()->id(),
+                'approved_at' => now(),
             ]);
 
             foreach ($request->items as $itemData) {
-                $poItem = PurchaseOrderItem::findOrFail($itemData['purchase_order_item_id']);
-                $orderedQty = (float)$poItem->quantity;
-                $prevReceived = (float)($poItem->received_qty ?? 0);
-
+                $productId = $itemData['product_id'];
                 $recQty = (float)$itemData['received_qty'];
                 $rejQty = (float)($itemData['rejected_qty'] ?? 0);
-                $accQty = max(0.0, $recQty - $rejQty);
-                $remQty = max(0.0, $orderedQty - ($prevReceived + $accQty));
 
-                $unitRate = (float)$poItem->rate;
-                $totalAmt = $accQty * $unitRate;
+                // Fetch matching PO items for this product
+                $poItems = PurchaseOrderItem::where('purchase_order_id', $po->id)
+                    ->where('product_id', $productId)
+                    ->orderBy('id')
+                    ->get();
 
-                GoodsReceiptNoteItem::create([
-                    'tenant_id' => $tenantId,
-                    'goods_receipt_note_id' => $grn->id,
-                    'purchase_order_item_id' => $poItem->id,
-                    'product_id' => $itemData['product_id'],
-                    'ordered_qty' => $orderedQty,
-                    'previous_received_qty' => $prevReceived,
-                    'received_qty' => $recQty,
-                    'accepted_qty' => $accQty,
-                    'rejected_qty' => $rejQty,
-                    'remaining_qty' => $remQty,
-                    'unit_rate' => $unitRate,
-                    'total_amount' => $totalAmt,
-                    'remarks' => $itemData['remarks'] ?? null,
-                ]);
+                $leftRec = $recQty;
+                $leftRej = $rejQty;
+
+                foreach ($poItems as $poItem) {
+                    $ordered = (float)$poItem->quantity;
+                    $prevRec = (float)($poItem->received_qty ?? 0);
+                    $remaining = max(0.0, $ordered - $prevRec);
+
+                    if ($remaining <= 0) {
+                        continue;
+                    }
+
+                    // Allocate received qty to this PO item
+                    $allocatedRec = min($leftRec, $remaining);
+                    $leftRec -= $allocatedRec;
+
+                    // Allocate rejected qty
+                    $allocatedRej = 0.0;
+                    if ($allocatedRec > 0 && $leftRej > 0) {
+                        $allocatedRej = min($leftRej, $allocatedRec);
+                        $leftRej -= $allocatedRej;
+                    }
+
+                    $allocatedAcc = max(0.0, $allocatedRec - $allocatedRej);
+                    $allocatedRem = max(0.0, $ordered - ($prevRec + $allocatedAcc));
+
+                    $unitRate = (float)$poItem->rate;
+                    $totalAmt = $allocatedAcc * $unitRate;
+
+                    GoodsReceiptNoteItem::create([
+                        'tenant_id' => $tenantId,
+                        'goods_receipt_note_id' => $grn->id,
+                        'purchase_order_item_id' => $poItem->id,
+                        'product_id' => $productId,
+                        'ordered_qty' => $ordered,
+                        'previous_received_qty' => $prevRec,
+                        'received_qty' => $allocatedRec,
+                        'accepted_qty' => $allocatedAcc,
+                        'rejected_qty' => $allocatedRej,
+                        'remaining_qty' => $allocatedRem,
+                        'unit_rate' => $unitRate,
+                        'total_amount' => $totalAmt,
+                        'remarks' => $itemData['remarks'] ?? null,
+                    ]);
+                }
+
+                // If there is still excess received quantity left, save it on the last PO item
+                if ($leftRec > 0) {
+                    $poItem = $poItems->last() ?: $poItems->first();
+                    $unitRate = (float)($poItem->rate ?? 0);
+                    $allocatedAcc = max(0.0, $leftRec - $leftRej);
+                    $totalAmt = $allocatedAcc * $unitRate;
+
+                    GoodsReceiptNoteItem::create([
+                        'tenant_id' => $tenantId,
+                        'goods_receipt_note_id' => $grn->id,
+                        'purchase_order_item_id' => $poItem->id,
+                        'product_id' => $productId,
+                        'ordered_qty' => (float)$poItem->quantity,
+                        'previous_received_qty' => (float)($poItem->received_qty ?? 0),
+                        'received_qty' => $leftRec,
+                        'accepted_qty' => $allocatedAcc,
+                        'rejected_qty' => $leftRej,
+                        'remaining_qty' => 0,
+                        'unit_rate' => $unitRate,
+                        'total_amount' => $totalAmt,
+                        'remarks' => ($itemData['remarks'] ?? '') . ' (Excess received)',
+                    ]);
+                }
             }
+
+            // Load items relationship to loop over it
+            $grn->load('items');
+
+            // Default warehouse if not specified
+            $warehouseId = $grn->warehouse_id ?: Warehouse::where('tenant_id', $tenantId)->first()?->id;
+
+            foreach ($grn->items as $item) {
+                $acceptedQty = (float)$item->accepted_qty;
+                $unitRate = (float)$item->unit_rate;
+
+                if ($acceptedQty > 0 && $warehouseId) {
+                    // Increase stock inside product_warehouse_stocks
+                    $stock = ProductWarehouseStock::firstOrCreate(
+                        [
+                            'tenant_id' => $tenantId,
+                            'product_id' => $item->product_id,
+                            'warehouse_id' => $warehouseId,
+                        ],
+                        [
+                            'quantity' => 0,
+                            'reserved_qty' => 0,
+                            'available_qty' => 0,
+                            'unit_cost' => $unitRate,
+                        ]
+                    );
+
+                    $newQty = (float)$stock->quantity + $acceptedQty;
+                    $newAvailable = (float)$stock->available_qty + $acceptedQty;
+
+                    $stock->update([
+                        'quantity' => $newQty,
+                        'available_qty' => $newAvailable,
+                        'unit_cost' => $unitRate,
+                    ]);
+
+                    // Insert stock movement inside stock_transactions
+                    StockTransaction::create([
+                        'tenant_id' => $tenantId,
+                        'product_id' => $item->product_id,
+                        'warehouse_id' => $warehouseId,
+                        'type' => 'IN',
+                        'reference_type' => 'GoodsReceiptNote',
+                        'reference_id' => $grn->id,
+                        'quantity' => $acceptedQty,
+                        'unit_cost' => $unitRate,
+                        'total_value' => $acceptedQty * $unitRate,
+                        'balance_qty' => $newQty,
+                    ]);
+                }
+
+                // Update Purchase Order Item received_qty
+                if ($item->purchase_order_item_id) {
+                    $poItem = PurchaseOrderItem::find($item->purchase_order_item_id);
+                    if ($poItem) {
+                        $poItem->increment('received_qty', $acceptedQty);
+                    }
+                }
+            }
+
+            // Automatically update Purchase Order Status
+            if ($grn->purchase_order_id) {
+                $po = PurchaseOrder::where('tenant_id', $tenantId)
+                    ->with('items')
+                    ->find($grn->purchase_order_id);
+
+                if ($po) {
+                    $allFullyReceived = $po->items->every(function ($pi) {
+                        return (float)$pi->quantity - (float)($pi->received_qty ?? 0) <= 0.0001;
+                    });
+
+                    $newPoStatus = $allFullyReceived ? 'Fully Received' : 'Partially Received';
+                    $po->update(['status' => $newPoStatus]);
+                }
+            }
+
+            // Directly post Accounting Journal Entry via global Accounting JournalService (Dr: Inventory 1400, Cr: GRNI 2100)
+            try {
+                $totalAmount = (float) $grn->items->sum('total_amount');
+                if ($totalAmount > 0) {
+                    $inventoryAccount = $this->accounts->findByCode('1100', $grn->tenant_id) 
+                                     ?? $this->accounts->findByCode('1400', $grn->tenant_id);
+
+                    $grniAccount = $this->accounts->findByCode('2100', $grn->tenant_id) 
+                                ?? $this->accounts->findByCode('2000', $grn->tenant_id);
+
+                    if ($inventoryAccount && $grniAccount) {
+                        $this->journals->post([
+                            [
+                                'chart_of_account_id' => $inventoryAccount->id,
+                                'debit' => $totalAmount,
+                                'description' => "Inventory Received for GRN {$grn->grn_number}",
+                            ],
+                            [
+                                'chart_of_account_id' => $grniAccount->id,
+                                'credit' => $totalAmount,
+                                'description' => "Goods Received Not Invoiced (GRNI) for GRN {$grn->grn_number}",
+                            ],
+                        ], [
+                            'tenant_id' => $grn->tenant_id,
+                            'source' => 'purchase',
+                            'reference_type' => GoodsReceiptNote::class,
+                            'reference_id' => $grn->id,
+                            'memo' => "Goods Receipt Note {$grn->grn_number} - Stock Credited",
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error('Accounting Journal Posting Exception on GRN Creation: ' . $e->getMessage());
+            }
+
+            return $grn;
         });
 
-        return redirect()->route('purchase.grns.index')->with('success', "Goods Receipt Note {$grnNumber} created successfully in Draft status.");
+        return redirect()->route('purchase.grns.show', $grn->id)->with('success', "Goods Receipt Note {$grn->grn_number} created and approved successfully.");
     }
 
     /**

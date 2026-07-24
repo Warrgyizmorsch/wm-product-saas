@@ -311,7 +311,28 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach ($order->items as $index => $item)
+                @php
+                    $groupedItems = $order->items->groupBy('product_id')->map(function($items) {
+                        $first = $items->first();
+                        return (object) [
+                            'id' => $first->id,
+                            'product' => $first->product,
+                            'product_id' => $first->product_id,
+                            'quantity' => $items->sum('quantity'),
+                            'rate' => $first->rate,
+                            'amount' => $items->sum('amount'),
+                            'discount_percent' => $first->discount_percent,
+                            'discount_amount' => $items->sum('discount_amount'),
+                            'tax_percent' => $first->tax_percent,
+                            'cgst_percent' => $first->cgst_percent,
+                            'sgst_percent' => $first->sgst_percent,
+                            'igst_percent' => $first->igst_percent,
+                            'tax_amount' => $items->sum('tax_amount'),
+                            'total_amount' => $items->sum('total_amount'),
+                        ];
+                    })->values();
+                @endphp
+                @foreach ($groupedItems as $index => $item)
                     <tr>
                         <td class="text-center" style="color: #64748b;">{{ $index + 1 }}</td>
                         <td>

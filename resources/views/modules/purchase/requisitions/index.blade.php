@@ -164,17 +164,28 @@
                                 </x-ui.badge>
                             </td>
                             <td class="text-end">
-                                <x-ui.action-dropdown id="reqActions-{{ $req->id }}">
-                                    <li>
-                                        <a class="dropdown-item py-2" href="{{ route('purchase.requisitions.show', $req->id) }}">
-                                            <i class="feather-eye me-1.5 text-muted"></i> View
-                                        </a>
-                                    </li>
+                                <x-ui.action-dropdown :viewUrl="route('purchase.requisitions.show', $req->id)" id="reqActions-{{ $req->id }}">
                                     @if($req->status === 'Draft')
                                         <li>
                                             <a class="dropdown-item py-2" href="{{ route('purchase.requisitions.edit', $req->id) }}">
                                                 <i class="feather-edit me-1.5 text-muted"></i> Edit
                                             </a>
+                                        </li>
+                                        <li>
+                                            <form action="{{ route('purchase.requisitions.approve', $req->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to approve this purchase request?')">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item py-2 text-success">
+                                                    <i class="feather-check-circle me-1.5"></i> Approve
+                                                </button>
+                                            </form>
+                                        </li>
+                                        <li>
+                                            <form action="{{ route('purchase.requisitions.reject', $req->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to reject this purchase request?')">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item py-2 text-warning">
+                                                    <i class="feather-x-circle me-1.5"></i> Reject
+                                                </button>
+                                            </form>
                                         </li>
                                         <li>
                                             <form action="{{ route('purchase.requisitions.destroy', $req->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this requisition?')">

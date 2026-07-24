@@ -45,17 +45,23 @@
                 ['label' => 'Material Requests (Prod)', 'route' => 'sales.material-requests.index'],
                 ['label' => 'Dispatch Orders', 'route' => 'sales.dispatches.index'],
             ]],
-            ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => ['Items', 'Warehouses', 'Stock Moves', 'Adjustments']],
+            ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => [
+                ['label' => 'Products', 'route' => 'inventory.products.index'],
+                ['label' => 'Warehouses', 'route' => 'inventory.warehouses.index'],
+                'Stock Moves',
+                'Adjustments'
+            ]],
             ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => [
-                ['label' => __('ui.purchase_requests'), 'route' => 'purchase.requisitions.index'],
-                ['label' => 'RFQs', 'route' => 'purchase.rfqs.index'],
                 ['label' => 'Savings Dashboard', 'route' => 'purchase.rfqs.savings'],
-                ['label' => 'Purchase Orders', 'route' => 'purchase.orders.index'],
+                ['label' => __('ui.purchase_requests'), 'route' => 'purchase.requisitions.index'],
                 ['label' => 'Pending PR Items', 'route' => 'purchase.requisitions.pending-items'],
+                ['label' => 'RFQs', 'route' => 'purchase.rfqs.index'],
+                ['label' => 'Purchase Orders', 'route' => 'purchase.orders.index'],
                 ['label' => 'Pending GRNs', 'route' => 'purchase.grns.pending'],
                 ['label' => 'All Goods Receipts', 'route' => 'purchase.grns.index'],
                 ['label' => 'Vendor Bills', 'route' => 'purchase.bills.index'],
                 ['label' => 'Vendor Payments', 'route' => 'purchase.payments.index'],
+
             ]],
         ],
         __('ui.production') => [

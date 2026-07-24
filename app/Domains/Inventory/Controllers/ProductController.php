@@ -620,7 +620,15 @@ class ProductController extends Controller
                 }
             ],
             'type' => 'required|in:finished_good,semi_finished,raw_material,component,service',
+            'supplier_method' => 'required|in:buy,manufacture',
+            'uom_id' => 'required|exists:uoms,id',
+            'inventory_valuation_method' => 'required|in:FIFO,Weighted Average',
             'unit_cost' => 'nullable|numeric|min:0',
+            'selling_price' => 'nullable|numeric|min:0',
+            'sales_account' => 'required|string|max:255',
+            'purchase_account' => 'required|string|max:255',
+            'inventory_account' => 'required|string|max:255',
+            'preferred_vendor_id' => 'nullable|exists:vendors,id',
         ]);
 
         $product = Product::create([
@@ -628,10 +636,19 @@ class ProductController extends Controller
             'name' => $validated['name'],
             'sku' => $validated['sku'],
             'type' => $validated['type'],
+            'supplier_method' => $validated['supplier_method'],
+            'uom_id' => $validated['uom_id'],
+            'inventory_valuation_method' => $validated['inventory_valuation_method'],
             'unit_cost' => $validated['unit_cost'] ?? 0.0,
-            'status' => 'active',
-            'selling_price' => $validated['unit_cost'] ?? 0.0,
+            'selling_price' => $validated['selling_price'] ?? 0.0,
             'cost_price' => $validated['unit_cost'] ?? 0.0,
+            'sales_account' => $validated['sales_account'],
+            'purchase_account' => $validated['purchase_account'],
+            'inventory_account' => $validated['inventory_account'],
+            'preferred_vendor_id' => $validated['preferred_vendor_id'],
+            'status' => 'active',
+            'planning_type' => $validated['supplier_method'] === 'manufacture' ? 'manufacture' : 'purchase',
+            'variation_type' => 'Single',
         ]);
 
         return response()->json([

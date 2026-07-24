@@ -34,7 +34,7 @@
                 class="odoo-table-select variant-selector"
                 data-row="{{ $rowIdx }}"
                 style="min-width:190px;">
-            <option value="">— Select Variant —</option>
+            <option value="">— {{ __('inventory.select_variant') }} —</option>
             @foreach($variants as $v)
                 <option value="{{ $v->id }}"
                         data-cost="{{ $v->cost_price }}"
@@ -52,7 +52,7 @@
                 class="odoo-table-select wh-selector"
                 data-row="{{ $rowIdx }}"
                 style="min-width:170px;">
-            <option value="">— Select Warehouse —</option>
+            <option value="">— {{ __('inventory.select_warehouse') }} —</option>
             @foreach($warehouses as $wh)
                 <option value="{{ $wh->id }}"
                         {{ (string)$wh->id === (string)$selectedWhId ? 'selected' : '' }}>
@@ -71,7 +71,7 @@
                class="odoo-table-input batch-input"
                data-row="{{ $rowIdx }}"
                value=""
-               placeholder="Batch Number"
+               placeholder="{{ __('inventory.batch_placeholder') }}"
                style="max-width:140px;">
     </td>
     @endif
@@ -84,7 +84,7 @@
                class="odoo-table-input serials-input"
                data-row="{{ $rowIdx }}"
                value=""
-               placeholder="S/Ns (comma separated)"
+               placeholder="{{ __('inventory.serials_placeholder') }}"
                style="min-width:180px;">
     </td>
     @endif
@@ -123,7 +123,7 @@
         <button type="button"
                 class="btn btn-sm erp-icon-btn erp-icon-btn--danger remove-row-btn"
                 data-row="{{ $rowIdx }}"
-                title="Remove row">
+                title="{{ __('inventory.delete') }}">
             <i class="feather-trash-2"></i>
         </button>
     </td>

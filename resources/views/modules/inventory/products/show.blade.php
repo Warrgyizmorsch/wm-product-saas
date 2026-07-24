@@ -1,21 +1,21 @@
 @extends('layouts.duralux')
 
-@section('title', 'Item Details | SaaS ERP')
-@section('page-title', 'Item details')
-@section('breadcrumb', 'Inventory / Items / Details')
+@section('title', __('inventory.item_details') . ' | SaaS ERP')
+@section('page-title', __('inventory.item_details'))
+@section('breadcrumb', __('inventory.inventory_items_details'))
 
 @section('page-actions')
     <div class="d-flex gap-2">
         <a href="{{ route('inventory.products.index') }}" class="btn btn-light">
-            <i class="feather-arrow-left me-2"></i>Back
+            <i class="feather-arrow-left me-2"></i>{{ __('inventory.back') }}
         </a>
         @if($product->item_type === 'Goods')
             <a href="{{ route('inventory.products.opening-stock', $product) }}" class="btn btn-soft-warning">
-                <i class="feather-package me-2"></i>Opening Stock
+                <i class="feather-package me-2"></i>{{ __('inventory.opening_stock') }}
             </a>
         @endif
         <a href="{{ route('inventory.products.edit', $product) }}" class="btn btn-primary">
-            <i class="feather-edit me-2"></i>Edit Item
+            <i class="feather-edit me-2"></i>{{ __('inventory.edit_item') }}
         </a>
     </div>
 @endsection
@@ -37,15 +37,15 @@
                                 <span class="text-muted fs-13 font-monospace">{{ $product->sku }}</span>
                                 <span class="text-muted">|</span>
                                 @if($product->item_type === 'Goods')
-                                    <span class="badge bg-soft-info text-info fs-11">Goods</span>
+                                    <span class="badge bg-soft-info text-info fs-11">{{ __('inventory.goods') }}</span>
                                 @else
-                                    <span class="badge bg-soft-warning text-warning fs-11">Service</span>
+                                    <span class="badge bg-soft-warning text-warning fs-11">{{ __('inventory.service') }}</span>
                                 @endif
                                 <span class="text-muted">|</span>
                                 @if($product->status === 'active')
-                                    <span class="badge bg-soft-success text-success fs-11">Active</span>
+                                    <span class="badge bg-soft-success text-success fs-11">{{ __('inventory.active') }}</span>
                                 @else
-                                    <span class="badge bg-soft-danger text-danger fs-11">Inactive</span>
+                                    <span class="badge bg-soft-danger text-danger fs-11">{{ __('inventory.inactive') }}</span>
                                 @endif
                             </div>
                         </div>
@@ -55,14 +55,14 @@
                     @if($product->item_type === 'Goods')
                         <div class="d-flex gap-4 text-end mt-3 mt-md-0">
                             <div>
-                                <span class="text-muted fs-11 text-uppercase d-block">Stock On Hand</span>
+                                <span class="text-muted fs-11 text-uppercase d-block">{{ __('inventory.stock_on_hand') }}</span>
                                 <h4 class="fw-bold text-dark mb-0">
                                     {{ number_format($product->total_stock, 0) }}
                                     <span class="fs-12 fw-normal text-muted">{{ $product->uom ? $product->uom->code : 'pcs' }}</span>
                                 </h4>
                             </div>
                             <div class="border-start ps-4">
-                                <span class="text-muted fs-11 text-uppercase d-block">Asset Value</span>
+                                <span class="text-muted fs-11 text-uppercase d-block">{{ __('inventory.asset_value') }}</span>
                                 <h4 class="fw-bold text-dark mb-0">
                                     ₹{{ number_format(
                                         $product->variation_type === 'Variant' 
@@ -80,23 +80,23 @@
                 <ul class="nav nav-tabs border-bottom mb-4" id="itemDetailsTabs" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active fw-bold" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="true">
-                            <i class="feather-info me-1"></i>Overview
+                            <i class="feather-info me-1"></i>{{ __('inventory.overview') }}
                         </button>
                     </li>
                     @if($product->item_type === 'Goods')
                         <li class="nav-item" role="presentation">
                             <button class="nav-link fw-bold" id="stock-tab" data-bs-toggle="tab" data-bs-target="#stock-pane" type="button" role="tab" aria-controls="stock-pane" aria-selected="false">
-                                <i class="feather-home me-1"></i>Warehouse Stock
+                                <i class="feather-home me-1"></i>{{ __('inventory.warehouse_stock') }}
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link fw-bold" id="ledger-tab" data-bs-toggle="tab" data-bs-target="#ledger-pane" type="button" role="tab" aria-controls="ledger-pane" aria-selected="false">
-                                <i class="feather-list me-1"></i>Stock Ledger
+                                <i class="feather-list me-1"></i>{{ __('inventory.stock_ledger') }}
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link fw-bold" id="reservations-tab" data-bs-toggle="tab" data-bs-target="#reservations-pane" type="button" role="tab" aria-controls="reservations-pane" aria-selected="false">
-                                <i class="feather-bookmark me-1"></i>Reservations
+                                <i class="feather-bookmark me-1"></i>{{ __('inventory.reservations') }}
                             </button>
                         </li>
                         @if($product->track_serial_number)
