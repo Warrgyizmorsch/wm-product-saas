@@ -3,6 +3,7 @@
 namespace App\Domains\Projects\Controllers;
 
 use App\Domains\CRM\Models\Customer;
+use App\Domains\Projects\Exports\ProjectsExport;
 use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\ProjectMember;
@@ -26,6 +27,14 @@ use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+
+/**
+ * Filter keys shared by the listing and export actions — search, every
+ * applied filter, and sort — so export can never observe a different set of
+ * projects than what the listing page currently shows.
+ */
 
 class ProjectController extends Controller
 {
@@ -41,14 +50,21 @@ class ProjectController extends Controller
     ) {
     }
 
+    /**
+     * Filter/search/sort keys the listing and export actions both read from
+     * the request — kept in one place so the two can never drift apart on
+     * which query params they honor.
+     */
+    private const LIST_FILTER_KEYS = [
+        'status', 'search', 'sort', 'direction',
+        'priority', 'client_id', 'owner_id', 'start_date', 'end_date',
+    ];
+
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Project::class);
 
-        $filters = $request->only([
-            'status', 'search', 'sort', 'direction',
-            'priority', 'client_id', 'owner_id', 'start_date', 'end_date',
-        ]);
+        $filters = $request->only(self::LIST_FILTER_KEYS);
 
         $data = [
             'projects'       => $this->projects->list($filters),
@@ -71,6 +87,22 @@ class ProjectController extends Controller
         }
 
         return view('modules.projects.index', $data);
+    }
+
+    /**
+     * Downloads the projects listing filtered/sorted exactly as currently
+     * viewed. Reuses the same filter keys and authorization as index(); the
+     * query itself comes from ProjectService, which delegates to the
+     * repository so no filter logic is duplicated here.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $this->authorize('viewAny', Project::class);
+
+        $filters = $request->only(self::LIST_FILTER_KEYS);
+        $query = $this->projects->exportQuery($filters);
+
+        return Excel::download(new ProjectsExport($query), ProjectsExport::filename());
     }
 
     public function searchClients(Request $request): JsonResponse
@@ -128,6 +160,9 @@ class ProjectController extends Controller
         $canUpdateProject = auth()->user()->can('update', $project);
 
         $members = $this->members->list($project);
+        $activeMembers = ($canManageMembers || $canManageMilestones || $canManageTaskLists || $canCreateTasks || $canUpdateProject)
+            ? $this->members->activeMembers($project)
+            : collect();
         $milestones = $this->milestones->list($project);
         $milestones->each(function (Milestone $milestone) {
             $health = $this->milestones->resolveHealth($milestone);
@@ -156,7 +191,7 @@ class ProjectController extends Controller
             'canUpdateProject'    => $canUpdateProject,
             'statusTransitions'   => $canUpdateProject ? $this->projects->availableStatusTransitions($project) : [],
             'customers'           => $canUpdateProject ? Customer::query()->orderBy('name')->get() : collect(),
-            'users'               => $canUpdateProject ? User::query()->orderBy('name')->get() : collect(),
+            'activeMemberOptions' => $activeMembers->pluck('user'),
             'milestones'          => $milestones,
             'milestoneKpis'       => $milestoneKpis,
             'canManageMilestones' => $canManageMilestones,
@@ -171,9 +206,7 @@ class ProjectController extends Controller
             'canCreateTasks'      => $canCreateTasks,
             'dashboard'           => $this->projects->dashboardStats($project, $taskLists, $tasksByList, $allTasks, $milestones, $members),
             'recentActivities'    => $this->activity->forProject($project, 5),
-            'activeMembers'       => ($canManageMembers || $canManageMilestones || $canManageTaskLists || $canCreateTasks)
-                ? $members->where('is_active', true)
-                : collect(),
+            'activeMembers'       => $activeMembers,
             'tenantUsers'         => ($canManageMembers || $canManageMilestones || $canManageTaskLists)
                 ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
                 : collect(),
@@ -254,6 +287,8 @@ class ProjectController extends Controller
 
     protected function inlineFieldSchema(): array
     {
+        $project = request()->route('project');
+
         return [
             'name' => [
                 'rules'   => ['required', 'string', 'max:255'],
@@ -308,12 +343,22 @@ class ProjectController extends Controller
                 'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'customer_id', $value),
             ],
             'owner_id' => [
-                'rules'   => ['required', 'integer', Rule::exists('users', 'id')->where('tenant_id', require_tenant_id())],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'owner_id', $value),
+                'rules'   => ['required', 'integer', $this->members->activeCollaboratorRule($project)],
+                'handler' => function (Project $project, $value) {
+                    $this->members->ensureCollaborator($project, (int) $value);
+
+                    return $this->projects->updateField($project, 'owner_id', $value);
+                },
             ],
             'manager_id' => [
-                'rules'   => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', require_tenant_id())],
-                'handler' => fn (Project $project, $value) => $this->projects->updateField($project, 'manager_id', $value),
+                'rules'   => ['nullable', 'integer', $this->members->activeCollaboratorRule($project)],
+                'handler' => function (Project $project, $value) {
+                    if ($value !== null) {
+                        $this->members->ensureCollaborator($project, (int) $value);
+                    }
+
+                    return $this->projects->updateField($project, 'manager_id', $value);
+                },
             ],
             'budget_type' => [
                 'rules'   => ['nullable', Rule::in(Project::BUDGET_TYPES)],

@@ -2,8 +2,8 @@
 
 namespace App\Domains\Projects\Requests;
 
+use App\Domains\Projects\Services\ProjectMemberService;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class AssignTaskRequest extends FormRequest
 {
@@ -12,27 +12,20 @@ class AssignTaskRequest extends FormRequest
         return true; // Policy handled in controller
     }
 
-    public function rules(): array
+    public function rules(ProjectMemberService $members): array
     {
-        $tenantId = require_tenant_id();
         $project = $this->route('project');
 
         return [
             'assignee_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('project_members', 'user_id')
-                    ->where('tenant_id', $tenantId)
-                    ->where('project_id', $project?->id)
-                    ->where('is_active', true),
+                $members->activeCollaboratorRule($project),
             ],
             'reviewer_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('project_members', 'user_id')
-                    ->where('tenant_id', $tenantId)
-                    ->where('project_id', $project?->id)
-                    ->where('is_active', true),
+                $members->activeCollaboratorRule($project),
             ],
         ];
     }

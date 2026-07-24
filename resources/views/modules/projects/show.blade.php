@@ -106,7 +106,7 @@
                     <button class="accordion-button" type="button" data-bs-toggle="collapse"
                         data-bs-target="#projectDetailsCollapse" aria-expanded="true"
                         aria-controls="projectDetailsCollapse">
-                        <i class="feather-info me-2 text-primary"></i>{{ __('projects.details') }}
+                        <i class="feather-info me-2 text-primary"></i>{{ __('projects.details_and_collaborators') }}
                     </button>
                 </h2>
                 <div id="projectDetailsCollapse" class="accordion-collapse collapse show"
@@ -138,10 +138,14 @@
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
-                                @php
-                                    $ownerOptions = $users->pluck('name', 'id');
-                                @endphp
-                                <x-ui.inline-edit field="owner_id" :value="$project->owner_id" :url="route('projects.field', $project)" type="select2" :options="$ownerOptions" :label="__('projects.project_owner')" />
+                                @if ($activeMemberOptions->isEmpty())
+                                    @include('modules.projects._no_collaborators_notice')
+                                @else
+                                    @php
+                                        $ownerOptions = $activeMemberOptions->pluck('name', 'id');
+                                    @endphp
+                                    <x-ui.inline-edit field="owner_id" :value="$project->owner_id" :url="route('projects.field', $project)" type="select2" :options="$ownerOptions" :label="__('projects.project_owner')" />
+                                @endif
                             @else
                                 {{ $project->owner?->name ?: '—' }}
                             @endif
@@ -154,11 +158,15 @@
                     <div class="col-md-8">
                         <span class="text-dark fw-bold fs-13">
                             @if ($canUpdateProject)
-                                @php
-                                    $managerOptions = $users->pluck('name', 'id')
-                                        ->prepend(__('projects.none_option'), '');
-                                @endphp
-                                <x-ui.inline-edit field="manager_id" :value="$project->manager_id" :url="route('projects.field', $project)" type="select2" :options="$managerOptions" :label="__('projects.project_manager')" />
+                                @if ($activeMemberOptions->isEmpty())
+                                    @include('modules.projects._no_collaborators_notice')
+                                @else
+                                    @php
+                                        $managerOptions = $activeMemberOptions->pluck('name', 'id')
+                                            ->prepend(__('projects.none_option'), '');
+                                    @endphp
+                                    <x-ui.inline-edit field="manager_id" :value="$project->manager_id" :url="route('projects.field', $project)" type="select2" :options="$managerOptions" :label="__('projects.project_manager')" />
+                                @endif
                             @else
                                 {{ $project->manager?->name ?: '—' }}
                             @endif
@@ -313,14 +321,12 @@
 
         {{-- Tab Navigation --}}
         @php
-            $activeProjectTab = in_array(request('tab'), ['summary', 'milestones', 'tasklists'], true)
+            $activeProjectTab = in_array(request('tab'), ['summary', 'milestones'], true)
                 ? request('tab')
-                : (in_array(old('_tasklist_form'), ['add', 'edit'], true) ? 'tasklists'
-                    : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'summary'));
+                : (in_array(old('_milestone_form'), ['add', 'edit'], true) ? 'milestones' : 'summary');
             $projectDetailTabs = [
                 ['id' => 'tab-summary', 'label' => __('projects.summary'), 'icon' => 'feather-grid', 'active' => $activeProjectTab === 'summary'],
                 ['id' => 'tab-milestones', 'label' => __('projects.milestones'), 'icon' => 'feather-flag', 'active' => $activeProjectTab === 'milestones'],
-                ['id' => 'tab-tasklists', 'label' => __('projects.tasklists'), 'icon' => 'feather-list', 'active' => $activeProjectTab === 'tasklists'],
             ];
         @endphp
         <x-ui.horizontal-tabs id="projectDetailsTabs" :tabs="$projectDetailTabs" />
@@ -334,10 +340,6 @@
             <div class="tab-pane fade {{ $activeProjectTab === 'milestones' ? 'show active' : '' }}" id="tab-milestones"
                 role="tabpanel" aria-labelledby="tab-milestones-tab">
                 @include('modules.projects._milestones')
-            </div>
-            <div class="tab-pane fade {{ $activeProjectTab === 'tasklists' ? 'show active' : '' }}" id="tab-tasklists"
-                role="tabpanel" aria-labelledby="tab-tasklists-tab">
-                @include('modules.projects._tasklists')
             </div>
         </div>
 
@@ -354,7 +356,7 @@
     @push('scripts')
         <script type="module" src="{{ asset('assets/js/inline-edit/index.js') }}"></script>
         <script src="{{ asset('assets/js/milestones/inline-create.js') }}"></script>
-        <script src="{{ asset('assets/js/tasklists/inline-create.js') }}"></script>
+        <script src="{{ asset('assets/js/projects/collaborators.js') }}"></script>
         <script>
             function openActivityDrawer(url) {
                 var drawerEl = document.getElementById('activityLogDrawer');

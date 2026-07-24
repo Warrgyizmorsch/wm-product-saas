@@ -7,6 +7,7 @@ use App\Domains\Projects\Models\Project;
 use App\Domains\Projects\Models\Task;
 use App\Domains\Projects\Models\TaskList;
 use App\Domains\Projects\Repositories\ProjectRepositoryInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -32,12 +33,24 @@ class ProjectService
     public function __construct(
         private readonly ProjectRepositoryInterface $projects,
         private readonly ActivityLogService $activity,
+        private readonly ProjectMemberService $members,
     ) {
     }
 
     public function list(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         return $this->projects->getAll($filters, $perPage);
+    }
+
+    /**
+     * The same filtered, sorted query as list(), unpaginated — for the
+     * export flow. Returns a Builder (not an HTTP response) so this stays
+     * usable from non-HTTP contexts (e.g. a future queued export or Artisan
+     * command) as well as the controller.
+     */
+    public function exportQuery(array $filters = []): Builder
+    {
+        return $this->projects->getQuery($filters);
     }
 
     public function find(int $id): ?Project
@@ -222,6 +235,11 @@ class ProjectService
 
             $project = $this->projects->create($data);
 
+            $this->members->ensureCollaborator($project, $project->owner_id);
+            if ($project->manager_id) {
+                $this->members->ensureCollaborator($project, $project->manager_id);
+            }
+
             $this->activity->record(
                 $project,
                 'project.created',
@@ -245,18 +263,23 @@ class ProjectService
             if ($newStatus !== $oldStatus) {
                 $otherData = collect($data)->except('status')->all();
 
-                return $this->persistStatusChange($project, $otherData, $oldStatus, $newStatus);
+                $project = $this->persistStatusChange($project, $otherData, $oldStatus, $newStatus);
+            } else {
+                $project = $this->projects->update($project->id, $data);
+
+                $this->activity->record(
+                    $project,
+                    'project.updated',
+                    "Project {$project->project_code} updated",
+                    "Project '{$project->name}' details updated",
+                    $project,
+                );
             }
 
-            $project = $this->projects->update($project->id, $data);
-
-            $this->activity->record(
-                $project,
-                'project.updated',
-                "Project {$project->project_code} updated",
-                "Project '{$project->name}' details updated",
-                $project,
-            );
+            $this->members->ensureCollaborator($project, $project->owner_id);
+            if ($project->manager_id) {
+                $this->members->ensureCollaborator($project, $project->manager_id);
+            }
 
             return $project;
         });

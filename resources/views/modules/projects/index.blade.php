@@ -166,11 +166,6 @@
 @endsection
 
 @section('content')
-    @php
-        $sortBy = request('sort');
-        $sortOrder = strtolower((string) request('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
-    @endphp
-
     <div class="erp-single-panel">
         @if (session('success'))
             <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
@@ -189,29 +184,6 @@
                         </button>
                     </x-ui.bulk-actions>
                 </div>
-
-                <x-ui.sort-dropdown :label="__('projects.sort')">
-                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'code', 'direction' => 'asc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'code' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>{{ __('projects.sort_code_asc') }}</span>
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'code', 'direction' => 'desc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'code' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>{{ __('projects.sort_code_desc') }}</span>
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'name', 'direction' => 'asc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>{{ __('projects.sort_name_asc') }}</span>
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'name', 'direction' => 'desc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'name' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>{{ __('projects.sort_name_desc') }}</span>
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'start_date', 'direction' => 'asc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'start_date' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>{{ __('projects.sort_start_date_asc') }}</span>
-                    </a>
-                    <a href="{{ request()->fullUrlWithQuery(['sort' => 'start_date', 'direction' => 'desc', 'page' => 1]) }}" class="dropdown-item {{ $sortBy === 'start_date' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>{{ __('projects.sort_start_date_desc') }}</span>
-                    </a>
-                </x-ui.sort-dropdown>
 
                 <form id="project-filter-form" method="GET" action="{{ route('projects.index') }}" class="d-inline">
                     <x-ui.filter :label="__('ui.filter')" offset="0, 5">
@@ -278,6 +250,10 @@
                         </div>
                     </x-ui.filter>
                 </form>
+
+                <a href="{{ route('projects.export', request()->query()) }}" class="btn btn-primary">
+                    <i class="feather-download me-2"></i>{{ __('projects.export') }}
+                </a>
             </div>
         </div>
 
@@ -323,7 +299,7 @@
                                     'Medium' => 'bg-soft-info text-info',
                                     default => 'bg-soft-dark text-dark',
                                 } }} px-2 py-0.5 fs-11 fw-semibold">
-                                    {{ __('projects.priorities.' . $project->priority) }}
+                                    {{ $project->priority_label }}
                                 </span>
                             </td>
                             <td>
@@ -339,7 +315,7 @@
                                     };
                                 @endphp
                                 <x-ui.badge variant="{{ $projectStatusVariant }}" soft class="px-2 py-0.5 fs-11 fw-semibold">
-                                    {{ __('projects.statuses.' . $project->status) }}
+                                    {{ $project->status_label }}
                                 </x-ui.badge>
                             </td>
                             <td class="fw-medium text-dark">{{ $project->start_date?->format('d/m/Y') ?: '—' }}</td>

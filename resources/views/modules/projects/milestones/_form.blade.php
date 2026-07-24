@@ -7,15 +7,22 @@
 <x-ui.odoo-form-ui type="textarea" id="milestone_description" label="{{ __('projects.description') }}" name="description"
     :value="old('description')"
     :errorText="$errors->first('description')" />
-<x-ui.odoo-form-ui type="select" id="milestone_owner_id" label="{{ __('projects.milestone_owner') }}" name="owner_id"
-    select2Selector="user" :errorText="$errors->first('owner_id')">
-    <option value="">{{ __('projects.select_user') }}</option>
-    @foreach ($tenantUsers as $tenantUser)
-        <option value="{{ $tenantUser->id }}" @selected((int) old('owner_id') === $tenantUser->id)>
-            {{ $tenantUser->name }}
-        </option>
-    @endforeach
-</x-ui.odoo-form-ui>
+@if ($activeMemberOptions->isEmpty())
+    <div class="mb-3">
+        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('projects.milestone_owner') }}</label>
+        @include('modules.projects._no_collaborators_notice')
+    </div>
+@else
+    <x-ui.odoo-form-ui type="select" id="milestone_owner_id" label="{{ __('projects.milestone_owner') }}" name="owner_id"
+        select2Selector="user" :errorText="$errors->first('owner_id')">
+        <option value="">{{ __('projects.select_user') }}</option>
+        @foreach ($activeMemberOptions as $memberOption)
+            <option value="{{ $memberOption->id }}" @selected((int) old('owner_id') === $memberOption->id)>
+                {{ $memberOption->name }}
+            </option>
+        @endforeach
+    </x-ui.odoo-form-ui>
+@endif
 <x-ui.odoo-form-ui type="input" id="milestone_start_date" inputType="date" label="{{ __('projects.start_date') }}" name="start_date"
     :value="old('start_date')"
     :errorText="$errors->first('start_date')" />

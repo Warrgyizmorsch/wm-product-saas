@@ -15,6 +15,7 @@ class TaskListService
         private readonly TaskListRepositoryInterface $taskLists,
         private readonly TaskRepositoryInterface $tasks,
         private readonly ActivityLogService $activity,
+        private readonly ProjectMemberService $members,
     ) {
     }
 
@@ -44,6 +45,10 @@ class TaskListService
 
             $taskList = $this->taskLists->create($data);
 
+            if ($taskList->owner_id) {
+                $this->members->ensureCollaborator($project, $taskList->owner_id);
+            }
+
             $this->activity->record(
                 $project,
                 'tasklist.created',
@@ -61,6 +66,10 @@ class TaskListService
         return DB::transaction(function () use ($taskList, $data) {
             $project = $taskList->project;
             $taskList = $this->taskLists->update($taskList->id, $data);
+
+            if ($taskList->owner_id) {
+                $this->members->ensureCollaborator($project, $taskList->owner_id);
+            }
 
             $this->activity->record(
                 $project,

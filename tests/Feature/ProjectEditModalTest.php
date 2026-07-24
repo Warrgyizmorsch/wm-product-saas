@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Models\ProjectMember;
 use App\Models\Access\Permission;
 use App\Models\Access\Role;
 use App\Models\Access\RolePermission;
@@ -105,6 +106,9 @@ class ProjectEditModalTest extends TestCase
 
         $ownProject = $this->createProject(['project_code' => 'PRJ-0001', 'name' => 'Owned by Editor', 'owner_id' => $editor->id]);
         $otherProject = $this->createProject(['project_code' => 'PRJ-0002', 'name' => 'Owned by Owner', 'owner_id' => $this->tenantOwner->id]);
+
+        ProjectMember::create(['tenant_id' => $this->tenant->id, 'project_id' => $ownProject->id, 'user_id' => $editor->id]);
+        ProjectMember::create(['tenant_id' => $this->tenant->id, 'project_id' => $otherProject->id, 'user_id' => $this->tenantOwner->id]);
 
         // Editor can view both projects (tenant-scoped view) but only edit their own.
         $index = $this->actingAs($editor)

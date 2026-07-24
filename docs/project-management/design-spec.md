@@ -604,3 +604,31 @@ stateDiagram-v2
 ---
 
 *No code has been written. Implementation proceeds one milestone at a time, in the order above, starting at M1.*
+
+## Collaborator invariant
+
+`ProjectMember` is the canonical representation of project participants —
+there is no separate Collaborator entity. The invariant that must always
+hold:
+
+> Every user assigned a project role (`Project.owner_id`, `Project.manager_id`,
+> `Milestone.owner_id`, `TaskList.owner_id`) must also exist as an active
+> (`is_active = true`, non-trashed) `ProjectMember` row for that project.
+
+Live write paths enforce this automatically:
+
+- `ProjectMemberService::ensureCollaborator()` — called whenever a user is
+  assigned as Owner/Manager/Milestone Owner/Task List Owner via `create()`
+  or `update()` on `ProjectService`, `MilestoneService`, `TaskListService`.
+  Idempotent: creates an active `ProjectMember` if none exists, reactivates
+  one if it exists but is inactive.
+- `ProjectMemberService::activeCollaboratorRule()` — the validation rule
+  used by inline field edits (e.g. `Project.owner_id`/`manager_id`), which
+  requires the target user to already be an active collaborator rather than
+  auto-adding them.
+- `ProjectMemberService::assertRemovable()` — blocks removing/deactivating a
+  collaborator who still holds one of these roles.
+
+Any new feature that assigns a user to a project role must call
+`ensureCollaborator()` (or validate against `activeCollaboratorRule()`) to
+preserve this invariant.

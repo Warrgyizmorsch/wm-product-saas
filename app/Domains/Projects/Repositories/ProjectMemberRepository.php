@@ -16,6 +16,16 @@ class ProjectMemberRepository implements ProjectMemberRepositoryInterface
             ->get();
     }
 
+    public function getActiveForProject(int $projectId): Collection
+    {
+        return ProjectMember::query()
+            ->with('user')
+            ->where('project_id', $projectId)
+            ->where('is_active', true)
+            ->latest('id')
+            ->get();
+    }
+
     public function find(int $id): ?ProjectMember
     {
         return ProjectMember::query()->with(['user', 'project'])->find($id);
@@ -27,6 +37,14 @@ class ProjectMemberRepository implements ProjectMemberRepositoryInterface
             ->where('project_id', $projectId)
             ->where('user_id', $userId)
             ->first();
+    }
+
+    public function existingUserIds(int $projectId): array
+    {
+        return ProjectMember::query()
+            ->where('project_id', $projectId)
+            ->pluck('user_id')
+            ->all();
     }
 
     public function create(array $data): ProjectMember

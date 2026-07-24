@@ -138,12 +138,22 @@ class ProjectsDemoGenerator
                 DB::table('project_members')->insert($members);
                 $insertedCounts['members'] += count($members);
 
+                // Owner/manager must themselves be project members — pick
+                // from this project's own team rather than the full tenant
+                // pool so seeded data satisfies the same invariant the app
+                // now enforces.
+                $memberUserIds = array_column($members, 'user_id');
+                DB::table('projects')->where('id', $projectId)->update([
+                    'owner_id' => $memberUserIds[0],
+                    'manager_id' => $memberUserIds[1] ?? $memberUserIds[0],
+                ]);
+
                 // Insert Milestones
                 $milestoneData = MilestoneGenerator::generateForProject(
                     $context,
                     $projectId,
                     $projectData['start_date'],
-                    $userIds,
+                    $memberUserIds,
                     $milestonesPerProject
                 );
 
@@ -158,7 +168,7 @@ class ProjectsDemoGenerator
                         $context,
                         $projectId,
                         $milestoneId,
-                        $userIds,
+                        $memberUserIds,
                         $listsPerMilestone
                     );
 

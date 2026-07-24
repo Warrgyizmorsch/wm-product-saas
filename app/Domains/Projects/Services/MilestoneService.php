@@ -29,6 +29,7 @@ class MilestoneService
         private readonly MilestoneRepositoryInterface $milestones,
         private readonly TaskDependencyRepositoryInterface $dependencies,
         private readonly ActivityLogService $activity,
+        private readonly ProjectMemberService $members,
     ) {
     }
 
@@ -55,6 +56,10 @@ class MilestoneService
 
             $milestone = $this->milestones->create($data);
 
+            if ($milestone->owner_id) {
+                $this->members->ensureCollaborator($project, $milestone->owner_id);
+            }
+
             $this->activity->record(
                 $project,
                 'milestone.created',
@@ -75,6 +80,10 @@ class MilestoneService
         return DB::transaction(function () use ($milestone, $data, $oldStatus, $newStatus) {
             $project = $milestone->project;
             $milestone = $this->milestones->update($milestone->id, $data);
+
+            if ($milestone->owner_id) {
+                $this->members->ensureCollaborator($project, $milestone->owner_id);
+            }
 
             if ($newStatus !== $oldStatus && $newStatus === Milestone::STATUS_COMPLETED) {
                 $this->activity->record(
@@ -109,6 +118,10 @@ class MilestoneService
         return DB::transaction(function () use ($milestone, $field, $value) {
             $project = $milestone->project;
             $milestone = $this->milestones->update($milestone->id, [$field => $value]);
+
+            if ($field === 'owner_id' && $milestone->owner_id) {
+                $this->members->ensureCollaborator($project, $milestone->owner_id);
+            }
 
             $this->activity->record(
                 $project,

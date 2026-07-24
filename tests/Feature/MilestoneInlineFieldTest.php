@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Domains\Projects\Models\Milestone;
 use App\Domains\Projects\Models\Project;
+use App\Domains\Projects\Models\ProjectMember;
 use App\Models\Access\Role;
 use App\Models\Access\UserRole;
 use App\Models\Tenant;
@@ -157,6 +158,11 @@ class MilestoneInlineFieldTest extends TestCase
             'name' => 'Assignee',
             'email' => 'assignee@example.com',
             'password' => bcrypt('password'),
+        ]);
+        ProjectMember::create([
+            'tenant_id' => $this->tenant->id,
+            'project_id' => $this->project->id,
+            'user_id' => $assignee->id,
         ]);
 
         $response = $this->actingAs($this->tenantOwner)

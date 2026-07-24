@@ -6,6 +6,7 @@ use App\Core\Database\BaseModel;
 use App\Domains\CRM\Models\Customer;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -83,6 +84,26 @@ class Project extends BaseModel
         'budget_hours'  => 'decimal:2',
     ];
 
+    /**
+     * Human-readable status label, the single source of truth for how a
+     * status renders — used by both the listing UI and the export so the
+     * two can never disagree on labels.
+     */
+    protected function statusLabel(): Attribute
+    {
+        return Attribute::get(fn () => __('projects.statuses.' . $this->status));
+    }
+
+    /**
+     * Human-readable priority label, the single source of truth for how a
+     * priority renders — used by both the listing UI and the export so the
+     * two can never disagree on labels.
+     */
+    protected function priorityLabel(): Attribute
+    {
+        return Attribute::get(fn () => __('projects.priorities.' . $this->priority));
+    }
+
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
@@ -101,6 +122,11 @@ class Project extends BaseModel
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class, 'project_id');
+    }
+
+    public function members(): HasMany
+    {
+        return $this->hasMany(ProjectMember::class, 'project_id');
     }
 
     public function milestones(): HasMany

@@ -62,7 +62,12 @@ class MilestoneController extends Controller
             'filters'     => $filters,
             'statuses'    => $statuses,
             'projects'    => $projects,
-            'tenantUsers' => User::query()->where('tenant_id', tenant_id())->orderBy('name')->get(),
+            // This page spans every project in the tenant, so there is no
+            // single project to scope collaborators against — the owner
+            // picker here is a documented exception and stays tenant-wide.
+            // Backend validation on submit still enforces membership via the
+            // specific milestone's own project.
+            'activeMemberOptions' => User::query()->where('tenant_id', tenant_id())->orderBy('name')->get(),
         ]);
     }
 
@@ -122,7 +127,9 @@ class MilestoneController extends Controller
         $members = ($canManageMilestones || $canManageTaskLists || $canCreateTasks)
             ? $this->members->list($project)
             : collect();
-        $activeMembers = $members->where('is_active', true);
+        $activeMembers = ($canManageMilestones || $canManageTaskLists || $canCreateTasks)
+            ? $this->members->activeMembers($project)
+            : collect();
 
         $openTasks = $milestoneTasks->reject(fn (Task $task) => in_array($task->status, $doneStatuses, true));
 
@@ -186,9 +193,7 @@ class MilestoneController extends Controller
             'members' => $members,
             'activeMembers' => $activeMembers,
             'milestones' => Milestone::query()->where('project_id', $project->id)->orderBy('name')->get(['id', 'name']),
-            'tenantUsers' => ($canManageMilestones || $canManageTaskLists || $canCreateTasks)
-                ? User::query()->where('tenant_id', $project->tenant_id)->orderBy('name')->get()
-                : collect(),
+            'activeMemberOptions' => $activeMembers->pluck('user'),
             'dashboard' => ['task_lists' => $taskListProgress],
             'totalTasks' => $milestoneTasks->count(),
             'completedTasks' => $milestoneTasks->where('status', Task::STATUS_COMPLETED)->count(),
@@ -290,6 +295,8 @@ class MilestoneController extends Controller
 
     protected function inlineFieldSchema(): array
     {
+        $project = request()->route('project');
+
         return [
             'name' => [
                 'rules'   => ['required', 'string', 'max:255'],
@@ -304,7 +311,7 @@ class MilestoneController extends Controller
                 'handler' => fn (Milestone $milestone, $value) => $this->milestones->updateField($milestone, 'status', $value),
             ],
             'owner_id' => [
-                'rules'   => ['nullable', 'integer', Rule::exists('users', 'id')->where('tenant_id', require_tenant_id())],
+                'rules'   => ['nullable', 'integer', $this->members->activeCollaboratorRule($project)],
                 'handler' => fn (Milestone $milestone, $value) => $this->milestones->updateField($milestone, 'owner_id', $value),
             ],
             'start_date' => [

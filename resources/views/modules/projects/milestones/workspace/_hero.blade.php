@@ -41,7 +41,7 @@
         ->mapWithKeys(fn ($status) => [$status => __('projects.statuses.' . $status)]);
 
     $heroOwnerOptions = $canManageMilestones
-        ? $tenantUsers->pluck('name', 'id')->prepend(__('projects.none_option'), '')
+        ? $activeMemberOptions->pluck('name', 'id')->prepend(__('projects.none_option'), '')
         : collect();
 @endphp
 
