@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Pending PR Items | SaaS ERP')
-@section('page-title', 'Pending Requisition Items')
-@section('breadcrumb', 'Purchase / Pending Requisitions')
+@section('title', __('purchase.pending_pr_items') . ' | SaaS ERP')
+@section('page-title', __('purchase.pending_pr_items'))
+@section('breadcrumb', __('ui.purchase') . ' / ' . __('purchase.pending_pr_items'))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/vendors/css/select2.min.css') }}">
@@ -54,17 +54,17 @@
                 <!-- Page Top Control Bar -->
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-3">
                     <div>
-                        <h4 class="fw-bold text-dark mb-0">Pending Requisition Line Items</h4>
-                        <small class="text-muted fs-12">Review approved requisition items waiting to be ordered. Select items to generate draft Purchase Orders.</small>
+                        <h4 class="fw-bold text-dark mb-0">{{ __('purchase.pending_req_line_items') }}</h4>
+                        <small class="text-muted fs-12">{{ __('purchase.pending_pr_help') }}</small>
                     </div>
                     
                     <!-- Group By Filter Selector -->
                     <div class="d-flex align-items-center gap-2">
-                        <label class="form-label fs-12 fw-bold text-muted mb-0 text-uppercase">Group By:</label>
+                        <label class="form-label fs-12 fw-bold text-muted mb-0 text-uppercase">{{ __('purchase.group_by') }}</label>
                         <select id="groupBySelect" class="form-select form-select-sm fw-semibold text-primary" style="width: 180px;" onchange="changeGroupBy(this.value)">
-                            <option value="supplier" @selected($groupBy === 'supplier')>Supplier / Vendor</option>
-                            <option value="pr" @selected($groupBy === 'pr')>PR Number</option>
-                            <option value="date" @selected($groupBy === 'date')>Date</option>
+                            <option value="supplier" @selected($groupBy === 'supplier')>{{ __('purchase.supplier_vendor') }}</option>
+                            <option value="pr" @selected($groupBy === 'pr')>{{ __('purchase.pr_number') }}</option>
+                            <option value="date" @selected($groupBy === 'date')>{{ __('purchase.date') }}</option>
                         </select>
                     </div>
                 </div>
@@ -77,15 +77,15 @@
                         <div class="d-flex align-items-center gap-2">
                             <i class="feather-info text-primary fs-18"></i>
                             <span class="fs-13 fw-semibold text-dark">
-                                Select items from the list below. Choose whether to bulk generate Draft Purchase Orders or Draft RFQs grouped by Supplier.
+                                {{ __('purchase.bulk_pr_action_help') }}
                             </span>
                         </div>
                         <div class="d-flex gap-2">
                             <x-ui.button type="button" variant="primary" size="sm" class="btn-submit-bulk" data-action="po" icon="feather-plus-circle">
-                                Create Bulk POs
+                                {{ __('purchase.create_bulk_pos') }}
                             </x-ui.button>
                             <x-ui.button type="button" variant="success" size="sm" class="btn-submit-bulk text-white" data-action="rfq" icon="feather-mail">
-                                Create Bulk RFQs
+                                {{ __('purchase.create_bulk_rfqs') }}
                             </x-ui.button>
                         </div>
                     </div>
@@ -95,13 +95,13 @@
                         <ul class="nav nav-tabs nav-tabs-custom mb-4" id="pendingPrTabs" role="tablist">
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link active fw-bold position-relative" id="assigned-tab" data-bs-toggle="tab" data-bs-target="#assigned-pane" type="button" role="tab">
-                                    <i class="feather-truck me-2"></i>Assigned Suppliers
+                                    <i class="feather-truck me-2"></i>{{ __('purchase.assigned_suppliers') }}
                                     <span class="badge rounded-pill bg-primary ms-2 fs-10">{{ count($assignedItems) }}</span>
                                 </button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link fw-bold position-relative" id="unassigned-tab" data-bs-toggle="tab" data-bs-target="#unassigned-pane" type="button" role="tab">
-                                    <i class="feather-help-circle text-danger me-2"></i>No Supplier
+                                    <i class="feather-help-circle text-danger me-2"></i>{{ __('purchase.no_supplier') }}
                                     <span class="badge rounded-pill bg-danger ms-2 fs-10">{{ count($unassignedItems) }}</span>
                                 </button>
                             </li>
@@ -115,8 +115,8 @@
                                 @if(empty($assignedItems))
                                     <div class="text-center py-5 border rounded bg-light">
                                         <i class="feather-check-circle text-success fs-32 mb-2"></i>
-                                        <h6 class="fw-bold">No assigned items</h6>
-                                        <p class="text-muted fs-12 mb-0">All items are either unassigned or fully ordered.</p>
+                                        <h6 class="fw-bold">{{ __('purchase.no_assigned_items') }}</h6>
+                                        <p class="text-muted fs-12 mb-0">{{ __('purchase.no_assigned_items_help') }}</p>
                                     </div>
                                 @else
                                     <div class="table-responsive">
@@ -126,14 +126,14 @@
                                                     <th style="width: 4%;" class="text-center">
                                                         <input type="checkbox" class="form-check-input select-all-pane" data-pane="assigned-pane">
                                                     </th>
-                                                    <th style="width: 22%;">Product Details</th>
-                                                    <th style="width: 18%;">Supplier / Vendor</th>
-                                                    <th style="width: 14%;">PR / Date</th>
-                                                    <th style="width: 12%;">Warehouse</th>
-                                                    <th class="text-end" style="width: 8%;">Req Qty</th>
-                                                    <th class="text-end" style="width: 8%;">Ordered</th>
-                                                    <th class="text-end" style="width: 8%;">Pending</th>
-                                                    <th style="width: 12%;" class="text-center">Action</th>
+                                                    <th style="width: 22%;">{{ __('purchase.product_details') }}</th>
+                                                    <th style="width: 18%;">{{ __('purchase.supplier_vendor') }}</th>
+                                                    <th style="width: 14%;">{{ __('purchase.pr_date') }}</th>
+                                                    <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
+                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
+                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
+                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
+                                                    <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -144,7 +144,7 @@
                                                         </td>
                                                         <td>
                                                             <div class="fw-bold text-truncate text-dark" title="{{ $pi['product_name'] }}">{{ $pi['product_name'] }}</div>
-                                                            <div class="text-muted fs-11">SKU: {{ $pi['sku'] }}</div>
+                                                            <div class="text-muted fs-11">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</div>
                                                         </td>
                                                         <td class="fw-semibold text-primary text-truncate" title="{{ $pi['vendor_name'] }}">
                                                             {{ $pi['vendor_name'] }}
@@ -167,10 +167,10 @@
                                                         </td>
                                                         <td class="text-center">
                                                             <div class="d-flex justify-content-center gap-1">
-                                                                <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="Convert to PO" data-bs-toggle="tooltip">
+                                                                <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
                                                                     <i class="feather feather-plus-circle"></i>
                                                                 </button>
-                                                                <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="Send RFQ" data-bs-toggle="tooltip">
+                                                                <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
                                                                     <i class="feather feather-mail"></i>
                                                                 </a>
                                                             </div>
@@ -188,8 +188,8 @@
                                 @if(empty($unassignedItems))
                                     <div class="text-center py-5 border rounded bg-light">
                                         <i class="feather-check-circle text-success fs-32 mb-2"></i>
-                                        <h6 class="fw-bold">No unassigned items</h6>
-                                        <p class="text-muted fs-12 mb-0">All pending items have a preferred supplier resolved!</p>
+                                        <h6 class="fw-bold">{{ __('purchase.no_unassigned_items') }}</h6>
+                                        <p class="text-muted fs-12 mb-0">{{ __('purchase.no_unassigned_items_help') }}</p>
                                     </div>
                                 @else
                                     <div class="table-responsive">
@@ -199,14 +199,14 @@
                                                     <th style="width: 4%;" class="text-center">
                                                         <input type="checkbox" class="form-check-input select-all-pane" data-pane="unassigned-pane">
                                                     </th>
-                                                    <th style="width: 22%;">Product Details</th>
-                                                    <th style="width: 18%;">Supplier / Vendor</th>
-                                                    <th style="width: 14%;">PR / Date</th>
-                                                    <th style="width: 12%;">Warehouse</th>
-                                                    <th class="text-end" style="width: 8%;">Req Qty</th>
-                                                    <th class="text-end" style="width: 8%;">Ordered</th>
-                                                    <th class="text-end" style="width: 8%;">Pending</th>
-                                                    <th style="width: 12%;" class="text-center">Action</th>
+                                                    <th style="width: 22%;">{{ __('purchase.product_details') }}</th>
+                                                    <th style="width: 18%;">{{ __('purchase.supplier_vendor') }}</th>
+                                                    <th style="width: 14%;">{{ __('purchase.pr_date') }}</th>
+                                                    <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
+                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
+                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
+                                                    <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
+                                                    <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -217,10 +217,10 @@
                                                         </td>
                                                         <td>
                                                             <div class="fw-bold text-truncate text-dark" title="{{ $pi['product_name'] }}">{{ $pi['product_name'] }}</div>
-                                                            <div class="text-muted fs-11">SKU: {{ $pi['sku'] }}</div>
+                                                            <div class="text-muted fs-11">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</div>
                                                         </td>
                                                         <td class="text-muted italic">
-                                                            — No Supplier —
+                                                            — {{ __('purchase.no_supplier') }} —
                                                         </td>
                                                         <td>
                                                             <span class="fw-semibold text-dark">{{ $pi['requisition_number'] }}</span>
@@ -240,10 +240,10 @@
                                                         </td>
                                                         <td class="text-center">
                                                             <div class="d-flex justify-content-center gap-1">
-                                                                <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="Convert to PO" data-bs-toggle="tooltip">
+                                                                <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
                                                                     <i class="feather feather-plus-circle"></i>
                                                                 </button>
-                                                                <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="Send RFQ" data-bs-toggle="tooltip">
+                                                                <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
                                                                     <i class="feather feather-mail"></i>
                                                                 </a>
                                                             </div>
@@ -262,8 +262,8 @@
                         @if(empty($pendingItems))
                             <div class="text-center py-5 border rounded bg-light">
                                 <i class="feather-check-circle text-success fs-32 mb-2"></i>
-                                <h6 class="fw-bold">No pending items</h6>
-                                <p class="text-muted fs-12 mb-0">All items are fully ordered.</p>
+                                <h6 class="fw-bold">{{ __('purchase.no_pending_items') }}</h6>
+                                <p class="text-muted fs-12 mb-0">{{ __('purchase.no_pending_items_help') }}</p>
                             </div>
                         @else
                             <div class="table-responsive">
@@ -273,14 +273,14 @@
                                             <th style="width: 4%;" class="text-center">
                                                 <input type="checkbox" id="selectAllGeneral" class="form-check-input">
                                             </th>
-                                            <th style="width: 20%;">Product Details</th>
-                                            <th style="width: 15%;">Supplier / Vendor</th>
-                                            <th style="width: 13%;">PR / Date</th>
-                                            <th style="width: 12%;">Warehouse</th>
-                                            <th class="text-end" style="width: 8%;">Req Qty</th>
-                                            <th class="text-end" style="width: 8%;">Ordered</th>
-                                            <th class="text-end" style="width: 8%;">Pending</th>
-                                            <th style="width: 12%;" class="text-center">Action</th>
+                                            <th style="width: 20%;">{{ __('purchase.product_details') }}</th>
+                                            <th style="width: 15%;">{{ __('purchase.supplier_vendor') }}</th>
+                                            <th style="width: 13%;">{{ __('purchase.pr_date') }}</th>
+                                            <th style="width: 12%;">{{ __('purchase.warehouse') }}</th>
+                                            <th class="text-end" style="width: 8%;">{{ __('purchase.req_qty') }}</th>
+                                            <th class="text-end" style="width: 8%;">{{ __('purchase.ordered') }}</th>
+                                            <th class="text-end" style="width: 8%;">{{ __('purchase.status_pending') }}</th>
+                                            <th style="width: 12%;" class="text-center">{{ __('purchase.action') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -291,10 +291,10 @@
                                                 </td>
                                                 <td>
                                                     <div class="fw-bold text-truncate text-dark" title="{{ $pi['product_name'] }}">{{ $pi['product_name'] }}</div>
-                                                    <div class="text-muted fs-11">SKU: {{ $pi['sku'] }}</div>
+                                                    <div class="text-muted fs-11">{{ __('purchase.sku') }}: {{ $pi['sku'] }}</div>
                                                 </td>
                                                 <td class="fw-semibold text-primary text-truncate" title="{{ $pi['vendor_name'] }}">
-                                                    {{ $pi['vendor_name'] ?: '— No Supplier —' }}
+                                                     {{ $pi['vendor_name'] ?: '— ' . __('purchase.no_supplier') . ' —' }}
                                                 </td>
                                                 <td>
                                                     <span class="fw-semibold text-dark">{{ $pi['requisition_number'] }}</span>
@@ -314,10 +314,10 @@
                                                 </td>
                                                 <td class="text-center">
                                                     <div class="d-flex justify-content-center gap-1">
-                                                        <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="Convert to PO" data-bs-toggle="tooltip">
+                                                        <button type="button" class="action-icon-btn po-btn btn-individual-po" data-item-id="{{ $pi['item_id'] }}" data-vendor-id="{{ $pi['vendor_id'] }}" data-vendor-name="{{ $pi['vendor_name'] }}" data-product-name="{{ $pi['product_name'] }}" data-quantity="{{ $pi['quantity_pending'] }}" data-uom="{{ $pi['uom'] }}" data-warehouse-id="{{ $pi['warehouse_id'] ?? '' }}" data-warehouse-name="{{ $pi['warehouse_name'] ?? '' }}" title="{{ __('purchase.convert_to_po') }}" data-bs-toggle="tooltip">
                                                             <i class="feather feather-plus-circle"></i>
                                                         </button>
-                                                        <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="Send RFQ" data-bs-toggle="tooltip">
+                                                        <a href="{{ route('purchase.rfqs.create', ['requisition_item_ids' => [$pi['item_id']]]) }}" class="action-icon-btn rfq-btn" title="{{ __('purchase.send_rfq') }}" data-bs-toggle="tooltip">
                                                             <i class="feather feather-mail"></i>
                                                         </a>
                                                     </div>
@@ -343,27 +343,27 @@
     </div>
 
     <!-- Choose Supplier Modal -->
-    <x-ui.modal id="supplierSelectModal" title="Select Supplier for Purchase Order" size="lg" :centered="true" :static="true" :showFooter="true">
+    <x-ui.modal id="supplierSelectModal" title="{{ __('purchase.select_supplier_po') }}" size="lg" :centered="true" :static="true" :showFooter="true">
         <div class="text-dark">
             <div class="mb-4">
-                <label class="form-label fw-semibold text-muted text-uppercase fs-12">Select Supplier / Vendor *</label>
+                <label class="form-label fw-semibold text-muted text-uppercase fs-12">{{ __('purchase.select_supplier_vendor') }}</label>
                 <select id="modalSupplierSelect" class="form-select form-select-sm fw-semibold text-dark p-2" style="font-size: 14px;">
-                    <option value="">-- Choose Supplier --</option>
+                    <option value="">{{ __('purchase.choose_supplier') }}</option>
                     @foreach($vendors as $v)
                         <option value="{{ $v->id }}">{{ $v->name }} {{ $v->code ? '('.$v->code.')' : '' }}</option>
                     @endforeach
                 </select>
-                <small class="text-muted fs-11 mt-1 d-block">This Purchase Order will be generated against the selected supplier. Any selected items will be assigned to this supplier.</small>
+                <small class="text-muted fs-11 mt-1 d-block">{{ __('purchase.po_supplier_help') }}</small>
             </div>
 
-            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Selected PR Line Items to Include:</h6>
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">{{ __('purchase.selected_items_include') }}</h6>
             <div class="table-responsive border rounded" style="max-height: 250px; overflow-y: auto;">
                 <table class="table table-sm table-striped align-middle mb-0 fs-13">
                     <thead class="bg-light text-muted">
                         <tr>
-                            <th>Product Details</th>
-                            <th>Current Preferred Supplier</th>
-                            <th class="text-end">Pending Qty</th>
+                            <th>{{ __('purchase.product_details') }}</th>
+                            <th>{{ __('purchase.current_preferred_supplier') }}</th>
+                            <th class="text-end">{{ __('purchase.pending_qty') }}</th>
                         </tr>
                     </thead>
                     <tbody id="modalSelectedItemsTable">
@@ -374,9 +374,9 @@
         </div>
 
         <x-slot name="footer">
-            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">Cancel</x-ui.button>
+            <x-ui.button type="button" variant="light" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</x-ui.button>
             <x-ui.button type="button" variant="primary" id="btnConfirmModalPo" icon="feather-plus-circle">
-                Proceed to Create PO
+                {{ __('purchase.proceed_create_po') }}
             </x-ui.button>
         </x-slot>
     </x-ui.modal>
@@ -433,7 +433,7 @@
                 const checkedCount = $('.row-checkbox:checked').length;
                 
                 if (checkedCount === 0) {
-                    alert('Please select at least one item.');
+                    alert('{{ __('purchase.js_select_at_least_one_item') }}');
                     return;
                 }
 
@@ -443,7 +443,7 @@
                     return {
                         id: $cb.val(),
                         vendorId: $cb.data('vendor-id'),
-                        vendorName: $cb.data('vendor-name') || 'No Supplier Assigned',
+                        vendorName: $cb.data('vendor-name') || '{{ __('purchase.no_supplier') }}',
                         productName: $cb.data('product-name'),
                         quantity: $cb.data('quantity'),
                         uom: $cb.data('uom'),
@@ -493,7 +493,7 @@
                     const url = new URL(redirectUrl);
                     selectedIds.forEach(id => url.searchParams.append('requisition_item_ids[]', id));
                     
-                    if (confirm('Redirect to RFQ Create Form with ' + checkedCount + ' selected item(s)?')) {
+                    if (confirm('{{ __('purchase.js_confirm_rfq_redirect') }} ' + checkedCount + ' {{ __('purchase.js_selected_items') }}')) {
                         window.location.href = url.toString();
                     }
                 }
@@ -524,13 +524,13 @@
             $('#btnConfirmModalPo').on('click', function() {
                 const vendorId = $('#modalSupplierSelect').val();
                 if (!vendorId) {
-                    alert('Please select a Supplier/Vendor.');
+                    alert('{{ __('purchase.js_select_supplier') }}');
                     return;
                 }
 
                 const selectedIds = $(this).data('selected-ids');
                 if (!selectedIds || selectedIds.length === 0) {
-                    alert('No items selected.');
+                    alert('{{ __('purchase.js_no_items_selected') }}');
                     return;
                 }
 

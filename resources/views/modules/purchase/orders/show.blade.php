@@ -1,47 +1,40 @@
 @extends('layouts.duralux')
 
-@section('title', "PO {$order->purchase_order_number} | SaaS ERP")
-@section('page-title', "Purchase Order Details")
+@section('title', __('purchase.purchase_orders') . " {$order->purchase_order_number} | SaaS ERP")
+@section('page-title', __('purchase.purchase_order_details'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.orders.index') }}">Purchase Orders</a> &gt; {{ $order->purchase_order_number }}
+    <a href="{{ route('purchase.orders.index') }}">{{ __('purchase.purchase_orders') }}</a> &gt; {{ $order->purchase_order_number }}
 @endsection
 
 @section('page-actions')
-    <div class="d-flex align-items-center gap-0">
-        <a href="{{ route('purchase.orders.index') }}" class="action-dropdown-btn me-2" title="Back to Orders" data-bs-toggle="tooltip">
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ route('purchase.orders.index') }}"
+           class="action-dropdown-btn"
+           title="{{ __('purchase.back_to_orders') }}"
+           data-bs-toggle="tooltip">
             <i class="feather feather-arrow-left"></i>
         </a>
-        <a href="{{ route('purchase.orders.download', $order->id) }}" class="action-dropdown-btn me-2" title="Download PDF" data-bs-toggle="tooltip">
+        <a href="{{ route('purchase.orders.download', $order->id) }}"
+           class="action-dropdown-btn"
+           title="{{ __('purchase.download_pdf') }}"
+           data-bs-toggle="tooltip">
             <i class="feather feather-download"></i>
         </a>
 
         @if($order->status === 'Draft')
-            <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST" class="d-inline me-2" onsubmit="return confirm('Are you sure you want to approve this purchase order?')">
-                @csrf
-                <button type="submit" class="btn btn-success">
-                    <i class="feather-check-circle me-2"></i>Approve Order
-                </button>
-            </form>
-
-            <form action="{{ route('purchase.orders.reject', $order->id) }}" method="POST" class="d-inline me-2" onsubmit="return confirm('Are you sure you want to reject this purchase order?')">
-                @csrf
-                <button type="submit" class="btn btn-danger">
-                    <i class="feather-x-circle me-2"></i>Reject Order
-                </button>
-            </form>
-
             <x-ui.action-dropdown id="poDetailsActions-{{ $order->id }}">
                 <li>
                     <a class="dropdown-item py-2" href="{{ route('purchase.orders.edit', $order->id) }}">
-                        <i class="feather-edit me-1.5 text-muted"></i> Edit Draft
+                        <i class="feather-edit me-1.5 text-muted"></i> {{ __('purchase.edit_draft') }}
                     </a>
                 </li>
                 <li>
-                    <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this purchase order?')">
+                    <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST"
+                          onsubmit="return confirm('{{ __('purchase.confirm_delete_po') }}')">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="dropdown-item py-2 text-danger">
-                            <i class="feather-trash-2 me-1.5"></i> Delete
+                            <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
                         </button>
                     </form>
                 </li>
@@ -182,28 +175,31 @@
             <!-- Main PO Card (Single Page Wrapper) -->
             <div class="card border-0 shadow-sm bg-white mb-4 print-area">
                 <div class="card-header bg-white border-bottom py-0 px-4 d-print-none d-flex justify-content-between align-items-center flex-wrap gap-2" style="min-height: 48px;">
-                    <h5 class="fw-bold text-dark mb-0 py-3 fs-14">Purchase Order Details</h5>
+                    <h5 class="fw-bold text-dark mb-0 py-3 fs-14">{{ __('purchase.purchase_order_details') }}</h5>
                     
                     <!-- Custom Chevron Status Pipeline -->
                     <div class="so-status-pipeline my-2 d-print-none">
                         @php
-                            $statuses = ['Draft', 'Approved'];
+                            $statuses = [
+                                'Draft' => __('purchase.status_draft'),
+                                'Approved' => __('purchase.status_approved')
+                            ];
                             if ($order->status === 'Cancelled') {
-                                $statuses[] = 'Cancelled';
+                                $statuses['Cancelled'] = __('purchase.status_cancelled');
                             }
-                            $currentIndex = array_search($order->status, $statuses);
+                            $currentIndex = array_search($order->status, array_keys($statuses));
                         @endphp
-                        @foreach($statuses as $index => $state)
+                        @foreach($statuses as $stateKey => $stateText)
                             @php
                                 $stepClass = '';
-                                if ($order->status === $state) {
+                                if ($order->status === $stateKey) {
                                     $stepClass = 'active';
-                                } elseif ($currentIndex !== false && $index < $currentIndex) {
+                                } elseif ($currentIndex !== false && array_search($stateKey, array_keys($statuses)) < $currentIndex) {
                                     $stepClass = 'completed';
                                 }
                             @endphp
                             <span class="pipeline-step {{ $stepClass }}">
-                                {{ $state }}
+                                {{ $stateText }}
                             </span>
                         @endforeach
                     </div>
@@ -228,8 +224,8 @@
                             </div>
                         </div>
                         <div class="col-sm-6 text-sm-end mt-3 mt-sm-0 text-start text-sm-end">
-                            <h5 class="fw-bold text-primary mb-1" style="letter-spacing: 0.5px; font-size: 14px;">PURCHASE ORDER</h5>
-                            <span class="fs-13 fw-bold text-dark d-block">No: {{ $order->purchase_order_number }}</span>
+                            <h5 class="fw-bold text-primary mb-1" style="letter-spacing: 0.5px; font-size: 14px;">{{ __('purchase.purchase_order') }}</h5>
+                            <span class="fs-13 fw-bold text-dark d-block">{{ __('purchase.no') }}: {{ $order->purchase_order_number }}</span>
                             @php
                                 $badgeClass = match($order->status) {
                                     'Draft' => 'bg-soft-secondary text-secondary',
@@ -237,8 +233,14 @@
                                     'Cancelled' => 'bg-soft-danger text-danger',
                                     default => 'bg-soft-dark text-dark',
                                 };
+                                $statusText = match($order->status) {
+                                    'Draft' => __('purchase.status_draft'),
+                                    'Approved' => __('purchase.status_approved'),
+                                    'Cancelled' => __('purchase.status_cancelled'),
+                                    default => $order->status,
+                                };
                             @endphp
-                            <span class="badge {{ $badgeClass }} px-2 py-0.5 fw-bold fs-10 mt-1">{{ $order->status }}</span>
+                            <span class="badge {{ $badgeClass }} px-2 py-0.5 fw-bold fs-10 mt-1">{{ $statusText }}</span>
                         </div>
                     </div>
 
@@ -247,25 +249,25 @@
                         <!-- Column 1: Supplier Info -->
                         <div class="col-md-4">
                             <div class="p-3 border rounded h-100 bg-light bg-opacity-10">
-                                <h6 class="fw-bold text-primary fs-10 text-uppercase border-bottom pb-1.5 mb-2.5" style="letter-spacing: 0.5px;">Supplier Info</h6>
+                                <h6 class="fw-bold text-primary fs-10 text-uppercase border-bottom pb-1.5 mb-2.5" style="letter-spacing: 0.5px;">{{ __('purchase.supplier_info') }}</h6>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">Supplier:</span>
+                                    <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">{{ __('purchase.supplier') }}:</span>
                                     <span class="fw-bold text-dark fs-13">{{ $order->vendor->name ?? '—' }}</span>
                                 </div>
                                 @if($order->vendor?->code)
                                     <div class="mb-2 d-flex align-items-baseline">
-                                        <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">Supplier Code:</span>
+                                        <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">{{ __('purchase.supplier_code') }}:</span>
                                         <span class="fw-semibold text-secondary">{{ $order->vendor->code }}</span>
                                     </div>
                                 @endif
                                 @if($order->supplier_quotation_number)
                                     <div class="mb-2 d-flex align-items-baseline">
-                                        <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">Quotation No:</span>
+                                        <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">{{ __('purchase.quote_no') }}:</span>
                                         <span class="fw-bold text-primary">{{ $order->supplier_quotation_number }}</span>
                                     </div>
                                 @endif
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">Supplier Address:</span>
+                                    <span class="text-muted fw-semibold" style="width: 100px; flex-shrink: 0;">{{ __('purchase.supplier_address') }}:</span>
                                     <span class="text-dark" style="line-height: 1.4; white-space: pre-line;">{{ $order->vendor->address ?? '—' }}</span>
                                 </div>
                             </div>
@@ -274,17 +276,17 @@
                         <!-- Column 2: Dates & Calculations Options -->
                         <div class="col-md-4">
                             <div class="p-3 border rounded h-100 bg-light bg-opacity-10">
-                                <h6 class="fw-bold text-primary fs-10 text-uppercase border-bottom pb-1.5 mb-2.5" style="letter-spacing: 0.5px;">Dates & Options</h6>
+                                <h6 class="fw-bold text-primary fs-10 text-uppercase border-bottom pb-1.5 mb-2.5" style="letter-spacing: 0.5px;">{{ __('purchase.dates_options') }}</h6>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">Order Date:</span>
+                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">{{ __('purchase.order_date') }}:</span>
                                     <span class="fw-semibold text-dark">{{ $order->date ? $order->date->format('d M Y') : '—' }}</span>
                                 </div>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">Delivery Date:</span>
+                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">{{ __('purchase.delivery_date') }}:</span>
                                     <span class="fw-semibold text-danger">{{ $order->delivery_date ? $order->delivery_date->format('d M Y') : '—' }}</span>
                                 </div>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">Location:</span>
+                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">{{ __('purchase.location') }}:</span>
                                     <div class="fw-semibold text-dark">
                                         {{ $order->location ?: '—' }}
                                         @if($order->warehouse?->address)
@@ -293,17 +295,33 @@
                                     </div>
                                 </div>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">Discount Option:</span>
-                                    <span class="fw-semibold text-dark">{{ ucwords(str_replace('_', ' ', $order->discount_type)) }}</span>
+                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">{{ __('purchase.discount_option') }}:</span>
+                                    @php
+                                        $discountOptionLabel = match($order->discount_type) {
+                                            'without_discount' => __('purchase.without_discount'),
+                                            'item_wise' => __('purchase.discount_item_level'),
+                                            'order_wise' => __('purchase.discount_order_level'),
+                                            default => ucwords(str_replace('_', ' ', $order->discount_type)),
+                                        };
+                                    @endphp
+                                    <span class="fw-semibold text-dark">{{ $discountOptionLabel }}</span>
                                 </div>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">Tax Option:</span>
-                                    <span class="fw-semibold text-dark">{{ ucwords(str_replace('_', ' ', $order->tax_type)) }}</span>
+                                    <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">{{ __('purchase.tax_option') }}:</span>
+                                    @php
+                                        $taxOptionLabel = match($order->tax_type) {
+                                            'without_tax' => __('purchase.without_tax'),
+                                            'item_wise_tax' => __('purchase.item_wise_tax'),
+                                            'order_wise_tax' => __('purchase.order_wise_tax'),
+                                            default => ucwords(str_replace('_', ' ', $order->tax_type)),
+                                        };
+                                    @endphp
+                                    <span class="fw-semibold text-dark">{{ $taxOptionLabel }}</span>
                                 </div>
                                 @if($order->tax_type !== 'without_tax')
                                     <div class="mb-2 d-flex align-items-baseline">
-                                        <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">GST Type:</span>
-                                        <span class="fw-semibold text-dark">{{ $order->gst_type === 'igst' ? 'IGST (Inter-State)' : 'CGST + SGST (Intra-State)' }}</span>
+                                        <span class="text-muted fw-semibold" style="width: 110px; flex-shrink: 0;">{{ __('purchase.gst_type') }}:</span>
+                                        <span class="fw-semibold text-dark">{{ $order->gst_type === 'igst' ? __('purchase.gst_inter_state') : __('purchase.gst_intra_state') }}</span>
                                     </div>
                                 @endif
                             </div>
@@ -312,53 +330,51 @@
                         <!-- Column 3: Traceability & Audit -->
                         <div class="col-md-4">
                             <div class="p-3 border rounded h-100 bg-light bg-opacity-10">
-                                <h6 class="fw-bold text-primary fs-10 text-uppercase border-bottom pb-1.5 mb-2.5" style="letter-spacing: 0.5px;">Traceability & Audit</h6>
+                                <h6 class="fw-bold text-primary fs-10 text-uppercase border-bottom pb-1.5 mb-2.5" style="letter-spacing: 0.5px;">{{ __('purchase.traceability_audit') }}</h6>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 115px; flex-shrink: 0;">Reference:</span>
+                                    <span class="text-muted fw-semibold" style="width: 115px; flex-shrink: 0;">{{ __('purchase.reference') }}:</span>
                                     <span class="fw-semibold text-dark">{{ $order->reference ?: '—' }}</span>
                                 </div>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 115px; flex-shrink: 0;">Source Request:</span>
+                                    <span class="text-muted fw-semibold" style="width: 115px; flex-shrink: 0;">{{ __('purchase.source_requisition') }}:</span>
                                     <span class="fw-semibold text-dark">
                                         @if($order->requisition)
                                             <span class="text-primary fw-bold">{{ $order->requisition->requisition_number }}</span>
                                         @else
-                                            <span class="text-muted">Direct Purchase</span>
+                                            <span class="text-muted">{{ __('purchase.direct_purchase') }}</span>
                                         @endif
                                     </span>
                                 </div>
                                 <div class="mb-2 d-flex align-items-baseline">
-                                    <span class="text-muted fw-semibold" style="width: 115px; flex-shrink: 0;">Created By:</span>
+                                    <span class="text-muted fw-semibold" style="width: 115px; flex-shrink: 0;">{{ __('purchase.created_by') }}:</span>
                                     <span class="fw-semibold text-dark">{{ $order->creator->name ?? 'System' }}</span>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Items Details Table (Quotation style table) -->
+                                  <!-- Items Details Table (Quotation style table) -->
                     <div class="mt-4">
-                        <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                        <h5 class="fw-bold text-dark mb-3 fs-14">{{ __('purchase.order_lines') }}</h5>
                         <div class="table-responsive rounded border">
                             <table class="table table-bordered table-sm align-middle fs-13 text-dark mb-0" style="width: 100%; min-width: 900px;">
                                 <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
                                     <tr>
-                                        <th class="ps-3" style="width: 5%;" class="text-center">S.No.</th>
-                                        <th style="width: 35%;">Product Description</th>
-                                        <th class="text-center" style="width: 10%;">Qty</th>
-                                        <th class="text-end" style="width: 12%;">Rate</th>
-                                        <th class="text-end" style="width: 12%;">Amount</th>
+                                        <th class="ps-3" style="width: 5%;" class="text-center">{{ __('purchase.s_no') }}</th>
+                                        <th style="width: 35%;">{{ __('purchase.product_description') }}</th>
+                                        <th class="text-center" style="width: 10%;">{{ __('purchase.qty') }}</th>
+                                        <th class="text-end" style="width: 12%;">{{ __('purchase.rate') }}</th>
+                                        <th class="text-end" style="width: 12%;">{{ __('purchase.amount') }}</th>
                                         
                                         @if($order->discount_type === 'item_wise')
-                                            <th class="text-end text-danger" style="width: 8%;">Disc %</th>
-                                            <th class="text-end text-danger" style="width: 10%;">Disc Amt</th>
+                                            <th class="text-end text-danger" style="width: 8%;">{{ __('purchase.disc_percent') }}</th>
+                                            <th class="text-end text-danger" style="width: 10%;">{{ __('purchase.disc_amt') }}</th>
                                         @endif
 
                                         @if($order->tax_type === 'item_wise_tax')
-                                            <th class="text-end text-muted" style="width: 8%;">Tax %</th>
-                                            <th class="text-end text-muted" style="width: 10%;">Tax Amt</th>
+                                            <th class="text-end text-muted" style="width: 8%;">{{ __('purchase.tax_percent') }}</th>
+                                            <th class="text-end text-muted" style="width: 10%;">{{ __('purchase.tax_amt') }}</th>
                                         @endif
 
-                                        <th class="text-end pe-3" style="width: 15%;">Total Amt</th>
+                                        <th class="text-end pe-3" style="width: 15%;">{{ __('purchase.total_amt') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -420,11 +436,11 @@
                     <div class="row mt-4 pt-3 border-top text-dark">
                         <!-- Left side: Terms & Notes -->
                         <div class="col-md-7 text-start">
-                            <h6 class="fw-bold text-dark mb-1.5 fs-12 text-uppercase" style="letter-spacing: 0.5px;">Terms & Conditions</h6>
+                            <h6 class="fw-bold text-dark mb-1.5 fs-12 text-uppercase" style="letter-spacing: 0.5px;">{{ __('purchase.terms_conditions') }}</h6>
                             @if($order->notes)
                                 <div class="text-muted fs-11 mb-0 terms-conditions-content" style="white-space: pre-line; line-height: 1.4;">{!! $order->notes !!}</div>
                             @else
-                                <p class="text-muted fs-11 mb-0" style="font-style: italic;">No terms or notes specified for this purchase order.</p>
+                                <p class="text-muted fs-11 mb-0" style="font-style: italic;">{{ __('purchase.no_terms_specified_po') }}</p>
                             @endif
                         </div>
                         
@@ -432,18 +448,18 @@
                         <div class="col-md-5">
                             <div class="border p-3 rounded bg-light">
                                 <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                    <span class="text-muted">Subtotal:</span>
+                                    <span class="text-muted">{{ __('purchase.subtotal') }}:</span>
                                     <span class="fw-semibold text-dark">{{ $currencySymbol }}{{ number_format($order->subtotal, 2) }}</span>
                                 </div>
 
                                 @if($order->discount_type !== 'without_discount' && $order->discount_amount > 0)
                                     <div class="d-flex justify-content-between mb-1.5 fs-12 text-danger">
-                                        <span>Discount:</span>
+                                        <span>{{ __('purchase.discount') }}:</span>
                                         <span>-{{ $currencySymbol }}{{ number_format($order->discount_amount, 2) }}</span>
                                     </div>
                                     
                                     <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                        <span class="text-muted">Gross Total (Before Tax):</span>
+                                        <span class="text-muted">{{ __('purchase.gross_total_before_tax') }}:</span>
                                         <span class="fw-semibold text-dark">{{ $currencySymbol }}{{ number_format($order->subtotal - $order->discount_amount, 2) }}</span>
                                     </div>
                                 @endif
@@ -454,14 +470,14 @@
                                         $taxPercent = $grossTotal > 0 ? ($order->tax_amount / $grossTotal) * 100 : 0;
                                     @endphp
                                     <div class="d-flex justify-content-between mb-1.5 fs-12">
-                                        <span class="text-muted">Taxes ({{ round($taxPercent, 2) }}%):</span>
+                                        <span class="text-muted">{{ __('purchase.taxes') }} ({{ round($taxPercent, 2) }}%):</span>
                                         <span class="fw-semibold text-dark">+{{ $currencySymbol }}{{ number_format($order->tax_amount, 2) }}</span>
                                     </div>
                                 @endif
 
                                 <hr class="my-2">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <span class="fs-13 fw-bold text-dark">Total Amount:</span>
+                                    <span class="fs-13 fw-bold text-dark">{{ __('purchase.total_amount') }}:</span>
                                     <span class="fs-13 fw-bold text-primary">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</span>
                                 </div>
                             </div>
@@ -471,12 +487,12 @@
                     <!-- Signature block -->
                     <div class="row mt-4 pt-3 border-top text-dark">
                         <div class="col-6 text-start">
-                            <p class="fs-10 text-muted mb-0">For queries regarding fulfillment, please refer to the purchase department.</p>
+                            <p class="fs-10 text-muted mb-0">{{ __('purchase.po_queries_fulfillment') }}</p>
                         </div>
                         <div class="col-6 text-end">
                             <div class="d-inline-block text-center" style="width: 180px;">
                                 <hr class="mb-1 mt-3">
-                                <span class="fs-10 text-muted text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Authorized Signature</span>
+                                <span class="fs-10 text-muted text-uppercase fw-semibold" style="letter-spacing: 0.5px;">{{ __('purchase.authorized_signature') }}</span>
                             </div>
                         </div>
                     </div>
@@ -489,12 +505,12 @@
                 <div class="card border-0 shadow-sm bg-white mb-4 d-print-none">
                     <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-dollar-sign text-success me-2"></i>Vendor Advance Payments & Accounting</h6>
-                            <small class="text-muted fs-11">Record advance payments made to supplier against this Purchase Order</small>
+                            <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-dollar-sign text-success me-2"></i>{{ __('purchase.vendor_advance_payments_accounting') }}</h6>
+                            <small class="text-muted fs-11">{{ __('purchase.record_advance_payments_help') }}</small>
                         </div>
                         @if($order->balance_due > 0)
                             <button type="button" class="btn btn-sm btn-primary py-1.5 px-3 fs-12 fw-semibold" data-bs-toggle="modal" data-bs-target="#advancePaymentModal" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
-                                <i class="feather-plus-circle me-1.5"></i>Register Advance Payment
+                                <i class="feather-plus-circle me-1.5"></i>{{ __('purchase.register_advance_payment') }}
                             </button>
                         @endif
                     </div>
@@ -502,19 +518,19 @@
                         <div class="row g-3 mb-3 text-dark">
                             <div class="col-md-4">
                                 <div class="p-3 border rounded bg-light-50">
-                                    <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">Total PO Amount</span>
+                                    <span class="fs-11 text-uppercase text-muted fw-bold d-block mb-1">{{ __('purchase.total_po_amount') }}</span>
                                     <h4 class="fw-bold text-dark mb-0">{{ $currencySymbol }}{{ number_format($order->grand_total, 2) }}</h4>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="p-3 border rounded bg-light-50">
-                                    <span class="fs-11 text-uppercase text-success fw-bold d-block mb-1">Advance Paid (Posted to Accounting)</span>
+                                    <span class="fs-11 text-uppercase text-success fw-bold d-block mb-1">{{ __('purchase.advance_paid_posted') }}</span>
                                     <h4 class="fw-bold text-success mb-0">{{ $currencySymbol }}{{ number_format($order->total_advance_paid, 2) }}</h4>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="p-3 border rounded bg-light-50">
-                                    <span class="fs-11 text-uppercase text-primary fw-bold d-block mb-1">Balance Due</span>
+                                    <span class="fs-11 text-uppercase text-primary fw-bold d-block mb-1">{{ __('purchase.balance_due') }}</span>
                                     <h4 class="fw-bold text-primary mb-0">{{ $currencySymbol }}{{ number_format($order->balance_due, 2) }}</h4>
                                 </div>
                             </div>
@@ -525,11 +541,11 @@
                                 <table class="table table-bordered table-sm align-middle fs-13 text-dark mb-0">
                                     <thead class="table-light fs-11 text-uppercase text-muted fw-semibold">
                                         <tr>
-                                            <th class="ps-3">Payment No</th>
-                                            <th>Date</th>
-                                            <th>Method</th>
-                                            <th>Reference No</th>
-                                            <th class="text-end pe-3">Amount</th>
+                                            <th class="ps-3">{{ __('purchase.payment_no') }}</th>
+                                            <th>{{ __('purchase.date') }}</th>
+                                            <th>{{ __('purchase.method') }}</th>
+                                            <th>{{ __('purchase.reference_no') }}</th>
+                                            <th class="text-end pe-3">{{ __('purchase.amount') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -538,7 +554,7 @@
                                                 <td class="ps-3 fw-bold text-primary">{{ $adv->payment_number }}</td>
                                                 <td>{{ $adv->payment_date ? $adv->payment_date->format('d-M-Y') : '—' }}</td>
                                                 <td><span class="badge bg-soft-info text-info fs-11 fw-semibold">{{ $adv->payment_method }}</span></td>
-                                                <td class="font-monospace">{{ $adv->reference_number ?: 'N/A' }}</td>
+                                                <td class="font-monospace">{{ $adv->reference_number ?: __('purchase.not_applicable') }}</td>
                                                 <td class="text-end pe-3 font-monospace fw-bold text-success">{{ $currencySymbol }}{{ number_format($adv->amount, 2) }}</td>
                                             </tr>
                                         @endforeach
@@ -547,14 +563,14 @@
                             </div>
                         @else
                             <div class="text-center py-3 text-muted fs-12">
-                                <i class="feather-info me-1"></i>No advance payments registered for this order yet.
+                                <i class="feather-info me-1"></i>{{ __('purchase.no_advance_payments_registered') }}
                             </div>
                         @endif
                     </div>
                 </div>
 
                 <!-- Register Advance Payment Modal -->
-                <x-ui.modal id="advancePaymentModal" title="Register Vendor Advance Payment" size="lg">
+                <x-ui.modal id="advancePaymentModal" title="{{ __('purchase.register_vendor_advance_payment') }}" size="lg">
                     <form action="{{ route('purchase.orders.advance-payments.store') }}" method="POST" class="odoo-sheet">
                         @csrf
                         <input type="hidden" name="purchase_order_id" value="{{ $order->id }}">
@@ -563,48 +579,48 @@
                         <div class="p-3">
                             <div class="alert alert-info py-2 px-3 fs-12 mb-3">
                                 <i class="feather-info me-1"></i>
-                                Registering this payment will post a double-entry Journal Entry to <strong>Vendor Advance (1200)</strong> and <strong>Bank (1010)</strong> via Black-Box Accounting Engine.
+                                {{ __('purchase.advance_payment_journal_help') }}
                             </div>
 
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Vendor" name="vendor_display" value="{{ $order->vendor?->name }}" readonly="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('purchase.vendor') }}" name="vendor_display" value="{{ $order->vendor?->name }}" readonly="true" />
                                 </div>
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="PO Number" name="po_display" value="{{ $order->purchase_order_number }}" readonly="true" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('purchase.po_no') }}" name="po_display" value="{{ $order->purchase_order_number }}" readonly="true" />
                                 </div>
                             </div>
 
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" inputType="number" label="Advance Amount" name="amount" id="advance_amount" value="{{ min($order->balance_due, $order->grand_total) }}" step="0.01" min="0.01" max="{{ $order->balance_due }}" required="true" placeholder="Enter amount..." />
+                                    <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('purchase.advance_amount') }}" name="amount" id="advance_amount" value="{{ min($order->balance_due, $order->grand_total) }}" step="0.01" min="0.01" max="{{ $order->balance_due }}" required="true" placeholder="{{ __('purchase.enter_amount_placeholder') }}" />
                                 </div>
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="select" label="Payment Method" name="payment_method" id="payment_method" required="true">
-                                        <option value="Bank Transfer" selected>Bank Transfer (NEFT/RTGS)</option>
-                                        <option value="Cheque">Cheque</option>
-                                        <option value="Cash">Cash</option>
-                                        <option value="UPI">UPI</option>
+                                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.payment_method') }}" name="payment_method" id="payment_method" required="true">
+                                        <option value="Bank Transfer" selected>{{ __('purchase.bank_transfer') }}</option>
+                                        <option value="Cheque">{{ __('purchase.cheque') }}</option>
+                                        <option value="Cash">{{ __('purchase.cash') }}</option>
+                                        <option value="UPI">{{ __('purchase.upi') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
                             </div>
 
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" inputType="date" label="Payment Date" name="payment_date" id="payment_date" value="{{ date('Y-m-d') }}" required="true" />
+                                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('purchase.payment_date') }}" name="payment_date" id="payment_date" value="{{ date('Y-m-d') }}" required="true" />
                                 </div>
                                 <div class="col-md-6">
-                                    <x-ui.odoo-form-ui type="input" label="Reference / Transaction No" name="reference_number" id="reference_number" placeholder="e.g. UTR123456789" />
+                                    <x-ui.odoo-form-ui type="input" label="{{ __('purchase.ref_transaction_no') }}" name="reference_number" id="reference_number" placeholder="e.g. UTR123456789" />
                                 </div>
                             </div>
 
-                            <x-ui.odoo-form-ui type="textarea" label="Payment Notes / Remarks" name="notes" placeholder="Enter payment notes..." rows="2" />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('purchase.payment_notes_remarks') }}" name="notes" placeholder="{{ __('purchase.enter_payment_notes_placeholder') }}" rows="2" />
                         </div>
 
                         <div class="modal-footer border-top px-3 py-2 bg-light d-flex justify-content-end gap-2">
-                            <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-sm btn-light border" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</button>
                             <button type="submit" class="btn btn-sm btn-primary fw-semibold" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
-                                <i class="feather-check me-1"></i>Post Advance Payment
+                                <i class="feather-check me-1"></i>{{ __('purchase.post_advance_payment') }}
                             </button>
                         </div>
                     </form>

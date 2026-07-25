@@ -22,7 +22,7 @@
                 ['label' => 'Contacts'],
                 ['label' => 'Activities'],
             ]],
-            ['label' => 'CRM Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
+            ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
             ]],
              ['label' => __('ui.sales'), 'icon' => 'feather-shopping-cart', 'url' => '#', 'children' => [
@@ -52,16 +52,19 @@
                 'Adjustments'
             ]],
             ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => [
-                ['label' => 'Savings Dashboard', 'route' => 'purchase.rfqs.savings'],
-                ['label' => __('ui.purchase_requests'), 'route' => 'purchase.requisitions.index'],
-                ['label' => 'Pending PR Items', 'route' => 'purchase.requisitions.pending-items'],
-                ['label' => 'RFQs', 'route' => 'purchase.rfqs.index'],
-                ['label' => 'Purchase Orders', 'route' => 'purchase.orders.index'],
-                ['label' => 'Pending GRNs', 'route' => 'purchase.grns.pending'],
-                ['label' => 'All Goods Receipts', 'route' => 'purchase.grns.index'],
-                ['label' => 'Vendor Bills', 'route' => 'purchase.bills.index'],
-                ['label' => 'Vendor Payments', 'route' => 'purchase.payments.index'],
-
+                ['label' => __('purchase.savings_dashboard'), 'route' => 'purchase.rfqs.savings'],
+                ['label' => __('ui.purchase_requests') ?: __('purchase.purchase_requests'), 'route' => 'purchase.requisitions.index'],
+                ['label' => __('purchase.pending_pr_items'), 'route' => 'purchase.requisitions.pending-items'],
+                ['label' => __('purchase.rfqs'), 'route' => 'purchase.rfqs.index'],
+                ['label' => __('purchase.purchase_orders'), 'route' => 'purchase.orders.index'],
+                ['label' => __('purchase.pending_grns'), 'route' => 'purchase.grns.pending'],
+                ['label' => __('purchase.all_goods_receipts'), 'route' => 'purchase.grns.index'],
+                ['label' => __('purchase.vendor_bills'), 'route' => 'purchase.bills.index'],
+                ['label' => __('purchase.vendor_payments'), 'route' => 'purchase.payments.index'],
+            ]],
+            ['label' => 'Purchase Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
+                ['label' => 'PR Approvals', 'route' => 'purchase.pr-approvals.index'],
+                ['label' => 'PO Approvals', 'route' => 'purchase.po-approvals.index'],
             ]],
         ],
         __('ui.production') => [

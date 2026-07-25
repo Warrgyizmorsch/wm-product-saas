@@ -133,46 +133,85 @@
                                 @endphp
                                 <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $quotation->status }}</span>
                             </td>
-                            <td class="text-end pe-4">
-                                <div class="d-inline-flex gap-2 align-items-center justify-content-end">
+                            <td class="text-end pe-4" style="white-space: nowrap;">
+                                <div class="d-inline-flex gap-1 align-items-center justify-content-end">
+                                    <button type="button" class="action-dropdown-btn view-detail-btn flex-shrink-0" 
+                                       data-url="{{ route('crm.quotations.detail-partial', $quotation->id) }}"
+                                       title="View Details" data-bs-toggle="tooltip">
+                                        <i class="feather-eye"></i>
+                                    </button>
+
                                     @if ($quotation->status === 'Pending Approval')
-                                        <form action="{{ route('crm.quotations.approve', $quotation->id) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('crm.quotations.approve', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Approve this quotation?')">
                                             @csrf
-                                            <button type="submit" class="btn btn-xs btn-soft-success py-1 px-2 fs-10 fw-bold border-0" title="Approve">
-                                                <i class="feather-check me-1"></i>Approve
+                                            <button type="submit" class="action-dropdown-btn action-btn-approve" title="Approve" data-bs-toggle="tooltip">
+                                                <i class="feather-check-circle"></i>
                                             </button>
                                         </form>
-                                        <form action="{{ route('crm.quotations.reject', $quotation->id) }}" method="POST" class="d-inline">
+                                        <form action="{{ route('crm.quotations.reject', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Reject this quotation?')">
                                             @csrf
-                                            <button type="submit" class="btn btn-xs btn-soft-danger py-1 px-2 fs-10 fw-bold border-0" title="Reject">
-                                                <i class="feather-x me-1"></i>Reject
+                                            <button type="submit" class="action-dropdown-btn action-btn-reject" title="Reject" data-bs-toggle="tooltip">
+                                                <i class="feather-x-circle"></i>
                                             </button>
                                         </form>
                                     @endif
 
-                                    <x-ui.action-dropdown :viewUrl="route('crm.quotations.show', $quotation->id)">
-                                        @if ($quotation->lead_id)
+                                    @if ($quotation->status === 'Approved')
+                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Mark this quotation as Sent to customer?')">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="status" value="Sent">
+                                            <button type="submit" class="action-dropdown-btn" title="Mark as Sent" data-bs-toggle="tooltip" style="color: #0284c7; background-color: #e0f2fe; border-color: #bae6fd;">
+                                                <i class="feather-send"></i>
+                                            </button>
+                                        </form>
+                                    @elseif (in_array($quotation->status, ['Sent', 'Quotation Sent']))
+                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Mark this quotation as Accepted by customer?')">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="status" value="Accepted">
+                                            <button type="submit" class="action-dropdown-btn action-btn-approve" title="Accept" data-bs-toggle="tooltip">
+                                                <i class="feather-check-circle"></i>
+                                            </button>
+                                        </form>
+                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Mark this quotation as Rejected by customer?')">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="status" value="Rejected">
+                                            <button type="submit" class="action-dropdown-btn action-btn-reject" title="Reject" data-bs-toggle="tooltip">
+                                                <i class="feather-x-circle"></i>
+                                            </button>
+                                        </form>
+                                    @elseif ($quotation->status === 'Accepted' && !$quotation->salesOrder)
+                                        <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="action-dropdown-btn" title="Convert to Sales Order" data-bs-toggle="tooltip" style="color: #6366f1; border-color: #c7d2fe; background-color: #e0e7ff; text-decoration: none;">
+                                            <i class="feather-shopping-cart"></i>
+                                        </a>
+                                    @endif
+
+                                    <div class="flex-shrink-0">
+                                        <x-ui.action-dropdown id="quotationActions-{{ $quotation->id }}">
+                                            @if ($quotation->lead_id)
+                                                <li>
+                                                    <a href="{{ route('crm.leads.show', ['lead' => $quotation->lead_id, 'edit_quotation' => 1, 'active_quotation_id' => $quotation->id]) }}" class="dropdown-item">
+                                                        <i class="feather-edit me-2 text-muted fs-12"></i>Edit Quotation
+                                                    </a>
+                                                </li>
+                                            @endif
+
+                                            <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <a href="{{ route('crm.leads.show', ['lead' => $quotation->lead_id, 'edit_quotation' => 1, 'active_quotation_id' => $quotation->id]) }}" class="dropdown-item">
-                                                    <i class="feather-edit me-2 text-muted fs-12"></i>Edit Quotation
-                                                </a>
+                                                <form action="{{ route('crm.quotations.destroy', $quotation->id) }}"
+                                                      method="POST"
+                                                      onsubmit="return confirm('Are you sure you want to delete this quotation?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Quotation
+                                                    </button>
+                                                </form>
                                             </li>
-                                        @endif
-
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <form action="{{ route('crm.quotations.destroy', $quotation->id) }}"
-                                                  method="POST"
-                                                  onsubmit="return confirm('Are you sure you want to delete this quotation?');">
-                                                @csrf
-                                                @method('DELETE')
-
-                                                <button type="submit" class="dropdown-item text-danger">
-                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Quotation
-                                                </button>
-                                            </form>
-                                        </li>
-                                    </x-ui.action-dropdown>
+                                        </x-ui.action-dropdown>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -196,7 +235,89 @@
                 :perPage="$quotations->perPage()" />
         </div>
     </div>
+
+    {{-- ── Quotation Detail Offcanvas Drawer ── --}}
+    <x-ui.drawer id="quotationDetailOffcanvas" title="Quotation Details" position="end" style="width: 580px; max-width: 95vw;">
+        <div id="quotationDetailContent">
+            <div id="quotationDetailLoading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2 fs-13">Loading details…</p>
+            </div>
+            <div id="quotationDetailBody" style="display:none;"></div>
+        </div>
+
+        <x-slot:footer>
+            <a id="quotationFullViewLink" href="#" class="btn btn-outline-primary btn-sm">
+                <i class="feather-external-link me-1"></i> View Full Details
+            </a>
+            <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="offcanvas">
+                <i class="feather-x me-1"></i> Close
+            </button>
+        </x-slot:footer>
+    </x-ui.drawer>
 @endsection
+
+@push('scripts')
+<script>
+    $(document).ready(function () {
+        var quotationDrawer = new bootstrap.Offcanvas(document.getElementById('quotationDetailOffcanvas'));
+
+        $(document).on('click', '.view-detail-btn', function (e) {
+            e.preventDefault();
+            var url = $(this).data('url');
+            var showUrl = url.replace('/detail-partial', ''); // Infer the show URL
+
+            $('#quotationDetailLoading').show();
+            $('#quotationDetailBody').hide().html('');
+            $('#quotationFullViewLink').attr('href', '#');
+            quotationDrawer.show();
+
+            $.get(url, function (data) {
+                $('#quotationDetailLoading').hide();
+                $('#quotationDetailBody').html(data).show();
+                $('#quotationFullViewLink').attr('href', showUrl);
+                $('[data-bs-toggle="tooltip"]', '#quotationDetailBody').each(function () {
+                    new bootstrap.Tooltip(this);
+                });
+            }).fail(function () {
+                $('#quotationDetailLoading').hide();
+                $('#quotationDetailBody').html(
+                    '<div class="alert alert-danger m-3"><i class="feather-alert-circle me-2"></i>Failed to load. Please try again.</div>'
+                ).show();
+            });
+        });
+    });
+</script>
+@endpush
+
+@push('styles')
+<style>
+    .action-btn-approve {
+        color: #15803d !important;
+        border-color: #bbf7d0 !important;
+        background-color: #f0fdf4 !important;
+    }
+    .action-btn-approve:hover {
+        background-color: #dcfce7 !important;
+        border-color: #86efac !important;
+        color: #15803d !important;
+    }
+    .action-btn-reject {
+        color: #dc2626 !important;
+        border-color: #fecaca !important;
+        background-color: #fff1f2 !important;
+    }
+    .action-btn-reject:hover {
+        background-color: #fee2e2 !important;
+        border-color: #fca5a5 !important;
+        color: #dc2626 !important;
+    }
+</style>
+@endpush
+
+
 
 @push('styles')
     <!-- Select2 Theme Styles -->

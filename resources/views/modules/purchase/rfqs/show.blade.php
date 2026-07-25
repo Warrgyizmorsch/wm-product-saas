@@ -1,25 +1,25 @@
 @extends('layouts.duralux')
 
-@section('title', "RFQ {$rfq->rfq_number} | SaaS ERP")
-@section('page-title', "RFQ Details & Comparison Matrix")
+@section('title', __('purchase.rfq') . " {$rfq->rfq_number} | SaaS ERP")
+@section('page-title', __('purchase.rfq_details_comparison'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.rfqs.index') }}">RFQs</a> &gt; {{ $rfq->rfq_number }}
+    <a href="{{ route('purchase.rfqs.index') }}">{{ __('purchase.rfqs') }}</a> &gt; {{ $rfq->rfq_number }}
 @endsection
 
 @section('page-actions')
     <div class="d-flex gap-2 flex-wrap">
         <a href="{{ route('purchase.rfqs.index') }}" class="btn btn-light border">
-            <i class="feather-arrow-left me-2"></i>Back to RFQs
+            <i class="feather-arrow-left me-2"></i>{{ __('purchase.back_to_rfqs') }}
         </a>
 
         @if($rfq->status === 'Draft')
             <a href="{{ route('purchase.rfqs.edit', $rfq->id) }}" class="btn btn-warning">
-                <i class="feather-edit me-2"></i>Edit Draft
+                <i class="feather-edit me-2"></i>{{ __('purchase.edit_draft') }}
             </a>
             <form action="{{ route('purchase.rfqs.send', $rfq->id) }}" method="POST" class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-info text-white">
-                    <i class="feather-mail me-2"></i>Send RFQ to Vendors
+                    <i class="feather-mail me-2"></i>{{ __('purchase.send_rfq_vendors') }}
                 </button>
             </form>
         @endif
@@ -28,7 +28,7 @@
             <form action="{{ route('purchase.rfqs.confirm', $rfq->id) }}" method="POST" class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-primary" style="background-color: #714B67; border-color: #714B67;">
-                    <i class="feather-check-circle me-2"></i>Confirm & Finalize
+                    <i class="feather-check-circle me-2"></i>{{ __('purchase.confirm_finalize') }}
                 </button>
             </form>
         @endif
@@ -228,8 +228,8 @@
                     <div class="d-flex align-items-center gap-2">
                         <i class="feather-check-circle fs-18 text-success"></i>
                         <div>
-                            <strong class="text-dark">Purchase Order Created (RFQ Confirmed)</strong>
-                            <div class="fs-12 text-muted">A Purchase Order has already been generated from this RFQ. Double PO creation is blocked.</div>
+                            <strong class="text-dark">{{ __('purchase.po_created_rfq_confirmed') }}</strong>
+                            <div class="fs-12 text-muted">{{ __('purchase.po_already_generated_from_rfq') }}</div>
                         </div>
                     </div>
                 </div>
@@ -249,21 +249,29 @@
                                 'Cancelled' => 'bg-soft-danger text-danger',
                                 default => 'bg-soft-dark text-dark',
                             };
+                            $statusLabel = match($rfq->status) {
+                                'Draft' => __('purchase.status_draft'),
+                                'Sent' => __('purchase.status_sent'),
+                                'Received' => __('purchase.rates_received'),
+                                'Confirmed' => __('purchase.status_confirmed'),
+                                'Cancelled' => __('purchase.status_cancelled'),
+                                default => $rfq->status,
+                            };
                         @endphp
-                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $rfq->status }}</span>
+                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $statusLabel }}</span>
                     </div>
 
                     <!-- Custom Chevron Status Pipeline -->
                     <div class="so-status-pipeline my-2 d-print-none">
                         @php
                             $statuses = [
-                                'Draft' => 'Draft',
-                                'Sent' => 'Sent',
-                                'Received' => 'Rates Received',
-                                'Confirmed' => 'Confirmed'
+                                'Draft' => __('purchase.status_draft'),
+                                'Sent' => __('purchase.status_sent'),
+                                'Received' => __('purchase.rates_received'),
+                                'Confirmed' => __('purchase.status_confirmed')
                             ];
                             if ($rfq->status === 'Cancelled') {
-                                $statuses['Cancelled'] = 'Cancelled';
+                                $statuses['Cancelled'] = __('purchase.status_cancelled');
                             }
                             $keys = array_keys($statuses);
                             $currentIndex = array_search($rfq->status, $keys);
@@ -288,20 +296,20 @@
                 <div class="card-body p-4 p-md-5">
                     <div class="row g-4 fs-13 pb-4 border-bottom">
                     <div class="col-md-6 border-end">
-                        <h6 class="fw-bold text-primary mb-3">RFQ General Details</h6>
-                        <x-ui.odoo-form-ui type="input" label="RFQ Date" name="rfq_date" :value="$rfq->rfq_date ? $rfq->rfq_date->format('d-M-Y') : '—'" readonly="true" />
-                        <x-ui.odoo-form-ui type="input" label="Source Requisition" name="requisition" :value="$rfq->requisition ? $rfq->requisition->requisition_number : 'Direct Inquiry (No Link)'" readonly="true" />
+                        <h6 class="fw-bold text-primary mb-3">{{ __('purchase.rfq_general_details') }}</h6>
+                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.rfq_date') }}" name="rfq_date" :value="$rfq->rfq_date ? $rfq->rfq_date->format('d-M-Y') : '—'" readonly="true" />
+                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.source_requisition') }}" name="requisition" :value="$rfq->requisition ? $rfq->requisition->requisition_number : __('purchase.direct_inquiry_no_link')" readonly="true" />
                     </div>
                     <div class="col-md-6">
-                        <h6 class="fw-bold text-primary mb-3">Auditing Details</h6>
-                        <x-ui.odoo-form-ui type="input" label="Created By" name="created_by" :value="$rfq->creator?->name ?? 'System'" readonly="true" />
-                        <x-ui.odoo-form-ui type="input" label="Created At" name="created_at" :value="$rfq->created_at->format('d-M-Y h:i A')" readonly="true" />
+                        <h6 class="fw-bold text-primary mb-3">{{ __('purchase.auditing_details') }}</h6>
+                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.created_by') }}" name="created_by" :value="$rfq->creator?->name ?? 'System'" readonly="true" />
+                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.created_at') }}" name="created_at" :value="$rfq->created_at->format('d-M-Y h:i A')" readonly="true" />
                     </div>
                 </div>
 
                 @if($rfq->notes)
                     <div class="mt-4 pt-2 mb-4">
-                        <h6 class="fw-bold text-primary mb-2">Terms & Notes</h6>
+                        <h6 class="fw-bold text-primary mb-2">{{ __('purchase.terms_notes') }}</h6>
                         <p class="text-secondary bg-light p-3 rounded fs-13 border mb-0" style="white-space: pre-line;">{{ $rfq->notes }}</p>
                     </div>
                 @endif
@@ -313,11 +321,11 @@
                     <div class="mt-5">
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                             <div>
-                                <h5 class="fw-bold text-dark mb-0"><i class="feather-layers text-primary me-2"></i>Update Rate Supplier</h5>
+                                <h5 class="fw-bold text-dark mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.update_rate_supplier') }}</h5>
                             </div>
                             <div>
                                 <button type="submit" class="btn btn-primary px-4 py-2 fw-semibold" style="background-color: #714B67; border-color: #714B67;">
-                                    <i class="feather-save me-2"></i>Save Quotation Matrix
+                                    <i class="feather-save me-2"></i>{{ __('purchase.save_quotation_matrix') }}
                                 </button>
                             </div>
                         </div>
@@ -373,46 +381,46 @@
                                                 </div>
                                                 <div>
                                                     @if($rv->status === 'Received')
-                                                        <span class="badge bg-soft-success text-success fs-10 fw-bold"><i class="feather-check-circle me-1"></i>Submitted</span>
+                                                        <span class="badge bg-soft-success text-success fs-10 fw-bold"><i class="feather-check-circle me-1"></i>{{ __('purchase.submitted') }}</span>
                                                     @else
-                                                        <span class="badge bg-soft-secondary text-secondary fs-10 fw-bold"><i class="feather-clock me-1"></i>Pending</span>
+                                                        <span class="badge bg-soft-secondary text-secondary fs-10 fw-bold"><i class="feather-clock me-1"></i>{{ __('purchase.pending') }}</span>
                                                     @endif
                                                 </div>
                                             </div>
                                             <div class="card-body p-3">
                                                 <div class="d-flex gap-2 mb-3">
                                                     <button type="button" class="btn btn-xs btn-outline-primary copy-portal-btn flex-fill fw-semibold py-1.5" data-link="{{ route('purchase.rfqs.portal', $rv->token) }}">
-                                                        <i class="feather-copy me-1"></i>Copy Portal Link
+                                                        <i class="feather-copy me-1"></i>{{ __('purchase.copy_portal_link') }}
                                                     </button>
                                                     <a href="{{ route('purchase.rfqs.portal', $rv->token) }}" target="_blank" class="btn btn-xs btn-outline-secondary flex-fill text-center fw-semibold py-1.5">
-                                                        <i class="feather-external-link me-1"></i>Open Portal
+                                                        <i class="feather-external-link me-1"></i>{{ __('purchase.open_portal') }}
                                                     </a>
                                                 </div>
 
                                                 <!-- Vendor Level Header Fields -->
                                                 <div class="row g-2 mb-3 p-2.5 bg-light rounded border fs-12">
                                                     <div class="col-6">
-                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-file-text me-1"></i>Quotation No.</label>
-                                                        <input type="text" class="odoo-form-control matrix-sync-input" data-sync="#dt_quote_no_{{ $rv->id }}" value="{{ $rv->quotation_number }}" placeholder="Ref Code">
+                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-file-text me-1"></i>{{ __('purchase.quote_no') }}</label>
+                                                        <input type="text" class="odoo-form-control matrix-sync-input" data-sync="#dt_quote_no_{{ $rv->id }}" value="{{ $rv->quotation_number }}" placeholder="{{ __('purchase.ref_code') }}">
                                                     </div>
                                                     <div class="col-6">
-                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-credit-card me-1"></i>Payment Type</label>
+                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-credit-card me-1"></i>{{ __('purchase.payment_type') }}</label>
                                                         <select class="odoo-table-select matrix-sync-input" data-sync="#dt_payment_{{ $rv->id }}">
-                                                            <option value="">Select...</option>
-                                                            <option value="Cash" @selected($rv->payment_type === 'Cash')>Cash</option>
-                                                            <option value="Net 30" @selected($rv->payment_type === 'Net 30')>Net 30</option>
-                                                            <option value="Net 60" @selected($rv->payment_type === 'Net 60')>Net 60</option>
-                                                            <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>50% Advance, 50% Delivery</option>
+                                                            <option value="">{{ __('purchase.select') }}</option>
+                                                            <option value="Cash" @selected($rv->payment_type === 'Cash')>{{ __('purchase.cash') }}</option>
+                                                            <option value="Net 30" @selected($rv->payment_type === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
+                                                            <option value="Net 60" @selected($rv->payment_type === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
+                                                            <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
                                                         </select>
                                                     </div>
                                                     <div class="col-12 mt-2">
-                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-info me-1"></i>Terms & Conditions</label>
-                                                        <input type="text" class="odoo-form-control matrix-sync-input" data-sync="#dt_terms_{{ $rv->id }}" value="{{ $rv->terms_conditions }}" placeholder="T&C remarks">
+                                                        <label class="fw-semibold text-secondary mb-1 fs-11"><i class="feather-info me-1"></i>{{ __('purchase.terms_conditions') }}</label>
+                                                        <input type="text" class="odoo-form-control matrix-sync-input" data-sync="#dt_terms_{{ $rv->id }}" value="{{ $rv->terms_conditions }}" placeholder="{{ __('purchase.terms_conditions_remarks') }}">
                                                     </div>
                                                 </div>
 
                                                 <!-- Items Rate Cards -->
-                                                <h6 class="fw-bold text-dark fs-12 mb-2 border-bottom pb-1.5"><i class="feather-layers text-primary me-1.5"></i>Items Rates</h6>
+                                                <h6 class="fw-bold text-dark fs-12 mb-2 border-bottom pb-1.5"><i class="feather-layers text-primary me-1.5"></i>{{ __('purchase.inquiry_line_items') }}</h6>
                                                 @php $mappedCount = 0; @endphp
                                                 @foreach($rfq->items as $itemIdx => $item)
                                                     @php
@@ -430,23 +438,23 @@
                                                         @endphp
                                                         <div class="p-2.5 mb-2.5 border rounded bg-white fs-12 shadow-xs">
                                                             <div class="fw-bold text-dark mb-1"><i class="feather-package text-primary me-1"></i>{{ $itemIdx + 1 }}. {{ $item->product?->name }}</div>
-                                                            <div class="text-muted fs-11 mb-2">Req Qty: <strong class="text-dark">{{ (float)$item->quantity }} {{ $item->product?->uom?->name ?? 'Pcs' }}</strong></div>
+                                                            <div class="text-muted fs-11 mb-2">{{ __('purchase.required_qty') }}: <strong class="text-dark">{{ (float)$item->quantity }} {{ $item->product?->uom?->name ?? 'Pcs' }}</strong></div>
 
                                                             <div class="row g-2">
                                                                 <div class="col-6">
-                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-dollar-sign me-0.5"></i>Rate/Unit ({{ $currency }})</label>
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-dollar-sign me-0.5"></i>{{ __('purchase.rate_unit') }} ({{ $currency }})</label>
                                                                     <input type="number" step="0.01" min="0" class="odoo-table-input mob-rate-input matrix-sync-input font-monospace" data-sync="#dt_rate_{{ $rv->id }}_{{ $item->product_id }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" value="{{ $quotedRate }}" placeholder="0.00">
                                                                 </div>
                                                                 <div class="col-6">
-                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-box me-0.5"></i>Quoted Qty</label>
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-box me-0.5"></i>{{ __('purchase.quoted_qty') }}</label>
                                                                     <input type="number" step="0.0001" min="0" class="odoo-table-input mob-qty-input matrix-sync-input font-monospace" data-sync="#dt_qty_{{ $rv->id }}_{{ $item->product_id }}" data-vendor="{{ $rv->id }}" data-product="{{ $item->product_id }}" value="{{ $quotedQty }}" placeholder="0.00">
                                                                 </div>
                                                                 <div class="col-6">
-                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-calendar me-0.5"></i>Deliv Date</label>
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-calendar me-0.5"></i>{{ __('purchase.deliv_date') }}</label>
                                                                     <input type="date" class="odoo-table-input matrix-sync-input" data-sync="#dt_deliv_{{ $rv->id }}_{{ $item->product_id }}" value="{{ $quotedDeliv }}">
                                                                 </div>
                                                                 <div class="col-6">
-                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-trending-up me-0.5"></i>Total ({{ $currency }})</label>
+                                                                    <label class="fw-semibold text-secondary fs-11 mb-1"><i class="feather-trending-up me-0.5"></i>{{ __('purchase.total') }} ({{ $currency }})</label>
                                                                     <div class="odoo-table-input bg-soft-success fw-bold text-success text-end font-monospace mob-total-val" id="mob_total_{{ $rv->id }}_{{ $item->product_id }}">
                                                                         {{ number_format($totalCost, 2, '.', '') }}
                                                                     </div>
@@ -457,7 +465,7 @@
                                                 @endforeach
                                                 @if($mappedCount === 0)
                                                     <div class="text-center py-3 text-muted">
-                                                        <i class="feather-info mb-1"></i> No items assigned to this vendor.
+                                                        <i class="feather-info mb-1"></i> {{ __('purchase.no_items_assigned_vendor') }}
                                                     </div>
                                                 @endif
                                             </div>
@@ -473,12 +481,12 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th style="width: 3%;" class="text-center align-middle">
-                                            <input type="checkbox" id="select-all-items" class="form-check-input" title="Select All Items">
+                                            <input type="checkbox" id="select-all-items" class="form-check-input" title="{{ __('purchase.select_all_items') }}">
                                         </th>
-                                        <th style="width: 4%;" class="text-center">S.No.</th>
-                                        <th style="width: 23%;">Product Description</th>
-                                        <th style="width: 8%;" class="text-center">Qty / UoM</th>
-                                        <th style="width: 10%;" class="text-muted fw-bold text-end pe-2">Vendor Details</th>
+                                        <th style="width: 4%;" class="text-center">{{ __('purchase.s_no') }}</th>
+                                        <th style="width: 23%;">{{ __('purchase.product_description') }}</th>
+                                        <th style="width: 8%;" class="text-center">{{ __('purchase.qty_uom') }}</th>
+                                        <th style="width: 10%;" class="text-muted fw-bold text-end pe-2">{{ __('purchase.vendor_details') }}</th>
                                         
                                         <!-- Loop each Vendor column -->
                                         @foreach($rfq->rfqVendors as $rv)
@@ -511,17 +519,17 @@
                                                 <!-- Copy Link & Open Portal Buttons -->
                                                 <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
                                                     <button type="button" class="btn btn-xs btn-outline-primary copy-portal-btn d-inline-flex align-items-center gap-0.5 py-2 px-2 fs-10" style="border-radius: 12px; font-weight: 500;" data-link="{{ route('purchase.rfqs.portal', $rv->token) }}">
-                                                        <i class="feather-copy" style="font-size: 10px;"></i> Copy
+                                                        <i class="feather-copy" style="font-size: 10px;"></i> {{ __('purchase.copy') }}
                                                     </button>
                                                     <a href="{{ route('purchase.rfqs.portal', $rv->token) }}" target="_blank" class="btn btn-xs btn-outline-secondary d-inline-flex align-items-center gap-0.5 py-2 px-2 fs-10" style="border-radius: 12px; font-weight: 500;">
-                                                        <i class="feather-external-link" style="font-size: 10px;"></i> Portal
+                                                        <i class="feather-external-link" style="font-size: 10px;"></i> {{ __('purchase.portal') }}
                                                     </a>
                                                 </div>
                                                 
                                                 @if($rv->status === 'Received')
-                                                    <span class="badge bg-soft-success text-success fs-9 fw-bold">Submitted</span>
+                                                    <span class="badge bg-soft-success text-success fs-9 fw-bold">{{ __('purchase.submitted') }}</span>
                                                 @else
-                                                    <span class="badge bg-soft-secondary text-secondary fs-9 fw-bold">Pending</span>
+                                                    <span class="badge bg-soft-secondary text-secondary fs-9 fw-bold">{{ __('purchase.pending') }}</span>
                                                 @endif
                                             </th>
                                         @endforeach
@@ -551,14 +559,14 @@
                                                 <div class="d-flex flex-column gap-0.5 mt-1">
                                                     <small class="text-muted font-monospace fs-10">SKU: {{ $item->product?->sku ?: '—' }}</small>
                                                     <small class="text-info fs-10 fw-semibold">
-                                                        <i class="feather-calendar me-1"></i>Expected: {{ $expectedDate }}
+                                                        <i class="feather-calendar me-1"></i>{{ __('purchase.expected') }}: {{ $expectedDate }}
                                                     </small>
                                                 </div>
                                             </td>
                                             <td rowspan="5" class="text-center font-monospace fw-bold text-dark align-middle bg-white">
                                                 {{ (float)$item->quantity }} <span class="text-muted small">({{ $item->product?->uom?->name ?? 'Pcs' }})</span>
                                             </td>
-                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Rate/Unit ({{ $currency }}):</td>
+                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">{{ __('purchase.rate_unit') }} ({{ $currency }}):</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
                                                     $isMapped = $item->vendors->contains('id', $rv->vendor_id);
@@ -571,7 +579,7 @@
                                                     </td>
                                                 @else
                                                     <td class="border-start p-2 text-center text-muted align-middle bg-light" style="width: 220px; min-width: 220px; max-width: 220px; background-color: #f8fafc !important; vertical-align: middle;" rowspan="5">
-                                                        <span class="small text-uppercase fw-semibold fs-10 text-muted"><i class="feather-info me-1"></i>Not Invited</span>
+                                                        <span class="small text-uppercase fw-semibold fs-10 text-muted"><i class="feather-info me-1"></i>{{ __('purchase.not_invited') }}</span>
                                                     </td>
                                                 @endif
                                             @endforeach
@@ -579,7 +587,7 @@
 
                                         <!-- Row 2: Quoted Qty -->
                                         <tr>
-                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Quoted Qty:</td>
+                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">{{ __('purchase.quoted_qty') }}:</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
                                                     $isMapped = $item->vendors->contains('id', $rv->vendor_id);
@@ -598,7 +606,7 @@
 
                                         <!-- Row 3: Total Amount -->
                                         <tr>
-                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Total Amount ({{ $currency }}):</td>
+                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">{{ __('purchase.total_amount') }} ({{ $currency }}):</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
                                                     $isMapped = $item->vendors->contains('id', $rv->vendor_id);
@@ -619,7 +627,7 @@
 
                                         <!-- Row 4: Delivery Date -->
                                         <tr>
-                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Deliv Date:</td>
+                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">{{ __('purchase.deliv_date') }}:</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
                                                     $isMapped = $item->vendors->contains('id', $rv->vendor_id);
@@ -638,7 +646,7 @@
 
                                         <!-- Row 5: Validity Date -->
                                         <tr>
-                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">Valid Date:</td>
+                                            <td class="text-end pe-2 fw-semibold text-muted fs-11 align-middle bg-white">{{ __('purchase.valid_date') }}:</td>
                                             @foreach($rfq->rfqVendors as $rv)
                                                 @php
                                                     $isMapped = $item->vendors->contains('id', $rv->vendor_id);
@@ -658,44 +666,44 @@
 
                                     <!-- Document-Level Global Footers -->
                                     <tr>
-                                        <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">Payment Type</td>
+                                        <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">{{ __('purchase.payment_type') }}</td>
                                         @foreach($rfq->rfqVendors as $rv)
                                             <td class="text-center border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
                                                 <input type="hidden" name="vendors[{{ $rv->id }}][id]" value="{{ $rv->id }}">
                                                 <select name="vendors[{{ $rv->id }}][payment_type]" id="dt_payment_{{ $rv->id }}" class="odoo-table-select py-0.5" style="font-size: 11px; background-color: transparent;">
-                                                    <option value="">Select...</option>
-                                                    <option value="Cash" @selected($rv->payment_type === 'Cash')>Cash</option>
-                                                    <option value="Net 30" @selected($rv->payment_type === 'Net 30')>Net 30</option>
-                                                    <option value="Net 60" @selected($rv->payment_type === 'Net 60')>Net 60</option>
-                                                    <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>50% Advance, 50% Delivery</option>
+                                                    <option value="">{{ __('purchase.select') }}</option>
+                                                    <option value="Cash" @selected($rv->payment_type === 'Cash')>{{ __('purchase.cash') }}</option>
+                                                    <option value="Net 30" @selected($rv->payment_type === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
+                                                    <option value="Net 60" @selected($rv->payment_type === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
+                                                    <option value="50% Advance, 50% Delivery" @selected($rv->payment_type === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
                                                 </select>
                                             </td>
                                         @endforeach
                                     </tr>
                                     <tr>
-                                        <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">Quotation No.</td>
+                                        <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">{{ __('purchase.quote_no') }}</td>
                                         @foreach($rfq->rfqVendors as $rv)
                                             <td class="text-center border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                <input type="text" name="vendors[{{ $rv->id }}][quotation_number]" id="dt_quote_no_{{ $rv->id }}" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;" value="{{ $rv->quotation_number }}" placeholder="Ref Code">
+                                                <input type="text" name="vendors[{{ $rv->id }}][quotation_number]" id="dt_quote_no_{{ $rv->id }}" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;" value="{{ $rv->quotation_number }}" placeholder="{{ __('purchase.ref_code') }}">
                                             </td>
                                         @endforeach
                                     </tr>
                                     <tr>
-                                        <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">Terms & Conditions</td>
+                                        <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">{{ __('purchase.terms_conditions') }}</td>
                                         @foreach($rfq->rfqVendors as $rv)
                                             <td class="text-center border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
-                                                <input type="text" name="vendors[{{ $rv->id }}][terms_conditions]" id="dt_terms_{{ $rv->id }}" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;" value="{{ $rv->terms_conditions }}" placeholder="T&C remarks">
+                                                <input type="text" name="vendors[{{ $rv->id }}][terms_conditions]" id="dt_terms_{{ $rv->id }}" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;" value="{{ $rv->terms_conditions }}" placeholder="{{ __('purchase.terms_conditions_remarks') }}">
                                             </td>
                                         @endforeach
-                                    </tr>/tr>
+                                    </tr>
                                     <tr>
-                                        <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">Attach File</td>
+                                        <td colspan="5" class="fw-bold text-end pe-2 text-muted fs-11 bg-white" style="vertical-align: middle;">{{ __('purchase.attach_file') }}</td>
                                         @foreach($rfq->rfqVendors as $rv)
                                             <td class="text-center border-start p-1 bg-white" style="width: 220px; min-width: 220px; max-width: 220px;">
                                                 <div class="d-flex flex-column gap-1 align-items-center">
                                                     <input type="file" name="vendors[{{ $rv->id }}][attachment]" class="odoo-table-input py-0.5" style="font-size: 11px; background-color: transparent;">
                                                     @if($rv->attachment_path)
-                                                        <a href="{{ asset('storage/' . $rv->attachment_path) }}" target="_blank" class="text-success text-decoration-underline fw-bold small fs-10"><i class="feather-paperclip me-0.5"></i>Download</a>
+                                                        <a href="{{ asset('storage/' . $rv->attachment_path) }}" target="_blank" class="text-success text-decoration-underline fw-bold small fs-10"><i class="feather-paperclip me-0.5"></i>{{ __('purchase.download') }}</a>
                                                     @endif
                                                 </div>
                                             </td>
@@ -706,9 +714,9 @@
                         </div>
 
                         <div class="d-flex justify-content-end mt-4 gap-3">
-                            <a href="{{ route('purchase.rfqs.index') }}" class="btn btn-light px-4 py-2 border">Cancel</a>
+                            <a href="{{ route('purchase.rfqs.index') }}" class="btn btn-light px-4 py-2 border">{{ __('purchase.cancel') }}</a>
                             <button type="submit" class="btn btn-primary px-5 py-2 fw-semibold" style="background-color: #714B67; border-color: #714B67;">
-                                <i class="feather-save me-2"></i>Save Quotation Matrix
+                                <i class="feather-save me-2"></i>{{ __('purchase.save_quotation_matrix') }}
                             </button>
                         </div>
                     </div>
@@ -732,11 +740,11 @@
             <div class="d-flex align-items-center gap-3">
                 <i class="feather-shopping-cart text-white fs-18"></i>
                 <div>
-                    <div class="text-white fw-bold fs-14">Create Purchase Order</div>
+                    <div class="text-white fw-bold fs-14">{{ __('purchase.create_purchase_order') }}</div>
                     <div class="text-white fs-12" style="opacity:0.85;">
-                        <span id="po-bar-items">0</span> item(s) selected
+                        <span id="po-bar-items">0</span> {{ __('purchase.items_selected') }}
                         &nbsp;&bull;&nbsp;
-                        Supplier: <strong id="po-bar-supplier">None</strong>
+                        {{ __('purchase.supplier') }}: <strong id="po-bar-supplier">{{ __('purchase.none') }}</strong>
                     </div>
                 </div>
             </div>
@@ -744,7 +752,7 @@
                 <button type="button"
                         class="btn btn-outline-light btn-sm fw-semibold px-3"
                         onclick="clearPoSelection()">
-                    <i class="feather-x me-1"></i>Clear
+                    <i class="feather-x me-1"></i>{{ __('purchase.clear') }}
                 </button>
                 <button type="button"
                         id="btn-open-po-modal"
@@ -752,7 +760,7 @@
                         style="background:#fff; color:#00a76f; border:none;"
                         data-bs-toggle="modal"
                         data-bs-target="#createPoModal">
-                    <i class="feather-check-circle me-2"></i>Create PO
+                    <i class="feather-check-circle me-2"></i>{{ __('purchase.create_po') }}
                     <span id="po-selection-count" class="badge ms-1" style="background:#00a76f; color:#fff;">0</span>
                 </button>
             </div>
@@ -761,7 +769,7 @@
     @endif
 
     {{-- ===================== Create PO Modal ===================== --}}
-    <x-ui.modal id="createPoModal" title="Create Purchase Order" size="xl" :centered="true" :showFooter="true" formAction="{{ route('purchase.rfqs.create-po', $rfq->id) }}" formMethod="POST">
+    <x-ui.modal id="createPoModal" title="{{ __('purchase.create_purchase_order') }}" size="xl" :centered="true" :showFooter="true" formAction="{{ route('purchase.rfqs.create-po', $rfq->id) }}" formMethod="POST">
         <input type="hidden" name="vendor_id" id="po-form-vendor-id" value="">
         <input type="hidden" name="source_type" value="rfq">
         <div id="po-form-items-inputs"></div>
@@ -770,10 +778,10 @@
 
             {{-- Selected Supplier --}}
             <div class="mb-3">
-                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">Selected Supplier</label>
+                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">{{ __('purchase.selected_supplier') }}</label>
                 <div class="p-2 rounded border bg-soft-success">
                     <span class="fw-bold text-success fs-13">
-                        <i class="feather-user me-1"></i><span id="po-supplier-name">None selected</span>
+                        <i class="feather-user me-1"></i><span id="po-supplier-name">{{ __('purchase.none_selected') }}</span>
                     </span>
                 </div>
             </div>
@@ -784,8 +792,8 @@
             <div class="row g-3 mb-3">
                 {{-- Location / Warehouse --}}
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="Location / Warehouse" name="location" id="po-location" required="true">
-                        <option value="">Select Warehouse...</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.location_warehouse') }}" name="location" id="po-location" required="true">
+                        <option value="">{{ __('purchase.select_warehouse') }}</option>
                         @foreach($warehouses as $w)
                             <option value="{{ $w->name }}">{{ $w->name }}</option>
                         @endforeach
@@ -793,66 +801,66 @@
                 </div>
                 {{-- PO Date --}}
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="PO Date" name="date" id="po-date" :value="now()->format('Y-m-d')" required="true" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('purchase.po_date') }}" name="date" id="po-date" :value="now()->format('Y-m-d')" required="true" />
                 </div>
                 {{-- Delivery Date --}}
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="input" inputType="date" label="Delivery Date" name="delivery_date" id="po-delivery-date" />
+                    <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('purchase.delivery_date') }}" name="delivery_date" id="po-delivery-date" />
                 </div>
             </div>
 
             <div class="row g-3 mb-3">
                 {{-- Discount Option --}}
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="Discount Option" name="discount_type" id="po-discount-type" required="true">
-                        <option value="without_discount" selected>Without Discount</option>
-                        <option value="item_wise">With Discount At Item Level</option>
-                        <option value="order_wise">With Discount At Order Level</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.discount_option') }}" name="discount_type" id="po-discount-type" required="true">
+                        <option value="without_discount" selected>{{ __('purchase.without_discount') }}</option>
+                        <option value="item_wise">{{ __('purchase.discount_item_level') }}</option>
+                        <option value="order_wise">{{ __('purchase.discount_order_level') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 {{-- Tax Option --}}
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="Tax Option" name="tax_type" id="po-tax-type" required="true">
-                        <option value="without_tax" selected>Without Tax</option>
-                        <option value="item_wise_tax">Item Wise Tax</option>
-                        <option value="order_wise_tax">Order Wise Tax</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.tax_option') }}" name="tax_type" id="po-tax-type" required="true">
+                        <option value="without_tax" selected>{{ __('purchase.without_tax') }}</option>
+                        <option value="item_wise_tax">{{ __('purchase.item_wise_tax') }}</option>
+                        <option value="order_wise_tax">{{ __('purchase.order_wise_tax') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
                 {{-- GST Type --}}
                 <div class="col-md-4">
-                    <x-ui.odoo-form-ui type="select" label="GST Type" name="gst_type" id="po-gst-type" required="true">
-                        <option value="cgst_sgst" selected>CGST + SGST (Intra-State)</option>
-                        <option value="igst">IGST (Inter-State)</option>
+                    <x-ui.odoo-form-ui type="select" label="{{ __('purchase.gst_type') }}" name="gst_type" id="po-gst-type" required="true">
+                        <option value="cgst_sgst" selected>{{ __('purchase.gst_intra_state') }}</option>
+                        <option value="igst">{{ __('purchase.gst_inter_state') }}</option>
                     </x-ui.odoo-form-ui>
                 </div>
             </div>
 
 
             {{-- Items preview table --}}
-            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">Selected Items</label>
+            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-2">{{ __('purchase.selected_items') }}</label>
             <div class="table-responsive mb-3" style="max-height:280px; overflow-y:auto;">
                 <x-ui.odoo-form-ui type="table" id="poItemsTableModal" style="table-layout: fixed; width: 100%;">
                     <thead>
                         <tr>
                             <th style="width: 4%;">#</th>
-                            <th style="width: 25%;">Product</th>
-                            <th class="text-end" style="width: 10%;">Qty <span class="text-danger">*</span></th>
-                            <th class="text-end" style="width: 10%;">Rate <span class="text-danger">*</span></th>
-                            <th class="text-end" style="width: 12%;">Amount</th>
+                            <th style="width: 25%;">{{ __('purchase.product') }}</th>
+                            <th class="text-end" style="width: 10%;">{{ __('purchase.qty') }} <span class="text-danger">*</span></th>
+                            <th class="text-end" style="width: 10%;">{{ __('purchase.rate') }} <span class="text-danger">*</span></th>
+                            <th class="text-end" style="width: 12%;">{{ __('purchase.amount') }}</th>
                             <!-- Discount Columns -->
-                            <th class="text-end discount-column" style="width: 8%;">Disc %</th>
-                            <th class="text-end discount-column" style="width: 10%;">Disc Amt</th>
+                            <th class="text-end discount-column" style="width: 8%;">{{ __('purchase.disc_percent') }}</th>
+                            <th class="text-end discount-column" style="width: 10%;">{{ __('purchase.disc_amt') }}</th>
                             <!-- Tax Columns -->
-                            <th class="text-end tax-column" style="width: 8%;">Tax %</th>
-                            <th class="text-end tax-column" style="width: 10%;">Tax Amt</th>
-                            <th class="text-end" style="width: 13%;">Total Amt</th>
+                            <th class="text-end tax-column" style="width: 8%;">{{ __('purchase.tax_percent') }}</th>
+                            <th class="text-end tax-column" style="width: 10%;">{{ __('purchase.tax_amt') }}</th>
+                            <th class="text-end" style="width: 13%;">{{ __('purchase.total_amt') }}</th>
                         </tr>
                     </thead>
                     <tbody id="po-preview-tbody">
                         <tr id="po-no-items-row">
                             <td colspan="10" class="text-center text-muted py-4">
                                 <i class="feather-package fs-2 d-block mb-2 text-light"></i>
-                                Tick items from the matrix
+                                {{ __('purchase.tick_items_from_matrix') }}
                             </td>
                         </tr>
                     </tbody>
@@ -863,7 +871,7 @@
             <div class="row mb-3">
                 <!-- Left side: Terms & Notes Editor -->
                 <div class="col-md-7">
-                    <x-ui.odoo-form-ui type="editor" label="Terms & Notes" name="notes" id="po-notes" placeholder="Specify any delivery terms, quality checks, payment instructions, etc.">
+                    <x-ui.odoo-form-ui type="editor" label="{{ __('purchase.terms_notes') }}" name="notes" id="po-notes" placeholder="{{ __('purchase.notes_placeholder') }}">
                     </x-ui.odoo-form-ui>
                 </div>
 
@@ -871,31 +879,31 @@
                 <div class="col-md-5 d-flex flex-column align-items-end fs-13">
                     <div class="card border-0 shadow-sm w-100" style="max-width: 380px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden;">
                         <div class="fw-bold py-2 px-3 text-white" style="background-color: #2563eb; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase;">
-                            ORDER SUMMARY
+                            {{ __('purchase.order_summary') }}
                         </div>
                         <div class="p-3 bg-white text-dark">
                             <!-- Taxable Subtotal -->
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="text-muted fs-12 fw-semibold">Taxable Subtotal</span>
+                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.taxable_subtotal') }}</span>
                                 <input type="text" id="summarySubtotalTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                 <input type="hidden" name="subtotal" id="summarySubtotalModal" value="0.00">
                             </div>
 
                             <!-- Total Discount -->
                             <div class="d-flex justify-content-between align-items-center mb-2" id="summaryDiscountRowModal">
-                                <span class="text-muted fs-12 fw-semibold">Discount Amount</span>
+                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.discount_amount') }}</span>
                                 <input type="number" name="discount_amount" id="summaryDiscountModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" step="0.01" value="0.00">
                             </div>
 
                             <!-- Gross Total -->
                             <div class="d-flex justify-content-between align-items-center mb-2" id="summaryGrossRowModal">
-                                <span class="text-muted fs-12 fw-semibold">Gross Total (Before Tax)</span>
+                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.gross_total_before_tax') }}</span>
                                 <input type="text" id="summaryGrossTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                             </div>
 
                             <!-- Tax Rate (Percent) -->
                             <div class="d-flex justify-content-between align-items-center mb-2" id="orderTaxPercentRowModal">
-                                <span class="text-muted fs-12 fw-semibold">Tax Rate (%)</span>
+                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.tax_rate_percent') }}</span>
                                 <input type="number" id="orderTaxPercentModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="0.00">
                             </div>
 
@@ -906,14 +914,14 @@
 
                             <!-- Tax Amount -->
                             <div class="d-flex justify-content-between align-items-center mb-2" id="summaryTaxRowModal">
-                                <span class="text-muted fs-12 fw-semibold">Tax Amount</span>
+                                <span class="text-muted fs-12 fw-semibold">{{ __('purchase.tax_amount') }}</span>
                                 <input type="text" id="summaryTaxTextModal" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                 <input type="hidden" name="tax_amount" id="summaryTaxModal" value="0.00">
                             </div>
 
                             <!-- Grand Total -->
                             <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                <span class="fw-bold fs-13" style="color: #2563eb;">Grand Total</span>
+                                <span class="fw-bold fs-13" style="color: #2563eb;">{{ __('purchase.grand_total') }}</span>
                                 <input type="text" id="summaryGrandtotalTextModal" class="form-control form-control-sm text-end fw-extrabold" style="width: 140px; height: 32px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb;" readonly value="0.00">
                                 <input type="hidden" name="grand_total" id="summaryGrandtotalModal" value="0.00">
                             </div>
@@ -928,9 +936,9 @@
         </div>
 
         <x-slot name="footer">
-            <x-ui.button variant="light" class="border" data-bs-dismiss="modal">Cancel</x-ui.button>
+            <x-ui.button variant="light" class="border" data-bs-dismiss="modal">{{ __('purchase.cancel') }}</x-ui.button>
             <x-ui.button variant="primary" icon="feather-check" id="btn-confirm-po" type="submit" style="background-color: #714B67; border-color: #714B67;">
-                Confirm &amp; Create PO
+                {{ __('purchase.confirm_create_po') }}
             </x-ui.button>
         </x-slot>
     </x-ui.modal>
@@ -1042,12 +1050,12 @@
 
                 if (!vendorId || !dbVendorId) {
                     e.preventDefault();
-                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> Please select a supplier using the radio button in the column header.');
+                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> {{ __('purchase.js_select_supplier_header') }}');
                     return false;
                 }
                 if (!items.length) {
                     e.preventDefault();
-                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> Please select at least one item.');
+                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> {{ __('purchase.js_select_at_least_one_item') }}');
                     return false;
                 }
 
@@ -1064,7 +1072,7 @@
 
                 if (unmappedProducts.length > 0) {
                     e.preventDefault();
-                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> The selected supplier is not invited to quote for the following selected item(s): <strong>' + unmappedProducts.join(', ') + '</strong>. Please uncheck these items first.');
+                    alertEl.removeClass('d-none').html('<i class="feather-alert-triangle me-1"></i> {{ __('purchase.js_supplier_not_invited_prefix') }} <strong>' + unmappedProducts.join(', ') + '</strong>. {{ __('purchase.js_supplier_not_invited_suffix') }}');
                     return false;
                 }
 

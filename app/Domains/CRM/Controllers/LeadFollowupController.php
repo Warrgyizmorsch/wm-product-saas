@@ -167,3 +167,50 @@ class LeadFollowupController extends Controller
         $lead->save();
     }
 }
+    public function destroy(LeadFollowup $followup)
+    {
+        $this->authorize('update', $followup->lead);
+
+        $lead = $followup->lead;
+
+        \App\Domains\CRM\Models\LeadHistory::logEvent(
+            $lead,
+            'activity_deleted',
+            $followup->type,
+            null,
+            "Deleted {$followup->type} activity (scheduled/logged for " . $followup->followup_date->format('d/m/Y h:i A') . ")"
+        );
+
+        $followup->delete();
+
+        // Sync Parent Lead status and next meetup date
+        $this->syncLeadStatusAndFollowupDate($lead);
+
+        return redirect()
+            ->route('crm.leads.show', $lead->id)
+            ->with('success', 'Follow-up successfully deleted!');
+    }
+
+    /**
+     * Recalculate and update the parent lead's status and next meetup date.
+     */
+    protected function syncLeadStatusAndFollowupDate(Lead $lead): void
+    {
+        // Refresh relation to get latest DB state
+        $lead->unsetRelation('followups');
+
+        // Find the next nearest pending followup
+        $nextPending = $lead->followups()
+            ->where('status', 'Pending')
+            ->orderBy('followup_date', 'asc')
+            ->first();
+
+        if ($nextPending) {
+            $lead->next_followup_date = $nextPending->followup_date;
+        } else {
+            $lead->next_followup_date = null;
+        }
+        
+        $lead->save();
+    }
+}

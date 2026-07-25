@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Goods Receipt Note - {{ $grn->grn_number }}</title>
+    <title>{{ __('purchase.goods_receipt_note') }} - {{ $grn->grn_number }}</title>
     <style>
         body {
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -108,50 +108,50 @@
         <tr>
             <td>
                 <div class="company-title">{{ $tenant?->name ?? 'SaaS ERP Workspace' }}</div>
-                <div style="color: #64748b; margin-top: 4px;">{{ $tenant?->settings['address'] ?? 'Main Store & Receiving Yard' }}</div>
+                <div style="color: #64748b; margin-top: 4px;">{{ $tenant?->settings['address'] ?? __('purchase.main_warehouse') }}</div>
             </td>
             <td class="text-right">
-                <div class="doc-title">GOODS RECEIPT NOTE</div>
+                <div class="doc-title">{{ strtoupper(__('purchase.goods_receipt_note')) }}</div>
                 <div class="font-mono" style="font-size: 14px; font-weight: bold; color: #3454d1; margin-top: 3px;">{{ $grn->grn_number }}</div>
-                <div style="margin-top: 4px;"><span class="badge-approved">{{ strtoupper($grn->status) }}</span></div>
+                <div style="margin-top: 4px;"><span class="badge-approved">{{ strtoupper(__('purchase.status_' . strtolower($grn->status))) }}</span></div>
             </td>
         </tr>
     </table>
 
     <table class="info-table">
         <tr>
-            <td class="info-header">Purchase Order #:</td>
-            <td class="font-mono" style="font-weight: bold;">{{ $grn->purchaseOrder ? $grn->purchaseOrder->purchase_order_number : 'Direct Receipt' }}</td>
-            <td class="info-header">Receipt Date:</td>
+            <td class="info-header">{{ __('purchase.purchase_order') }} #:</td>
+            <td class="font-mono" style="font-weight: bold;">{{ $grn->purchaseOrder ? $grn->purchaseOrder->purchase_order_number : __('purchase.direct_receipt') }}</td>
+            <td class="info-header">{{ __('purchase.receipt_date') }}:</td>
             <td>{{ $grn->received_date ? $grn->received_date->format('d-M-Y') : '—' }}</td>
         </tr>
         <tr>
-            <td class="info-header">Vendor Name:</td>
+            <td class="info-header">{{ __('purchase.supplier_vendor') }}:</td>
             <td style="font-weight: bold; color: #1e293b;">{{ $grn->vendor?->name ?? 'N/A' }}</td>
-            <td class="info-header">Warehouse:</td>
-            <td>{{ $grn->warehouse?->name ?? 'Main Warehouse' }}</td>
+            <td class="info-header">{{ __('purchase.warehouse') }}:</td>
+            <td>{{ $grn->warehouse?->name ?? __('purchase.main_warehouse') }}</td>
         </tr>
         <tr>
-            <td class="info-header">Challan / Invoice #:</td>
+            <td class="info-header">{{ __('purchase.challan_invoice_no') }}:</td>
             <td>{{ $grn->challan_number ?: '—' }}</td>
-            <td class="info-header">Challan Date:</td>
+            <td class="info-header">{{ __('purchase.challan_date') }}:</td>
             <td>{{ $grn->challan_date ? $grn->challan_date->format('d-M-Y') : '—' }}</td>
         </tr>
         <tr>
-            <td class="info-header">Transporter Name:</td>
+            <td class="info-header">{{ __('purchase.transporter_name') }}:</td>
             <td>{{ $grn->transporter_name ?: '—' }}</td>
-            <td class="info-header">Vehicle Number:</td>
+            <td class="info-header">{{ __('purchase.vehicle_number') }}:</td>
             <td>{{ $grn->vehicle_number ?: '—' }}</td>
         </tr>
         <tr>
-            <td class="info-header">L.R. Number:</td>
+            <td class="info-header">{{ __('purchase.lr_number') }}:</td>
             <td colspan="3">{{ $grn->lr_number ?: '—' }}</td>
         </tr>
     </table>
 
     @if($grn->notes)
         <div style="margin-bottom: 12px; padding: 6px 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3px;">
-            <strong>Store Remarks:</strong> {{ $grn->notes }}
+            <strong>{{ __('purchase.store_remarks') }}:</strong> {{ $grn->notes }}
         </div>
     @endif
 
@@ -159,13 +159,13 @@
         <thead>
             <tr>
                 <th style="width: 4%;">#</th>
-                <th style="width: 30%;">Product Description</th>
-                <th class="text-center" style="width: 10%;">Ordered</th>
-                <th class="text-center" style="width: 10%;">Prev Rec</th>
-                <th class="text-center" style="width: 10%;">Received</th>
-                <th class="text-center" style="width: 9%;">Rejected</th>
-                <th class="text-center" style="width: 10%;">Accepted</th>
-                <th class="text-right" style="width: 17%;">Total ({{ $currency }})</th>
+                <th style="width: 30%;">{{ __('purchase.product_description') }}</th>
+                <th class="text-center" style="width: 10%;">{{ __('purchase.ordered') }}</th>
+                <th class="text-center" style="width: 10%;">{{ __('purchase.prev_rec_short') }}</th>
+                <th class="text-center" style="width: 10%;">{{ __('purchase.received') }}</th>
+                <th class="text-center" style="width: 9%;">{{ __('purchase.rejected') }}</th>
+                <th class="text-center" style="width: 10%;">{{ __('purchase.accepted') }}</th>
+                <th class="text-right" style="width: 17%;">{{ __('purchase.total_amount') }} ({{ $currency }})</th>
             </tr>
         </thead>
         <tbody>
@@ -198,9 +198,9 @@
                     <td class="text-center">{{ $idx + 1 }}</td>
                     <td>
                         <strong>{{ $item->product?->name }}</strong>
-                        <div style="font-size: 8.5px; color: #64748b;">SKU: {{ $item->product?->sku ?? 'N/A' }} | UOM: {{ $item->product?->uom?->name ?? 'Pcs' }}</div>
+                        <div style="font-size: 8.5px; color: #64748b;">{{ __('purchase.sku') }}: {{ $item->product?->sku ?? 'N/A' }} | UOM: {{ $item->product?->uom?->name ?? 'Pcs' }}</div>
                         @if($item->remarks)
-                            <div style="font-size: 8.5px; color: #dc2626;">Remarks: {{ $item->remarks }}</div>
+                            <div style="font-size: 8.5px; color: #dc2626;">{{ __('purchase.remarks') }}: {{ $item->remarks }}</div>
                         @endif
                     </td>
                     <td class="text-center font-mono">{{ number_format($item->ordered_qty, 2) }}</td>
@@ -212,7 +212,7 @@
                 </tr>
             @endforeach
             <tr style="background-color: #f8fafc; font-weight: bold;">
-                <td colspan="4" class="text-right">Total Summary:</td>
+                <td colspan="4" class="text-right">{{ __('purchase.total_summary') }}:</td>
                 <td class="text-center font-mono" style="color: #2563eb;">{{ number_format($totRec, 2) }}</td>
                 <td class="text-center font-mono" style="color: #dc2626;">{{ number_format($totRej, 2) }}</td>
                 <td class="text-center font-mono" style="color: #166534;">{{ number_format($totAcc, 2) }}</td>
@@ -224,13 +224,13 @@
     <table class="signature-table">
         <tr>
             <td>
-                <div class="sign-line">Received By (Store Keeper)</div>
+                <div class="sign-line">{{ __('purchase.received_by_store_keeper') }}</div>
             </td>
             <td>
-                <div class="sign-line">Quality Inspected By</div>
+                <div class="sign-line">{{ __('purchase.quality_inspected_by') }}</div>
             </td>
             <td>
-                <div class="sign-line">Authorized Signatory</div>
+                <div class="sign-line">{{ __('purchase.authorized_signatory') }}</div>
             </td>
         </tr>
     </table>

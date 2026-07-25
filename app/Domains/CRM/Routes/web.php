@@ -67,6 +67,7 @@ Route::prefix('crm')
         Route::get('quotations/create', [QuotationController::class, 'create'])->name('quotations.create');
         Route::post('quotations', [QuotationController::class, 'store'])->name('quotations.store');
         Route::get('quotations/{quotation}', [QuotationController::class, 'show'])->name('quotations.show');
+        Route::get('quotations/{quotation}/detail-partial', [QuotationController::class, 'detailPartial'])->name('quotations.detail-partial');
         Route::get('quotations/{quotation}/download', [QuotationController::class, 'downloadPdf'])->name('quotations.download');
         Route::get('quotations/{quotation}/edit', [QuotationController::class, 'edit'])->name('quotations.edit');
         Route::put('quotations/{quotation}', [QuotationController::class, 'update'])->name('quotations.update');

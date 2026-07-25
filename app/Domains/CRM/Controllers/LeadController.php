@@ -27,7 +27,7 @@ class LeadController extends Controller
     {
         $this->authorize('viewAny', Lead::class);
 
-        $query = Lead::query();
+        $query = Lead::query()->with('quotations');
 
         // Search Keywords
         if ($search = $request->input('search')) {
@@ -53,6 +53,15 @@ class LeadController extends Controller
         // Status Filter
         if ($status = $request->input('status')) {
             $query->where('status', $status);
+        }
+
+        // Quotation Status Filter
+        if ($quotationStatus = $request->input('quotation_status')) {
+            if ($quotationStatus === 'with_quotation') {
+                $query->has('quotations');
+            } elseif ($quotationStatus === 'without_quotation') {
+                $query->doesntHave('quotations');
+            }
         }
 
         // Sorting

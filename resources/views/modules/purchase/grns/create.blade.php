@@ -1,12 +1,12 @@
 @extends('layouts.duralux')
 
-@section('title', 'New Goods Receipt Note | SaaS ERP')
-@section('page-title', 'Create Goods Receipt Note (GRN)')
-@section('breadcrumb', 'Purchase / Goods Receipt Notes / Create')
+@section('title', __('purchase.new_goods_receipt') . ' | SaaS ERP')
+@section('page-title', __('purchase.create_goods_receipt_note'))
+@section('breadcrumb', __('ui.purchase') . ' / ' . __('purchase.goods_receipt_notes') . ' / ' . __('purchase.create'))
 
 @section('page-actions')
     <x-ui.button href="{{ route('purchase.grns.index') }}" variant="light" icon="feather-arrow-left" class="border">
-        Back to GRNs
+        {{ __('purchase.back_to_grns') }}
     </x-ui.button>
 @endsection
 
@@ -29,12 +29,12 @@
                 <x-ui.odoo-form-ui type="sheet" class="shadow-sm rounded border-0">
                     <div class="border-bottom py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div class="d-flex align-items-center">
-                            <h5 class="fw-bold text-dark mb-0 me-3"><i class="feather-plus-circle text-primary me-2"></i>New Goods Receipt Note</h5>
+                            <h5 class="fw-bold text-dark mb-0 me-3"><i class="feather-plus-circle text-primary me-2"></i>{{ __('purchase.new_goods_receipt') }}</h5>
                             <span class="badge bg-soft-primary text-primary px-2.5 py-1 fw-bold fs-11 font-monospace">{{ $grnNumber }}</span>
                         </div>
                         <div>
                             <x-ui.button type="submit" variant="primary" icon="feather-save" class="fw-bold px-4 py-2">
-                                Save GRN
+                                {{ __('purchase.save_grn') }}
                             </x-ui.button>
                         </div>
                     </div>
@@ -43,10 +43,10 @@
                         <!-- Header Form Controls -->
                         <div class="row g-3 fs-13 pb-4 border-bottom">
                             <div class="col-md-6 border-end">
-                                <h6 class="fw-bold text-primary mb-3">PO & Supplier Details</h6>
+                                <h6 class="fw-bold text-primary mb-3">{{ __('purchase.po_supplier_details') }}</h6>
 
-                                <x-ui.odoo-form-ui type="select" label="Select PO" name="purchase_order_id" id="po_selector" :required="true" :error-text="$errors->first('purchase_order_id')">
-                                    <option value="">-- Choose Approved Purchase Order --</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.select_po') }}" name="purchase_order_id" id="po_selector" :required="true" :error-text="$errors->first('purchase_order_id')">
+                                    <option value="">-- {{ __('purchase.choose_approved_po') }} --</option>
                                     @foreach($approvedOrders as $po)
                                         @php
                                             $ordQty = (float)$po->items->sum('quantity');
@@ -61,12 +61,12 @@
 
                                 <div class="row g-2">
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Vendor Name" name="vendor_display" id="vendor_display" value="{{ $selectedPo?->vendor?->name ?? '' }}" readonly="true" placeholder="Auto-loaded from PO" :error-text="$errors->first('vendor_id')" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.supplier_vendor') }}" name="vendor_display" id="vendor_display" value="{{ $selectedPo?->vendor?->name ?? '' }}" readonly="true" placeholder="{{ __('purchase.autoloaded_from_po') }}" :error-text="$errors->first('vendor_id')" />
                                         <input type="hidden" name="vendor_id" id="vendor_id" value="{{ $selectedPo?->vendor_id ?? '' }}">
                                     </div>
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id" id="warehouse_id" :required="true" :error-text="$errors->first('warehouse_id')">
-                                            <option value="">Select Warehouse...</option>
+                                        <x-ui.odoo-form-ui type="select" label="{{ __('purchase.warehouse') }}" name="warehouse_id" id="warehouse_id" :required="true" :error-text="$errors->first('warehouse_id')">
+                                            <option value="">{{ __('purchase.select_warehouse_placeholder') }}</option>
                                             @foreach($warehouses as $wh)
                                                 <option value="{{ $wh->id }}" @selected(($selectedPo && $selectedPo->warehouse?->id === $wh->id) || $loop->first)>
                                                     {{ $wh->name }}
@@ -76,72 +76,72 @@
                                     </div>
                                 </div>
 
-                                <x-ui.odoo-form-ui type="input" inputType="date" label="Receipt Date" name="received_date" id="received_date" value="{{ old('received_date', date('Y-m-d')) }}" :required="true" :error-text="$errors->first('received_date')" />
+                                <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('purchase.receipt_date') }}" name="received_date" id="received_date" value="{{ old('received_date', date('Y-m-d')) }}" :required="true" :error-text="$errors->first('received_date')" />
                             </div>
 
                             <div class="col-md-6">
-                                <h6 class="fw-bold text-primary mb-3">Challan & Logistics Details</h6>
+                                <h6 class="fw-bold text-primary mb-3">{{ __('purchase.challan_logistics_details') }}</h6>
 
                                 <div class="row g-2">
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Challan / Invoice No" name="challan_number" id="challan_number" value="{{ old('challan_number') }}" placeholder="Supplier Challan No" :error-text="$errors->first('challan_number')" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.challan_invoice_no') }}" name="challan_number" id="challan_number" value="{{ old('challan_number') }}" placeholder="{{ __('purchase.supplier_challan_no') }}" :error-text="$errors->first('challan_number')" />
                                     </div>
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" inputType="date" label="Challan Date" name="challan_date" id="challan_date" value="{{ old('challan_date', date('Y-m-d')) }}" :error-text="$errors->first('challan_date')" />
+                                        <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('purchase.challan_date') }}" name="challan_date" id="challan_date" value="{{ old('challan_date', date('Y-m-d')) }}" :error-text="$errors->first('challan_date')" />
                                     </div>
                                 </div>
 
                                 <div class="row g-2">
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Transporter Name" name="transporter_name" id="transporter_name" value="{{ old('transporter_name') }}" placeholder="Courier / Transporter" :error-text="$errors->first('transporter_name')" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.transporter_name') }}" name="transporter_name" id="transporter_name" value="{{ old('transporter_name') }}" placeholder="{{ __('purchase.courier_transporter_placeholder') }}" :error-text="$errors->first('transporter_name')" />
                                     </div>
                                     <div class="col-md-6">
-                                        <x-ui.odoo-form-ui type="input" label="Vehicle Number" name="vehicle_number" id="vehicle_number" value="{{ old('vehicle_number') }}" placeholder="e.g. MH-12-AB-1234" :error-text="$errors->first('vehicle_number')" />
+                                        <x-ui.odoo-form-ui type="input" label="{{ __('purchase.vehicle_number') }}" name="vehicle_number" id="vehicle_number" value="{{ old('vehicle_number') }}" placeholder="e.g. MH-12-AB-1234" :error-text="$errors->first('vehicle_number')" />
                                     </div>
                                 </div>
 
-                                <x-ui.odoo-form-ui type="input" label="L.R. Number" name="lr_number" id="lr_number" value="{{ old('lr_number') }}" placeholder="Lorry Receipt / Docket No" :error-text="$errors->first('lr_number')" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('purchase.lr_number') }}" name="lr_number" id="lr_number" value="{{ old('lr_number') }}" placeholder="Lorry Receipt / Docket No" :error-text="$errors->first('lr_number')" />
                             </div>
                         </div>
 
                         <!-- Notes Section -->
                         <div class="mt-3 mb-4">
-                            <x-ui.odoo-form-ui type="textarea" label="Store Receipt Remarks / Notes" name="notes" placeholder="Enter any store verification remarks or package condition notes..." rows="2" :error-text="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('purchase.store_receipt_remarks') }}" name="notes" placeholder="{{ __('purchase.store_receipt_remarks_placeholder') }}" rows="2" :error-text="$errors->first('notes')">{{ old('notes') }}</x-ui.odoo-form-ui>
                         </div>
 
                         <!-- Item Matrix Section using Common Odoo Table Component -->
                         <div class="mt-4">
                             <div class="d-flex align-items-center justify-content-between mb-3">
-                                <h6 class="fw-bold text-primary mb-0"><i class="feather-layers text-primary me-2"></i>Received Products Matrix</h6>
-                                <span class="badge bg-soft-info text-info fs-11 fw-semibold" id="itemsCountBadge">0 Items</span>
+                                <h6 class="fw-bold text-primary mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.received_products_matrix') }}</h6>
+                                <span class="badge bg-soft-info text-info fs-11 fw-semibold" id="itemsCountBadge">0 {{ __('purchase.items') }}</span>
                             </div>
 
-                            <div class="table-responsive border rounded bg-white">
+                             <div class="table-responsive border rounded bg-white">
                                 <x-ui.odoo-form-ui type="table" id="grnItemsTable">
                                     <thead class="table-light">
                                         <tr>
                                             <th style="width: 4%;">#</th>
-                                            <th style="width: 25%;">Product Details</th>
-                                            <th style="width: 10%;" class="text-center">Ordered</th>
-                                            <th style="width: 10%;" class="text-center">Prev. Rec.</th>
-                                            <th style="width: 10%;" class="text-center">Remaining</th>
-                                            <th style="width: 11%;" class="text-center">Receive Qty <span class="text-danger">*</span></th>
-                                            <th style="width: 10%;" class="text-center">Reject Qty</th>
-                                            <th style="width: 10%;" class="text-center">Accepted</th>
-                                            <th style="width: 10%;" class="text-end">Rate ({{ $currency }})</th>
-                                            <th style="width: 12%;" class="text-end">Total ({{ $currency }})</th>
+                                            <th style="width: 25%;">{{ __('purchase.product_description') }}</th>
+                                            <th style="width: 10%;" class="text-center">{{ __('purchase.ordered') }}</th>
+                                            <th style="width: 10%;" class="text-center">{{ __('purchase.prev_received') }}</th>
+                                            <th style="width: 10%;" class="text-center">{{ __('purchase.remaining_qty') }}</th>
+                                            <th style="width: 11%;" class="text-center">{{ __('purchase.receive_qty') }} <span class="text-danger">*</span></th>
+                                            <th style="width: 10%;" class="text-center">{{ __('purchase.reject_qty') }}</th>
+                                            <th style="width: 10%;" class="text-center">{{ __('purchase.accepted') }}</th>
+                                            <th style="width: 10%;" class="text-end">{{ __('purchase.unit_rate') }} ({{ $currency }})</th>
+                                            <th style="width: 12%;" class="text-end">{{ __('purchase.total_amount') }} ({{ $currency }})</th>
                                         </tr>
                                     </thead>
                                     <tbody id="grnItemsTbody">
                                         <tr>
                                             <td colspan="10" class="text-center py-4 text-muted">
-                                                <i class="feather-info me-1"></i>Please select a Purchase Order above to load item details.
+                                                <i class="feather-info me-1"></i>{{ __('purchase.select_po_to_load_details') }}
                                             </td>
                                         </tr>
                                     </tbody>
                                     <tfoot class="table-light fw-bold" id="grnItemsTfoot" style="display: none;">
                                         <tr>
-                                            <td colspan="5" class="text-end">Totals:</td>
+                                            <td colspan="5" class="text-end">{{ __('purchase.totals') }}:</td>
                                             <td class="text-center font-monospace text-primary fs-13" id="footTotalReceive">0.00</td>
                                             <td class="text-center font-monospace text-danger fs-13" id="footTotalReject">0.00</td>
                                             <td class="text-center font-monospace text-success fs-13" id="footTotalAccepted">0.00</td>
@@ -172,7 +172,7 @@
 
             var url = "{{ route('purchase.grns.get-po-items', ':poId') }}".replace(':poId', poId);
             
-            $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading Purchase Order Items...</td></tr>');
+            $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>{{ __('purchase.js_loading_po_items') }}</td></tr>');
 
             $.ajax({
                 url: url,
@@ -187,11 +187,11 @@
 
                         renderPoItems(res.items);
                     } else {
-                        alert('Failed to load PO details.');
+                        alert('{{ __('purchase.js_failed_to_load_po_details') }}');
                     }
                 },
                 error: function() {
-                    alert('Error fetching Purchase Order items.');
+                    alert('{{ __('purchase.js_error_fetching_po_items') }}');
                     resetGrnItems();
                 }
             });
@@ -205,14 +205,14 @@
         function resetGrnItems() {
             $('#vendor_display').val('');
             $('#vendor_id').val('');
-            $('#itemsCountBadge').text('0 Items');
-            $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted"><i class="feather-info me-1"></i>Please select a Purchase Order above to load item details.</td></tr>');
+            $('#itemsCountBadge').text('0 {{ __('purchase.items') }}');
+            $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted"><i class="feather-info me-1"></i>{{ __('purchase.select_po_to_load_details') }}</td></tr>');
             $('#grnItemsTfoot').hide();
         }
 
         function renderPoItems(items) {
             if (!items || items.length === 0) {
-                $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted">No pending items found for this Purchase Order.</td></tr>');
+                $('#grnItemsTbody').html('<tr><td colspan="10" class="text-center py-4 text-muted">{{ __('purchase.js_no_pending_items_found') }}</td></tr>');
                 $('#grnItemsTfoot').hide();
                 return;
             }
@@ -236,7 +236,7 @@
                                     <div class="fs-11 text-muted">Code: ${item.product_code || 'N/A'} | UOM: <strong>${item.uom_name}</strong></div>
                                 </div>
                                 <button type="button" class="btn btn-xs bg-soft-primary text-primary border-0 btn-toggle-remark ms-2 px-2 py-1 rounded-pill fw-semibold" data-target="#remark_row_${idx}">
-                                    <i class="feather-plus me-1 fs-11"></i><span class="btn-lbl">Note</span>
+                                    <i class="feather-plus me-1 fs-11"></i><span class="btn-lbl">{{ __('purchase.note_lbl') }}</span>
                                 </button>
                             </div>
                             <input type="hidden" name="items[${idx}][purchase_order_item_id]" value="${item.purchase_order_item_id}">
@@ -273,13 +273,13 @@
                             <div class="p-3 rounded-3 border bg-white shadow-xs">
                                 <div class="d-flex align-items-center gap-2 mb-1.5">
                                     <span class="badge bg-soft-primary text-primary fs-10 fw-bold text-uppercase">
-                                        <i class="feather-message-square me-1"></i>Item Remarks / Rejection Reason
+                                        <i class="feather-message-square me-1"></i>{{ __('purchase.item_remarks_rejection_reason') }}
                                     </span>
-                                    <span class="fs-11 text-muted">For <strong>${item.product_name}</strong></span>
+                                    <span class="fs-11 text-muted">{{ __('purchase.for') }} <strong>${item.product_name}</strong></span>
                                 </div>
                                 <input type="text" class="odoo-table-input fs-12 text-dark px-2 py-1" 
                                        name="items[${idx}][remarks]" 
-                                       placeholder="Enter rejection cause, damage details, or item notes for ${item.product_name}...">
+                                       placeholder="{{ __('purchase.js_enter_rejection_remarks') }} ${item.product_name}...">
                             </div>
                         </td>
                     </tr>
@@ -287,7 +287,7 @@
             });
 
             $('#grnItemsTbody').html(html);
-            $('#itemsCountBadge').text(items.length + ' Items');
+            $('#itemsCountBadge').text(items.length + ' ' + (items.length === 1 ? '{{ __('purchase.item') }}' : '{{ __('purchase.items') }}'));
             $('#grnItemsTfoot').show();
 
             recalculateTotals();
@@ -303,11 +303,11 @@
             if (icon.hasClass('feather-plus')) {
                 icon.removeClass('feather-plus').addClass('feather-minus');
                 $(this).removeClass('bg-soft-primary text-primary').addClass('bg-soft-danger text-danger');
-                lbl.text('Hide');
+                lbl.text('{{ __('purchase.hide_lbl') }}');
             } else {
                 icon.removeClass('feather-minus').addClass('feather-plus');
                 $(this).removeClass('bg-soft-danger text-danger').addClass('bg-soft-primary text-primary');
-                lbl.text('Note');
+                lbl.text('{{ __('purchase.note_lbl') }}');
             }
         });
 
@@ -323,13 +323,13 @@
             var rejVal = parseFloat(rejectInput.val()) || 0;
 
             if (recVal > remaining) {
-                alert('Received Qty cannot exceed Remaining Qty (' + remaining.toFixed(2) + ')');
+                alert('{{ __('purchase.js_rec_qty_exceed_rem') }} (' + remaining.toFixed(2) + ')');
                 recVal = remaining;
                 receiveInput.val(recVal.toFixed(2));
             }
 
             if (rejVal > recVal) {
-                alert('Rejected Qty cannot exceed Received Qty (' + recVal.toFixed(2) + ')');
+                alert('{{ __('purchase.js_rej_qty_exceed_rec') }} (' + recVal.toFixed(2) + ')');
                 rejVal = recVal;
                 rejectInput.val(rejVal.toFixed(2));
             }
@@ -341,7 +341,7 @@
                 remarkRow.slideDown(150);
                 toggleBtn.find('i').removeClass('feather-plus').addClass('feather-minus');
                 toggleBtn.removeClass('bg-soft-primary text-primary').addClass('bg-soft-danger text-danger');
-                toggleBtn.find('.btn-lbl').text('Hide');
+                toggleBtn.find('.btn-lbl').text('{{ __('purchase.hide_lbl') }}');
             }
 
             var accVal = Math.max(0, recVal - rejVal);

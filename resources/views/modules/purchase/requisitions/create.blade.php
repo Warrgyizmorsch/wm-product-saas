@@ -1,9 +1,9 @@
 @extends('layouts.duralux')
 
-@section('title', 'Create Purchase Request | SaaS ERP')
-@section('page-title', 'New Purchase Request')
+@section('title', __('purchase.create_purchase_request') . ' | SaaS ERP')
+@section('page-title', __('purchase.create_purchase_request'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.requisitions.index') }}">Purchase Requests</a> &gt; Create
+    <a href="{{ route('purchase.requisitions.index') }}">{{ __('purchase.purchase_requests') }}</a> &gt; {{ __('purchase.create') }}
 @endsection
 
 @push('styles')
@@ -23,15 +23,15 @@
                     <!-- Top buttons bar -->
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
                         <div>
-                            <h4 class="fw-bold text-dark mb-0">Create Purchase Request</h4>
-                            <small class="text-muted fs-12">Submit a draft purchase request. You can select a reference document as a source.</small>
+                            <h4 class="fw-bold text-dark mb-0">{{ __('purchase.create_purchase_request') }}</h4>
+                            <small class="text-muted fs-12">{{ __('purchase.create_req_help') }}</small>
                         </div>
                         <div class="d-flex gap-2">
                             <x-ui.button href="{{ route('purchase.requisitions.index') }}" variant="light" size="sm">
-                                Cancel
+                                {{ __('purchase.cancel') }}
                             </x-ui.button>
                             <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">
-                                Save Draft
+                                {{ __('purchase.save') }}
                             </x-ui.button>
                         </div>
                     </div>
@@ -39,23 +39,23 @@
                     <div class="row g-4 fs-13 text-dark">
                         <!-- Left: Metadata & Source Info -->
                         <div class="col-md-6 border-end">
-                            <h6 class="fw-bold text-primary mb-3">Requisition Information</h6>
+                            <h6 class="fw-bold text-primary mb-3">{{ __('purchase.req_details') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" label="Requisition Date" name="requisition_date" inputType="date" :value="old('requisition_date', date('Y-m-d'))" required="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.requisition_date') }}" name="requisition_date" inputType="date" :value="old('requisition_date', date('Y-m-d'))" required="true" />
                             
-                            <x-ui.odoo-form-ui type="select" label="Source Type" name="source_type" id="sourceTypeSelect" required="true">
-                                <option value="direct" @selected(old('source_type') === 'direct')>Direct / Manual</option>
-                                <option value="so" @selected(old('source_type') === 'so')>Sales Order</option>
-                                <option value="mo" @selected(old('source_type') === 'mo')>Manufacturing Order (MO)</option>
-                                <option value="material_request" @selected(old('source_type') === 'material_request')>Material Request (Prod)</option>
-                                <option value="material_requirement" @selected(old('source_type') === 'material_requirement')>Material Requirement (Store)</option>
-                                <option value="requisition_slip" @selected(old('source_type') === 'requisition_slip')>Requisition Slip</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.source_type') }}" name="source_type" id="sourceTypeSelect" required="true">
+                                <option value="direct" @selected(old('source_type') === 'direct')>{{ __('purchase.source_direct') }}</option>
+                                <option value="so" @selected(old('source_type') === 'so')>{{ __('purchase.source_so') }}</option>
+                                <option value="mo" @selected(old('source_type') === 'mo')>{{ __('purchase.source_mo') }}</option>
+                                <option value="material_request" @selected(old('source_type') === 'material_request')>{{ __('purchase.source_material_request') }}</option>
+                                <option value="material_requirement" @selected(old('source_type') === 'material_requirement')>{{ __('purchase.source_material_requirement') }}</option>
+                                <option value="requisition_slip" @selected(old('source_type') === 'requisition_slip')>{{ __('purchase.source_requisition_slip') }}</option>
                             </x-ui.odoo-form-ui>
 
                             <!-- Dynamic Source Reference Containers -->
                             <div class="source-ref-container" id="container-so" style="display: none;">
-                                <x-ui.odoo-form-ui type="select" label="Sales Order Reference" name="sales_order_id">
-                                    <option value="">Select Sales Order...</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.source_so') }} {{ __('purchase.reference') }}" name="sales_order_id">
+                                    <option value="">{{ __('purchase.select_so') }}</option>
                                     @foreach($salesOrders as $so)
                                         <option value="{{ $so->id }}" @selected(old('sales_order_id') == $so->id)>{{ $so->sales_order_number }} ({{ $so->customer?->name }})</option>
                                     @endforeach
@@ -63,8 +63,8 @@
                             </div>
 
                             <div class="source-ref-container" id="container-mo" style="display: none;">
-                                <x-ui.odoo-form-ui type="select" label="Manufacturing Order Reference" name="production_order_id">
-                                    <option value="">Select Production Order...</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.source_mo') }} {{ __('purchase.reference') }}" name="production_order_id">
+                                    <option value="">{{ __('purchase.select_mo') }}</option>
                                     @foreach($productionOrders as $mo)
                                         <option value="{{ $mo->id }}" @selected(old('production_order_id') == $mo->id)>{{ $mo->order_number }} ({{ $mo->product?->name }})</option>
                                     @endforeach
@@ -72,8 +72,8 @@
                             </div>
 
                             <div class="source-ref-container" id="container-material_request" style="display: none;">
-                                <x-ui.odoo-form-ui type="select" label="Material Request Slip Reference" name="production_requisition_slip_id">
-                                    <option value="">Select Material Request...</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.source_material_request') }} {{ __('purchase.reference') }}" name="production_requisition_slip_id">
+                                    <option value="">{{ __('purchase.select_mr') }}</option>
                                     @foreach($materialRequests as $mr)
                                         <option value="{{ $mr->id }}" @selected(old('production_requisition_slip_id') == $mr->id)>{{ $mr->requisition_number }} (MO: {{ $mr->order?->order_number }})</option>
                                     @endforeach
@@ -81,8 +81,8 @@
                             </div>
 
                             <div class="source-ref-container" id="container-material_requirement" style="display: none;">
-                                <x-ui.odoo-form-ui type="select" label="Material Requirement Reference" name="material_requirement_id">
-                                    <option value="">Select Material Requirement...</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.source_material_requirement') }} {{ __('purchase.reference') }}" name="material_requirement_id">
+                                    <option value="">{{ __('purchase.select_mreq') }}</option>
                                     @foreach($materialRequirements as $mreq)
                                         <option value="{{ $mreq->id }}" @selected(old('material_requirement_id') == $mreq->id)>{{ $mreq->requirement_number }} (SO: {{ $mreq->salesOrder?->sales_order_number }})</option>
                                     @endforeach
@@ -90,28 +90,28 @@
                             </div>
 
                             <div class="source-ref-container" id="container-requisition_slip" style="display: none;">
-                                <x-ui.odoo-form-ui type="input" label="Requisition Slip Number" name="requisition_slip_number" :value="old('requisition_slip_number')" placeholder="e.g. SLIP-2026-98765" />
+                                <x-ui.odoo-form-ui type="input" label="{{ __('purchase.source_requisition_slip') }} {{ __('purchase.number') }}" name="requisition_slip_number" :value="old('requisition_slip_number')" placeholder="{{ __('purchase.slip_placeholder') }}" />
                             </div>
                         </div>
 
                         <!-- Right: Notes & Additional Info -->
                         <div class="col-md-6">
-                            <h6 class="fw-bold text-primary mb-3">Additional Details</h6>
-                            <x-ui.odoo-form-ui type="textarea" label="Notes" name="notes" rows="6" placeholder="Procurement reason, vendor recommendations, priority remarks, etc.">{{ old('notes') }}</x-ui.odoo-form-ui>
+                            <h6 class="fw-bold text-primary mb-3">{{ __('purchase.additional_details') }}</h6>
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('purchase.notes') }}" name="notes" rows="6" placeholder="{{ __('purchase.notes_placeholder') }}">{{ old('notes') }}</x-ui.odoo-form-ui>
                         </div>
                     </div>
 
                     <!-- Requisition Items Dynamic Section -->
                     <div class="mt-5">
-                        <h5 class="fw-bold text-dark mb-3"><i class="feather-layers text-primary me-2"></i>Requisition Line Items</h5>
+                        <h5 class="fw-bold text-dark mb-3"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.requisition_line_items') }}</h5>
                         <div class="table-responsive">
                             <table class="odoo-table" id="prItemsTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 40%">Product <span class="text-danger">*</span></th>
-                                        <th style="width: 25%">Destination Warehouse</th>
-                                        <th class="text-end" style="width: 15%">Quantity <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 15%">Est. Cost (₹) <span class="text-danger">*</span></th>
+                                        <th style="width: 40%">{{ __('purchase.product') }} <span class="text-danger">*</span></th>
+                                        <th style="width: 25%">{{ __('purchase.destination_warehouse') }}</th>
+                                        <th class="text-end" style="width: 15%">{{ __('purchase.quantity') }} <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 15%">{{ __('purchase.estimated_cost') }} <span class="text-danger">*</span></th>
                                         <th class="text-center" style="width: 5%"></th>
                                     </tr>
                                 </thead>
@@ -120,15 +120,15 @@
                                     <tr class="item-row" data-index="0">
                                         <td>
                                             <x-ui.odoo-form-ui type="select" name="items[0][product_id]" required="true" class="product-select select2-simple">
-                                                <option value="">Select Product...</option>
+                                                <option value="">{{ __('purchase.select_product') }}</option>
                                                 @foreach($products as $p)
-                                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
+                                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                 @endforeach
                                             </x-ui.odoo-form-ui>
                                         </td>
                                         <td>
                                             <x-ui.odoo-form-ui type="select" name="items[0][warehouse_id]" class="warehouse-select select2-simple">
-                                                <option value="">Select Warehouse...</option>
+                                                <option value="">{{ __('purchase.select_warehouse') }}</option>
                                                 @foreach($warehouses as $w)
                                                     <option value="{{ $w->id }}" @selected($w->is_default)>{{ $w->name }}</option>
                                                 @endforeach
@@ -149,7 +149,7 @@
                         </div>
                         <div class="mt-3">
                             <button type="button" class="btn btn-sm btn-soft-primary px-3 fw-bold" id="addRowBtn">
-                                <i class="feather-plus me-1"></i> Add Line
+                                <i class="feather-plus me-1"></i> {{ __('purchase.add_line') }}
                             </button>
                         </div>
                     </div>
@@ -205,7 +205,7 @@
                     <tr class="item-row" data-index="${rowIdx}">
                         <td>
                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select product-select select2-simple" required>
-                                <option value="">Select Product...</option>
+                                <option value="">{{ __('purchase.select_product') }}</option>
                                 @foreach($products as $p)
                                     <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
                                 @endforeach
@@ -213,7 +213,7 @@
                         </td>
                         <td>
                             <select name="items[${rowIdx}][warehouse_id]" class="odoo-table-select warehouse-select select2-simple">
-                                <option value="">Select Warehouse...</option>
+                                <option value="">{{ __('purchase.select_warehouse') }}</option>
                                 @foreach($warehouses as $w)
                                     <option value="{{ $w->id }}" @selected($w->is_default)>{{ $w->name }}</option>
                                 @endforeach

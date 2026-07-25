@@ -1,33 +1,33 @@
 @extends('layouts.duralux')
 
-@section('title', "GRN {$grn->grn_number} | SaaS ERP")
-@section('page-title', "Goods Receipt Note Details")
+@section('title', __('purchase.grn') . " {$grn->grn_number} | SaaS ERP")
+@section('page-title', __('purchase.grn_details'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.orders.index') }}">Purchase</a> &gt; <a href="{{ route('purchase.grns.index') }}">Goods Receipt Notes</a> &gt; {{ $grn->grn_number }}
+    <a href="{{ route('purchase.orders.index') }}">{{ __('ui.purchase') }}</a> &gt; <a href="{{ route('purchase.grns.index') }}">{{ __('purchase.goods_receipt_notes') }}</a> &gt; {{ $grn->grn_number }}
 @endsection
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-0">
-        <a href="{{ route('purchase.grns.index') }}" class="action-dropdown-btn me-2" title="Back to GRNs" data-bs-toggle="tooltip">
+        <a href="{{ route('purchase.grns.index') }}" class="action-dropdown-btn me-2" title="{{ __('purchase.back_to_grns') }}" data-bs-toggle="tooltip">
             <i class="feather feather-arrow-left"></i>
         </a>
-        <a href="{{ route('purchase.grns.download', $grn->id) }}" class="action-dropdown-btn me-2" title="Download PDF" data-bs-toggle="tooltip">
+        <a href="{{ route('purchase.grns.download', $grn->id) }}" class="action-dropdown-btn me-2" title="{{ __('purchase.download_pdf') }}" data-bs-toggle="tooltip">
             <i class="feather feather-download"></i>
         </a>
 
         @if($grn->status === 'Draft')
             <x-ui.button href="{{ route('purchase.grns.edit', $grn->id) }}" variant="warning" icon="feather-edit" class="me-2">
-                Edit Draft
+                {{ __('purchase.edit_draft') }}
             </x-ui.button>
-            <form action="{{ route('purchase.grns.approve', $grn->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Approve this GRN? This will update warehouse inventory stock and PO status.')">
+            <form action="{{ route('purchase.grns.approve', $grn->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('purchase.confirm_grn_approval') }}')">
                 @csrf
                 <x-ui.button type="submit" variant="success" icon="feather-check-circle" class="text-white">
-                    Approve & Update Stock
+                    {{ __('purchase.approve_update_stock') }}
                 </x-ui.button>
             </form>
         @else
             <a href="{{ route('purchase.bills.create', ['grn_id' => $grn->id]) }}" class="btn btn-success text-white fs-12 fw-bold shadow-sm">
-                <i class="feather-file-text me-1.5"></i>Create Vendor Bill
+                <i class="feather-file-text me-1.5"></i>{{ __('purchase.create_vendor_bill') }}
             </a>
         @endif
     </div>
@@ -209,8 +209,8 @@
                     <div class="d-flex align-items-center gap-2">
                         <i class="feather-check-circle fs-18 text-success"></i>
                         <div>
-                            <strong class="text-dark">Goods Receipt Approved & Inventory Stock Updated</strong>
-                            <div class="fs-12 text-muted">Stock has been credited to {{ $grn->warehouse?->name ?? 'Main Warehouse' }}. Stock transaction records created.</div>
+                            <strong class="text-dark">{{ __('purchase.grn_approved_stock_updated') }}</strong>
+                            <div class="fs-12 text-muted">{{ __('purchase.stock_credited_to') }} {{ $grn->warehouse?->name ?? __('purchase.main_warehouse') }}. {{ __('purchase.stock_transaction_records_created') }}</div>
                         </div>
                     </div>
                 </div>
@@ -229,7 +229,7 @@
                                 default => 'bg-soft-secondary text-secondary',
                             };
                         @endphp
-                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $grn->status }}</span>
+                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ __('purchase.status_' . strtolower($grn->status)) }}</span>
                     </div>
 
                     <!-- Chevron Status Pipeline -->
@@ -253,7 +253,7 @@
                                 }
                             @endphp
                             <span class="pipeline-step {{ $stepClass }}">
-                                {{ $label }}
+                                {{ __('purchase.status_' . strtolower(str_replace(' ', '_', $key))) }}
                             </span>
                         @endforeach
                     </div>
@@ -263,50 +263,50 @@
                     <!-- Top Details Grid -->
                     <div class="row g-4 fs-13 pb-4 border-bottom">
                         <div class="col-md-6 border-end">
-                            <h6 class="fw-bold text-primary mb-3">Receipt & Vendor Information</h6>
+                            <h6 class="fw-bold text-primary mb-3">{{ __('purchase.receipt_vendor_info') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" label="GRN Number" name="grn_number" :value="$grn->grn_number" readonly="true" />
-                            <x-ui.odoo-form-ui type="input" label="Purchase Order" name="po_number" :value="$grn->purchaseOrder ? $grn->purchaseOrder->purchase_order_number : 'Direct Receipt'" readonly="true" />
-                            <x-ui.odoo-form-ui type="input" label="Vendor Name" name="vendor" :value="$grn->vendor?->name ?? '—'" readonly="true" />
-                            <x-ui.odoo-form-ui type="input" label="Target Warehouse" name="warehouse" :value="$grn->warehouse?->name ?? 'Main Warehouse'" readonly="true" />
-                            <x-ui.odoo-form-ui type="input" label="Receipt Date" name="received_date" :value="$grn->received_date ? $grn->received_date->format('d-M-Y') : '—'" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.grn_number') }}" name="grn_number" :value="$grn->grn_number" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.purchase_order') }}" name="po_number" :value="$grn->purchaseOrder ? $grn->purchaseOrder->purchase_order_number : __('purchase.direct_receipt')" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.supplier_vendor') }}" name="vendor" :value="$grn->vendor?->name ?? '—'" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.target_warehouse') }}" name="warehouse" :value="$grn->warehouse?->name ?? __('purchase.main_warehouse')" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.receipt_date') }}" name="received_date" :value="$grn->received_date ? $grn->received_date->format('d-M-Y') : '—'" readonly="true" />
                         </div>
 
                         <div class="col-md-6">
-                            <h6 class="fw-bold text-primary mb-3">Challan & Transporter Information</h6>
+                            <h6 class="fw-bold text-primary mb-3">{{ __('purchase.challan_transporter_info') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" label="Challan / Invoice No" name="challan_number" :value="$grn->challan_number ?: '—'" readonly="true" />
-                            <x-ui.odoo-form-ui type="input" label="Challan Date" name="challan_date" :value="$grn->challan_date ? $grn->challan_date->format('d-M-Y') : '—'" readonly="true" />
-                            <x-ui.odoo-form-ui type="input" label="Transporter Name" name="transporter" :value="$grn->transporter_name ?: '—'" readonly="true" />
-                            <x-ui.odoo-form-ui type="input" label="Vehicle Number" name="vehicle" :value="$grn->vehicle_number ?: '—'" readonly="true" />
-                            <x-ui.odoo-form-ui type="input" label="L.R. Number" name="lr_number" :value="$grn->lr_number ?: '—'" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.challan_invoice_no') }}" name="challan_number" :value="$grn->challan_number ?: '—'" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.challan_date') }}" name="challan_date" :value="$grn->challan_date ? $grn->challan_date->format('d-M-Y') : '—'" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.transporter_name') }}" name="transporter" :value="$grn->transporter_name ?: '—'" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.vehicle_number') }}" name="vehicle" :value="$grn->vehicle_number ?: '—'" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.lr_number') }}" name="lr_number" :value="$grn->lr_number ?: '—'" readonly="true" />
                         </div>
                     </div>
 
                     <!-- Notes Section -->
                     @if($grn->notes)
                         <div class="mt-4 pt-2 mb-4">
-                            <h6 class="fw-bold text-primary mb-2">Store Receipt Remarks / Notes</h6>
+                            <h6 class="fw-bold text-primary mb-2">{{ __('purchase.store_receipt_remarks') }}</h6>
                             <p class="text-secondary bg-light p-3 rounded fs-13 border mb-0" style="white-space: pre-line;">{{ $grn->notes }}</p>
                         </div>
                     @endif
 
                     <!-- Itemized Received Table -->
                     <div class="mt-4 pt-2">
-                        <h6 class="fw-bold text-primary mb-3"><i class="feather-layers text-primary me-2"></i>Itemized Received Products</h6>
+                        <h6 class="fw-bold text-primary mb-3"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.itemized_received_products') }}</h6>
                         <div class="table-responsive border rounded bg-white mb-4">
                             <table class="table table-hover align-middle mb-0 fs-13 text-dark">
                                 <thead class="table-light">
                                     <tr>
                                         <th style="width: 4%;" class="ps-3">#</th>
-                                        <th>Product Name</th>
-                                        <th class="text-center">Ordered Qty</th>
-                                        <th class="text-center">Prev. Rec.</th>
-                                        <th class="text-center">Received</th>
-                                        <th class="text-center">Rejected</th>
-                                        <th class="text-center">Accepted</th>
-                                        <th class="text-end">Unit Rate ({{ $currency }})</th>
-                                        <th class="text-end pe-3">Total Amount ({{ $currency }})</th>
+                                        <th>{{ __('purchase.product_name') }}</th>
+                                        <th class="text-center">{{ __('purchase.ordered_qty') }}</th>
+                                        <th class="text-center">{{ __('purchase.prev_received') }}</th>
+                                        <th class="text-center">{{ __('purchase.received') }}</th>
+                                        <th class="text-center">{{ __('purchase.rejected') }}</th>
+                                        <th class="text-center">{{ __('purchase.accepted') }}</th>
+                                        <th class="text-end">{{ __('purchase.unit_rate') }} ({{ $currency }})</th>
+                                        <th class="text-end pe-3">{{ __('purchase.total_amount') }} ({{ $currency }})</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -340,9 +340,9 @@
                                             <td class="ps-3 text-center fw-semibold text-muted">{{ $idx + 1 }}</td>
                                             <td>
                                                 <div class="fw-bold text-dark">{{ $item->product?->name }}</div>
-                                                <div class="fs-11 text-muted">SKU: {{ $item->product?->sku ?? 'N/A' }} | UOM: {{ $item->product?->uom?->name ?? 'Pcs' }}</div>
+                                                <div class="fs-11 text-muted">{{ __('purchase.sku') }}: {{ $item->product?->sku ?? 'N/A' }} | UOM: {{ $item->product?->uom?->name ?? 'Pcs' }}</div>
                                                 @if($item->remarks)
-                                                    <div class="fs-11 text-danger mt-0.5"><i class="feather-info me-1"></i>Remarks: {{ $item->remarks }}</div>
+                                                    <div class="fs-11 text-danger mt-0.5"><i class="feather-info me-1"></i>{{ __('purchase.remarks') }}: {{ $item->remarks }}</div>
                                                 @endif
                                             </td>
                                             <td class="text-center font-monospace">{{ number_format($item->ordered_qty, 2) }}</td>
@@ -357,7 +357,7 @@
                                 </tbody>
                                 <tfoot class="table-light fw-bold">
                                     <tr>
-                                        <td colspan="4" class="text-end pe-3">Total Summaries:</td>
+                                        <td colspan="4" class="text-end pe-3">{{ __('purchase.total_summaries') }}:</td>
                                         <td class="text-center font-monospace text-primary fs-14">{{ number_format($totRec, 2) }}</td>
                                         <td class="text-center font-monospace text-danger fs-14">{{ number_format($totRej, 2) }}</td>
                                         <td class="text-center font-monospace text-success fs-14">{{ number_format($totAcc, 2) }}</td>
@@ -371,13 +371,13 @@
                         <!-- Audit Footer -->
                         <div class="row pt-3 text-secondary fs-12 border-top">
                             <div class="col-md-6">
-                                <div><strong>Created By:</strong> {{ $grn->creator?->name ?? 'System' }} on {{ $grn->created_at->format('d-M-Y h:i A') }}</div>
+                                <div><strong>{{ __('purchase.created_by') }}:</strong> {{ $grn->creator?->name ?? __('purchase.system') }} on {{ $grn->created_at->format('d-M-Y h:i A') }}</div>
                             </div>
                             <div class="col-md-6 text-md-end">
                                 @if($grn->status === 'Approved')
-                                    <div><strong>Approved By:</strong> {{ $grn->approver?->name ?? 'System' }} on {{ $grn->approved_at ? $grn->approved_at->format('d-M-Y h:i A') : '—' }}</div>
+                                    <div><strong>{{ __('purchase.approved_by') }}:</strong> {{ $grn->approver?->name ?? __('purchase.system') }} on {{ $grn->approved_at ? $grn->approved_at->format('d-M-Y h:i A') : '—' }}</div>
                                 @else
-                                    <div><strong>Status:</strong> <span class="badge bg-soft-warning text-warning">Draft (Pending Approval)</span></div>
+                                    <div><strong>{{ __('purchase.status') }}:</strong> <span class="badge bg-soft-warning text-warning">{{ __('purchase.draft_pending_approval') }}</span></div>
                                 @endif
                             </div>
                         </div>

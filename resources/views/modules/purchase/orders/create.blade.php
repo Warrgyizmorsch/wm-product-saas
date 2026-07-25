@@ -1,9 +1,9 @@
 @extends('layouts.duralux')
 
-@section('title', 'Create Purchase Order | SaaS ERP')
-@section('page-title', 'New Purchase Order')
+@section('title', __('purchase.create_purchase_order') . ' | SaaS ERP')
+@section('page-title', __('purchase.new_purchase_order'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.orders.index') }}">Purchase Orders</a> &gt; Create
+    <a href="{{ route('purchase.orders.index') }}">{{ __('purchase.purchase_orders') }}</a> &gt; {{ __('purchase.create') }}
 @endsection
 
 @push('styles')
@@ -59,15 +59,15 @@
                     <!-- Actions Top bar -->
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
                         <div>
-                            <h4 class="fw-bold text-dark mb-0">Create Purchase Order</h4>
-                            <small class="text-muted fs-12">Create a new purchase order directly or source it from an approved purchase request.</small>
+                            <h4 class="fw-bold text-dark mb-0">{{ __('purchase.create_purchase_order') }}</h4>
+                            <small class="text-muted fs-12">{{ __('purchase.create_po_help') }}</small>
                         </div>
                         <div class="d-flex gap-2">
                             <x-ui.button href="{{ route('purchase.orders.index') }}" variant="light" size="sm">
-                                Cancel
+                                {{ __('purchase.cancel') }}
                             </x-ui.button>
                             <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">
-                                Save Draft PO
+                                {{ __('purchase.save_draft_po') }}
                             </x-ui.button>
                         </div>
                     </div>
@@ -85,17 +85,17 @@
                     <div class="row g-4 fs-13 text-dark">
                         <!-- Left Panel: Supplier & Location details -->
                         <div class="col-md-6 border-end">
-                            <h6 class="fw-bold text-primary mb-3">Supplier & Location Details</h6>
+                            <h6 class="fw-bold text-primary mb-3">{{ __('purchase.supplier_location_details') }}</h6>
 
-                            <x-ui.odoo-form-ui type="select" label="Location / Warehouse" name="location" id="locationSelect" required="true">
-                                <option value="">Select Warehouse...</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.location_warehouse') }}" name="location" id="locationSelect" required="true">
+                                <option value="">{{ __('purchase.select_warehouse') }}</option>
                                 @foreach($warehouses as $w)
                                     <option value="{{ $w->name }}" @selected(old('location', request('location')) == $w->name || request('warehouse_id') == $w->id)>{{ $w->name }}</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="select" label="Supplier Name" name="vendor_id" id="vendorSelect" required="true">
-                                <option value="">Select Supplier...</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_name') }}" name="vendor_id" id="vendorSelect" required="true">
+                                <option value="">{{ __('purchase.select_supplier') }}</option>
                                 @foreach($vendors as $v)
                                     <option value="{{ $v->id }}" 
                                         data-code="{{ $v->code }}" 
@@ -109,12 +109,12 @@
                             </x-ui.odoo-form-ui>
 
 
-                            <x-ui.odoo-form-ui type="input" label="Purchase Order No." name="po_number_dummy" value="[Auto-Generated]" readonly="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.po_no') }}" name="po_number_dummy" value="[{{ __('purchase.auto_generated') }}]" readonly="true" />
 
 
 
-                            <x-ui.odoo-form-ui type="select" label="Load from PR (Indent)" name="purchase_requisition_id" id="requisitionSelect">
-                                <option value="">-- Direct PO (No PR link) --</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.load_from_pr') }}" name="purchase_requisition_id" id="requisitionSelect">
+                                <option value="">{{ __('purchase.direct_po_no_pr') }}</option>
                                 @foreach($requisitions as $pr)
                                     <option value="{{ $pr->id }}" @selected($selectedRequisitionId == $pr->id)>
                                         {{ $pr->requisition_number }} ({{ $pr->requester?->name ?? 'System' }} - {{ $pr->requisition_date->format('d-M-Y') }})
@@ -125,27 +125,27 @@
 
                         <!-- Right Panel: Dates, Discount & Tax Types -->
                         <div class="col-md-6">
-                            <h6 class="fw-bold text-primary mb-3">Dates & Calculations Options</h6>
+                            <h6 class="fw-bold text-primary mb-3">{{ __('purchase.dates_options') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" label="Order Date" name="date" inputType="date" :value="old('date', date('Y-m-d'))" required="true" />
-                            <x-ui.odoo-form-ui type="input" label="Delivery Date" name="delivery_date" inputType="date" :value="old('delivery_date')" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.order_date') }}" name="date" inputType="date" :value="old('date', date('Y-m-d'))" required="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.delivery_date') }}" name="delivery_date" inputType="date" :value="old('delivery_date')" />
 
-                            <x-ui.odoo-form-ui type="select" label="Discount Option" name="discount_type" id="discountTypeSelect" required="true">
-                                <option value="without_discount" @selected(old('discount_type') === 'without_discount')>Without Discount</option>
-                                <option value="item_wise" @selected(old('discount_type') === 'item_wise')>With Discount At Item Level</option>
-                                <option value="order_wise" @selected(old('discount_type') === 'order_wise')>With Discount At Order Level</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.discount_option') }}" name="discount_type" id="discountTypeSelect" required="true">
+                                <option value="without_discount" @selected(old('discount_type') === 'without_discount')>{{ __('purchase.without_discount') }}</option>
+                                <option value="item_wise" @selected(old('discount_type') === 'item_wise')>{{ __('purchase.discount_item_level') }}</option>
+                                <option value="order_wise" @selected(old('discount_type') === 'order_wise')>{{ __('purchase.discount_order_level') }}</option>
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="select" label="Tax Option" name="tax_type" id="taxTypeSelect" required="true">
-                                <option value="without_tax" @selected(old('tax_type') === 'without_tax')>Without Tax</option>
-                                <option value="item_wise_tax" @selected(old('tax_type') === 'item_wise_tax')>Item Wise Tax</option>
-                                <option value="order_wise_tax" @selected(old('tax_type', 'order_wise_tax') === 'order_wise_tax')>Order Wise Tax</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.tax_option') }}" name="tax_type" id="taxTypeSelect" required="true">
+                                <option value="without_tax" @selected(old('tax_type') === 'without_tax')>{{ __('purchase.without_tax') }}</option>
+                                <option value="item_wise_tax" @selected(old('tax_type') === 'item_wise_tax')>{{ __('purchase.item_wise_tax') }}</option>
+                                <option value="order_wise_tax" @selected(old('tax_type', 'order_wise_tax') === 'order_wise_tax')>{{ __('purchase.order_wise_tax') }}</option>
                             </x-ui.odoo-form-ui>
 
                             <div id="gstTypeContainer">
-                                <x-ui.odoo-form-ui type="select" label="GST Type" name="gst_type" id="gstTypeSelect" required="true">
-                                    <option value="cgst_sgst" @selected(old('gst_type', 'cgst_sgst') === 'cgst_sgst')>CGST + SGST (Intra-State)</option>
-                                    <option value="igst" @selected(old('gst_type') === 'igst')>IGST (Inter-State)</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('purchase.gst_type') }}" name="gst_type" id="gstTypeSelect" required="true">
+                                    <option value="cgst_sgst" @selected(old('gst_type', 'cgst_sgst') === 'cgst_sgst')>{{ __('purchase.gst_intra_state') }}</option>
+                                    <option value="igst" @selected(old('gst_type') === 'igst')>{{ __('purchase.gst_inter_state') }}</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                         </div>
@@ -153,39 +153,90 @@
 
                     <!-- Items Table -->
                     <div class="mt-5">
-                        <h5 class="fw-bold text-dark mb-3"><i class="feather-layers text-primary me-2"></i>Purchase Order Line Items</h5>
+                        <h5 class="fw-bold text-dark mb-3"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.po_line_items') }}</h5>
                         <div class="table-responsive">
                             <x-ui.odoo-form-ui type="table" id="poItemsTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 32%">Product <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 8%">Qty <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 8%">Rate <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 8%">Amount</th>
+                                        <th style="width: 32%">{{ __('purchase.product') }} <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 8%">{{ __('purchase.qty') }} <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 8%">{{ __('purchase.rate') }} <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 8%">{{ __('purchase.amount') }}</th>
                                         
                                         <!-- Discount Columns -->
-                                        <th class="text-end discount-column" style="width: 6%">Disc %</th>
-                                        <th class="text-end discount-column" style="width: 8%">Disc Amt</th>
+                                        <th class="text-end discount-column" style="width: 6%">{{ __('purchase.disc_percent') }}</th>
+                                        <th class="text-end discount-column" style="width: 8%">{{ __('purchase.disc_amt') }}</th>
                                         
                                         <!-- Tax Columns (Item Wise) -->
-                                        <th class="text-end tax-column" style="width: 8%">Tax %</th>
-                                        <th class="text-end tax-column" style="width: 10%">Tax Amt</th>
+                                        <th class="text-end tax-column" style="width: 8%">{{ __('purchase.tax_percent') }}</th>
+                                        <th class="text-end tax-column" style="width: 10%">{{ __('purchase.tax_amt') }}</th>
 
-                                        <th class="text-end" style="width: 11%">Total Amt</th>
+                                        <th class="text-end" style="width: 11%">{{ __('purchase.total_amt') }}</th>
                                         <th style="width: 3%"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <!-- Prefilled items (if loaded from request query or old input) -->
-                                    @if(count($prefilledItems) > 0)
+                                    @if(old('items') && is_array(old('items')))
+                                        @foreach(old('items') as $idx => $item)
+                                            <tr class="item-row" data-index="{{ $idx }}">
+                                                <td>
+                                                    <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" required="true">
+                                                        <option value="">{{ __('purchase.select_product') }}</option>
+                                                        @foreach($products as $p)
+                                                            <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" @selected($p->id == $item['product_id'])>
+                                                                {{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})
+                                                            </option>
+                                                        @endforeach
+                                                    </x-ui.odoo-form-ui>
+                                                </td>
+                                                <td>
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][quantity]" class="text-end qty-input" step="0.0001" min="0.0001" required="true" :value="$item['quantity']" />
+                                                </td>
+                                                <td>
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][rate]" class="text-end rate-input" step="0.01" min="0" required="true" :value="$item['rate']" />
+                                                </td>
+                                                <td>
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][amount]" class="text-end amount-input" step="0.01" min="0" readonly="true" :value="$item['quantity'] * $item['rate']" />
+                                                </td>
+                                                <!-- Discount -->
+                                                <td class="discount-column">
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][discount_percent]" class="text-end disc-percent-input" step="0.01" min="0" max="100" value="0.00" />
+                                                </td>
+                                                <td class="discount-column">
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][discount_amount]" class="text-end disc-amount-input" step="0.01" readonly="true" value="0.00" />
+                                                </td>
+                                                <!-- Tax rates (Percent and Amount columns) -->
+                                                <td class="tax-column">
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][tax_percent]" class="text-end tax-percent-input" step="0.01" min="0" value="0.00" />
+                                                    <!-- Hidden splits calculated by JS -->
+                                                    <input type="hidden" name="items[{{ $idx }}][cgst_percent]" class="cgst-percent-input" value="0.00">
+                                                    <input type="hidden" name="items[{{ $idx }}][sgst_percent]" class="sgst-percent-input" value="0.00">
+                                                    <input type="hidden" name="items[{{ $idx }}][igst_percent]" class="igst-percent-input" value="0.00">
+                                                    <input type="hidden" name="items[{{ $idx }}][cgst_amount]" class="cgst-amount-input" value="0.00">
+                                                    <input type="hidden" name="items[{{ $idx }}][sgst_amount]" class="sgst-amount-input" value="0.00">
+                                                    <input type="hidden" name="items[{{ $idx }}][igst_amount]" class="igst-amount-input" value="0.00">
+                                                </td>
+                                                <td class="tax-column">
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][tax_amount]" class="text-end tax-amount-input" step="0.01" readonly="true" value="0.00" />
+                                                </td>
+                                                <td>
+                                                    <x-ui.odoo-form-ui type="input" inputType="number" name="items[{{ $idx }}][total_amount]" class="text-end total-amount-input" step="0.01" readonly="true" value="{{ $item['quantity'] * $item['rate'] }}" />
+                                                </td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-link text-danger remove-row-btn p-1 border-0"><i class="feather-trash-2 fs-14"></i></button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    @elseif(count($prefilledItems) > 0)
                                         @foreach($prefilledItems as $idx => $item)
                                             <tr class="item-row" data-index="{{ $idx }}">
                                                 <td>
                                                     <x-ui.odoo-form-ui type="select" name="items[{{ $idx }}][product_id]" class="product-select" required="true">
-                                                        <option value="">Select Product...</option>
+                                                        <option value="">{{ __('purchase.select_product') }}</option>
                                                         @foreach($products as $p)
                                                             <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" @selected($p->id == $item['product_id'])>
-                                                                {{ $p->name }} ({{ $p->sku ?: 'No SKU' }})
+                                                                {{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})
                                                             </option>
                                                         @endforeach
                                                     </x-ui.odoo-form-ui>
@@ -233,9 +284,9 @@
                                         <tr class="item-row" data-index="0">
                                             <td>
                                                 <x-ui.odoo-form-ui type="select" name="items[0][product_id]" class="product-select" required="true">
-                                                    <option value="">Select Product...</option>
+                                                    <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
+                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
                                             </td>
@@ -282,7 +333,7 @@
                         </div>
                         <div class="mt-3">
                             <button type="button" class="btn btn-sm btn-soft-primary px-3 fw-bold" id="addRowBtn">
-                                <i class="feather-plus me-1"></i> Add Line
+                                <i class="feather-plus me-1"></i> {{ __('purchase.add_line') }}
                             </button>
                         </div>
                     </div>
@@ -291,7 +342,7 @@
                     <div class="row mt-5 pt-3 border-top g-4">
                         <!-- Left side: Rich text editor notes -->
                         <div class="col-md-7">
-                            <x-ui.odoo-form-ui type="editor" label="Terms & Notes" name="notes" placeholder="Specify any delivery terms, quality checks, payment instructions, etc.">
+                            <x-ui.odoo-form-ui type="editor" label="{{ __('purchase.terms_notes') }}" name="notes" placeholder="{{ __('purchase.notes_placeholder') }}">
                                 {!! old('notes') !!}
                             </x-ui.odoo-form-ui>
                         </div>
@@ -300,31 +351,31 @@
                         <div class="col-md-5 d-flex flex-column align-items-end fs-13">
                             <div class="card border-0 shadow-sm w-100" style="max-width: 380px; background: #ffffff; border-radius: 8px; border: 1px solid #cbd5e1 !important; overflow: hidden;">
                                 <div class="fw-bold py-3 px-3 text-white" style="background-color: #2563eb; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase;">
-                                    ORDER SUMMARY
+                                    {{ __('purchase.order_summary') }}
                                 </div>
                                 <div class="p-3 bg-white text-dark">
                                     <!-- Taxable Subtotal -->
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="text-muted fs-13 fw-semibold">Taxable Subtotal</span>
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.taxable_subtotal') }}</span>
                                         <input type="text" id="summarySubtotalText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                         <input type="hidden" name="subtotal" id="summarySubtotal" value="0.00">
                                     </div>
 
                                     <!-- Total Discount -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryDiscountRow">
-                                        <span class="text-muted fs-13 fw-semibold">Discount Amount</span>
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.discount_amount') }}</span>
                                         <input type="number" name="discount_amount" id="summaryDiscount" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" step="0.01" value="0.00">
                                     </div>
 
                                     <!-- Gross Total -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryGrossRow">
-                                        <span class="text-muted fs-13 fw-semibold">Gross Total (Before Tax)</span>
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.gross_total_before_tax') }}</span>
                                         <input type="text" id="summaryGrossText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                     </div>
 
                                     <!-- Tax Rate (Percent) -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="orderTaxPercentRow">
-                                        <span class="text-muted fs-13 fw-semibold">Tax Rate (%)</span>
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.tax_rate_percent') }}</span>
                                         <input type="number" id="orderTaxPercent" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155;" min="0" step="0.01" value="0.00">
                                     </div>
 
@@ -335,14 +386,14 @@
 
                                     <!-- Tax Amount -->
                                     <div class="d-flex justify-content-between align-items-center mb-3" id="summaryTaxRow">
-                                        <span class="text-muted fs-13 fw-semibold">Tax Amount</span>
+                                        <span class="text-muted fs-13 fw-semibold">{{ __('purchase.tax_amount') }}</span>
                                         <input type="text" id="summaryTaxText" class="form-control form-control-sm text-end fw-bold" style="width: 140px; height: 32px; border: 1px solid #cbd5e1; border-radius: 4px; color: #334155; background-color: #f8fafc;" readonly value="0.00">
                                         <input type="hidden" name="tax_amount" id="summaryTax" value="0.00">
                                     </div>
 
                                     <!-- Grand Total (Mewar Balance Amount style) -->
                                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                                        <span class="fw-bold fs-13" style="color: #2563eb;">Grand Total</span>
+                                        <span class="fw-bold fs-13" style="color: #2563eb;">{{ __('purchase.grand_total') }}</span>
                                         <input type="text" id="summaryGrandtotalText" class="form-control form-control-sm text-end fw-extrabold" style="width: 140px; height: 32px; border: 1px solid #2563eb; border-radius: 4px; background-color: #eff6ff; color: #2563eb;" readonly value="0.00">
                                         <input type="hidden" name="grand_total" id="summaryGrandtotal" value="0.00">
                                     </div>
@@ -606,9 +657,9 @@
                     <tr class="item-row" data-index="${rowIdx}">
                         <td>
                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
-                                <option value="">Select Product...</option>
+                                <option value="">{{ __('purchase.select_product') }}</option>
                                 @foreach($products as $p)
-                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: 'No SKU' }})</option>
+                                    <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">{{ $p->name }} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                 @endforeach
                             </select>
                         </td>
@@ -678,7 +729,7 @@
                 const prId = $(this).val();
                 if (!prId) return;
 
-                if (!confirm('Loading requisition items will clear any lines you have currently added. Do you want to proceed?')) {
+                if (!confirm('{{ __('purchase.confirm_load_requisition_items') }}')) {
                     $(this).val('').trigger('change.select2');
                     return;
                 }
@@ -700,7 +751,7 @@
                                     <tr class="item-row" data-index="${rowIdx}">
                                         <td>
                                             <select name="items[${rowIdx}][product_id]" class="odoo-table-select odoo-select2 product-select" required style="border-radius:0;">
-                                                <option value="">Select Product...</option>
+                                                <option value="">{{ __('purchase.select_product') }}</option>
                                                 @foreach($products as $p)
                                                     <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}">${item.product_name}</option>
                                                 @endforeach
@@ -753,11 +804,11 @@
                             updateRemoveRowButtons();
                             adjustLayout();
                         } else {
-                            alert('No items found or failed to fetch requisition items.');
+                            alert('{{ __('purchase.alert_no_items_found') }}');
                         }
                     },
                     error: function() {
-                        alert('Error communicating with the server.');
+                        alert('{{ __('purchase.alert_server_error') }}');
                     }
                 });
             });

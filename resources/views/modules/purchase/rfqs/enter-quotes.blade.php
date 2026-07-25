@@ -1,9 +1,9 @@
 @extends('layouts.duralux')
 
-@section('title', "Enter Quotation Rates | SaaS ERP")
-@section('page-title', "Enter Quotation Rates")
+@section('title', __('purchase.enter_quotation_rates') . ' | SaaS ERP')
+@section('page-title', __('purchase.enter_quotation_rates'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.rfqs.index') }}">RFQs</a> &gt; <a href="{{ route('purchase.rfqs.show', $rfq->id) }}">{{ $rfq->rfq_number }}</a> &gt; Enter Quotes
+    <a href="{{ route('purchase.rfqs.index') }}">{{ __('purchase.rfqs') }}</a> &gt; <a href="{{ route('purchase.rfqs.show', $rfq->id) }}">{{ $rfq->rfq_number }}</a> &gt; {{ __('purchase.enter_quotes') }}
 @endsection
 
 @section('content')
@@ -17,15 +17,15 @@
                     <!-- Top buttons bar -->
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
                         <div>
-                            <h4 class="fw-bold text-dark mb-0">Record Vendor Rates for {{ $rfq->rfq_number }}</h4>
-                            <small class="text-muted fs-12">Input the price details received from <strong>{{ $rfq->vendor?->name }}</strong>.</small>
+                            <h4 class="fw-bold text-dark mb-0">{{ __('purchase.record_vendor_rates_for') }} {{ $rfq->rfq_number }}</h4>
+                            <small class="text-muted fs-12">{{ __('purchase.input_price_details_from') }} <strong>{{ $rfq->vendor?->name }}</strong>.</small>
                         </div>
                         <div class="d-flex gap-2">
                             <x-ui.button href="{{ route('purchase.rfqs.show', $rfq->id) }}" variant="light" size="sm">
-                                Cancel
+                                {{ __('purchase.cancel') }}
                             </x-ui.button>
                             <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">
-                                Save Rates
+                                {{ __('purchase.save_rates') }}
                             </x-ui.button>
                         </div>
                     </div>
@@ -36,9 +36,9 @@
                             <table class="odoo-table" id="quotesTable">
                                 <thead>
                                     <tr>
-                                        <th style="width: 45%">Product</th>
-                                        <th class="text-end" style="width: 20%">Inquired Qty</th>
-                                        <th class="text-end" style="width: 35%">Quoted Rate (₹) <span class="text-danger">*</span></th>
+                                        <th style="width: 45%">{{ __('purchase.product') }}</th>
+                                        <th class="text-end" style="width: 20%">{{ __('purchase.inquired_qty') }}</th>
+                                        <th class="text-end" style="width: 35%">{{ __('purchase.quoted_rate_rs') }} <span class="text-danger">*</span></th>
                                     </tr>
                                 </thead>
                                 <tbody>

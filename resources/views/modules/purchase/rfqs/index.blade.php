@@ -1,14 +1,14 @@
 @extends('layouts.duralux')
 
-@section('title', 'Request for Quotations | SaaS ERP')
-@section('page-title', 'Request for Quotations (RFQ)')
+@section('title', __('purchase.rfqs') . ' | SaaS ERP')
+@section('page-title', __('purchase.rfqs'))
 @section('breadcrumb')
-    Request for Quotations
+    {{ __('purchase.rfqs') }}
 @endsection
 
 @section('page-actions')
     <x-ui.button href="{{ route('purchase.rfqs.create') }}" variant="primary" icon="feather-plus">
-        New RFQ
+        {{ __('purchase.new_rfq') }}
     </x-ui.button>
 @endsection
 
@@ -36,9 +36,9 @@
                 <div class="card border-0 shadow-sm bg-white" style="border-left: 4px solid #3b82f6 !important;">
                     <div class="card-body p-3 d-flex align-items-center justify-content-between">
                         <div>
-                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Total Filtered RFQs</span>
+                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.total_filtered_rfqs') }}</span>
                             <h4 class="fw-bold text-dark mb-0 mt-1 fs-18">{{ $totalFilteredCount }}</h4>
-                            <span class="fs-11 text-muted">All Matching Records</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.all_matching_records') }}</span>
                         </div>
                         <div class="avatar-text bg-soft-primary text-primary rounded-circle" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
                             <i class="feather-layers fs-18"></i>
@@ -51,9 +51,9 @@
                 <div class="card border-0 shadow-sm bg-white" style="border-left: 4px solid #06b6d4 !important;">
                     <div class="card-body p-3 d-flex align-items-center justify-content-between">
                         <div>
-                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Filtered Spend</span>
+                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.filtered_spend') }}</span>
                             <h4 class="fw-bold text-dark mb-0 mt-1 fs-18">{{ $currencySymbol }}{{ number_format($totalFilteredSpend, 2) }}</h4>
-                            <span class="fs-11 text-muted">Total RFQ Purchase Value</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.total_rfq_purchase_value') }}</span>
                         </div>
                         <div class="avatar-text bg-soft-info text-info rounded-circle" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
                             <i class="feather-shopping-bag fs-18"></i>
@@ -66,9 +66,9 @@
                 <div class="card border-0 shadow-sm bg-white" style="border-left: 4px solid #10b981 !important;">
                     <div class="card-body p-3 d-flex align-items-center justify-content-between">
                         <div>
-                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Total Savings Achieved</span>
+                            <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.total_savings_achieved') }}</span>
                             <h4 class="fw-bold text-success mb-0 mt-1 fs-18">+{{ $currencySymbol }}{{ number_format($totalFilteredSavings, 2) }}</h4>
-                            <span class="fs-11 text-muted">Net Saved Across All {{ $totalFilteredCount }} RFQs</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.net_saved_across_all') }} {{ $totalFilteredCount }} RFQs</span>
                         </div>
                         <div class="avatar-text bg-soft-success text-success rounded-circle" style="width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
                             <i class="feather-trending-up fs-18"></i>
@@ -80,51 +80,51 @@
 
         <!-- Toolbar: Search, Sort, Filters -->
         <div class="d-flex align-items-center mb-3 flex-wrap gap-2">
-            <h5 class="fw-bold text-dark mb-0 me-3">RFQs List</h5>
+            <h5 class="fw-bold text-dark mb-0 me-3">{{ __('purchase.rfqs_list') }}</h5>
             
             <div class="d-flex gap-2 ms-auto align-items-center flex-wrap">
                 <!-- Quick Search -->
                 <form method="GET" action="{{ route('purchase.rfqs.index') }}" class="d-flex gap-2">
-                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search RFQ, vendor, purchaser..." value="{{ request('search') }}" style="width:220px;">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="{{ __('purchase.search_rfq_placeholder') }}" value="{{ request('search') }}" style="width:220px;">
                     <button type="submit" class="btn btn-sm btn-outline-primary"><i class="feather-search"></i></button>
                 </form>
 
                 <!-- Custom Sort Component -->
                 <x-ui.sort-dropdown :label="__('crm.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'rfq_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'rfq_date' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>RFQ Date (Latest)</span>
+                        <span>{{ __('purchase.rfq_date_latest') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'rfq_date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'rfq_date' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>RFQ Date (Oldest)</span>
+                        <span>{{ __('purchase.rfq_date_oldest') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'rfq_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'rfq_number' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>RFQ Number (A-Z)</span>
+                        <span>{{ __('purchase.rfq_number_az') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- Custom Filter Component -->
                 <form method="GET" action="{{ route('purchase.rfqs.index') }}" class="d-inline">
                     <x-ui.filter :label="__('ui.filter')" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
                         
                         <div class="mb-2">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                <option value="Draft" {{ request('status') === 'Draft' ? 'selected' : '' }}>Draft</option>
-                                <option value="Sent" {{ request('status') === 'Sent' ? 'selected' : '' }}>Sent</option>
-                                <option value="Received" {{ request('status') === 'Received' ? 'selected' : '' }}>Received</option>
-                                <option value="Confirmed" {{ request('status') === 'Confirmed' ? 'selected' : '' }}>Confirmed</option>
-                                <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>Cancelled</option>
+                                <option value="">{{ __('purchase.all_statuses') }}</option>
+                                <option value="Draft" {{ request('status') === 'Draft' ? 'selected' : '' }}>{{ __('purchase.status_draft') }}</option>
+                                <option value="Sent" {{ request('status') === 'Sent' ? 'selected' : '' }}>{{ __('purchase.status_sent') }}</option>
+                                <option value="Received" {{ request('status') === 'Received' ? 'selected' : '' }}>{{ __('purchase.status_received') }}</option>
+                                <option value="Confirmed" {{ request('status') === 'Confirmed' ? 'selected' : '' }}>{{ __('purchase.status_confirmed') }}</option>
+                                <option value="Cancelled" {{ request('status') === 'Cancelled' ? 'selected' : '' }}>{{ __('purchase.status_cancelled') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         @if(isset($isAdmin) && $isAdmin)
                             <div class="mb-2">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Purchaser (Created By)</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.purchaser') }}</label>
                                 <select name="created_by" class="form-select form-select-sm">
-                                    <option value="">All Purchasers</option>
+                                    <option value="">{{ __('purchase.all_purchasers') }}</option>
                                     @foreach($allPurchasers as $u)
                                         <option value="{{ $u->id }}" {{ request('created_by') == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
                                     @endforeach
@@ -133,18 +133,18 @@
                         @endif
 
                         <div class="mb-2">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">From Date</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.from_date') }}</label>
                             <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
                         </div>
 
                         <div class="mb-2">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">To Date</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.to_date') }}</label>
                             <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('purchase.rfqs.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('purchase.rfqs.index') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -159,14 +159,14 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input">
                         </th>
-                        <th>RFQ Number</th>
-                        <th>Purchaser</th>
-                        <th>Vendors / Suppliers</th>
-                        <th>RFQ Date</th>
-                        <th>Linked Requisition</th>
-                        <th class="text-end">Savings Achieved</th>
-                        <th>Status</th>
-                        <th class="text-end pe-4">Actions</th>
+                        <th>{{ __('purchase.rfq_number') }}</th>
+                        <th>{{ __('purchase.purchaser') }}</th>
+                        <th>{{ __('purchase.vendors_suppliers') }}</th>
+                        <th>{{ __('purchase.rfq_date') }}</th>
+                        <th>{{ __('purchase.linked_requisition') }}</th>
+                        <th class="text-end">{{ __('purchase.savings_achieved') }}</th>
+                        <th>{{ __('purchase.status') }}</th>
+                        <th class="text-end pe-4">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -191,7 +191,7 @@
                                         <div class="fw-semibold text-dark fs-12">
                                             <i class="feather-truck text-muted me-1 fs-11"></i>{{ $rv->vendor?->name ?? '—' }}
                                             @if($rv->status === 'Received')
-                                                <span class="badge bg-soft-success text-success fs-10 ms-1 font-monospace">Quoted</span>
+                                                <span class="badge bg-soft-success text-success fs-10 ms-1 font-monospace">{{ __('purchase.status_quoted') }}</span>
                                             @endif
                                         </div>
                                     @endforeach
@@ -206,7 +206,7 @@
                                         {{ $rfq->requisition->requisition_number }}
                                     </a>
                                 @else
-                                    <span class="text-muted fs-12">Direct / Manual</span>
+                                    <span class="text-muted fs-12">{{ __('purchase.direct_manual') }}</span>
                                 @endif
                             </td>
                             <td class="text-end font-monospace">
@@ -228,62 +228,62 @@
                                         'Cancelled' => 'bg-soft-danger text-danger',
                                         default => 'bg-soft-dark text-dark',
                                     };
-                                @endphp
-                                <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">
-                                    {{ $rfq->status }}
-                                </span>
-                            </td>
-                            <td class="text-end pe-4">
-                                <x-ui.action-dropdown :viewUrl="route('purchase.rfqs.show', $rfq->id)">
-                                    @if($rfq->status === 'Draft')
-                                        <li>
-                                            <a href="{{ route('purchase.rfqs.edit', $rfq->id) }}" class="dropdown-item">
-                                                <i class="feather-edit me-2 text-muted fs-12"></i>Edit RFQ
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <form action="{{ route('purchase.rfqs.send', $rfq->id) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item">
-                                                    <i class="feather-mail me-2 text-muted fs-12"></i>Send RFQ to Vendors
-                                                </button>
-                                            </form>
-                                        </li>
-                                    @endif
-
-                                    @if($rfq->status === 'Received')
-                                        <li>
-                                            <form action="{{ route('purchase.rfqs.confirm', $rfq->id) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item">
-                                                    <i class="feather-check-circle me-2 text-muted fs-12"></i>Confirm & Finalize
-                                                </button>
-                                            </form>
-                                        </li>
-                                    @endif
-
-                                    @if(in_array($rfq->status, ['Draft', 'Sent']))
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <form action="{{ route('purchase.rfqs.destroy', $rfq->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this RFQ?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="dropdown-item text-danger">
-                                                    <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete
-                                                </button>
-                                            </form>
-                                        </li>
-                                    @endif
-                                </x-ui.action-dropdown>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="9" class="text-center py-5 text-muted">
-                                <i class="feather-list fs-1 d-block mb-3 text-light"></i>
-                                No Request for Quotations found.
-                            </td>
-                        </tr>
+                                 @endphp
+                                 <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">
+                                     {{ __('purchase.status_' . strtolower($rfq->status)) }}
+                                 </span>
+                             </td>
+                             <td class="text-end pe-4">
+                                 <x-ui.action-dropdown :viewUrl="route('purchase.rfqs.show', $rfq->id)">
+                                     @if($rfq->status === 'Draft')
+                                         <li>
+                                             <a href="{{ route('purchase.rfqs.edit', $rfq->id) }}" class="dropdown-item">
+                                                 <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('purchase.edit_rfq') }}
+                                             </a>
+                                         </li>
+                                         <li>
+                                             <form action="{{ route('purchase.rfqs.send', $rfq->id) }}" method="POST" class="d-inline">
+                                                 @csrf
+                                                 <button type="submit" class="dropdown-item">
+                                                     <i class="feather-mail me-2 text-muted fs-12"></i>{{ __('purchase.send_rfq_vendors') }}
+                                                 </button>
+                                             </form>
+                                         </li>
+                                     @endif
+ 
+                                     @if($rfq->status === 'Received')
+                                         <li>
+                                             <form action="{{ route('purchase.rfqs.confirm', $rfq->id) }}" method="POST" class="d-inline">
+                                                 @csrf
+                                                 <button type="submit" class="dropdown-item">
+                                                     <i class="feather-check-circle me-2 text-muted fs-12"></i>{{ __('purchase.confirm_finalize') }}
+                                                 </button>
+                                             </form>
+                                         </li>
+                                     @endif
+ 
+                                     @if(in_array($rfq->status, ['Draft', 'Sent']))
+                                         <li><hr class="dropdown-divider"></li>
+                                         <li>
+                                             <form action="{{ route('purchase.rfqs.destroy', $rfq->id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ __('purchase.confirm_delete_rfq') }}');">
+                                                 @csrf
+                                                 @method('DELETE')
+                                                 <button type="submit" class="dropdown-item text-danger">
+                                                     <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('purchase.delete') }}
+                                                 </button>
+                                             </form>
+                                         </li>
+                                     @endif
+                                 </x-ui.action-dropdown>
+                             </td>
+                         </tr>
+                     @empty
+                         <tr>
+                             <td colspan="9" class="text-center py-5 text-muted">
+                                 <i class="feather-list fs-1 d-block mb-3 text-light"></i>
+                                 {{ __('purchase.no_rfqs') }}
+                             </td>
+                         </tr>
                     @endforelse
                 </tbody>
             </x-ui.odoo-form-ui>

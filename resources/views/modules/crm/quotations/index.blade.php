@@ -124,43 +124,27 @@
                             <td class="text-end fw-bold text-dark">₹{{ number_format($quotation->total_amount, 2) }}</td>
                             <td class="ps-4">
                                 @php
+                                    $displayStatus = $quotation->status;
                                     $badgeClass = 'bg-soft-secondary text-secondary';
                                     if ($quotation->status === 'Quotation Sent' || $quotation->status === 'Sent') $badgeClass = 'bg-soft-info text-info';
-                                    elseif ($quotation->status === 'Accepted' || $quotation->status === 'Approved') $badgeClass = 'bg-soft-success text-success';
+                                    elseif ($quotation->status === 'Approved') $badgeClass = 'bg-soft-success text-success';
                                     elseif ($quotation->status === 'Rejected') $badgeClass = 'bg-soft-danger text-danger';
                                     elseif ($quotation->status === 'Pending Approval') $badgeClass = 'bg-soft-warning text-warning';
                                     elseif ($quotation->status === 'Quotation Rework') $badgeClass = 'bg-soft-warning text-warning';
+                                    elseif ($quotation->status === 'Accepted') {
+                                        $badgeClass = 'bg-soft-warning text-warning';
+                                        $displayStatus = 'Pending';
+                                    }
+                                    elseif ($quotation->status === 'Converted') $badgeClass = 'bg-soft-success text-success';
                                 @endphp
-                                <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $quotation->status }}</span>
+                                <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $displayStatus }}</span>
                             </td>
                             <td class="text-end pe-4">
                                 <div class="d-inline-flex gap-2 align-items-center justify-content-end">
-                                    @if ($quotation->status === 'Approved')
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="Quotation Sent">
-                                            <button type="submit" class="btn btn-xs btn-soft-info py-1 px-2 fs-10 fw-bold border-0" title="Send Quotation">
-                                                <i class="feather-send me-1"></i>Send
-                                            </button>
-                                        </form>
-                                    @elseif (in_array($quotation->status, ['Quotation Sent', 'Sent']))
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="Accepted">
-                                            <button type="submit" class="btn btn-xs btn-soft-success py-1 px-2 fs-10 fw-bold border-0" title="Accept Quotation">
-                                                <i class="feather-check me-1"></i>Accept
-                                            </button>
-                                        </form>
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="Rejected">
-                                            <button type="submit" class="btn btn-xs btn-soft-danger py-1 px-2 fs-10 fw-bold border-0" title="Reject Quotation">
-                                                <i class="feather-x me-1"></i>Reject
-                                            </button>
-                                        </form>
+                                    @if ($quotation->status === 'Accepted' && !$quotation->salesOrder)
+                                        <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="action-dropdown-btn" title="Convert to Sales Order" data-bs-toggle="tooltip" style="color: #6366f1; border-color: #c7d2fe; background-color: #e0e7ff; text-decoration: none;">
+                                            <i class="feather-shopping-cart"></i>
+                                        </a>
                                     @endif
 
                                     <x-ui.action-dropdown :viewUrl="route('crm.quotations.show', $quotation->id)">

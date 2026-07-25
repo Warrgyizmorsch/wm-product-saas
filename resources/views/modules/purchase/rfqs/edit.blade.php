@@ -1,9 +1,9 @@
 @extends('layouts.duralux')
 
-@section('title', 'Edit RFQ | SaaS ERP')
-@section('page-title', 'Edit Request for Quotation')
+@section('title', __('purchase.edit_rfq') . ' | SaaS ERP')
+@section('page-title', __('purchase.edit_rfq'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.rfqs.index') }}">RFQs</a> &gt; Edit Details
+    <a href="{{ route('purchase.rfqs.index') }}">{{ __('purchase.rfqs') }}</a> &gt; {{ __('purchase.edit') }}
 @endsection
 
 @push('styles')
@@ -47,15 +47,15 @@
                     <!-- Top buttons bar -->
                     <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom flex-wrap gap-2">
                         <div>
-                            <h4 class="fw-bold text-dark mb-0">Edit RFQ: {{ $rfq->rfq_number }}</h4>
-                            <small class="text-muted fs-12">Update draft quotation inquiry details.</small>
+                            <h4 class="fw-bold text-dark mb-0">{{ __('purchase.edit_rfq') }}: {{ $rfq->rfq_number }}</h4>
+                            <small class="text-muted fs-12">{{ __('purchase.edit_rfq_help') }}</small>
                         </div>
                         <div class="d-flex gap-2">
                             <x-ui.button href="{{ route('purchase.rfqs.show', $rfq->id) }}" variant="light" size="sm">
-                                Cancel
+                                {{ __('purchase.cancel') }}
                             </x-ui.button>
                             <x-ui.button type="submit" variant="primary" size="sm" icon="feather-save" style="background-color: #714B67; border-color: #714B67;">
-                                Update RFQ
+                                {{ __('purchase.update_rfq') }}
                             </x-ui.button>
                         </div>
                     </div>
@@ -63,12 +63,12 @@
                     <div class="row g-4 fs-13 text-dark">
                         <!-- Left Column -->
                         <div class="col-md-6 border-end">
-                            <h6 class="fw-bold text-primary mb-3">General Information</h6>
+                            <h6 class="fw-bold text-primary mb-3">{{ __('purchase.general_information') }}</h6>
 
-                            <x-ui.odoo-form-ui type="input" label="RFQ Date" name="rfq_date" inputType="date" :value="old('rfq_date', $rfq->rfq_date ? $rfq->rfq_date->format('Y-m-d') : '')" required="true" />
+                            <x-ui.odoo-form-ui type="input" label="{{ __('purchase.rfq_date') }}" name="rfq_date" inputType="date" :value="old('rfq_date', $rfq->rfq_date ? $rfq->rfq_date->format('Y-m-d') : '')" required="true" />
                             
-                            <x-ui.odoo-form-ui type="select" label="Source Requisition" name="purchase_requisition_id" id="requisitionSelect" class="select2-simple">
-                                <option value="">Select Approved PR (Optional)...</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('purchase.source_requisition') }}" name="purchase_requisition_id" id="requisitionSelect" class="select2-simple">
+                                <option value="">{{ __('purchase.select_approved_pr') }}</option>
                                 @foreach($requisitions as $pr)
                                     <option value="{{ $pr->id }}" @selected($rfq->purchase_requisition_id == $pr->id)>
                                         {{ $pr->requisition_number }} (Requested by: {{ $pr->requester?->name ?? '—' }})
@@ -79,32 +79,32 @@
 
                         <!-- Right Column -->
                         <div class="col-md-6">
-                            <h6 class="fw-bold text-primary mb-3">Additional Details</h6>
-                            <x-ui.odoo-form-ui type="textarea" label="Notes" name="notes" rows="6" placeholder="Terms of delivery, special requests, remarks, etc.">{{ old('notes', $rfq->notes) }}</x-ui.odoo-form-ui>
+                            <h6 class="fw-bold text-primary mb-3">{{ __('purchase.additional_details') }}</h6>
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('purchase.notes') }}" name="notes" rows="6" placeholder="{{ __('purchase.notes_placeholder_rfq') }}">{{ old('notes', $rfq->notes) }}</x-ui.odoo-form-ui>
                         </div>
                     </div>
 
                     <!-- Line Items Section -->
                     <div class="mt-5">
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                            <h5 class="fw-bold text-dark mb-0"><i class="feather-layers text-primary me-2"></i>Inquiry Line Items</h5>
+                            <h5 class="fw-bold text-dark mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.inquiry_line_items') }}</h5>
                             
                             <!-- Bulk Supplier Assignment controls -->
                             <div class="d-flex align-items-center gap-2 bg-light p-2 rounded border shadow-sm">
-                                <span class="fs-12 fw-bold text-muted text-uppercase me-1"><i class="feather-truck text-primary me-1"></i>Bulk Supplier:</span>
+                                <span class="fs-12 fw-bold text-muted text-uppercase me-1"><i class="feather-truck text-primary me-1"></i>{{ __('purchase.bulk_supplier') }}</span>
                                 <div style="width: 220px;">
                                     <select id="bulkSupplierSelect" class="form-select form-select-sm fw-semibold select2-simple">
-                                        <option value="">Select Supplier...</option>
+                                        <option value="">{{ __('purchase.select_supplier') }}</option>
                                         @foreach($vendors as $v)
                                             <option value="{{ $v->id }}">{{ $v->name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
                                 <button type="button" class="btn btn-sm btn-primary px-3 fw-bold d-flex align-items-center gap-1" id="bulkAddSupplierBtn" style="background-color: #714B67; border-color: #714B67;">
-                                    <i class="feather-user-plus fs-12"></i> Add
+                                    <i class="feather-user-plus fs-12"></i> {{ __('purchase.add') }}
                                 </button>
                                 <button type="button" class="btn btn-sm btn-soft-danger px-3 fw-bold d-flex align-items-center gap-1" id="bulkRemoveSupplierBtn">
-                                    <i class="feather-user-minus fs-12"></i> Remove
+                                    <i class="feather-user-minus fs-12"></i> {{ __('purchase.remove') }}
                                 </button>
                             </div>
                         </div>
@@ -116,10 +116,10 @@
                                         <th style="width: 4%;" class="text-center">
                                             <input type="checkbox" id="selectAllItems" class="form-check-input">
                                         </th>
-                                        <th style="width: 32%">Product <span class="text-danger">*</span></th>
-                                        <th style="width: 30%">Assigned Suppliers <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 14%">Quantity <span class="text-danger">*</span></th>
-                                        <th class="text-end" style="width: 15%">Est. Cost (₹)</th>
+                                        <th style="width: 32%">{{ __('purchase.product') }} <span class="text-danger">*</span></th>
+                                        <th style="width: 30%">{{ __('purchase.assigned_suppliers') }} <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 14%">{{ __('purchase.quantity') }} <span class="text-danger">*</span></th>
+                                        <th class="text-end" style="width: 15%">{{ __('purchase.est_cost_rs') }}</th>
                                         <th class="text-center" style="width: 5%"></th>
                                     </tr>
                                 </thead>
@@ -134,9 +134,9 @@
                                             </td>
                                             <td>
                                                 <select name="items[{{ $index }}][product_id]" required class="odoo-table-select product-select select2-simple">
-                                                    <option value="">Select Product...</option>
+                                                    <option value="">{{ __('purchase.select_product') }}</option>
                                                     @foreach($products as $p)
-                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" data-vendor="{{ $p->preferred_vendor_id }}" @selected($item->product_id == $p->id)>{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: 'No SKU' }})</option>
+                                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" data-vendor="{{ $p->preferred_vendor_id }}" @selected($item->product_id == $p->id)>{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                                                     @endforeach
                                                 </select>
                                             </td>
@@ -168,7 +168,7 @@
                         </div>
                         <div class="mt-3">
                             <button type="button" class="btn btn-sm btn-soft-primary px-3 fw-bold" id="addRowBtn">
-                                <i class="feather-plus me-1"></i> Add Line
+                                <i class="feather-plus me-1"></i> {{ __('purchase.add_line') }}
                             </button>
                         </div>
                     </div>
@@ -185,9 +185,9 @@
             </td>
             <td>
                 <select name="items[__INDEX__][product_id]" class="odoo-table-select product-select select2-simple" required>
-                    <option value="">Select Product...</option>
+                    <option value="">{{ __('purchase.select_product') }}</option>
                     @foreach($products as $p)
-                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" data-vendor="{{ $p->preferred_vendor_id }}">{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: 'No SKU' }})</option>
+                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost ?? 0.00 }}" data-vendor="{{ $p->preferred_vendor_id }}">{!! htmlspecialchars_decode($p->name) !!} ({{ $p->sku ?: __('purchase.no_sku') }})</option>
                     @endforeach
                 </select>
             </td>
@@ -240,7 +240,7 @@
                 
                 const selectedOptions = $select.find('option:selected');
                 if (selectedOptions.length === 0) {
-                    $badgeContainer.html('<span class="text-muted fs-11 italic me-2">No Supplier</span>');
+                    $badgeContainer.html('<span class="text-muted fs-11 italic me-2">{{ __('purchase.no_supplier') }}</span>');
                 } else {
                     selectedOptions.each(function() {
                         const id = $(this).val();
@@ -256,8 +256,8 @@
                 
                 // Add the plus badge at the end of the badge list
                 $badgeContainer.append(`
-                    <span class="badge bg-light text-secondary border cursor-pointer edit-item-vendors-btn py-1 mb-1" style="line-height: 1.2;" title="Add Supplier">
-                        <i class="feather-plus me-0.5"></i> Add
+                    <span class="badge bg-light text-secondary border cursor-pointer edit-item-vendors-btn py-1 mb-1" style="line-height: 1.2;" title="{{ __('purchase.add') }}">
+                        <i class="feather-plus me-0.5"></i> {{ __('purchase.add') }}
                     </span>
                 `);
             }
@@ -375,7 +375,7 @@
                 const currentVals = $select.val() || [];
                 
                 // Build dropdown options containing non-selected vendors
-                let optionsHtml = '<option value="">-- Choose --</option>';
+                let optionsHtml = '<option value="">{{ __('purchase.choose') }}</option>';
                 $select.find('option').each(function() {
                     const id = $(this).val();
                     const name = $(this).text();
@@ -451,13 +451,13 @@
             $('#bulkAddSupplierBtn').on('click', function() {
                 const selectedVendorId = $('#bulkSupplierSelect').val();
                 if (!selectedVendorId) {
-                    alert('Please select a Supplier first.');
+                    alert('{{ __('purchase.js_select_supplier_first') }}');
                     return;
                 }
 
                 const checkedRows = $('.row-item-checkbox:checked');
                 if (checkedRows.length === 0) {
-                    alert('Please select at least one item row using checkboxes.');
+                    alert('{{ __('purchase.js_select_checkboxes') }}');
                     return;
                 }
 
@@ -478,13 +478,13 @@
             $('#bulkRemoveSupplierBtn').on('click', function() {
                 const selectedVendorId = $('#bulkSupplierSelect').val();
                 if (!selectedVendorId) {
-                    alert('Please select a Supplier first.');
+                    alert('{{ __('purchase.js_select_supplier_first') }}');
                     return;
                 }
 
                 const checkedRows = $('.row-item-checkbox:checked');
                 if (checkedRows.length === 0) {
-                    alert('Please select at least one item row using checkboxes.');
+                    alert('{{ __('purchase.js_select_checkboxes') }}');
                     return;
                 }
 

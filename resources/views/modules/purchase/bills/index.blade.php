@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Vendor Bills | SaaS ERP')
-@section('page-title', 'Vendor Bills & Invoices')
-@section('breadcrumb', 'Purchase / Vendor Bills')
+@section('title', __('purchase.vendor_bills') . ' | SaaS ERP')
+@section('page-title', __('purchase.vendor_bills_invoices'))
+@section('breadcrumb', __('ui.purchase') . ' / ' . __('purchase.vendor_bills'))
 
 @push('styles')
     <style>
@@ -43,34 +43,34 @@
         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
             <div>
                 <h5 class="fw-bold text-dark mb-0">
-                    <i class="feather-file-text me-2 text-primary"></i>Vendor Bills
+                    <i class="feather-file-text me-2 text-primary"></i>{{ __('purchase.vendor_bills') }}
                 </h5>
-                <p class="text-muted fs-12 mb-0">Manage vendor invoices generated from Goods Receipt Notes</p>
+                <p class="text-muted fs-12 mb-0">{{ __('purchase.manage_vendor_invoices_help') }}</p>
             </div>
 
             <!-- Common Filter Panel -->
             <form method="GET" action="{{ route('purchase.bills.index') }}" class="d-inline">
                 <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keyword</label>
-                        <x-ui.odoo-form-ui type="input" name="search" placeholder="Search bill no, vendor..." value="{{ request('search') }}" />
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.search_keyword') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" placeholder="{{ __('purchase.search_po_placeholder') }}" value="{{ request('search') }}" />
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.status') }}</label>
                         <x-ui.odoo-form-ui type="select" name="status">
-                            <option value="">All Statuses</option>
-                            <option value="Posted" @selected(request('status') === 'Posted')>Posted</option>
-                            <option value="Paid" @selected(request('status') === 'Paid')>Paid</option>
-                            <option value="Partially Paid" @selected(request('status') === 'Partially Paid')>Partially Paid</option>
+                            <option value="">{{ __('purchase.all_statuses') }}</option>
+                            <option value="Posted" @selected(request('status') === 'Posted')>{{ __('purchase.status_posted') }}</option>
+                            <option value="Paid" @selected(request('status') === 'Paid')>{{ __('purchase.status_paid') }}</option>
+                            <option value="Partially Paid" @selected(request('status') === 'Partially Paid')>{{ __('purchase.status_partially_paid') }}</option>
                         </x-ui.odoo-form-ui>
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('purchase.bills.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        <a href="{{ route('purchase.bills.index') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
             </form>
@@ -80,16 +80,16 @@
             <x-ui.odoo-form-ui type="table" id="billsTable">
                 <thead>
                     <tr>
-                        <th style="width: 11%">Bill Number</th>
-                        <th style="width: 11%">Vendor Invoice No</th>
-                        <th style="width: 15%">Vendor</th>
-                        <th style="width: 8%">Bill Date</th>
-                        <th style="width: 8%">Due Date</th>
-                        <th style="width: 9%" class="text-center">Status</th>
-                        <th style="width: 9%" class="text-end">Grand Total</th>
-                        <th style="width: 9%" class="text-end">Paid Amount</th>
-                        <th style="width: 9%" class="text-end">Due Amount</th>
-                        <th style="width: 11%" class="text-end">Actions</th>
+                        <th style="width: 11%">{{ __('purchase.bill_number') }}</th>
+                        <th style="width: 11%">{{ __('purchase.vendor_invoice_no') }}</th>
+                        <th style="width: 15%">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="width: 8%">{{ __('purchase.bill_date') }}</th>
+                        <th style="width: 8%">{{ __('purchase.due_date') }}</th>
+                        <th style="width: 9%" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="width: 9%" class="text-end">{{ __('purchase.grand_total') }}</th>
+                        <th style="width: 9%" class="text-end">{{ __('purchase.paid_amount') }}</th>
+                        <th style="width: 9%" class="text-end">{{ __('purchase.due_amount') }}</th>
+                        <th style="width: 11%" class="text-end">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -115,7 +115,7 @@
                             <td>{{ $bill->due_date ? $bill->due_date->format('d-M-Y') : '—' }}</td>
                             <td class="text-center">
                                 <span class="badge bg-soft-{{ $badgeClass }} text-{{ $badgeClass }} px-2.5 py-1 fs-11 fw-bold">
-                                    {{ $bill->status }}
+                                    {{ __('purchase.status_' . strtolower(str_replace(' ', '_', $bill->status))) }}
                                 </span>
                             </td>
                             <td class="text-end font-monospace fw-bold text-dark">₹{{ number_format($bill->grand_total, 2) }}</td>
@@ -123,7 +123,7 @@
                             <td class="text-end font-monospace fw-bold text-danger">₹{{ number_format($bill->due_amount, 2) }}</td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
-                                    <a href="{{ route('purchase.bills.show', $bill->id) }}" class="action-icon-btn view-btn" title="View Details" data-bs-toggle="tooltip">
+                                    <a href="{{ route('purchase.bills.show', $bill->id) }}" class="action-icon-btn view-btn" title="{{ __('purchase.view_details') }}" data-bs-toggle="tooltip">
                                         <i class="feather feather-eye"></i>
                                     </a>
                                 </div>
@@ -133,8 +133,8 @@
                         <tr>
                             <td colspan="10" class="text-center py-5 text-muted">
                                 <i class="feather-info fs-36 text-secondary d-block mb-2"></i>
-                                <h6 class="fw-bold text-dark mb-1">No Vendor Bills Found</h6>
-                                <p class="fs-12 mb-0">Vendor Bills are generated from Approved Goods Receipt Notes (GRN).</p>
+                                <h6 class="fw-bold text-dark mb-1">{{ __('purchase.no_vendor_bills_found') }}</h6>
+                                <p class="fs-12 mb-0">{{ __('purchase.no_vendor_bills_help') }}</p>
                             </td>
                         </tr>
                     @endforelse

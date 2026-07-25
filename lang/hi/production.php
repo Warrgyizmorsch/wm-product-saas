@@ -869,7 +869,7 @@ return [
     'overview' => 'पूर्वावलोकन',
     'operations_routing' => 'संचालन राउटिंग',
     'wip_tracking' => 'WIP ट्रैकिंग',
-    'material_reservations' => 'सामग्री आरक्षण',
+    'material_reservations' => 'सामग्री आरक्षित',
     'material_issues' => 'सामग्री निर्गमन',
     'progress_logs' => 'प्रगति लॉग',
     'scrap_rework' => 'स्क्रैप और रीवर्क',
@@ -917,7 +917,7 @@ return [
     'no_wip_active' => 'कोई WIP ट्रैकिंग सक्रिय नहीं है। ड्राफ्ट आदेश जारी होने पर WIP स्वचालित रूप से प्रारंभ होता है।',
 
     // Material Reservations Tab
-    'component_reservations' => 'घटक सामग्री आरक्षण',
+    'component_reservations' => 'घटक सामग्री आरक्षित',
     'request_additional_material' => 'अतिरिक्त सामग्री का अनुरोध करें',
     'material_component' => 'सामग्री घटक',
     'warehouse' => 'गोदाम',
@@ -1064,8 +1064,8 @@ return [
     'mark_operation_completed' => 'संचालन पूर्ण चिह्नित करें (अगले क्रम के लिए तैयार)',
     'save_progress_log' => 'प्रगति लॉग सहेजें',
     'issue_raw_material' => 'कच्ची सामग्री घटक निर्गत करें',
-    'reservation' => 'आरक्षण',
-    'use_reservation_warehouse' => 'आरक्षण गोदाम का उपयोग करें',
+    'reservation' => 'आरक्षित',
+    'use_reservation_warehouse' => 'आरक्षित गोदाम का उपयोग करें',
     'use_default_warehouse' => 'डिफ़ॉल्ट गोदाम का उपयोग करें',
     'log_material_issue' => 'सामग्री निर्गमन दर्ज करें',
     'return_materials_stock' => 'स्टॉक में सामग्री वापस लौटाएं',

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vendor Quotation Portal | SaaS ERP</title>
+    <title>{{ __('purchase.vendor_quotation_portal') }} | SaaS ERP</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Google Fonts -->
@@ -103,12 +103,12 @@
                     <div class="portal-header">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                             <div>
-                                <span class="badge bg-white text-dark mb-2 px-2.5 py-1 fw-bold">RFQ Portal</span>
-                                <h3 class="fw-bold mb-0">Quotation Submission Request</h3>
-                                <p class="mb-0 mt-1 opacity-75">Submit your best prices and terms for inquiry number: <strong>{{ $rfq->rfq_number }}</strong></p>
+                                <span class="badge bg-white text-dark mb-2 px-2.5 py-1 fw-bold">{{ __('purchase.rfq_portal') }}</span>
+                                <h3 class="fw-bold mb-0">{{ __('purchase.quotation_submission_request') }}</h3>
+                                <p class="mb-0 mt-1 opacity-75">{{ __('purchase.portal_submit_help') }} <strong>{{ $rfq->rfq_number }}</strong></p>
                             </div>
                             <div class="text-md-end">
-                                <small class="opacity-75">Inquiry Date</small>
+                                <small class="opacity-75">{{ __('purchase.inquiry_date') }}</small>
                                 <h5 class="fw-semibold mb-0">{{ $rfq->rfq_date ? $rfq->rfq_date->format('d-M-Y') : '—' }}</h5>
                             </div>
                         </div>
@@ -123,63 +123,63 @@
                             <!-- Vendor & Client Summary Row -->
                             <div class="row g-4 mb-5 pb-4 border-bottom bg-light p-3 rounded">
                                 <div class="col-md-6">
-                                    <small class="text-muted text-uppercase fw-semibold">Supplier details</small>
+                                    <small class="text-muted text-uppercase fw-semibold">{{ __('purchase.supplier_details') }}</small>
                                     <h5 class="fw-bold text-dark mb-1">{{ $vendor->name }}</h5>
                                     <p class="mb-0 text-secondary fs-13"><i data-feather="phone" class="me-1" style="width:13px;"></i>{{ $vendor->phone ?: '—' }}</p>
                                     <p class="mb-0 text-secondary fs-13"><i data-feather="mail" class="me-1" style="width:13px;"></i>{{ $vendor->email ?: '—' }}</p>
                                 </div>
                                 <div class="col-md-6 text-md-end border-start-md">
-                                    <small class="text-muted text-uppercase fw-semibold">Requested By</small>
-                                    <h5 class="fw-bold text-dark mb-1">Procurement Department</h5>
+                                    <small class="text-muted text-uppercase fw-semibold">{{ __('purchase.requested_by') }}</small>
+                                    <h5 class="fw-bold text-dark mb-1">{{ __('purchase.procurement_department') }}</h5>
                                     <p class="mb-0 text-secondary fs-13">SaaS ERP Enterprise</p>
                                 </div>
                             </div>
 
                             <!-- Quotation Details Form -->
-                            <h5 class="fw-bold mb-3 text-dark"><i data-feather="file-text" class="me-2 text-primary"></i>Quotation Header</h5>
+                            <h5 class="fw-bold mb-3 text-dark"><i data-feather="file-text" class="me-2 text-primary"></i>{{ __('purchase.quotation_header') }}</h5>
                             <div class="row g-4 mb-5">
                                 <div class="col-md-4">
-                                    <label class="form-label">Quotation Number / Ref <span class="text-danger">*</span></label>
+                                    <label class="form-label">{{ __('purchase.quotation_number_ref') }}</label>
                                     <input type="text" name="quotation_number" class="form-control" value="{{ old('quotation_number', $rfqVendor->quotation_number) }}" required placeholder="e.g. QU-XYZ-987">
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Payment Terms</label>
+                                    <label class="form-label">{{ __('purchase.payment_terms') }}</label>
                                     <select name="payment_type" class="form-select">
-                                        <option value="">Select Payment Terms...</option>
-                                        <option value="Cash" @selected(old('payment_type', $rfqVendor->payment_type) === 'Cash')>Cash</option>
-                                        <option value="Net 30" @selected(old('payment_type', $rfqVendor->payment_type) === 'Net 30')>Net 30 Days</option>
-                                        <option value="Net 60" @selected(old('payment_type', $rfqVendor->payment_type) === 'Net 60')>Net 60 Days</option>
-                                        <option value="50% Advance, 50% Delivery" @selected(old('payment_type', $rfqVendor->payment_type) === '50% Advance, 50% Delivery')>50% Advance, 50% Delivery</option>
+                                        <option value="">{{ __('purchase.select_payment_terms') }}</option>
+                                        <option value="Cash" @selected(old('payment_type', $rfqVendor->payment_type) === 'Cash')>{{ __('purchase.cash') }}</option>
+                                        <option value="Net 30" @selected(old('payment_type', $rfqVendor->payment_type) === 'Net 30')>{{ __('purchase.net_30_days') }}</option>
+                                        <option value="Net 60" @selected(old('payment_type', $rfqVendor->payment_type) === 'Net 60')>{{ __('purchase.net_60_days') }}</option>
+                                        <option value="50% Advance, 50% Delivery" @selected(old('payment_type', $rfqVendor->payment_type) === '50% Advance, 50% Delivery')>{{ __('purchase.payment_50_50') }}</option>
                                     </select>
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Quotation Attachment (PDF/Image)</label>
+                                    <label class="form-label">{{ __('purchase.quotation_attachment') }}</label>
                                     <input type="file" name="attachment" class="form-control">
                                     @if($rfqVendor->attachment_path)
                                         <div class="mt-2 fs-12">
                                             <i data-feather="paperclip" class="me-1 text-success" style="width:13px;"></i>
-                                            <a href="{{ asset('storage/' . $rfqVendor->attachment_path) }}" target="_blank" class="text-decoration-underline text-success fw-semibold">Current Attachment File</a>
+                                            <a href="{{ asset('storage/' . $rfqVendor->attachment_path) }}" target="_blank" class="text-decoration-underline text-success fw-semibold">{{ __('purchase.current_attachment') }}</a>
                                         </div>
                                     @endif
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Terms & Conditions / Remarks</label>
-                                    <textarea name="terms_conditions" class="form-control" rows="3" placeholder="Mention any freight charges, waranty terms, payment specifics, etc.">{{ old('terms_conditions', $rfqVendor->terms_conditions) }}</textarea>
+                                    <label class="form-label">{{ __('purchase.terms_conditions_remarks') }}</label>
+                                    <textarea name="terms_conditions" class="form-control" rows="3" placeholder="{{ __('purchase.remarks_placeholder_portal') }}">{{ old('terms_conditions', $rfqVendor->terms_conditions) }}</textarea>
                                 </div>
                             </div>
 
                             <!-- Quotation Items Rates Grid -->
-                            <h5 class="fw-bold mb-3 text-dark"><i data-feather="list" class="me-2 text-primary"></i>Inquired Items Rates</h5>
+                            <h5 class="fw-bold mb-3 text-dark"><i data-feather="list" class="me-2 text-primary"></i>{{ __('purchase.inquired_items_rates') }}</h5>
                             <div class="table-responsive mb-5">
                                 <table class="table table-quote border">
                                     <thead>
                                         <tr>
-                                            <th style="width: 30%">Product</th>
-                                            <th class="text-end" style="width: 12%">Inquired Qty</th>
-                                            <th class="text-end" style="width: 18%">Your Qty <span class="text-danger">*</span></th>
-                                            <th class="text-end" style="width: 20%">Quoted Rate / Unit <span class="text-danger">*</span></th>
-                                            <th style="width: 10%">Delivery Date</th>
-                                            <th style="width: 10%">Validity Date</th>
+                                            <th style="width: 30%">{{ __('purchase.product') }}</th>
+                                            <th class="text-end" style="width: 12%">{{ __('purchase.inquired_qty') }}</th>
+                                            <th class="text-end" style="width: 18%">{{ __('purchase.your_qty') }}</th>
+                                            <th class="text-end" style="width: 20%">{{ __('purchase.quoted_rate_unit') }}</th>
+                                            <th style="width: 10%">{{ __('purchase.delivery_date') }}</th>
+                                            <th style="width: 10%">{{ __('purchase.validity_date') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -195,7 +195,7 @@
                                                     <div class="d-flex flex-column gap-0.5 mt-1">
                                                         <small class="text-muted">SKU: {{ $item->product?->sku ?: '—' }}</small>
                                                         <small class="text-primary fs-11 fw-semibold">
-                                                            <i data-feather="calendar" class="me-1" style="width:12px; height:12px;"></i>Expected: {{ $rfq->requisition?->requisition_date ? $rfq->requisition->requisition_date->format('d-M-Y') : $rfq->rfq_date->format('d-M-Y') }}
+                                                            <i data-feather="calendar" class="me-1" style="width:12px; height:12px;"></i>{{ __('purchase.expected') }} {{ $rfq->requisition?->requisition_date ? $rfq->requisition->requisition_date->format('d-M-Y') : $rfq->rfq_date->format('d-M-Y') }}
                                                         </small>
                                                     </div>
                                                 </td>
@@ -229,7 +229,7 @@
 
                             <div class="d-flex justify-content-end border-top pt-4">
                                 <button type="submit" class="btn btn-submit">
-                                    <i data-feather="check-circle" class="me-2"></i>Submit Quotation Rates
+                                    <i data-feather="check-circle" class="me-2"></i>{{ __('purchase.submit_quotation_rates') }}
                                 </button>
                             </div>
                         </form>
