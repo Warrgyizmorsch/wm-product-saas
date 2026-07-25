@@ -193,6 +193,8 @@ class SchedulingService
                 'created_by' => auth()->id() ?: 1,
             ]);
             $scheduledData = [];
+            // Track created schedule-op IDs per parallel_group for sibling exclusion
+            $parallelGroupOpIds = []; // ['GROUP-A' => [scheduleOpId1, ...]]
 
             foreach ($operations as $op) {
                 $times = $this->calculateOperationTimes($op, $order->quantity_ordered);
@@ -213,11 +215,17 @@ class SchedulingService
                     ? $startDate->copy()
                     : $predecessors->max('planned_finish')->copy();
 
+                // Collect parallel-group sibling schedule-op IDs to exclude from bookings
+                $excludeScheduleOpIds = [];
+                if ($op->is_parallel && $op->parallel_group !== null) {
+                    $excludeScheduleOpIds = $parallelGroupOpIds[$op->parallel_group] ?? [];
+                }
+
                 // Find optimal machine & slot
                 if ($op->routing_operation_id) {
-                    $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $earliestStart, $duration, $tenantId, true);
+                    $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $earliestStart, $duration, $tenantId, true, $excludeScheduleOpIds);
                 } else {
-                    $slot = $this->calculateAvailableSlot($op->work_center_id, null, $earliestStart, $duration, true);
+                    $slot = $this->calculateAvailableSlot($op->work_center_id, null, $earliestStart, $duration, true, $excludeScheduleOpIds);
                     $alloc = [
                         'machine_id' => null,
                         'start' => $slot['start'],
@@ -233,7 +241,7 @@ class SchedulingService
                 $machineId = $alloc['machine_id'] ?? null;
                 $priority = $alloc['priority'] ?? 1;
 
-                ProductionScheduleOperation::create([
+                $schedOp = ProductionScheduleOperation::create([
                     'tenant_id' => $tenantId,
                     'production_schedule_id' => $schedule->id,
                     'production_order_id' => $order->id,
@@ -253,6 +261,11 @@ class SchedulingService
                     'lane' => 'WorkCenter_' . $op->work_center_id,
                     'resource_id' => $machineId ? 'Machine_' . $machineId : 'WorkCenter_' . $op->work_center_id,
                 ]);
+
+                // Track parallel group schedule-op IDs for sibling exclusion
+                if ($op->is_parallel && $op->parallel_group !== null) {
+                    $parallelGroupOpIds[$op->parallel_group][] = $schedOp->id;
+                }
 
                 $scheduledData[] = [
                     'sequence' => $op->sequence,
@@ -347,6 +360,8 @@ class SchedulingService
             $reversedOps = $operations->reverse();
             $records = [];
             $scheduledData = [];
+            // Track created schedule-op IDs per parallel_group for sibling exclusion
+            $parallelGroupOpIds = []; // ['GROUP-A' => [scheduleOpId1, ...]]
 
             foreach ($reversedOps as $op) {
                 $times = $this->calculateOperationTimes($op, $order->quantity_ordered);
@@ -367,11 +382,17 @@ class SchedulingService
                     ? $dueDate->copy()
                     : $successors->min('planned_start')->copy();
 
+                // Collect parallel-group sibling schedule-op IDs to exclude from bookings
+                $excludeScheduleOpIds = [];
+                if ($op->is_parallel && $op->parallel_group !== null) {
+                    $excludeScheduleOpIds = $parallelGroupOpIds[$op->parallel_group] ?? [];
+                }
+
                 // Find slot searching backwards
                 if ($op->routing_operation_id) {
-                    $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $latestFinish, $duration, $tenantId, false);
+                    $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $latestFinish, $duration, $tenantId, false, $excludeScheduleOpIds);
                 } else {
-                    $slot = $this->calculateAvailableSlot($op->work_center_id, null, $latestFinish, $duration, false);
+                    $slot = $this->calculateAvailableSlot($op->work_center_id, null, $latestFinish, $duration, false, $excludeScheduleOpIds);
                     $alloc = [
                         'machine_id' => null,
                         'start' => $slot['start'],
@@ -404,6 +425,8 @@ class SchedulingService
                     'locked' => false,
                     'lane' => 'WorkCenter_' . $op->work_center_id,
                     'resource_id' => $machineId ? 'Machine_' . $machineId : 'WorkCenter_' . $op->work_center_id,
+                    '_parallel_group' => $op->parallel_group,
+                    '_is_parallel' => $op->is_parallel,
                 ];
 
                 $scheduledData[] = [
@@ -422,12 +445,19 @@ class SchedulingService
             }
 
             foreach ($records as $record) {
-                ProductionScheduleOperation::create($record);
+                $parallelGroup = $record['_parallel_group'] ?? null;
+                $isParallel = $record['_is_parallel'] ?? false;
+                unset($record['_parallel_group'], $record['_is_parallel']);
+                $schedOp = ProductionScheduleOperation::create($record);
+                if ($isParallel && $parallelGroup !== null) {
+                    $parallelGroupOpIds[$parallelGroup][] = $schedOp->id;
+                }
             }
 
             $schedule->update([
                 'capacity_utilization' => $this->calculateOverallUtilization($schedule),
             ]);
+
 
             app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
@@ -562,7 +592,8 @@ class SchedulingService
         ?int $machineId,
         Carbon $from,
         float $durationMinutes,
-        bool $forward = true
+        bool $forward = true,
+        array $excludeScheduleOpIds = []
     ): array {
         $wc = $this->getCachedWorkCenter($workCenterId);
         if (!$wc) {
@@ -605,6 +636,11 @@ class SchedulingService
         }
 
         $bookings = $bookingsQuery->get();
+
+        // Exclude parallel-group siblings so they may share the same slot
+        if (!empty($excludeScheduleOpIds)) {
+            $bookings = $bookings->whereNotIn('id', $excludeScheduleOpIds)->values();
+        }
 
         $searchDate = $from->copy();
         $limitDays = 365;
@@ -805,7 +841,8 @@ class SchedulingService
         Carbon $from,
         float $durationMinutes,
         int $tenantId,
-        bool $forward = true
+        bool $forward = true,
+        array $excludeScheduleOpIds = []
     ): array {
         $warnings = [];
         $routingOp = RoutingOperation::withoutGlobalScopes()->find($routingOpId);
@@ -874,7 +911,7 @@ class SchedulingService
         // Calculate slot for each valid candidate
         $evaluated = [];
         foreach ($candidates as $cand) {
-            $slot = $this->calculateAvailableSlot($routingOp->work_center_id, $cand['machine']->id, $from, $durationMinutes, $forward);
+            $slot = $this->calculateAvailableSlot($routingOp->work_center_id, $cand['machine']->id, $from, $durationMinutes, $forward, $excludeScheduleOpIds);
             $evaluated[] = [
                 'machine' => $cand['machine'],
                 'priority' => $cand['priority'],
