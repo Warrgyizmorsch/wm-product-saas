@@ -237,6 +237,11 @@ class ProductionOrder extends BaseModel
         return $this->hasMany(ProductionCostAdjustment::class, 'production_order_id');
     }
 
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(ProductionSchedule::class, 'production_order_id');
+    }
+
     // ── Status Helpers ──
 
     public function isDraft(): bool

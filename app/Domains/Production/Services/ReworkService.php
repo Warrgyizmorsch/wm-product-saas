@@ -190,8 +190,14 @@ class ReworkService
                     // Update WIP counts
                     $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $rework->original_production_order_id)->first();
                     if ($wip) {
+                        $nextOpExists = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $wip->production_order_id)
+                            ->where('sequence', '>', $originalOp->sequence)
+                            ->exists();
+
                         $wip->rejected_quantity = max(0.0000, $wip->rejected_quantity - $reworkQty);
-                        $wip->completed_quantity += $reworkQty;
+                        if (!$nextOpExists) {
+                            $wip->completed_quantity += $reworkQty;
+                        }
                         $wip->available_quantity += $reworkQty;
                         $wip->save();
                     }

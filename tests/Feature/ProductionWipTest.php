@@ -266,7 +266,7 @@ class ProductionWipTest extends TestCase
         // Total cost added = $360.
         $wipService->completeWipOperation(
             $wip->id,
-            $schedOp->id,
+            $orderOp1->id,
             10.0000, // good
             0.0000,  // rejected
             0.0000,  // scrap
@@ -316,5 +316,178 @@ class ProductionWipTest extends TestCase
         $this->assertNotNull($tx);
         $this->assertEquals(8.0000, $tx->quantity);
         $this->assertStringContainsString('Damage during setup', $tx->remarks);
+    }
+
+    public function test_wip_available_quantity_with_rejects_and_rework(): void
+    {
+        $order = $this->createOrder();
+        $this->post(route('production.orders.release', $order->id));
+        $wip = ProductionWip::where('production_order_id', $order->id)->first();
+
+        $orderOp1 = $order->operations()->where('sequence', 10)->first();
+
+        $wipService = app(ProductionWipService::class);
+
+        // 1. Complete operation 10 with 8 good, 2 rejected
+        $wipService->completeWipOperation(
+            $wip->id,
+            $orderOp1->id,
+            8.0000,  // good
+            2.0000,  // rejected
+            0.0000,  // scrap
+            0.0000,  // setup mins
+            0.0000,  // run mins
+            'Completed with 8 good and 2 rejected',
+            $this->user->id
+        );
+
+        $wip->refresh();
+        // Since sequence 10 is an intermediate operation, available_quantity should be order quantity - rejects = 8
+        $this->assertEquals(8.0000, $wip->available_quantity);
+        $this->assertEquals(2.0000, $wip->rejected_quantity);
+        $this->assertEquals(0.0000, $wip->completed_quantity);
+
+        // 2. Create NCR and Rework Order to simulate Rework completion
+        $ncr = \App\Domains\Production\Models\ProductionNcr::create([
+            'tenant_id' => $this->tenantId,
+            'ncr_number' => 'NCR-TEST-123',
+            'category' => 'process',
+            'status' => 'open',
+            'disposition_type' => 'rework',
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $orderOp1->id,
+            'description' => 'Test description',
+        ]);
+
+        $reworkOrder = \App\Domains\Production\Models\ProductionReworkOrder::create([
+            'tenant_id' => $this->tenantId,
+            'rework_number' => 'RWK-TEST-123',
+            'ncr_id' => $ncr->id,
+            'original_production_order_id' => $order->id,
+            'status' => 'draft',
+            'cost_estimate' => 100.00,
+        ]);
+
+        $orderRework = \App\Domains\Production\Models\ProductionOrderRework::create([
+            'tenant_id' => $this->tenantId,
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $orderOp1->id,
+            'quantity' => 2.0000,
+            'status' => 'pending',
+            'recorded_by' => $this->user->id,
+            'recorded_at' => now(),
+        ]);
+
+        $reworkOp = \App\Domains\Production\Models\ProductionReworkOperation::create([
+            'tenant_id' => $this->tenantId,
+            'rework_order_id' => $reworkOrder->id,
+            'sequence' => 10,
+            'name' => 'Rework inspection',
+            'work_center_id' => $this->workCenter->id,
+            'status' => 'running',
+            'actual_start' => now(),
+        ]);
+
+        // Complete the rework operation
+        $reworkService = app(\App\Domains\Production\Services\ReworkService::class);
+        $reworkService->completeOperation($reworkOp->id, [], $this->tenantId);
+
+        $wip->refresh();
+        // Since sequence 10 is intermediate, completing rework should:
+        // - decrement rejected_quantity to 0
+        // - increment available_quantity back to 10
+        // - NOT increment completed_quantity (still 0)
+        $this->assertEquals(0.0000, $wip->rejected_quantity);
+        $this->assertEquals(10.0000, $wip->available_quantity);
+        $this->assertEquals(0.0000, $wip->completed_quantity);
+    }
+
+    public function test_wip_completed_quantity_with_rework_on_last_operation(): void
+    {
+        $order = $this->createOrder();
+        $this->post(route('production.orders.release', $order->id));
+        $wip = ProductionWip::where('production_order_id', $order->id)->first();
+
+        $orderOp2 = $order->operations()->where('sequence', 20)->first();
+
+        // 1. Move to the last operation (Seq 20)
+        $wip->update([
+            'current_routing_operation_id' => $orderOp2->routing_operation_id,
+        ]);
+
+        $wipService = app(ProductionWipService::class);
+
+        // 2. Complete the last operation with 8 good, 2 rejected
+        $wipService->completeWipOperation(
+            $wip->id,
+            $orderOp2->id,
+            8.0000,  // good
+            2.0000,  // rejected
+            0.0000,  // scrap
+            0.0000,  // setup mins
+            0.0000,  // run mins
+            'Last op completed with 8 good and 2 rejected',
+            $this->user->id
+        );
+
+        $wip->refresh();
+        // Since it's the last operation, available_quantity and completed_quantity should be set to good quantity = 8
+        $this->assertEquals(8.0000, $wip->available_quantity);
+        $this->assertEquals(8.0000, $wip->completed_quantity);
+        $this->assertEquals(2.0000, $wip->rejected_quantity);
+
+        // 3. Create NCR and Rework Order to simulate Rework completion on last operation
+        $ncr = \App\Domains\Production\Models\ProductionNcr::create([
+            'tenant_id' => $this->tenantId,
+            'ncr_number' => 'NCR-TEST-456',
+            'category' => 'process',
+            'status' => 'open',
+            'disposition_type' => 'rework',
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $orderOp2->id,
+            'description' => 'Test description 2',
+        ]);
+
+        $reworkOrder = \App\Domains\Production\Models\ProductionReworkOrder::create([
+            'tenant_id' => $this->tenantId,
+            'rework_number' => 'RWK-TEST-456',
+            'ncr_id' => $ncr->id,
+            'original_production_order_id' => $order->id,
+            'status' => 'draft',
+            'cost_estimate' => 100.00,
+        ]);
+
+        $orderRework = \App\Domains\Production\Models\ProductionOrderRework::create([
+            'tenant_id' => $this->tenantId,
+            'production_order_id' => $order->id,
+            'production_order_operation_id' => $orderOp2->id,
+            'quantity' => 2.0000,
+            'status' => 'pending',
+            'recorded_by' => $this->user->id,
+            'recorded_at' => now(),
+        ]);
+
+        $reworkOp = \App\Domains\Production\Models\ProductionReworkOperation::create([
+            'tenant_id' => $this->tenantId,
+            'rework_order_id' => $reworkOrder->id,
+            'sequence' => 10,
+            'name' => 'Rework inspection',
+            'work_center_id' => $this->workCenter->id,
+            'status' => 'running',
+            'actual_start' => now(),
+        ]);
+
+        // Complete rework operation
+        $reworkService = app(\App\Domains\Production\Services\ReworkService::class);
+        $reworkService->completeOperation($reworkOp->id, [], $this->tenantId);
+
+        $wip->refresh();
+        // Since sequence 20 is the last operation, completing rework should:
+        // - decrement rejected_quantity to 0
+        // - increment available_quantity to 10
+        // - increment completed_quantity to 10
+        $this->assertEquals(0.0000, $wip->rejected_quantity);
+        $this->assertEquals(10.0000, $wip->available_quantity);
+        $this->assertEquals(10.0000, $wip->completed_quantity);
     }
 }

@@ -633,6 +633,7 @@ return [
 
     // Production Scheduling (Schedules)
     'schedules' => 'कार्यक्रम / शेड्यूल',
+    'production_schedules' => 'उत्पादन कार्यक्रम / शेड्यूल',
     'production_scheduling' => 'उत्पादन शेड्यूलिंग',
     'calendar_view' => 'कैलेंडर दृश्य',
     'work_center_view' => 'कार्य केंद्र दृश्य',

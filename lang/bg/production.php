@@ -633,6 +633,7 @@ return [
 
     // Production Scheduling (Schedules)
     'schedules' => 'Графици',
+    'production_schedules' => 'Производствени графици',
     'production_scheduling' => 'Производствено планиране / Графици',
     'calendar_view' => 'Календарен изглед',
     'work_center_view' => 'Изглед по работни центрове',
