@@ -52,6 +52,49 @@ class PurchaseOrderController extends Controller
         return view('modules.purchase.orders.index', compact('orders'));
     }
 
+    /**
+     * PO Approvals — only Draft orders pending approval.
+     */
+    public function poApprovals(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        $query = PurchaseOrder::where('tenant_id', $tenantId)
+            ->where('status', 'Draft')
+            ->with(['vendor', 'requisition', 'creator']);
+
+        if ($request->filled('search')) {
+            $search = '%' . $request->input('search') . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('purchase_order_number', 'like', $search)
+                  ->orWhereHas('vendor', fn($v) => $v->where('name', 'like', $search));
+            });
+        }
+
+        $sortBy    = $request->input('sort_by', 'id');
+        $sortOrder = $request->input('sort_order', 'desc');
+        $allowedSorts = ['id', 'purchase_order_number', 'date', 'grand_total'];
+
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        $orders = $query->paginate(15)->withQueryString();
+
+        return view('modules.purchase.approvals.po-index', compact('orders'));
+    }
+
+    /**
+     * Return HTML partial for PO offcanvas drawer.
+     */
+    public function poDetailPartial(PurchaseOrder $order)
+    {
+        $order->load(['vendor', 'requisition', 'items.product']);
+        return view('modules.purchase.approvals.po-detail-partial', compact('order'));
+    }
+
     public function create(Request $request)
     {
         $tenantId = require_tenant_id();

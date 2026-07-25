@@ -104,13 +104,16 @@ class SalesOrderService
 
             if (!empty($data['quotation_id'])) {
                 $quotation = \App\Domains\CRM\Models\Quotation::find($data['quotation_id']);
-                if ($quotation && $quotation->lead_id) {
-                    $lead = \App\Domains\CRM\Models\Lead::find($quotation->lead_id);
-                    if ($lead) {
-                        $lead->update([
-                            'status' => 'Converted',
-                            'is_customer' => true,
-                        ]);
+                if ($quotation) {
+                    $quotation->update(['status' => 'Converted']);
+                    if ($quotation->lead_id) {
+                        $lead = \App\Domains\CRM\Models\Lead::find($quotation->lead_id);
+                        if ($lead) {
+                            $lead->update([
+                                'status' => 'Converted',
+                                'is_customer' => true,
+                            ]);
+                        }
                     }
                 }
             }

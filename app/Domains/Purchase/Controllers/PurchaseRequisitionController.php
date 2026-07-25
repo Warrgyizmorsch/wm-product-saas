@@ -51,9 +51,45 @@ class PurchaseRequisitionController extends Controller
         return view('modules.purchase.requisitions.index', compact('requisitions'));
     }
 
+    /**
+     * PR Approvals — only Draft (pending) requisitions.
+     */
+    public function prApprovals(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        $query = PurchaseRequisition::where('tenant_id', $tenantId)
+            ->where('status', 'Draft')
+            ->with(['requester', 'sourceable']);
+
+        if ($request->filled('source_type')) {
+            $query->where('source_type', $request->input('source_type'));
+        }
+
+        if ($request->filled('search')) {
+            $search = '%' . $request->input('search') . '%';
+            $query->where('requisition_number', 'like', $search);
+        }
+
+        $sortBy    = $request->input('sort_by', 'id');
+        $sortOrder = $request->input('sort_order', 'desc');
+        $allowedSorts = ['id', 'requisition_number', 'requisition_date'];
+
+        if (in_array($sortBy, $allowedSorts)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
+        $requisitions = $query->paginate(15)->withQueryString();
+
+        return view('modules.purchase.approvals.index', compact('requisitions'));
+    }
+
     public function create()
     {
         $tenantId = require_tenant_id();
+
 
         $products = Product::where('tenant_id', $tenantId)->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
@@ -160,6 +196,25 @@ class PurchaseRequisitionController extends Controller
             ->findOrFail($id);
 
         return view('modules.purchase.requisitions.show', compact('requisition'));
+    }
+
+    /**
+     * Return the offcanvas drawer partial for the given requisition (AJAX).
+     */
+    public function detailPartial(int $id)
+    {
+        $tenantId = require_tenant_id();
+
+        $requisition = PurchaseRequisition::where('tenant_id', $tenantId)
+            ->with([
+                'requester',
+                'sourceable',
+                'items.product',
+                'items.warehouse'
+            ])
+            ->findOrFail($id);
+
+        return view('modules.purchase.requisitions.detail-partial', compact('requisition'));
     }
 
     public function edit(int $id)

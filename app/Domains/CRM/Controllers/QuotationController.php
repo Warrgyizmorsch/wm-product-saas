@@ -31,9 +31,9 @@ class QuotationController extends Controller
             ->with(['lead', 'salesPerson'])
             ->where('is_current', true);
 
-        // Exclude Draft and Pending Approval statuses by default
+        // Only show Accepted and Converted quotations by default on this screen
         if (!$request->has('status') && !$request->has('search')) {
-            $query->whereNotIn('status', ['Draft', 'Pending Approval']);
+            $query->whereIn('status', ['Accepted', 'Converted']);
         }
 
         // Search Keywords
@@ -127,6 +127,12 @@ class QuotationController extends Controller
         $quotations = $query->paginate(10)->withQueryString();
 
         return view('modules.crm.quotations.approvals', compact('quotations'));
+    }
+
+    public function detailPartial(Quotation $quotation)
+    {
+        $quotation->load(['lead', 'salesPerson', 'items.product']);
+        return view('modules.crm.quotations.detail-partial', compact('quotation'));
     }
 
     public function create()
@@ -345,7 +351,7 @@ class QuotationController extends Controller
         $this->authorize('update', $quotation);
 
         $validated = $request->validate([
-            'status' => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework'],
+            'status' => ['required', 'string', 'in:Draft,Pending Approval,Approved,Sent,Quotation Sent,Accepted,Rejected,Quotation Rework,Converted'],
         ]);
 
         $newStatus = $validated['status'];

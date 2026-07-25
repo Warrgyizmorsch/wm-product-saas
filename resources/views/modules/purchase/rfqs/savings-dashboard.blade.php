@@ -1,9 +1,9 @@
 @extends('layouts.duralux')
 
-@section('title', 'RFQ Purchase Savings Dashboard | SaaS ERP')
-@section('page-title', 'RFQ Purchase Savings Dashboard')
+@section('title', __('purchase.rfq_savings_dashboard') . ' | SaaS ERP')
+@section('page-title', __('purchase.rfq_savings_dashboard'))
 @section('breadcrumb')
-    <a href="{{ route('purchase.rfqs.index') }}">RFQs</a> &gt; Purchase Savings Dashboard
+    <a href="{{ route('purchase.rfqs.index') }}">{{ __('purchase.rfqs') }}</a> &gt; {{ __('purchase.savings_dashboard') }}
 @endsection
 
 @section('content')
@@ -20,13 +20,13 @@
                 <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div>
                         <h4 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
-                            <i class="feather-trending-up text-primary fs-22"></i> RFQ Purchase Savings Dashboard
+                            <i class="feather-trending-up text-primary fs-22"></i> {{ __('purchase.rfq_savings_dashboard') }}
                         </h4>
-                        <p class="text-muted fs-13 mb-0">Track cost savings achieved through competitive RFQ-based Purchase Orders.</p>
+                        <p class="text-muted fs-13 mb-0"> {{ __('purchase.savings_dashboard_help') }}</p>
                     </div>
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-outline-secondary border btn-sm px-3" onclick="window.print()">
-                            <i class="feather-printer me-1"></i> Print Report
+                            <i class="feather-printer me-1"></i> {{ __('purchase.print_report') }}
                         </button>
                     </div>
                 </div>
@@ -39,13 +39,13 @@
                     <div class="card border-0 shadow-sm h-100 bg-white" style="border-left: 4px solid #10b981 !important;">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Total Savings</span>
+                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.total_savings') }}</span>
                                 <div class="avatar-text bg-soft-success text-success rounded-circle" style="width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
                                     <i class="feather-dollar-sign fs-14"></i>
                                 </div>
                             </div>
                             <h4 class="fw-bold text-success mb-1 fs-18">{{ $currencySymbol }}{{ number_format($totalSavings, 2) }}</h4>
-                            <span class="fs-11 text-muted">Cost Saved via RFQ</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.cost_saved_via_rfq') }}</span>
                         </div>
                     </div>
                 </div>
@@ -55,13 +55,13 @@
                     <div class="card border-0 shadow-sm h-100 bg-white" style="border-left: 4px solid #3b82f6 !important;">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Purchase Value</span>
+                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.purchase_value') }}</span>
                                 <div class="avatar-text bg-soft-primary text-primary rounded-circle" style="width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
                                     <i class="feather-shopping-bag fs-14"></i>
                                 </div>
                             </div>
                             <h4 class="fw-bold text-dark mb-1 fs-18">{{ $currencySymbol }}{{ number_format($totalSpend, 2) }}</h4>
-                            <span class="fs-11 text-muted">Total RFQ PO Spend</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.total_rfq_po_spend') }}</span>
                         </div>
                     </div>
                 </div>
@@ -71,13 +71,13 @@
                     <div class="card border-0 shadow-sm h-100 bg-white" style="border-left: 4px solid #8b5cf6 !important;">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">RFQ Orders</span>
+                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.rfq_orders') }}</span>
                                 <div class="avatar-text bg-soft-purple text-purple rounded-circle" style="width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
                                     <i class="feather-layers fs-14"></i>
                                 </div>
                             </div>
                             <h4 class="fw-bold text-dark mb-1 fs-18">{{ count($processedOrders) }}</h4>
-                            <span class="fs-11 text-muted">PO Count from RFQ</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.po_count_from_rfq') }}</span>
                         </div>
                     </div>
                 </div>
@@ -87,13 +87,13 @@
                     <div class="card border-0 shadow-sm h-100 bg-white" style="border-left: 4px solid #f59e0b !important;">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Avg Saving %</span>
+                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.avg_saving_percent') }}</span>
                                 <div class="avatar-text bg-soft-warning text-warning rounded-circle" style="width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
                                     <i class="feather-percent fs-14"></i>
                                 </div>
                             </div>
                             <h4 class="fw-bold text-warning mb-1 fs-18">{{ number_format($avgSavingPercent, 2) }}%</h4>
-                            <span class="fs-11 text-muted">Average Net Saving</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.avg_net_saving') }}</span>
                         </div>
                     </div>
                 </div>
@@ -103,13 +103,13 @@
                     <div class="card border-0 shadow-sm h-100 bg-white" style="border-left: 4px solid #ec4899 !important;">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Best Purchaser</span>
+                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.best_purchaser') }}</span>
                                 <div class="avatar-text bg-soft-pink text-pink rounded-circle" style="width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
                                     <i class="feather-user fs-14"></i>
                                 </div>
                             </div>
                             <h4 class="fw-bold text-dark mb-1 fs-15 text-truncate" title="{{ $bestPurchaserName }}">{{ $bestPurchaserName }}</h4>
-                            <span class="fs-11 text-muted">Top Negotiator</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.top_negotiator') }}</span>
                         </div>
                     </div>
                 </div>
@@ -119,13 +119,13 @@
                     <div class="card border-0 shadow-sm h-100 bg-white" style="border-left: 4px solid #06b6d4 !important;">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-center justify-content-between mb-2">
-                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">Max PO Saving</span>
+                                <span class="text-muted fs-11 fw-bold text-uppercase" style="letter-spacing:0.5px;">{{ __('purchase.max_po_saving') }}</span>
                                 <div class="avatar-text bg-soft-info text-info rounded-circle" style="width:32px; height:32px; display:flex; align-items:center; justify-content:center;">
                                     <i class="feather-award fs-14"></i>
                                 </div>
                             </div>
                             <h4 class="fw-bold text-info mb-1 fs-18">{{ $currencySymbol }}{{ number_format($highestSingleSavings, 2) }}</h4>
-                            <span class="fs-11 text-muted">Single PO Peak</span>
+                            <span class="fs-11 text-muted">{{ __('purchase.single_po_peak') }}</span>
                         </div>
                     </div>
                 </div>
@@ -134,25 +134,25 @@
             <!-- Filter Panel -->
             <div class="card border-0 shadow-sm mb-4 bg-white">
                 <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-filter me-2 text-primary"></i>Filters & Parameters</h6>
-                    <a href="{{ route('purchase.rfqs.savings') }}" class="btn btn-xs btn-light border">Reset Filters</a>
+                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-filter me-2 text-primary"></i>{{ __('purchase.filters_parameters') }}</h6>
+                    <a href="{{ route('purchase.rfqs.savings') }}" class="btn btn-xs btn-light border">{{ __('purchase.reset_filters') }}</a>
                 </div>
                 <div class="card-body p-4">
                     <form action="{{ route('purchase.rfqs.savings') }}" method="GET" class="row g-3 fs-12">
                         <div class="col-md-2 col-sm-6">
-                            <label class="form-label fw-bold text-muted mb-1 fs-11">From Date</label>
+                            <label class="form-label fw-bold text-muted mb-1 fs-11">{{ __('purchase.from_date') }}</label>
                             <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}">
                         </div>
                         <div class="col-md-2 col-sm-6">
-                            <label class="form-label fw-bold text-muted mb-1 fs-11">To Date</label>
+                            <label class="form-label fw-bold text-muted mb-1 fs-11">{{ __('purchase.to_date') }}</label>
                             <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}">
                         </div>
 
                         @if($isAdmin)
                             <div class="col-md-2 col-sm-6">
-                                <label class="form-label fw-bold text-muted mb-1 fs-11">Purchaser (Buyer)</label>
+                                <label class="form-label fw-bold text-muted mb-1 fs-11">{{ __('purchase.purchaser_buyer') }}</label>
                                 <select name="purchaser_id" class="form-select form-select-sm">
-                                    <option value="">All Purchasers</option>
+                                    <option value="">{{ __('purchase.all_purchasers') }}</option>
                                     @foreach($allPurchasers as $u)
                                         <option value="{{ $u->id }}" @selected(request('purchaser_id') == $u->id)>{{ $u->name }}</option>
                                     @endforeach
@@ -161,9 +161,9 @@
                         @endif
 
                         <div class="col-md-2 col-sm-6">
-                            <label class="form-label fw-bold text-muted mb-1 fs-11">Vendor</label>
+                            <label class="form-label fw-bold text-muted mb-1 fs-11">{{ __('purchase.vendor') }}</label>
                             <select name="vendor_id" class="form-select form-select-sm">
-                                <option value="">All Vendors</option>
+                                <option value="">{{ __('purchase.all_vendors') }}</option>
                                 @foreach($allVendors as $v)
                                     <option value="{{ $v->id }}" @selected(request('vendor_id') == $v->id)>{{ $v->name }}</option>
                                 @endforeach
@@ -171,18 +171,18 @@
                         </div>
 
                         <div class="col-md-2 col-sm-6">
-                            <label class="form-label fw-bold text-muted mb-1 fs-11">PO No.</label>
+                            <label class="form-label fw-bold text-muted mb-1 fs-11">{{ __('purchase.po_no') }}</label>
                             <input type="text" name="po_number" class="form-control form-control-sm" placeholder="e.g. PO-2026-..." value="{{ request('po_number') }}">
                         </div>
 
                         <div class="col-md-2 col-sm-6">
-                            <label class="form-label fw-bold text-muted mb-1 fs-11">RFQ No.</label>
+                            <label class="form-label fw-bold text-muted mb-1 fs-11">{{ __('purchase.rfq_no') }}</label>
                             <input type="text" name="rfq_number" class="form-control form-control-sm" placeholder="e.g. RFQ-2026-..." value="{{ request('rfq_number') }}">
                         </div>
 
                         <div class="col-12 d-flex justify-content-end gap-2 mt-2 pt-2 border-top">
                             <button type="submit" class="btn btn-primary btn-sm px-4 fw-semibold">
-                                <i class="feather-search me-1"></i> Apply Filters
+                                <i class="feather-search me-1"></i> {{ __('purchase.apply_filters') }}
                             </button>
                         </div>
                     </form>
@@ -195,7 +195,7 @@
                 <div class="col-lg-7">
                     <div class="card border-0 shadow-sm h-100 bg-white">
                         <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                            <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-bar-chart-2 text-primary me-2"></i>Monthly Savings Trend</h6>
+                            <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-bar-chart-2 text-primary me-2"></i>{{ __('purchase.monthly_savings_trend') }}</h6>
                             <span class="badge bg-soft-primary text-primary fs-10 fw-bold">Year {{ date('Y') }}</span>
                         </div>
                         <div class="card-body p-4">
@@ -227,16 +227,16 @@
                 <div class="col-lg-5">
                     <div class="card border-0 shadow-sm h-100 bg-white">
                         <div class="card-header bg-white py-3 border-bottom">
-                            <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-briefcase text-primary me-2"></i>Department-Wise Savings</h6>
+                            <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-briefcase text-primary me-2"></i>{{ __('purchase.department_wise_savings') }}</h6>
                         </div>
                         <div class="card-body p-4">
                             <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
                                 <table class="table table-hover align-middle fs-12 mb-0">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>Department</th>
-                                            <th class="text-end">Total Spend</th>
-                                            <th class="text-end">Savings ({{ $currencySymbol }})</th>
+                                            <th>{{ __('purchase.department') }}</th>
+                                            <th class="text-end">{{ __('purchase.total_spend') }}</th>
+                                            <th class="text-end">{{ __('purchase.savings') }} ({{ $currencySymbol }})</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -248,7 +248,7 @@
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="3" class="text-center text-muted py-3">No department data found</td>
+                                                <td colspan="3" class="text-center text-muted py-3">{{ __('purchase.no_dept_data') }}</td>
                                             </tr>
                                         @endforelse
                                     </tbody>
@@ -263,20 +263,20 @@
             @if($isAdmin)
                 <div class="card border-0 shadow-sm mb-4 bg-white">
                     <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                        <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-award text-warning me-2"></i>Purchaser Performance Leaderboard</h6>
-                        <span class="badge bg-soft-warning text-warning fs-10 fw-bold">Top Negotiators</span>
+                        <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-award text-warning me-2"></i>{{ __('purchase.purchaser_performance_leaderboard') }}</h6>
+                        <span class="badge bg-soft-warning text-warning fs-10 fw-bold">{{ __('purchase.top_negotiator') }}</span>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle fs-12 mb-0">
                                 <thead class="table-light">
                                     <tr>
-                                        <th style="width: 80px;" class="text-center">Rank</th>
-                                        <th>Purchaser Name</th>
-                                        <th class="text-center">Total POs</th>
-                                        <th class="text-end">Purchase Amount</th>
-                                        <th class="text-end">Total Savings</th>
-                                        <th class="text-end">Avg Saving %</th>
+                                        <th style="width: 80px;" class="text-center">{{ __('purchase.rank') }}</th>
+                                        <th>{{ __('purchase.purchaser_name') }}</th>
+                                        <th class="text-center">{{ __('purchase.total_pos') }}</th>
+                                        <th class="text-end">{{ __('purchase.purchase_amount') }}</th>
+                                        <th class="text-end">{{ __('purchase.total_savings') }}</th>
+                                        <th class="text-end">{{ __('purchase.avg_saving_percent') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -284,9 +284,9 @@
                                     @forelse($purchaserSavings as $p)
                                         @php
                                             $medal = match($rank) {
-                                                1 => '<span class="badge bg-primary text-white font-monospace px-2 py-1"><i class="feather-award me-1"></i>Rank 1</span>',
-                                                2 => '<span class="badge bg-info text-white font-monospace px-2 py-1"><i class="feather-award me-1"></i>Rank 2</span>',
-                                                3 => '<span class="badge bg-secondary text-white font-monospace px-2 py-1"><i class="feather-award me-1"></i>Rank 3</span>',
+                                                1 => '<span class="badge bg-primary text-white font-monospace px-2 py-1"><i class="feather-award me-1"></i>' . __('purchase.rank') . ' 1</span>',
+                                                2 => '<span class="badge bg-info text-white font-monospace px-2 py-1"><i class="feather-award me-1"></i>' . __('purchase.rank') . ' 2</span>',
+                                                3 => '<span class="badge bg-secondary text-white font-monospace px-2 py-1"><i class="feather-award me-1"></i>' . __('purchase.rank') . ' 3</span>',
                                                 default => "<span class=\"text-muted font-monospace fw-bold\">#{$rank}</span>"
                                             };
                                             $pSavingPercent = ($p['total_spend'] + $p['total_savings']) > 0 ? ($p['total_savings'] / ($p['total_spend'] + $p['total_savings'])) * 100 : 0;
@@ -304,7 +304,7 @@
                                         @php $rank++; @endphp
                                     @empty
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted py-3">No purchaser data available</td>
+                                            <td colspan="6" class="text-center text-muted py-3">{{ __('purchase.no_purchaser_data') }}</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
@@ -317,17 +317,17 @@
             <!-- Vendor Savings Performance -->
             <div class="card border-0 shadow-sm mb-4 bg-white">
                 <div class="card-header bg-white py-3 border-bottom">
-                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-users text-primary me-2"></i>Vendor Competitive Performance</h6>
+                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-users text-primary me-2"></i>{{ __('purchase.vendor_competitive_performance') }}</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle fs-12 mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Vendor Name</th>
-                                    <th class="text-center">RFQs Won</th>
-                                    <th class="text-end">Total PO Value</th>
-                                    <th class="text-end">Savings Given (vs High Quote)</th>
+                                    <th>{{ __('purchase.vendor_name') }}</th>
+                                    <th class="text-center">{{ __('purchase.rfqs_won') }}</th>
+                                    <th class="text-end">{{ __('purchase.total_po_value') }}</th>
+                                    <th class="text-end">{{ __('purchase.savings_given_vs_high') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -340,7 +340,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="text-center text-muted py-3">No vendor performance data found</td>
+                                        <td colspan="4" class="text-center text-muted py-3">{{ __('purchase.no_vendor_performance_data') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -352,25 +352,25 @@
             <!-- Detailed PO Savings Data Grid -->
             <div class="card border-0 shadow-sm mb-4 bg-white">
                 <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-list text-primary me-2"></i>Detailed PO Savings Breakdown</h6>
-                    <span class="text-muted fs-11">Click details to view item-level rate comparison</span>
+                    <h6 class="fw-bold text-dark mb-0 fs-13"><i class="feather-list text-primary me-2"></i>{{ __('purchase.detailed_po_savings_breakdown') }}</h6>
+                    <span class="text-muted fs-11">{{ __('purchase.click_details_to_view_item_level_rate_comparison') }}</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle fs-12 mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>PO No.</th>
-                                    <th>RFQ No.</th>
-                                    <th>Quote No.</th>
-                                    <th>Purchaser</th>
-                                    <th>Vendor</th>
-                                    <th class="text-end">Highest Quote</th>
-                                    <th class="text-end">Selected PO Amt</th>
-                                    <th class="text-end">Savings ({{ $currencySymbol }})</th>
-                                    <th class="text-end">Saving %</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-center" style="width: 140px;">Action</th>
+                                    <th>{{ __('purchase.po_no') }}</th>
+                                    <th>{{ __('purchase.rfq_no') }}</th>
+                                    <th>{{ __('purchase.quote_no') }}</th>
+                                    <th>{{ __('purchase.purchaser') }}</th>
+                                    <th>{{ __('purchase.vendor') }}</th>
+                                    <th class="text-end">{{ __('purchase.highest_quote') }}</th>
+                                    <th class="text-end">{{ __('purchase.selected_po_amt') }}</th>
+                                    <th class="text-end">{{ __('purchase.savings') }} ({{ $currencySymbol }})</th>
+                                    <th class="text-end">{{ __('purchase.saving_percent') }}</th>
+                                    <th class="text-center">{{ __('purchase.status') }}</th>
+                                    <th class="text-center" style="width: 140px;">{{ __('purchase.action') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -394,13 +394,13 @@
                                         </td>
                                         <td class="text-center">
                                             <button type="button" class="btn btn-xs btn-outline-primary fw-semibold px-2 btn-show-po-savings" data-order-id="{{ $row['id'] }}">
-                                                <i class="feather-eye me-1"></i> Details
+                                                <i class="feather-eye me-1"></i> {{ __('purchase.details') }}
                                             </button>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="11" class="text-center text-muted py-4">No RFQ Purchase Orders found matching filters</td>
+                                        <td colspan="11" class="text-center text-muted py-4">{{ __('purchase.no_po_found_filters') }}</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -413,13 +413,13 @@
     </div>
 
     <!-- PO Savings Item-Level Details Modal -->
-    <x-ui.modal id="poSavingsModal" title="PO Item Savings Details" size="lg" :centered="true" :showFooter="false">
+    <x-ui.modal id="poSavingsModal" title="{{ __('purchase.po_item_savings_details') }}" size="lg" :centered="true" :showFooter="false">
         <div id="po-savings-modal-content" class="fs-13">
             <div class="text-center py-4">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">Loading...</span>
                 </div>
-                <div class="text-muted fs-12 mt-2">Fetching item savings calculation...</div>
+                <div class="text-muted fs-12 mt-2">{{ __('purchase.fetching_item_savings') }}</div>
             </div>
         </div>
     </x-ui.modal>
@@ -437,7 +437,7 @@
                 contentContainer.html(`
                     <div class="text-center py-4">
                         <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-                        <div class="text-muted fs-12 mt-2">Fetching item savings calculation...</div>
+                        <div class="text-muted fs-12 mt-2">{{ __('purchase.fetching_item_savings') }}</div>
                     </div>
                 `);
 
@@ -448,7 +448,7 @@
                     type: 'GET',
                     success: function(res) {
                         if (!res.success) {
-                            contentContainer.html('<div class="alert alert-danger mb-0">Failed to load PO details.</div>');
+                            contentContainer.html('<div class="alert alert-danger mb-0">{{ __('purchase.failed_load_po_details') }}</div>');
                             return;
                         }
 
@@ -473,42 +473,42 @@
                         contentContainer.html(`
                             <div class="row g-3 mb-3 p-3 bg-light rounded border text-dark">
                                 <div class="col-md-4">
-                                    <div class="text-muted fs-11 text-uppercase fw-bold">Purchase Order</div>
+                                    <div class="text-muted fs-11 text-uppercase fw-bold">{{ __('purchase.purchase_order') }}</div>
                                     <div class="fw-bold text-primary fs-14">${res.po_number}</div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="text-muted fs-11 text-uppercase fw-bold">RFQ Reference</div>
+                                    <div class="text-muted fs-11 text-uppercase fw-bold">{{ __('purchase.rfq_reference') }}</div>
                                     <div class="fw-bold text-dark fs-13">${res.rfq_number}</div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="text-muted fs-11 text-uppercase fw-bold">Supplier Quote No.</div>
+                                    <div class="text-muted fs-11 text-uppercase fw-bold">{{ __('purchase.supplier_quote_no') }}</div>
                                     <div class="fw-bold text-dark fs-13">${res.supplier_quotation_number}</div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="text-muted fs-11 text-uppercase fw-bold">Purchaser / Buyer</div>
+                                    <div class="text-muted fs-11 text-uppercase fw-bold">{{ __('purchase.purchaser_buyer') }}</div>
                                     <div class="fw-semibold text-dark">${res.purchaser_name}</div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="text-muted fs-11 text-uppercase fw-bold">Vendor Name</div>
+                                    <div class="text-muted fs-11 text-uppercase fw-bold">{{ __('purchase.vendor_name') }}</div>
                                     <div class="fw-semibold text-dark">${res.vendor_name}</div>
                                 </div>
                                 <div class="col-md-4">
-                                    <div class="text-muted fs-11 text-uppercase fw-bold">Net Savings</div>
+                                    <div class="text-muted fs-11 text-uppercase fw-bold">{{ __('purchase.net_savings') }}</div>
                                     <div class="fw-bold text-success fs-14">+${currencySymbol}${res.net_savings.toFixed(2)} (${res.savings_percent}%)</div>
                                 </div>
                             </div>
 
-                            <h6 class="fw-bold text-primary mb-2 fs-12 text-uppercase">Item-Level Rate Comparison</h6>
+                            <h6 class="fw-bold text-primary mb-2 fs-12 text-uppercase">{{ __('purchase.item_level_rate_comparison') }}</h6>
                             <div class="table-responsive rounded border mb-3">
                                 <table class="table table-sm align-middle fs-12 mb-0">
                                     <thead class="table-light">
                                         <tr>
                                             <th>#</th>
-                                            <th>Item Description</th>
-                                            <th class="text-end">Highest Quote Rate</th>
-                                            <th class="text-end">Selected PO Rate</th>
-                                            <th class="text-center">Qty</th>
-                                            <th class="text-end">Item Savings</th>
+                                            <th>{{ __('purchase.item_description') }}</th>
+                                            <th class="text-end">{{ __('purchase.highest_quote_rate') }}</th>
+                                            <th class="text-end">{{ __('purchase.selected_po_rate') }}</th>
+                                            <th class="text-center">{{ __('purchase.qty') }}</th>
+                                            <th class="text-end">{{ __('purchase.item_savings') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -519,7 +519,7 @@
                         `);
                     },
                     error: function() {
-                        contentContainer.html('<div class="alert alert-danger mb-0">Error fetching PO savings details.</div>');
+                        contentContainer.html('<div class="alert alert-danger mb-0">{{ __('purchase.error_fetching_po_savings') }}</div>');
                     }
                 });
             });

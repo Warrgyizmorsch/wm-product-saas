@@ -103,6 +103,15 @@
                             </x-ui.odoo-form-ui>
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Quotation Status</label>
+                            <x-ui.odoo-form-ui type="select" name="quotation_status">
+                                <option value="">All Leads</option>
+                                <option value="with_quotation" {{ request('quotation_status') === 'with_quotation' ? 'selected' : '' }}>With Quotation</option>
+                                <option value="without_quotation" {{ request('quotation_status') === 'without_quotation' ? 'selected' : '' }}>Without Quotation</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
                         <div class="d-flex gap-2 justify-content-end mt-4">
                             <a href="{{ route('crm.leads.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
                             <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
@@ -148,10 +157,9 @@
                         <th>{{ __('crm.call_date_time') }}</th>
                         <th>{{ __('crm.lead_company') }}</th>
                         <th>{{ __('crm.phone_email') }}</th>
-                        <th class="text-end">{{ __('crm.value_est_sale') }}</th>
-                        <th>{{ __('crm.source') }}</th>
-                        <th>{{ __('crm.priority') }}</th>
-                        <th>{{ __('crm.segment') }}</th>
+                        <th class="text-end pe-4">{{ __('crm.value_est_sale') }}</th>
+                        <th>Details</th>
+                        <th>Quotation</th>
                         <th>{{ __('crm.status') }}</th>
                         <th class="text-end pe-4">{{ __('crm.actions') }}</th>
                     </tr>
@@ -188,7 +196,7 @@
                                     <span class="text-muted">N/A</span>
                                 @endif
                             </td>
-                            <td class="text-end">
+                            <td class="text-end pe-4">
                                 <span class="fw-bold text-dark d-block mb-1">{{ $lead->expected_amount ? '₹' . number_format($lead->expected_amount, 2) : '—' }}</span>
                                 @if($lead->expected_sale_date)
                                     <span class="text-muted fs-11"><i class="feather-calendar me-1 fs-10 text-success"></i>{{ $lead->expected_sale_date->format('d/m/Y') }}</span>
@@ -197,28 +205,38 @@
                                 @endif
                             </td>
                             <td>
-                                @if($lead->source && $lead->source !== 'Select an Option')
-                                    <span class="badge bg-soft-secondary text-secondary">{{ $lead->source }}</span>
-                                @else
-                                    <span class="text-muted">—</span>
-                                @endif
-                            </td>
-                            <td>
-                                @if($lead->priority && $lead->priority !== 'Select an Option')
-                                    @if ($lead->priority == 'High' || $lead->priority == 'Urgent')
-                                        <span class="badge bg-soft-danger text-danger">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
-                                    @elseif ($lead->priority == 'Medium')
-                                        <span class="badge bg-soft-warning text-warning">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
-                                    @else
-                                        <span class="badge bg-soft-success text-success">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                <div class="d-flex flex-column gap-1 fs-11">
+                                    @if($lead->source && $lead->source !== 'Select an Option')
+                                        <div><span class="text-muted">Source:</span> <span class="fw-semibold text-dark">{{ $lead->source }}</span></div>
                                     @endif
-                                @else
-                                    <span class="text-muted">—</span>
-                                @endif
+                                    
+                                    @if($lead->priority && $lead->priority !== 'Select an Option')
+                                        <div><span class="text-muted">Priority:</span> 
+                                            @if ($lead->priority == 'High' || $lead->priority == 'Urgent')
+                                                <span class="fw-semibold text-danger">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                            @elseif ($lead->priority == 'Medium')
+                                                <span class="fw-semibold text-warning">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                            @else
+                                                <span class="fw-semibold text-success">{{ __('crm.priorities.' . $lead->priority) ?? $lead->priority }}</span>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    @if($lead->segment && $lead->segment !== 'Select an Option')
+                                        <div><span class="text-muted">Segment:</span> <span class="fw-semibold text-dark">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span></div>
+                                    @endif
+
+                                    @if((!$lead->source || $lead->source === 'Select an Option') && (!$lead->priority || $lead->priority === 'Select an Option') && (!$lead->segment || $lead->segment === 'Select an Option'))
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </div>
                             </td>
                             <td>
-                                @if($lead->segment && $lead->segment !== 'Select an Option')
-                                    <span class="badge bg-soft-info text-info">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span>
+                                @php
+                                    $latestQuotation = $lead->quotations->sortByDesc('id')->first();
+                                @endphp
+                                @if ($latestQuotation)
+                                    <span class="fw-semibold text-dark">{{ $latestQuotation->quotation_number }}</span>
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif

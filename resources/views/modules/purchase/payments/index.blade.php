@@ -30,7 +30,7 @@
 
 @section('page-actions')
     <x-ui.button href="{{ route('purchase.payments.create') }}" variant="primary" icon="feather-plus">
-        Register Vendor Payment
+        {{ __('purchase.register_vendor_payment') }}
     </x-ui.button>
 @endsection
 
@@ -46,22 +46,22 @@
         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
             <div>
                 <h5 class="fw-bold text-dark mb-0">
-                    <i class="feather-credit-card me-2 text-primary"></i>Vendor Payments Ledger
+                    <i class="feather-credit-card me-2 text-primary"></i>{{ __('purchase.vendor_payments_ledger') }}
                 </h5>
-                <p class="text-muted fs-12 mb-0">View vendor payments and multi-bill allocation records</p>
+                <p class="text-muted fs-12 mb-0">{{ __('purchase.view_vendor_payments_help') }}</p>
             </div>
 
             <!-- Common Filter Component -->
             <form method="GET" action="{{ route('purchase.payments.index') }}" class="d-inline">
                 <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keyword</label>
-                        <x-ui.odoo-form-ui type="input" name="search" placeholder="Search payment no, vendor..." value="{{ request('search') }}" />
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.search_keyword') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" placeholder="{{ __('purchase.search_payment_placeholder') }}" value="{{ request('search') }}" />
                     </div>
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('purchase.payments.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        <a href="{{ route('purchase.payments.index') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
             </form>
@@ -71,14 +71,14 @@
             <x-ui.odoo-form-ui type="table" id="paymentsTable">
                 <thead>
                     <tr>
-                        <th style="width: 14%">Payment Number</th>
-                        <th style="width: 18%">Vendor</th>
-                        <th style="width: 10%">Date</th>
-                        <th style="width: 10%" class="text-center">Type</th>
-                        <th style="width: 10%" class="text-center">Method</th>
-                        <th style="width: 16%">Reference UTR</th>
-                        <th style="width: 12%" class="text-end">Paid Amount</th>
-                        <th style="width: 10%" class="text-end">Actions</th>
+                        <th style="width: 14%">{{ __('purchase.payment_number') }}</th>
+                        <th style="width: 18%">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="width: 10%">{{ __('purchase.date') }}</th>
+                        <th style="width: 10%" class="text-center">{{ __('purchase.type') }}</th>
+                        <th style="width: 10%" class="text-center">{{ __('purchase.method') }}</th>
+                        <th style="width: 16%">{{ __('purchase.reference_utr') }}</th>
+                        <th style="width: 12%" class="text-end">{{ __('purchase.paid_amount') }}</th>
+                        <th style="width: 10%" class="text-end">{{ __('purchase.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -92,16 +92,16 @@
                             <td class="fw-semibold text-dark">{{ $pay->vendor?->name ?: '—' }}</td>
                             <td>{{ $pay->payment_date ? $pay->payment_date->format('d-M-Y') : '—' }}</td>
                             <td class="text-center">
-                                <span class="badge bg-soft-primary text-primary px-2.5 py-1 fs-11 fw-semibold">{{ $pay->payment_type }}</span>
+                                <span class="badge bg-soft-primary text-primary px-2.5 py-1 fs-11 fw-semibold">{{ __('purchase.pay_type_' . strtolower(str_replace(' ', '_', $pay->payment_type))) }}</span>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-soft-info text-info px-2.5 py-1 fs-11 fw-semibold">{{ $pay->payment_method }}</span>
+                                <span class="badge bg-soft-info text-info px-2.5 py-1 fs-11 fw-semibold">{{ __('purchase.pay_method_' . strtolower(str_replace(' ', '_', $pay->payment_method))) }}</span>
                             </td>
                             <td class="font-monospace fs-12 text-secondary">{{ $pay->reference_number ?: 'N/A' }}</td>
                             <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($pay->amount, 2) }}</td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-1">
-                                    <a href="{{ route('purchase.payments.show', $pay->id) }}" class="action-icon-btn view-btn" title="View Details" data-bs-toggle="tooltip">
+                                    <a href="{{ route('purchase.payments.show', $pay->id) }}" class="action-icon-btn view-btn" title="{{ __('purchase.view_details') }}" data-bs-toggle="tooltip">
                                         <i class="feather feather-eye"></i>
                                     </a>
                                 </div>
@@ -111,8 +111,8 @@
                         <tr>
                             <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="feather-info fs-36 text-secondary d-block mb-2"></i>
-                                <h6 class="fw-bold text-dark mb-1">No Payments Registered</h6>
-                                <p class="fs-12 mb-0">Register your first payment using the register button.</p>
+                                <h6 class="fw-bold text-dark mb-1">{{ __('purchase.no_payments_registered') }}</h6>
+                                <p class="fs-12 mb-0">{{ __('purchase.no_payments_registered_help') }}</p>
                             </td>
                         </tr>
                     @endforelse

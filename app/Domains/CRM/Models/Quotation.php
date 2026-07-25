@@ -96,6 +96,11 @@ class Quotation extends BaseModel
         return $this->belongsTo(Quotation::class, 'parent_id');
     }
 
+    public function salesOrder(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Domains\Sales\Models\SalesOrder::class);
+    }
+
     public function revisions(): HasMany
     {
         return $this->hasMany(Quotation::class, 'parent_id');

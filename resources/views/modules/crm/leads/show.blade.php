@@ -600,93 +600,140 @@
 
                                     <!-- SUBTAB 2: INTERACTIONS (ACTIVITIES) TIMELINE -->
                                     <div class="tab-pane fade" id="subtab-interactions" role="tabpanel" aria-labelledby="subtab-interactions-tab">
-                                        <div class="d-flex align-items-center justify-content-between mb-4 mt-1 flex-wrap gap-2">
+                                        <div class="d-flex align-items-center justify-content-between mb-3 mt-1 flex-wrap gap-2">
                                             <h5 class="fw-bold text-dark fs-14 mb-0">{{ __('crm.interactions_scheduled_activities') }}</h5>
-                                            <button type="button" class="btn btn-xs btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#modalScheduleActivity">
-                                                <i class="feather-calendar me-1"></i>{{ __('crm.schedule_activity') }}
-                                            </button>
+                                            <x-ui.button variant="primary" size="sm" icon="feather-calendar" data-bs-toggle="modal" data-bs-target="#modalScheduleActivity">
+                                                {{ __('crm.schedule_activity') }}
+                                            </x-ui.button>
                                         </div>
 
-                                        <div class="zoho-timeline-container">
-                                            @php
-                                                $groupedFollowups = $lead->followups->groupBy(function($item) {
-                                                    return $item->followup_date->format('d/m/Y');
-                                                });
-                                            @endphp
+                                        @php
+                                            $groupedFollowups = $lead->followups->groupBy(function($item) {
+                                                return $item->followup_date->format('d/m/Y');
+                                            });
+                                        @endphp
 
-                                            @if($groupedFollowups->isEmpty())
-                                                <div class="text-center py-5 text-muted border border-dashed rounded bg-white fs-12">
-                                                    <i class="feather-clock fs-24 mb-1.5 d-block text-muted opacity-50"></i>
-                                                    {{ __('crm.no_activity_logs') }}
-                                                </div>
-                                            @else
-                                                @foreach($groupedFollowups as $date => $items)
-                                                    <!-- Date Header -->
-                                                    <div class="zoho-timeline-date-group">
-                                                        <div class="zoho-timeline-date-header">{{ $date }}</div>
-                                                        
-                                                        @foreach($items as $item)
-                                                            <!-- Timeline Row -->
-                                                            <div class="zoho-timeline-event d-flex align-items-start">
-                                                                <div class="zoho-timeline-line"></div>
-                                                                
-                                                                @php
-                                                                    $icon = 'feather-phone';
-                                                                    if($item->type === 'Email') $icon = 'feather-mail';
-                                                                    elseif($item->type === 'Meeting') $icon = 'feather-users';
-                                                                    elseif($item->type === 'Demo') $icon = 'feather-monitor';
-                                                                @endphp
-                                                                <div class="zoho-timeline-icon">
-                                                                    <i class="{{ $icon }}"></i>
+                                        @if($groupedFollowups->isEmpty())
+                                            <div class="text-center py-5 text-muted border border-dashed rounded-3 bg-light fs-12" style="border-color:#cbd5e1!important;">
+                                                <i class="feather-calendar fs-28 d-block mb-2 opacity-40"></i>
+                                                <span class="fw-semibold">No activities scheduled yet.</span><br>
+                                                <span class="fs-11">Click &ldquo;Schedule Activity&rdquo; to add one.</span>
+                                            </div>
+                                        @else
+                                            @foreach($groupedFollowups as $date => $items)
+                                                <!-- Date Header -->
+                                                <div class="activity-date-group mb-3">
+                                                    <div class="activity-date-badge mb-2">
+                                                        <i class="feather-calendar fs-10 me-1"></i>{{ $date }}
+                                                    </div>
+
+                                                    @foreach($items as $item)
+                                                        @php
+                                                            $actIcon = 'feather-phone-call';
+                                                            $actIconBg = 'bg-soft-primary';
+                                                            $actIconColor = 'text-primary';
+                                                            if($item->type === 'Email')   { $actIcon = 'feather-mail';    $actIconBg = 'bg-soft-info';    $actIconColor = 'text-info'; }
+                                                            elseif($item->type === 'Meeting') { $actIcon = 'feather-users';  $actIconBg = 'bg-soft-purple'; $actIconColor = 'text-purple'; }
+                                                            elseif($item->type === 'Demo')    { $actIcon = 'feather-monitor'; $actIconBg = 'bg-soft-teal';  $actIconColor = 'text-teal'; }
+
+                                                            $statusBadgeClass = 'bg-warning text-white';
+                                                            $statusLabel = 'Pending';
+                                                            if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = 'Connected'; }
+                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-secondary text-white'; $statusLabel = 'Not Connected'; }
+                                                        @endphp
+
+                                                        <div class="activity-card mb-2 {{ $item->status === 'Completed' ? 'activity-card--done' : ($item->status === 'Cancelled' ? 'activity-card--cancelled' : '') }}">
+                                                            <div class="activity-card-inner">
+
+                                                                <!-- Top row: Icon + Type + Time + Status -->
+                                                                <div class="d-flex align-items-center gap-2 mb-2">
+                                                                    <div class="activity-type-icon {{ $actIconBg }} {{ $actIconColor }} flex-shrink-0">
+                                                                        <i class="{{ $actIcon }}"></i>
+                                                                    </div>
+                                                                    <span class="fw-bold text-dark fs-13">{{ __('crm.activity_types.' . $item->type) ?? $item->type }}</span>
+                                                                    <span class="activity-time-chip"><i class="feather-clock fs-9 me-1"></i>{{ $item->followup_date->format('h:i A') }}</span>
+                                                                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2 py-1 fs-10 fw-semibold">{{ $statusLabel }}</span>
                                                                 </div>
-                                                                
-                                                                <div class="zoho-timeline-content d-flex align-items-start gap-3 w-100">
-                                                                    <div class="zoho-timeline-time mt-0.5">{{ $item->followup_date->format('h:i A') }}</div>
-                                                                    <div class="flex-grow-1">
-                                                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                                                            <div>
-                                                                                <span class="badge bg-soft-primary text-primary text-uppercase fs-10 px-2 py-0.5 fw-bold me-2">{{ __('crm.activity_types.' . $item->type) ?? $item->type }}</span>
-                                                                                @if($item->status === 'Pending')
-                                                                                    <span class="badge bg-soft-warning text-warning fs-10 px-1.5 py-0.5 fw-bold">{{ __('crm.checklist_statuses.Pending') }}</span>
-                                                                                @else
-                                                                                    <span class="badge bg-soft-success text-success fs-10 px-1.5 py-0.5 fw-bold">{{ __('crm.checklist_statuses.Complete') }}</span>
-                                                                                @endif
-                                                                            </div>
-                                                                            
-                                                                            <!-- Action Buttons -->
-                                                                            <div class="d-flex gap-1 d-print-none">
-                                                                                @if($item->status === 'Pending')
-                                                                                    <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
-                                                                                        @csrf
-                                                                                        @method('PUT')
-                                                                                        <input type="hidden" name="status" value="Completed">
-                                                                                        <button type="submit" class="btn btn-icon btn-xs btn-soft-success" title="Mark Done" style="width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">
-                                                                                            <i class="feather-check" style="font-size: 10px;"></i>
-                                                                                        </button>
-                                                                                    </form>
-                                                                                @endif
-                                                                                <form action="{{ route('crm.followups.destroy', $item->id) }}" method="POST" class="d-inline">
-                                                                                    @csrf
-                                                                                    @method('DELETE')
-                                                                                    <button type="submit" class="btn btn-icon btn-xs btn-soft-danger" onclick="return confirm('{{ __('crm.confirm_delete_log') }}')" style="width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">
-                                                                                        <i class="feather-trash-2" style="font-size: 10px;"></i>
-                                                                                    </button>
-                                                                                </form>
-                                                                            </div>
-                                                                        </div>
-                                                                        
-                                                                        <span class="fs-13 fw-semibold text-dark d-block mt-2">{{ $item->notes }}</span>
-                                                                        <div class="text-muted fs-11 mt-0.5">
-                                                                            by {{ $lead->owner?->name ?: 'System' }} {{ $item->followup_date->format('d/m/Y') }}
-                                                                        </div>
+
+                                                                <!-- Notes / Message -->
+                                                                @if($item->notes)
+                                                                    <div class="activity-notes">{{ $item->notes }}</div>
+                                                                @endif
+
+                                                                <!-- Attribution -->
+                                                                <div class="activity-by mt-1">
+                                                                    <i class="feather-user fs-9 me-1"></i>
+                                                                    by {{ $lead->owner?->name ?: 'System' }} &bull; {{ $item->followup_date->format('d M Y') }}
+                                                                </div>
+
+                                                                <!-- Action Buttons — horizontal row at bottom, only for Pending -->
+                                                                @if($item->status === 'Pending')
+                                                                    <div class="activity-footer-actions d-flex gap-2 mt-3 d-print-none">
+                                                                        <!-- Connected -->
+                                                                        <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
+                                                                            @csrf
+                                                                            @method('PUT')
+                                                                            <input type="hidden" name="status" value="Completed">
+                                                                            <x-ui.button type="submit" variant="soft-success" size="sm" icon="feather-phone-call">Connected</x-ui.button>
+                                                                        </form>
+
+                                                                        <!-- Not Connected -->
+                                                                        <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
+                                                                            @csrf
+                                                                            @method('PUT')
+                                                                            <input type="hidden" name="status" value="Cancelled">
+                                                                            <x-ui.button type="submit" variant="soft-warning" size="sm" icon="feather-phone-off">Not Connected</x-ui.button>
+                                                                        </form>
+
+                                                                        <!-- Cancelled -->
+                                                                        <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
+                                                                            @csrf
+                                                                            @method('PUT')
+                                                                            <input type="hidden" name="status" value="Cancelled">
+                                                                            <x-ui.button type="submit" variant="soft-danger" size="sm" icon="feather-x-circle">Cancelled</x-ui.button>
+                                                                        </form>
+
+                                                                        <!-- Reschedule -->
+                                                                        <x-ui.button type="button" variant="soft-primary" size="sm" icon="feather-refresh-cw" data-bs-toggle="modal" data-bs-target="#rescheduleModal_{{ $item->id }}">Reschedule</x-ui.button>
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- Reschedule Modal using x-ui.modal component -->
+                                                        @if($item->status === 'Pending')
+                                                            <x-ui.modal
+                                                                :id="'rescheduleModal_' . $item->id"
+                                                                title="Reschedule Activity"
+                                                                size="sm"
+                                                                :centered="true"
+                                                                :formAction="route('crm.followups.update', $item->id)"
+                                                                formMethod="PUT"
+                                                                :submitText="'Confirm Reschedule'"
+                                                                :closeText="__('crm.cancel')"
+                                                            >
+                                                                <p class="text-muted fs-11 mb-3">
+                                                                    <i class="{{ $actIcon }} me-1"></i>
+                                                                    {{ __('crm.activity_types.' . $item->type) ?? $item->type }}
+                                                                    &bull; Current: <strong>{{ $item->followup_date->format('d M Y, h:i A') }}</strong>
+                                                                </p>
+                                                                <div class="mb-3 text-start">
+                                                                    <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">New Date &amp; Time</label>
+                                                                    <div class="input-group input-group-sm">
+                                                                        <span class="input-group-text bg-light"><i class="feather-calendar fs-11 text-muted"></i></span>
+                                                                        <input type="text" class="form-control form-control-sm reschedule-datepicker" name="followup_date" required autocomplete="off" placeholder="Pick new date &amp; time">
                                                                     </div>
                                                                 </div>
-                                                            </div>
-                                                        @endforeach
-                                                    </div>
-                                                @endforeach
-                                            @endif
-                                        </div>
+                                                                <div class="mb-1 text-start">
+                                                                    <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Note (optional)</label>
+                                                                    <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Reason for rescheduling...">{{ $item->notes }}</textarea>
+                                                                </div>
+                                                            </x-ui.modal>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
+                                            @endforeach
+                                        @endif
                                     </div>
                                     
                                 </div>
@@ -1368,7 +1415,7 @@
             flex-grow: 1;
         }
 
-        /* Zoho CRM Timeline Styles */
+        /* Zoho CRM Timeline Styles (legacy, kept for history tab) */
         .zoho-timeline-container {
             position: relative;
             padding-left: 10px;
@@ -1438,6 +1485,104 @@
             font-size: 13px;
             color: #0f172a;
             font-family: 'Inter', sans-serif;
+        }
+
+        /* ===== Activity Card Styles (Interactions Tab) ===== */
+        .activity-date-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .activity-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #ffffff;
+            transition: box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .activity-card:hover {
+            box-shadow: 0 4px 16px rgba(30,64,175,0.07);
+            border-color: #bfdbfe;
+        }
+        .activity-card--done {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+            opacity: 0.85;
+        }
+        .activity-card--cancelled {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            opacity: 0.7;
+        }
+        .activity-card-inner {
+            padding: 12px 14px;
+        }
+
+        .activity-type-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            margin-top: 2px;
+        }
+
+        .activity-time-chip {
+            display: inline-flex;
+            align-items: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: #64748b;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 2px 8px;
+        }
+
+        .activity-notes {
+            font-size: 12px;
+            font-weight: 500;
+            color: #334155;
+            background: #f8fafc;
+            border-left: 3px solid #93c5fd;
+            border-radius: 0 6px 6px 0;
+            padding: 5px 10px;
+            margin: 6px 0;
+            font-style: italic;
+            line-height: 1.5;
+        }
+        .activity-card--done .activity-notes {
+            border-left-color: #86efac;
+        }
+
+        .activity-by {
+            font-size: 10px;
+            color: #94a3b8;
+            font-weight: 500;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Footer action buttons — horizontal row at bottom of card */
+        .activity-footer-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding-top: 10px;
+            border-top: 1px dashed #e2e8f0;
+        }
+        .activity-footer-actions .erp-icon-btn {
+            flex-shrink: 0;
         }
         
         .zoho-timeline-subtabs .nav-link {
@@ -1849,6 +1994,22 @@
                 drops: 'auto',
                 locale: {
                     format: 'YYYY-MM-DD hh:mm A'
+                }
+            });
+
+            // Initialize reschedule datepickers when their modal opens
+            $('[id^="rescheduleModal_"]').on('shown.bs.modal', function() {
+                var $picker = $(this).find('.reschedule-datepicker');
+                if (!$picker.data('daterangepicker')) {
+                    $picker.daterangepicker({
+                        singleDatePicker: true,
+                        timePicker: true,
+                        timePickerIncrement: 5,
+                        drops: 'up',
+                        locale: {
+                            format: 'YYYY-MM-DD hh:mm A'
+                        }
+                    });
                 }
             });
 

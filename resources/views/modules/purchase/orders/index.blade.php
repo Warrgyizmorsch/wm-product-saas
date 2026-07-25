@@ -1,12 +1,14 @@
 @extends('layouts.duralux')
 
-@section('title', 'Purchase Orders | SaaS ERP')
-@section('page-title', 'Purchase Orders')
-@section('breadcrumb', 'Purchase / Orders')
+@section('title', __('purchase.purchase_orders') . ' | SaaS ERP')
+@section('page-title', __('purchase.purchase_orders'))
+@section('breadcrumb')
+    {{ __('ui.purchase') }} / {{ __('purchase.purchase_orders') }}
+@endsection
 
 @section('page-actions')
     <x-ui.button href="{{ route('purchase.orders.create') }}" variant="primary" icon="feather-plus" style="background-color: #714B67; border-color: #714B67;">
-        Create Purchase Order
+        {{ __('purchase.create_purchase_order') }}
     </x-ui.button>
 @endsection
 
@@ -27,56 +29,56 @@
         @endif
 
         <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">Purchase Orders Listing</h5>
+            <h5 class="fw-bold text-dark mb-0">{{ __('purchase.purchase_orders_listing') }}</h5>
             
             <div class="d-flex gap-2 ms-auto">
                 <!-- Custom Sort Dropdown -->
-                <x-ui.sort-dropdown :label="__('crm.sort') ?? 'Sort'">
+                <x-ui.sort-dropdown :label="__('purchase.sort') ?? 'Sort'">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'date' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Date (Latest)</span>
+                        <span>{{ __('purchase.date_latest') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'date', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'date' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Date (Oldest)</span>
+                        <span>{{ __('purchase.date_oldest') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'purchase_order_number', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'purchase_order_number' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>PO Number (A-Z)</span>
+                        <span>{{ __('purchase.po_number_az') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'purchase_order_number', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'purchase_order_number' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>PO Number (Z-A)</span>
+                        <span>{{ __('purchase.po_number_za') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'grand_total', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'grand_total' && $sortOrder === 'desc' ? 'active' : '' }}">
-                        <span>Amount (High-Low)</span>
+                        <span>{{ __('purchase.amount_high_low') }}</span>
                     </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'grand_total', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'grand_total' && $sortOrder === 'asc' ? 'active' : '' }}">
-                        <span>Amount (Low-High)</span>
+                        <span>{{ __('purchase.amount_low_high') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
 
                 <!-- Filter Panel -->
                 <form method="GET" action="{{ route('purchase.orders.index') }}" class="d-inline">
-                    <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter :label="__('purchase.filter') ?? 'Filters'" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
                         
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keyword</label>
-                            <x-ui.odoo-form-ui type="input" name="search" placeholder="Search PO, Supplier, Ref..." value="{{ request('search') }}" />
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.search_keyword') }}</label>
+                            <x-ui.odoo-form-ui type="input" name="search" placeholder="{{ __('purchase.search_po_placeholder') }}" value="{{ request('search') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status">
-                                <option value="">All Statuses</option>
-                                <option value="Draft" @selected(request('status') === 'Draft')>Draft</option>
-                                <option value="Approved" @selected(request('status') === 'Approved')>Approved</option>
-                                <option value="Cancelled" @selected(request('status') === 'Cancelled')>Cancelled</option>
+                                <option value="">{{ __('purchase.all_statuses') }}</option>
+                                <option value="Draft" @selected(request('status') === 'Draft')>{{ __('purchase.status_draft') }}</option>
+                                <option value="Approved" @selected(request('status') === 'Approved')>{{ __('purchase.status_approved') }}</option>
+                                <option value="Cancelled" @selected(request('status') === 'Cancelled')>{{ __('purchase.status_cancelled') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
-                            <a href="{{ route('purchase.orders.index') }}" class="btn btn-sm btn-light border">Reset</a>
-                            <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                            <a href="{{ route('purchase.orders.index') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                            <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                         </div>
                     </x-ui.filter>
                 </form>
@@ -91,15 +93,15 @@
                         <th style="width: 3%" class="text-center">
                             <input type="checkbox" class="form-check-input select-all">
                         </th>
-                        <th style="width: 12%">PO Number</th>
-                        <th style="width: 18%">Supplier Name</th>
-                        <th style="width: 12%">Ref Document</th>
-                        <th style="width: 10%">PO Date</th>
-                        <th style="width: 10%" class="text-end">Subtotal</th>
-                        <th style="width: 9%" class="text-end">Total Tax</th>
-                        <th style="width: 12%" class="text-end">Grand Total</th>
-                        <th style="width: 12%" class="text-center">Status</th>
-                        <th style="width: 12%" class="text-end">Actions</th>
+                        <th style="width: 12%">{{ __('purchase.po_no') }}</th>
+                        <th style="width: 18%">{{ __('purchase.supplier_name') }}</th>
+                        <th style="width: 12%">{{ __('purchase.ref_document') }}</th>
+                        <th style="width: 10%">{{ __('purchase.po_date') }}</th>
+                        <th style="width: 10%" class="text-end">{{ __('purchase.subtotal') }}</th>
+                        <th style="width: 9%" class="text-end">{{ __('purchase.total_tax') }}</th>
+                        <th style="width: 12%" class="text-end">{{ __('purchase.grand_total') }}</th>
+                        <th style="width: 12%" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="width: 12%" class="text-end">{{ __('purchase.action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -120,7 +122,7 @@
                                         {{ $order->requisition->requisition_number }}
                                     </a>
                                 @else
-                                    <span class="text-muted small">Direct PO</span>
+                                    <span class="text-muted small">{{ __('purchase.direct_po') }}</span>
                                 @endif
                             </td>
                             <td>{{ $order->date ? $order->date->format('d-M-Y') : '—' }}</td>
@@ -132,9 +134,16 @@
                                     $statusClass = 'warning';
                                     if ($order->status === 'Approved') $statusClass = 'success';
                                     elseif ($order->status === 'Cancelled') $statusClass = 'danger';
+
+                                    $statusText = match($order->status) {
+                                        'Draft' => __('purchase.status_draft'),
+                                        'Approved' => __('purchase.status_approved'),
+                                        'Cancelled' => __('purchase.status_cancelled'),
+                                        default => $order->status,
+                                    };
                                 @endphp
                                 <x-ui.badge :soft="true" :variant="$statusClass">
-                                    {{ $order->status }}
+                                    {{ $statusText }}
                                 </x-ui.badge>
                             </td>
                             <td class="text-end">
@@ -142,31 +151,15 @@
                                     @if($order->status === 'Draft')
                                         <li>
                                             <a class="dropdown-item py-2" href="{{ route('purchase.orders.edit', $order->id) }}">
-                                                <i class="feather-edit me-1.5 text-muted"></i> Edit Draft
+                                                <i class="feather-edit me-1.5 text-muted"></i> {{ __('purchase.edit_draft') }}
                                             </a>
                                         </li>
                                         <li>
-                                            <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to approve this purchase order?')">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item py-2 text-success">
-                                                    <i class="feather-check-circle me-1.5"></i> Approve
-                                                </button>
-                                            </form>
-                                        </li>
-                                        <li>
-                                            <form action="{{ route('purchase.orders.reject', $order->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to reject this purchase order?')">
-                                                @csrf
-                                                <button type="submit" class="dropdown-item py-2 text-danger">
-                                                    <i class="feather-x-circle me-1.5"></i> Reject
-                                                </button>
-                                            </form>
-                                        </li>
-                                        <li>
-                                            <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this purchase order?')">
+                                            <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" onsubmit="return confirm('{{ __('purchase.confirm_delete_po') }}')">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="dropdown-item py-2 text-danger">
-                                                    <i class="feather-trash-2 me-1.5"></i> Delete
+                                                    <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
                                                 </button>
                                             </form>
                                         </li>
@@ -178,7 +171,7 @@
                         <tr>
                             <td colspan="10" class="text-center py-5 text-muted fs-14">
                                 <i class="feather-truck fs-24 mb-1.5 d-block opacity-50"></i>
-                                No purchase orders found.
+                                {{ __('purchase.no_pos_found') }}
                             </td>
                         </tr>
                     @endforelse

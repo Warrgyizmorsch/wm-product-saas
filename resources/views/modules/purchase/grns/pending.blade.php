@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Pending Goods Receipts | SaaS ERP')
-@section('page-title', 'Pending Goods Receipts')
-@section('breadcrumb', 'Purchase / Goods Receipt Notes / Pending Receipts')
+@section('title', __('purchase.pending_goods_receipts') . ' | SaaS ERP')
+@section('page-title', __('purchase.pending_goods_receipts'))
+@section('breadcrumb', __('ui.purchase') . ' / ' . __('purchase.goods_receipt_notes') . ' / ' . __('purchase.pending_receipts'))
 
 @push('styles')
     <style>
@@ -31,10 +31,10 @@
 @section('page-actions')
     <div class="d-flex gap-2 flex-wrap">
         <x-ui.button href="{{ route('purchase.grns.index') }}" variant="light" icon="feather-list" class="border">
-            All Goods Receipts
+            {{ __('purchase.all_goods_receipts') }}
         </x-ui.button>
         <x-ui.button href="{{ route('purchase.grns.create') }}" variant="primary" icon="feather-plus" style="background-color: var(--bs-primary); border-color: var(--bs-primary);">
-            New Goods Receipt
+            {{ __('purchase.new_goods_receipt') }}
         </x-ui.button>
     </div>
 @endsection
@@ -58,21 +58,21 @@
         <!-- Header Controls & System Filter -->
         <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
             <div>
-                <h5 class="fw-bold text-dark mb-0"><i class="feather-clock text-primary me-2"></i>Pending Goods Receipts</h5>
-                <p class="text-muted fs-12 mb-0">Approved Purchase Orders waiting for store material receipt</p>
+                <h5 class="fw-bold text-dark mb-0"><i class="feather-clock text-primary me-2"></i>{{ __('purchase.pending_goods_receipts') }}</h5>
+                <p class="text-muted fs-12 mb-0">{{ __('purchase.pending_grns_help') }}</p>
             </div>
 
             <!-- Common Filter Component -->
             <form method="GET" action="{{ route('purchase.grns.pending') }}" class="d-inline">
                 <x-ui.filter :label="__('ui.filter') ?? 'Filters'" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('purchase.filter_options') }}</h6>
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keyword</label>
-                        <x-ui.odoo-form-ui type="input" name="search" placeholder="Search PO # or Vendor..." value="{{ request('search') }}" />
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('purchase.search_keyword') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" placeholder="{{ __('purchase.search_po_vendor_placeholder') }}" value="{{ request('search') }}" />
                     </div>
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('purchase.grns.pending') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        <a href="{{ route('purchase.grns.pending') }}" class="btn btn-sm btn-light border">{{ __('purchase.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('purchase.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
             </form>
@@ -83,16 +83,16 @@
             <x-ui.odoo-form-ui type="table" id="pendingGrnTable">
                 <thead>
                     <tr>
-                        <th style="width: 12%">PO Number</th>
-                        <th style="width: 16%">Vendor</th>
-                        <th style="width: 14%">Warehouse</th>
-                        <th style="width: 10%">PO Date</th>
-                        <th style="width: 12%" class="text-end">Total Amount</th>
-                        <th style="width: 8%" class="text-center">Ordered Qty</th>
-                        <th style="width: 8%" class="text-center">Received Qty</th>
-                        <th style="width: 8%" class="text-center">Remaining Qty</th>
-                        <th style="width: 10%" class="text-center">Status</th>
-                        <th style="width: 12%" class="text-end">Action</th>
+                        <th style="width: 12%">{{ __('purchase.po_number') }}</th>
+                        <th style="width: 16%">{{ __('purchase.supplier_vendor') }}</th>
+                        <th style="width: 14%">{{ __('purchase.warehouse') }}</th>
+                        <th style="width: 10%">{{ __('purchase.po_date') }}</th>
+                        <th style="width: 12%" class="text-end">{{ __('purchase.total_amount') }}</th>
+                        <th style="width: 8%" class="text-center">{{ __('purchase.ordered_qty') }}</th>
+                        <th style="width: 8%" class="text-center">{{ __('purchase.received_qty') }}</th>
+                        <th style="width: 8%" class="text-center">{{ __('purchase.remaining_qty') }}</th>
+                        <th style="width: 10%" class="text-center">{{ __('purchase.status') }}</th>
+                        <th style="width: 12%" class="text-end">{{ __('purchase.action') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -115,7 +115,7 @@
                             </td>
                             <td class="fw-semibold text-dark">{{ $order->vendor?->name ?? 'N/A' }}</td>
                             <td>
-                                <i class="feather-archive me-1 text-muted"></i>{{ $order->location ?? $order->warehouse?->name ?? 'Main Warehouse' }}
+                                <i class="feather-archive me-1 text-muted"></i>{{ $order->location ?? $order->warehouse?->name ?? __('purchase.main_warehouse') }}
                             </td>
                             <td>{{ $order->date ? $order->date->format('d-M-Y') : '—' }}</td>
                             <td class="text-end fw-bold text-dark font-monospace">{{ $currency }} {{ number_format($order->grand_total, 2) }}</td>
@@ -123,10 +123,10 @@
                             <td class="text-center font-monospace text-success fw-semibold">{{ number_format($recQty, 2) }}</td>
                             <td class="text-center font-monospace text-danger fw-bold">{{ number_format($remQty, 2) }}</td>
                             <td class="text-center">
-                                <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $order->status }}</span>
+                                <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ __('purchase.status_' . strtolower(str_replace(' ', '_', $order->status))) }}</span>
                             </td>
                             <td class="text-end">
-                                <a href="{{ route('purchase.grns.create', ['po_id' => $order->id]) }}" class="action-icon-btn grn-btn" title="Create GRN" data-bs-toggle="tooltip">
+                                <a href="{{ route('purchase.grns.create', ['po_id' => $order->id]) }}" class="action-icon-btn grn-btn" title="{{ __('purchase.create_grn') }}" data-bs-toggle="tooltip">
                                     <i class="feather feather-plus-circle"></i>
                                 </a>
                             </td>
@@ -135,8 +135,8 @@
                         <tr>
                             <td colspan="10" class="text-center py-5 text-muted">
                                 <i class="feather-check-circle fs-36 text-success d-block mb-2"></i>
-                                <h6 class="fw-bold text-dark mb-1">All Approved POs Received!</h6>
-                                <p class="fs-12 mb-0">There are currently no pending purchase orders waiting for goods receipt.</p>
+                                <h6 class="fw-bold text-dark mb-1">{{ __('purchase.all_approved_pos_received') }}</h6>
+                                <p class="fs-12 mb-0">{{ __('purchase.no_pending_grns_help') }}</p>
                             </td>
                         </tr>
                     @endforelse
