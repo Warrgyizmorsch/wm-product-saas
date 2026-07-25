@@ -29,6 +29,10 @@ return [
     'sort' => 'Сортиране',
     'filter' => 'Филтър',
     'search' => 'Търсене',
+    'export_excel' => 'Експорт в Excel',
+    'download_sample' => 'Изтегляне на модел',
+    'import' => 'Внос на артикули',
+    'import_export_options' => 'Опции за внос / износ',
 
     // Items List / Listing
     'items_listing' => 'Списък с артикули',

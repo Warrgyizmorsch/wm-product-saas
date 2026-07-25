@@ -100,7 +100,7 @@ class PurchaseOrderController extends Controller
         $tenantId = require_tenant_id();
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
-        $products = Product::where('tenant_id', $tenantId)->get();
+        $products = Product::sellable()->where('tenant_id', $tenantId)->get();
 
         $allRequisitions = PurchaseRequisition::where('tenant_id', $tenantId)
             ->where('status', 'Approved')
@@ -386,7 +386,7 @@ class PurchaseOrderController extends Controller
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
-        $products = Product::where('tenant_id', $tenantId)->get();
+        $products = Product::sellable()->where('tenant_id', $tenantId)->get();
         $allRequisitions = PurchaseRequisition::where('tenant_id', $tenantId)
             ->where('status', 'Approved')
             ->with('items')

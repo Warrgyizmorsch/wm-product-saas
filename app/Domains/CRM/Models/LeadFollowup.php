@@ -17,10 +17,13 @@ class LeadFollowup extends Model
         'type',
         'status',
         'notes',
+        'rescheduled_from_id',
+        'original_followup_date',
     ];
 
     protected $casts = [
         'followup_date' => 'datetime',
+        'original_followup_date' => 'datetime',
     ];
 
     /**
@@ -29,5 +32,21 @@ class LeadFollowup extends Model
     public function lead(): BelongsTo
     {
         return $this->belongsTo(Lead::class);
+    }
+
+    /**
+     * Get the original followup from which this was rescheduled.
+     */
+    public function rescheduledFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'rescheduled_from_id');
+    }
+
+    /**
+     * Get subsequent followups rescheduled from this one.
+     */
+    public function rescheduledTo()
+    {
+        return $this->hasMany(self::class, 'rescheduled_from_id');
     }
 }

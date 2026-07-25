@@ -29,6 +29,10 @@ return [
     'sort' => 'Sort',
     'filter' => 'Filter',
     'search' => 'Search',
+    'export_excel' => 'Export Excel',
+    'download_sample' => 'Download Sample',
+    'import' => 'Import Items',
+    'import_export_options' => 'Import / Export Options',
 
     // Items List / Listing
     'items_listing' => 'Items Listing',

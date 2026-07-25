@@ -110,6 +110,31 @@
                         </div>
                     </x-ui.filter>
                 </form>
+
+                <!-- Action Dropdown for Import/Export/Download Sample (Action button style) -->
+                <div class="dropdown d-inline-block">
+                    <a href="javascript:void(0)" class="action-dropdown-btn dropdown-toggle-custom" :title="__('inventory.import_export_options')">
+                        <i class="feather feather-paperclip"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
+                        <li>
+                            <a href="{{ route('inventory.products.export') }}" class="dropdown-item">
+                                <i class="feather-download me-2 text-muted fs-12"></i>{{ __('inventory.export_excel') }}
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('inventory.products.downloadSample') }}" class="dropdown-item">
+                                <i class="feather-file-text me-2 text-muted fs-12"></i>{{ __('inventory.download_sample') }}
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a href="javascript:void(0);" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importProductsModal">
+                                <i class="feather-upload me-2 text-muted fs-12"></i>{{ __('inventory.import') }}
+                            </a>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -227,4 +252,17 @@
                 :perPage="$products->perPage()" />
         </div>
     </div>
+
+    {{-- Import Products Modal --}}
+    <x-ui.modal id="importProductsModal" title="Import Items / Products" submitText="Import File" :centered="true">
+        <form method="POST" action="{{ route('inventory.products.import') }}" enctype="multipart/form-data" id="importProductsForm">
+            @csrf
+            <p class="fs-13 text-muted mb-3">Upload an Excel (.xlsx, .xls) or CSV (.csv) file containing item details.</p>
+            <x-ui.odoo-form-ui type="file" name="file" label="Excel / CSV File" required placeholder="Choose File" />
+        </form>
+        <x-slot name="footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" form="importProductsForm" class="btn btn-primary">Import File</button>
+        </x-slot>
+    </x-ui.modal>
 @endsection

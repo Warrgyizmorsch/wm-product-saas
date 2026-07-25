@@ -147,7 +147,7 @@ class LeadController extends Controller
 
         $lead = new Lead();
         $users = User::orderBy('name')->get();
-        $products = Product::whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
+        $products = Product::sellable()->whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
         return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
     }
 
@@ -183,7 +183,7 @@ class LeadController extends Controller
 
         $customers = Customer::orderBy('name')->get();
         $nextQuotationNumber = app(QuotationService::class)->getNextQuotationNumber();
-        $products = Product::whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
+        $products = Product::sellable()->whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
 
         // Get previous and next leads based on ID order (latest chronological order)
         $prevLead = Lead::where('id', '>', $lead->id)->orderBy('id', 'asc')->first();
@@ -312,7 +312,7 @@ class LeadController extends Controller
         $this->authorize('update', $lead);
 
         $users = User::orderBy('name')->get();
-        $products = Product::whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
+        $products = Product::sellable()->whereIn('type', ['finished_good', 'component'])->orderBy('name')->get();
         return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
     }
 
