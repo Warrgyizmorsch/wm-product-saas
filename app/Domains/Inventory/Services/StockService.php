@@ -598,14 +598,10 @@ class StockService
             // 5. Update Warehouse Stock totals
             if ($stock) {
                 $newQty = max(0.0, $currentQty - $quantity);
-                if ($newQty > 0 || (float)$stock->reserved_qty > 0) {
-                    $stock->update([
-                        'quantity' => $newQty,
-                        'available_qty' => max(0.0, $newQty - (float)$stock->reserved_qty)
-                    ]);
-                } else {
-                    $stock->delete();
-                }
+                $stock->update([
+                    'quantity' => $newQty,
+                    'available_qty' => max(0.0, $newQty - (float)$stock->reserved_qty)
+                ]);
             }
 
             // Attach details of allocations and serials consumed to transaction

@@ -14,9 +14,96 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
+use App\Exports\ProductExport;
+use App\Exports\ProductSampleExport;
+use App\Imports\ProductImport;
+use App\Domains\Accounting\Models\ChartOfAccount;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
 {
+    /**
+     * Helper to get chart of accounts for inventory forms
+     */
+    private function getAccountsData(): array
+    {
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $allAccounts = ChartOfAccount::query()
+            ->where(function($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            })
+            ->where('is_active', true)
+            ->orderBy('code', 'asc')
+            ->get();
+
+        $salesAccounts = $allAccounts->where('type', 'income');
+        if ($salesAccounts->isEmpty()) {
+            $salesAccounts = $allAccounts;
+        }
+
+        $purchaseAccounts = $allAccounts->where('type', 'expense');
+        if ($purchaseAccounts->isEmpty()) {
+            $purchaseAccounts = $allAccounts;
+        }
+
+        $inventoryAccounts = $allAccounts->where('type', 'asset');
+        if ($inventoryAccounts->isEmpty()) {
+            $inventoryAccounts = $allAccounts;
+        }
+
+        return [
+            'salesAccounts' => $salesAccounts,
+            'purchaseAccounts' => $purchaseAccounts,
+            'inventoryAccounts' => $inventoryAccounts,
+        ];
+    }
+    /**
+     * Download sample Excel template for products.
+     */
+    public function downloadSample()
+    {
+        $this->authorize('viewAny', Product::class);
+
+        return Excel::download(new ProductSampleExport, 'product_sample.xlsx');
+    }
+
+    /**
+     * Import products from Excel/CSV file.
+     */
+    public function import(Request $request)
+    {
+        $this->authorize('create', Product::class);
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt',
+        ]);
+
+        try {
+            Excel::import(new ProductImport, $request->file('file'));
+            return redirect()->route('inventory.products.index')->with('success', 'Products imported successfully!');
+        } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
+            $failures = $e->failures();
+            $errors = [];
+            foreach ($failures as $failure) {
+                $errors[] = "Row {$failure->row()}: " . implode(', ', $failure->errors());
+            }
+            return redirect()->route('inventory.products.index')->withErrors($errors);
+        } catch (\Exception $e) {
+            return redirect()->route('inventory.products.index')->withErrors(['file' => 'Failed to import file: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Export all products to Excel file.
+     */
+    public function export()
+    {
+        $this->authorize('viewAny', Product::class);
+
+        return Excel::download(new ProductExport, 'products_export.xlsx');
+    }
+
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Product::class);
@@ -63,7 +150,12 @@ class ProductController extends Controller
         $vendors = Vendor::query()->where('status', 'active')->get();
         $warehouses = Warehouse::query()->where('status', 'active')->get();
 
-        return view('modules.inventory.products.create', compact('uoms', 'vendors', 'warehouses'));
+        $accountsData = $this->getAccountsData();
+
+        return view('modules.inventory.products.create', array_merge(
+            compact('uoms', 'vendors', 'warehouses'),
+            $accountsData
+        ));
     }
 
     public function store(Request $request): RedirectResponse
@@ -272,7 +364,7 @@ class ProductController extends Controller
     {
         $this->authorize('update', $product);
 
-        $product->load(['uom', 'vendor', 'warehouseStocks']);
+        $product->load(['uom', 'vendor', 'warehouseStocks', 'variants.warehouseStocks']);
         $uoms = Uom::query()->get();
         $vendors = Vendor::query()->where('status', 'active')->get();
         $warehouses = Warehouse::query()->where('status', 'active')->get();
@@ -281,7 +373,12 @@ class ProductController extends Controller
         $warehouseStocksMap = $product->warehouseStocks->pluck('quantity', 'warehouse_id')->toArray();
         $warehouseCostsMap = $product->warehouseStocks->pluck('unit_cost', 'warehouse_id')->toArray();
 
-        return view('modules.inventory.products.edit', compact('product', 'uoms', 'vendors', 'warehouses', 'warehouseStocksMap', 'warehouseCostsMap'));
+        $accountsData = $this->getAccountsData();
+
+        return view('modules.inventory.products.edit', array_merge(
+            compact('product', 'uoms', 'vendors', 'warehouses', 'warehouseStocksMap', 'warehouseCostsMap'),
+            $accountsData
+        ));
     }
 
     public function update(Request $request, Product $product): RedirectResponse
@@ -337,10 +434,17 @@ class ProductController extends Controller
             'inventory_valuation_method' => 'nullable|string|in:FIFO,Weighted Average',
 
             'warehouse_stocks' => 'nullable|array',
+            'variants' => 'nullable|array',
+            'variants.*.name' => 'nullable|string|max:255',
+            'variants.*.sku' => 'nullable|string|max:255',
+            'variants.*.selling_price' => 'nullable|numeric|min:0',
+            'variants.*.cost_price' => 'nullable|numeric|min:0',
+            'variants.*.reorder_point' => 'nullable|numeric|min:0',
+            'variants.*.status' => 'nullable|in:active,inactive',
             'status' => 'required|in:active,inactive',
         ]);
 
-        DB::transaction(function () use ($validated, $product, $tenantId) {
+        DB::transaction(function () use ($validated, $product, $tenantId, $request) {
             $product->update([
                 'name' => $validated['name'],
                 'type' => $validated['type'],
@@ -353,9 +457,9 @@ class ProductController extends Controller
                 'selling_price' => $validated['selling_price'],
                 'cost_price' => $validated['cost_price'],
                 'unit_cost' => $validated['cost_price'],
-                'sales_account' => $validated['sales_account'],
-                'purchase_account' => $validated['purchase_account'],
-                'inventory_account' => $validated['inventory_account'],
+                'sales_account' => $validated['sales_account'] ?? $product->sales_account ?? 'Sales Income',
+                'purchase_account' => $validated['purchase_account'] ?? $product->purchase_account ?? 'Cost of Goods Sold',
+                'inventory_account' => $validated['inventory_account'] ?? $product->inventory_account ?? 'Inventory Asset',
                 'reorder_point' => $validated['reorder_point'] ?? 0,
                 'description' => $validated['description'],
                 'brand' => $validated['brand'],
@@ -382,6 +486,110 @@ class ProductController extends Controller
                 'type' => $validated['type'],
                 'supplier_method' => $validated['supplier_method'] ?? 'buy'
             ]);
+
+            // Process variant quick updates & new variant creations
+            if ($product->variation_type === 'Variant') {
+                $attributesConfig = [];
+                if (!empty($request->input('attributes'))) {
+                    foreach ($request->input('attributes') as $attr) {
+                        $name = trim($attr['name'] ?? '');
+                        $options = array_filter(array_map('trim', $attr['options'] ?? []));
+                        if ($name && !empty($options)) {
+                            $attributesConfig[] = [
+                                'name' => $name,
+                                'values' => array_values(array_unique($options)),
+                            ];
+                        }
+                    }
+                }
+                if (!empty($attributesConfig)) {
+                    $product->attributes_config = $attributesConfig;
+                    $product->save();
+                }
+
+                $submittedVariants = $request->input('variants', []);
+                $defaultWarehouse = Warehouse::query()->where('is_default', true)->first() ?? Warehouse::query()->first();
+                $processedIds = [];
+
+                foreach ($submittedVariants as $vData) {
+                    $variantId = $vData['id'] ?? null;
+                    $variantSku = trim($vData['sku'] ?? '');
+                    $attrLabel = trim($vData['attributes'] ?? '');
+                    $name = $product->name . ($attrLabel ? " ({$attrLabel})" : '');
+                    $vSelling = isset($vData['selling_price']) && is_numeric($vData['selling_price']) ? (float)$vData['selling_price'] : $product->selling_price;
+                    $vCost = isset($vData['cost_price']) && is_numeric($vData['cost_price']) ? (float)$vData['cost_price'] : $product->cost_price;
+                    $vReorder = isset($vData['reorder_point']) && is_numeric($vData['reorder_point']) ? (float)$vData['reorder_point'] : 0;
+                    $vOpening = isset($vData['opening_stock']) && is_numeric($vData['opening_stock']) ? (float)$vData['opening_stock'] : 0;
+
+                    $variant = null;
+                    if ($variantId) {
+                        $variant = Product::where('parent_id', $product->id)->where('id', $variantId)->first();
+                    }
+                    if (!$variant && $variantSku) {
+                        $variant = Product::where('parent_id', $product->id)->where('sku', $variantSku)->first();
+                    }
+
+                    if ($variant) {
+                        $variant->update([
+                            'name' => $name,
+                            'sku' => $variantSku ?: $variant->sku,
+                            'selling_price' => $vSelling,
+                            'cost_price' => $vCost,
+                            'unit_cost' => $vCost,
+                            'reorder_point' => $vReorder,
+                            'status' => $vData['status'] ?? 'active',
+                            'type' => $validated['type'],
+                            'supplier_method' => $validated['supplier_method'] ?? 'buy',
+                            'uom_id' => $validated['uom_id'],
+                        ]);
+                        $processedIds[] = $variant->id;
+                    } else if (!empty($variantSku)) {
+                        // Create new variant generated in Edit Builder
+                        $newVariant = Product::create([
+                            'tenant_id' => $tenantId,
+                            'parent_id' => $product->id,
+                            'name' => $name,
+                            'sku' => $variantSku,
+                            'type' => $validated['type'],
+                            'item_type' => $product->item_type,
+                            'variation_type' => 'Single',
+                            'uom_id' => $validated['uom_id'],
+                            'status' => 'active',
+                            'selling_price' => $vSelling,
+                            'cost_price' => $vCost,
+                            'unit_cost' => $vCost,
+                            'reorder_point' => $vReorder,
+                            'opening_stock' => $vOpening,
+                            'opening_stock_rate' => $vCost,
+                            'variant_values' => ['label' => $attrLabel],
+                            'track_serial_number' => $product->track_serial_number,
+                            'track_batch' => $product->track_batch,
+                            'supplier_method' => $validated['supplier_method'] ?? 'buy',
+                        ]);
+                        $processedIds[] = $newVariant->id;
+
+                        if ($vOpening > 0 && $defaultWarehouse) {
+                            try {
+                                \App\Domains\Inventory\Services\StockService::recordInflow(
+                                    $tenantId,
+                                    $newVariant->id,
+                                    $defaultWarehouse->id,
+                                    $vOpening,
+                                    $vCost,
+                                    'Opening Stock'
+                                );
+                            } catch (\Exception $e) {}
+                        }
+                    }
+                }
+
+                // Delete any old child variant that was removed from the matrix in edit mode
+                if (!empty($processedIds)) {
+                    Product::where('parent_id', $product->id)
+                        ->whereNotIn('id', $processedIds)
+                        ->delete();
+                }
+            }
 
             if ($product->variation_type === 'Single') {
                 // Update stock per warehouse

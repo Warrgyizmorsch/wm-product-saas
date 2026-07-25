@@ -39,7 +39,9 @@
                             elseif($lead->status === 'Lost') $statusClass = 'bg-soft-danger text-danger';
                         @endphp
                         <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ $lead->status ? __('crm.statuses.' . $lead->status) : __('crm.statuses.New') }}</span>
-                        <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ $lead->segment ? __('crm.segments.' . $lead->segment) : __('crm.no_segment') }}</span>
+                        @if($lead->segment && $lead->segment !== 'Select an Option')
+                            <span class="badge bg-soft-secondary text-secondary px-2 py-0.5 fs-10 fw-semibold">{{ __('crm.segments.' . $lead->segment) ?? $lead->segment }}</span>
+                        @endif
                     </div>
                     <!-- Tag Button -->
                     <div class="mt-1 d-flex align-items-center">
@@ -110,7 +112,7 @@
                             <a href="#sectionNotes" class="nav-link active py-1.5 px-2 fs-12 rounded text-dark fw-medium">{{ __('crm.notes') }}</a>
                         </li>
                         <li class="nav-item">
-                            <a href="#subtab-interactions" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.open_activities') }}</a>
+                            <a href="#subtab-interactions" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.activities') }}</a>
                         </li>
                         <li class="nav-item">
                             <a href="#subtab-history" class="nav-link py-1.5 px-2 fs-12 rounded text-dark">{{ __('crm.history') }}</a>
@@ -608,7 +610,9 @@
                                         </div>
 
                                         @php
-                                            $groupedFollowups = $lead->followups->groupBy(function($item) {
+                                            $groupedFollowups = $lead->followups->reject(function($item) {
+                                                return $item->status === 'Rescheduled' && $item->rescheduledTo->isNotEmpty();
+                                            })->groupBy(function($item) {
                                                 return $item->followup_date->format('d/m/Y');
                                             });
                                         @endphp
@@ -639,31 +643,86 @@
                                                             $statusBadgeClass = 'bg-warning text-white';
                                                             $statusLabel = 'Pending';
                                                             if($item->status === 'Completed') { $statusBadgeClass = 'bg-success text-white'; $statusLabel = 'Connected'; }
-                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-secondary text-white'; $statusLabel = 'Not Connected'; }
+                                                            elseif($item->status === 'Not Connected') { $statusBadgeClass = 'bg-warning text-white'; $statusLabel = 'Not Connected'; }
+                                                            elseif($item->status === 'Cancelled') { $statusBadgeClass = 'bg-danger text-white'; $statusLabel = 'Cancelled'; }
+                                                            elseif($item->status === 'Rescheduled') { $statusBadgeClass = 'bg-info text-white'; $statusLabel = 'Rescheduled'; }
                                                         @endphp
 
-                                                        <div class="activity-card mb-2 {{ $item->status === 'Completed' ? 'activity-card--done' : ($item->status === 'Cancelled' ? 'activity-card--cancelled' : '') }}">
+                                                        <div class="activity-card mb-2">
                                                             <div class="activity-card-inner">
 
                                                                 <!-- Top row: Icon + Type + Time + Status -->
-                                                                <div class="d-flex align-items-center gap-2 mb-2">
+                                                                <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
                                                                     <div class="activity-type-icon {{ $actIconBg }} {{ $actIconColor }} flex-shrink-0">
                                                                         <i class="{{ $actIcon }}"></i>
                                                                     </div>
                                                                     <span class="fw-bold text-dark fs-13">{{ __('crm.activity_types.' . $item->type) ?? $item->type }}</span>
                                                                     <span class="activity-time-chip"><i class="feather-clock fs-9 me-1"></i>{{ $item->followup_date->format('h:i A') }}</span>
-                                                                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2 py-1 fs-10 fw-semibold">{{ $statusLabel }}</span>
+                                                                    <span class="badge rounded-pill {{ $statusBadgeClass }} px-2 py-1 fs-10 fw-semibold" @if($item->status !== 'Pending') title="Status updated on {{ $item->updated_at->format('d/m/Y h:i A') }}" @endif>{{ $statusLabel }}</span>
+
+                                                                    @php
+                                                                        $lastRescheduledDate = $item->rescheduledFrom?->followup_date;
+                                                                    @endphp
+                                                                    @if($lastRescheduledDate)
+                                                                        <span class="badge bg-soft-info text-info border border-info border-opacity-25 px-2 py-1 fs-10 fw-semibold ms-auto" title="Rescheduled from {{ $lastRescheduledDate->format('d/m/Y h:i A') }}">
+                                                                            <i class="feather-refresh-cw me-1 fs-9"></i>Rescheduled from {{ $lastRescheduledDate->format('d/m/Y h:i A') }}
+                                                                        </span>
+                                                                    @endif
                                                                 </div>
 
-                                                                <!-- Notes / Message -->
+                                                                <!-- Notes / Messages (Original + Reschedule + Latest) -->
+                                                                @php
+                                                                    $prevItem = $item->rescheduledFrom;
+                                                                    $prevNotes = [];
+                                                                    while($prevItem) {
+                                                                        if ($prevItem->notes && !in_array($prevItem->notes, array_column($prevNotes, 'notes')) && $prevItem->notes !== $item->notes) {
+                                                                            $prevNotes[] = [
+                                                                                'date' => $prevItem->followup_date,
+                                                                                'notes' => $prevItem->notes,
+                                                                            ];
+                                                                        }
+                                                                        $prevItem = $prevItem->rescheduledFrom;
+                                                                    }
+                                                                    $chronologicalPrevNotes = array_reverse($prevNotes);
+                                                                @endphp
+
+                                                                @if(!empty($chronologicalPrevNotes))
+                                                                    @foreach($chronologicalPrevNotes as $idx => $pNote)
+                                                                        @php
+                                                                            $isFirstOriginal = ($idx === 0);
+                                                                            $labelTitle = $isFirstOriginal ? 'Original Note' : 'Reschedule Note';
+                                                                            $iconClass = $isFirstOriginal ? 'feather-file-text' : 'feather-clock';
+                                                                        @endphp
+                                                                        <div class="activity-notes activity-notes--original opacity-75 mb-1" style="border-left-color: {{ $isFirstOriginal ? '#94a3b8' : '#cbd5e1' }}; background: #f8fafc;">
+                                                                            <span class="fs-10 fw-bold text-muted text-uppercase d-block mb-1">
+                                                                                <i class="{{ $iconClass }} me-1 fs-9"></i>{{ $labelTitle }} ({{ $pNote['date']->format('d/m/Y') }}):
+                                                                            </span>
+                                                                            <span class="text-secondary">{{ $pNote['notes'] }}</span>
+                                                                        </div>
+                                                                    @endforeach
+                                                                @endif
+
                                                                 @if($item->notes)
-                                                                    <div class="activity-notes">{{ $item->notes }}</div>
+                                                                    <div class="activity-notes">
+                                                                        @if(!empty($chronologicalPrevNotes))
+                                                                            <span class="fs-10 fw-bold text-primary text-uppercase d-block mb-1">
+                                                                                <i class="feather-edit-2 me-1 fs-9"></i>Latest Note:
+                                                                            </span>
+                                                                        @endif
+                                                                        {{ $item->notes }}
+                                                                    </div>
                                                                 @endif
 
                                                                 <!-- Attribution -->
-                                                                <div class="activity-by mt-1">
-                                                                    <i class="feather-user fs-9 me-1"></i>
-                                                                    by {{ $lead->owner?->name ?: 'System' }} &bull; {{ $item->followup_date->format('d M Y') }}
+                                                                <div class="activity-by mt-1 d-flex align-items-center flex-wrap gap-2">
+                                                                    <span>
+                                                                        <i class="feather-user fs-9 me-1"></i>by {{ $lead->owner?->name ?: 'System' }} &bull; Scheduled: {{ $item->followup_date->format('d M Y, h:i A') }}
+                                                                    </span>
+                                                                    @if($item->status !== 'Pending')
+                                                                        <span class="text-muted ms-auto fs-10">
+                                                                            <i class="feather-clock fs-9 me-1 text-primary"></i>Status Updated: <strong class="text-dark">{{ $item->updated_at->format('d M Y, h:i A') }}</strong>
+                                                                        </span>
+                                                                    @endif
                                                                 </div>
 
                                                                 <!-- Action Buttons — horizontal row at bottom, only for Pending -->
@@ -681,7 +740,7 @@
                                                                         <form action="{{ route('crm.followups.update', $item->id) }}" method="POST" class="d-inline">
                                                                             @csrf
                                                                             @method('PUT')
-                                                                            <input type="hidden" name="status" value="Cancelled">
+                                                                            <input type="hidden" name="status" value="Not Connected">
                                                                             <x-ui.button type="submit" variant="soft-warning" size="sm" icon="feather-phone-off">Not Connected</x-ui.button>
                                                                         </form>
 
@@ -705,13 +764,14 @@
                                                             <x-ui.modal
                                                                 :id="'rescheduleModal_' . $item->id"
                                                                 title="Reschedule Activity"
-                                                                size="sm"
+                                                                size="md"
                                                                 :centered="true"
                                                                 :formAction="route('crm.followups.update', $item->id)"
                                                                 formMethod="PUT"
                                                                 :submitText="'Confirm Reschedule'"
                                                                 :closeText="__('crm.cancel')"
                                                             >
+                                                                <input type="hidden" name="is_reschedule" value="1">
                                                                 <p class="text-muted fs-11 mb-3">
                                                                     <i class="{{ $actIcon }} me-1"></i>
                                                                     {{ __('crm.activity_types.' . $item->type) ?? $item->type }}
@@ -1325,18 +1385,21 @@
             padding: 8px 12px;
             font-weight: 500;
             transition: all 0.2s ease;
+            border-radius: 8px;
         }
 
         .zoho-sidebar-nav .nav-link:hover {
-            background-color: #e2e8f0;
-            color: #0f172a !important;
+            background-color: color-mix(in srgb, var(--bs-primary) 8%, transparent);
+            color: var(--bs-primary, #1e40af) !important;
             text-decoration: none;
         }
 
         .zoho-sidebar-nav .nav-link.active {
-            background-color: #cbd5e1;
-            color: #000000 !important;
-            font-weight: 600;
+            background-color: var(--bs-primary, #1e40af) !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 12px color-mix(in srgb, var(--bs-primary) 30%, transparent);
+            border-radius: 8px;
         }
 
         .zoho-nav-tabs {
@@ -1510,16 +1573,6 @@
         .activity-card:hover {
             box-shadow: 0 4px 16px rgba(30,64,175,0.07);
             border-color: #bfdbfe;
-        }
-        .activity-card--done {
-            background: #f0fdf4;
-            border-color: #bbf7d0;
-            opacity: 0.85;
-        }
-        .activity-card--cancelled {
-            background: #f8fafc;
-            border-color: #e2e8f0;
-            opacity: 0.7;
         }
         .activity-card-inner {
             padding: 12px 14px;

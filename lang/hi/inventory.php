@@ -29,6 +29,10 @@ return [
     'sort' => 'क्रमबद्ध करें',
     'filter' => 'फ़िल्टर',
     'search' => 'खोजें',
+    'export_excel' => 'एक्सेल निर्यात करें',
+    'download_sample' => 'सैंपल डाउनलोड करें',
+    'import' => 'सामग्री आयात करें',
+    'import_export_options' => 'आयात / निर्यात विकल्प',
 
     // Items List / Listing
     'items_listing' => 'वस्तु सूची',

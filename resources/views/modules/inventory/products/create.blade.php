@@ -170,17 +170,27 @@
                             <x-ui.odoo-form-ui type="input" :label="__('inventory.selling_price')" name="selling_price" inputType="number" step="0.01" placeholder="Selling Price (₹)" required="true" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.sales_account')" name="sales_account" required="true">
-                                <option value="Sales Income">Sales Income Account</option>
-                                <option value="General Income">General Income Account</option>
-                                <option value="Interest Income">Interest Income Account</option>
+                                <option value="" selected disabled>Select Sales Account</option>
+                                @forelse($salesAccounts as $acc)
+                                    <option value="{{ $acc->name }}">{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                @empty
+                                    <option value="Sales Income">Sales Income Account</option>
+                                    <option value="General Income">General Income Account</option>
+                                    <option value="Interest Income">Interest Income Account</option>
+                                @endforelse
                             </x-ui.odoo-form-ui>
 
                             <x-ui.odoo-form-ui type="input" :label="__('inventory.cost_price')" name="cost_price" inputType="number" step="0.01" placeholder="Purchase Cost (₹)" required="true" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.purchase_account')" name="purchase_account" required="true">
-                                <option value="Cost of Goods Sold">Cost of Goods Sold (COGS)</option>
-                                <option value="Purchases">Purchases Expense Account</option>
-                                <option value="Job Costs">Job Costs Expense Account</option>
+                                <option value="" selected disabled>Select Purchase Account</option>
+                                @forelse($purchaseAccounts as $acc)
+                                    <option value="{{ $acc->name }}">{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                @empty
+                                    <option value="Cost of Goods Sold">Cost of Goods Sold (COGS)</option>
+                                    <option value="Purchases">Purchases Expense Account</option>
+                                    <option value="Job Costs">Job Costs Expense Account</option>
+                                @endforelse
                             </x-ui.odoo-form-ui>
 
                             <div class="border-top pt-3 mt-3">
@@ -242,9 +252,14 @@
                         <div class="row g-4 fs-13 text-dark">
                             <div class="col-lg-6 border-end">
                                 <x-ui.odoo-form-ui type="select" label="Inventory Account" name="inventory_account" required="true">
-                                    <option value="Inventory Asset" selected>Inventory Asset Account</option>
-                                    <option value="Raw Materials Stock">Raw Materials Stock</option>
-                                    <option value="Finished Goods Stock">Finished Goods Stock</option>
+                                    <option value="" selected disabled>Select Inventory Account</option>
+                                    @forelse($inventoryAccounts as $acc)
+                                        <option value="{{ $acc->name }}">{{ $acc->code ? $acc->code . ' - ' : '' }}{{ $acc->name }}</option>
+                                    @empty
+                                        <option value="Inventory Asset">Inventory Asset Account</option>
+                                        <option value="Raw Materials Stock">Raw Materials Stock</option>
+                                        <option value="Finished Goods Stock">Finished Goods Stock</option>
+                                    @endforelse
                                 </x-ui.odoo-form-ui>
 
                                 <x-ui.odoo-form-ui type="input" label="Reorder Point" name="reorder_point" inputType="number" placeholder="Alert limit when stock falls below" />

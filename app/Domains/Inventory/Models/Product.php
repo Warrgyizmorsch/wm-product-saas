@@ -4,13 +4,12 @@ namespace App\Domains\Inventory\Models;
 
 use App\Core\Database\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $table = 'products';
 
@@ -129,8 +128,23 @@ class Product extends BaseModel
     public function getTotalStockAttribute(): float
     {
         if ($this->variation_type === 'Variant') {
-            return $this->variants->sum(fn($v) => $v->warehouseStocks->sum('quantity'));
+            $variantWhSum = (float)$this->variants->sum(fn($v) => $v->warehouseStocks->sum('quantity'));
+            return $variantWhSum > 0 ? $variantWhSum : (float)$this->variants->sum('opening_stock');
         }
-        return $this->warehouseStocks->sum('quantity');
+        $whSum = (float)$this->warehouseStocks->sum('quantity');
+        return $whSum > 0 ? $whSum : (float)$this->opening_stock;
+    }
+
+    /**
+     * Scope query to only sellable / transactable products.
+     * Excludes master variant parent templates (variation_type = 'Variant' AND parent_id IS NULL)
+     * because abstract parent templates do not hold physical stock.
+     */
+    public function scopeSellable(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        $query->where(function($q) {
+            $q->where('variation_type', '!=', 'Variant')
+              ->orWhereNotNull('parent_id');
+        });
     }
 }
