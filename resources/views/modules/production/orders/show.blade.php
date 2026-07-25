@@ -2067,57 +2067,59 @@
         </x-slot>
     </x-ui.modal>
 
-    {{-- Generate Schedule Modal --}}
-    <x-ui.modal id="scheduleModal" title="{{ __('production.generate_schedule') }}" class="text-start">
-        <form method="POST" action="{{ route('production.schedules.store') }}" id="scheduleForm">
-            @csrf
-            
-            <input type="hidden" name="production_order_id" value="{{ $order->id }}">
-            
-            <div class="mb-3">
-                <label class="form-label fw-semibold text-muted fs-12">{{ __('production.production_order') }}</label>
-                <div class="p-2.5 bg-light rounded text-dark fs-13 border">
-                    <strong>ID:</strong> {{ $order->id }} <br>
-                    <strong>{{ __('production.order_number') }}:</strong> {{ $order->order_number }}
+    @if($order->schedules->isEmpty())
+        {{-- Generate Schedule Modal --}}
+        <x-ui.modal id="scheduleModal" title="{{ __('production.generate_schedule') }}" class="text-start">
+            <form method="POST" action="{{ route('production.schedules.store') }}" id="scheduleForm">
+                @csrf
+                
+                <input type="hidden" name="production_order_id" value="{{ $order->id }}">
+                
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-muted fs-12">{{ __('production.production_order') }}</label>
+                    <div class="p-2.5 bg-light rounded text-dark fs-13 border">
+                        <strong>ID:</strong> {{ $order->id }} <br>
+                        <strong>{{ __('production.order_number') }}:</strong> {{ $order->order_number }}
+                    </div>
                 </div>
-            </div>
 
-            <x-ui.odoo-form-ui 
-                type="input" 
-                :label="__('production.schedule_start_date')" 
-                name="start_date" 
-                inputType="datetime-local" 
-                :value="old('start_date', now()->format('Y-m-d\TH:i'))" 
-                :required="true" 
-            />
+                <x-ui.odoo-form-ui 
+                    type="input" 
+                    :label="__('production.schedule_start_date')" 
+                    name="start_date" 
+                    inputType="datetime-local" 
+                    :value="old('start_date', now()->format('Y-m-d\TH:i'))" 
+                    :required="true" 
+                />
 
-            <x-ui.odoo-form-ui 
-                type="select" 
-                :label="__('production.scheduling_type')" 
-                name="scheduling_type" 
-                :required="true"
-            >
-                <option value="forward" {{ old('scheduling_type', 'forward') === 'forward' ? 'selected' : '' }}>
-                    {{ __('production.forward_scheduling') }}
-                </option>
-                <option value="backward" {{ old('scheduling_type') === 'backward' ? 'selected' : '' }}>
-                    {{ __('production.backward_scheduling') }}
-                </option>
-            </x-ui.odoo-form-ui>
+                <x-ui.odoo-form-ui 
+                    type="select" 
+                    :label="__('production.scheduling_type')" 
+                    name="scheduling_type" 
+                    :required="true"
+                >
+                    <option value="forward" {{ old('scheduling_type', 'forward') === 'forward' ? 'selected' : '' }}>
+                        {{ __('production.forward_scheduling') }}
+                    </option>
+                    <option value="backward" {{ old('scheduling_type') === 'backward' ? 'selected' : '' }}>
+                        {{ __('production.backward_scheduling') }}
+                    </option>
+                </x-ui.odoo-form-ui>
 
-            <x-ui.odoo-form-ui 
-                type="textarea" 
-                :label="__('production.description') ?? 'Notes'" 
-                name="notes" 
-                placeholder="Optional scheduling notes or remarks..." 
-                :value="old('notes')" 
-            />
-        </form>
-        <x-slot name="footer">
-            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
-            <button type="submit" class="btn btn-primary text-white" onclick="document.getElementById('scheduleForm').submit();">{{ __('production.generate_schedule') }}</button>
-        </x-slot>
-    </x-ui.modal>
+                <x-ui.odoo-form-ui 
+                    type="textarea" 
+                    :label="__('production.description') ?? 'Notes'" 
+                    name="notes" 
+                    placeholder="Optional scheduling notes or remarks..." 
+                    :value="old('notes')" 
+                />
+            </form>
+            <x-slot name="footer">
+                <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">{{ __('production.cancel') }}</button>
+                <button type="submit" class="btn btn-primary text-white" onclick="document.getElementById('scheduleForm').submit();">{{ __('production.generate_schedule') }}</button>
+            </x-slot>
+        </x-ui.modal>
+    @endif
 
 </div>{{-- end .erp-single-panel --}}
 

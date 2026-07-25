@@ -674,6 +674,7 @@ return [
 
     // Production Scheduling (Schedules)
     'schedules' => 'Schedules',
+    'production_schedules' => 'Production Schedules',
     'production_scheduling' => 'Production Scheduling',
     'calendar_view' => 'Calendar View',
     'work_center_view' => 'Work Center View',
