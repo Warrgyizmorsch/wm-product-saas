@@ -379,9 +379,9 @@
                                                               <i class="feather-info text-primary fs-16 mt-0.5"></i>
                                                               <div>
                                                                   <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      The grace period is set to 
+                                                                      {{ __('hrms.penalization.grace_period_set_to') }} 
                                                                       <input type="number" name="grace_period_minutes" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->grace_period_minutes : 15 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
-                                                                      minutes relative to the scheduled shift start time.
+                                                                      {{ __('hrms.penalization.minutes_relative_to_shift') }}
                                                                   </p>
                                                               </div>
                                                           </div>
@@ -391,9 +391,9 @@
                                                               <i class="feather-calendar text-primary fs-16 mt-0.5"></i>
                                                               <div>
                                                                   <p class="mb-0 text-dark" style="line-height: 1.6;">
-                                                                      An employee is allowed up to 
+                                                                      {{ __('hrms.penalization.employee_allowed_up_to') }} 
                                                                       <input type="number" name="threshold_count" class="odoo-table-input d-inline-block text-center px-1 mx-1" value="{{ $rule ? $rule->threshold_count : 2 }}" min="0" style="width: 60px; height: 24px; font-weight: 600; vertical-align: middle; border-bottom: 1px solid #cbd5e1 !important;" required>
-                                                                      late arrival occurrences per month within the grace period without triggering a penalty.
+                                                                      {{ __('hrms.penalization.late_occurrences_without_penalty') }}
                                                                   </p>
                                                               </div>
                                                           </div>

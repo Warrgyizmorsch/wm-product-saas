@@ -358,7 +358,7 @@
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <a class="nav-link {{ $tab === 'weekly_patterns' ? 'active' : '' }}" href="{{ route('hrms.roster.index', ['tab' => 'weekly_patterns']) }}">
-                                        <i class="feather-repeat me-2"></i>Weekly Patterns
+                                        <i class="feather-repeat me-2"></i>{{ __('hrms.roster.weekly_patterns') }}
                                     </a>
                                 </li>
                                 <li class="nav-item" role="presentation">
@@ -458,17 +458,17 @@
                                              </x-slot>
 
                                              <div class="table-responsive">
-                                                  <table class="table table-hover mb-0 align-middle" id="shiftsTable">
+                                                  <table class="table table-hover mb-0 align-middle" id="shiftsTable" style="table-layout: fixed; width: 100%;">
                                                       <thead class="table-light">
                                                           <tr>
-                                                              <th width="60">#</th>
-                                                              <th>{{ __('hrms.roster.shift_name') }}</th>
-                                                              <th>{{ __('hrms.org.company') }}</th>
-                                                              <th>{{ __('hrms.roster.shift_timing') }}</th>
-                                                              <th>{{ __('hrms.roster.break_duration') }}</th>
-                                                              <th>{{ __('hrms.roster.overtime_allowed') }}</th>
-                                                              <th>{{ __('hrms.org.status') }}</th>
-                                                              <th width="150" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
+                                                              <th style="width: 5%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">#</th>
+                                                              <th style="width: 17%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.shift_name') }}</th>
+                                                              <th style="width: 16%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.org.company') }}</th>
+                                                              <th style="width: 15%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.shift_timing') }}</th>
+                                                              <th style="width: 15%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.break_duration') }}</th>
+                                                              <th style="width: 15%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.overtime_allowed') }}</th>
+                                                              <th style="width: 9%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.org.status') }}</th>
+                                                              <th style="width: 8%; white-space: normal; word-break: break-word; overflow-wrap: anywhere;" class="text-end">{{ __('hrms.org.tbl_actions') }}</th>
                                                           </tr>
                                                       </thead>
                                                       <tbody>
@@ -479,17 +479,17 @@
                                                               data-status="{{ $sf->active ? 'active' : 'inactive' }}"
                                                               data-overtime="{{ $sf->overtime_allowed ? 'allowed' : 'not_allowed' }}">
                                                               <td class="shift-index-cell">{{ $loop->iteration }}</td>
-                                                              <td>
-                                                                  <span class="fw-bold text-dark shift-name-label d-block">{{ $sf->name }}</span>
-                                                                  <small class="text-muted font-monospace shift-code-label fs-11">{{ $sf->code }}</small>
-                                                              </td>
-                                                              <td>
-                                                                  @if($sf->company)
-                                                                      <span class="text-muted fs-12">{{ $sf->company->company_name }}</span>
-                                                                  @else
-                                                                      <span class="badge bg-soft-secondary text-secondary">{{ __('hrms.roster.shared_all') }}</span>
-                                                                  @endif
-                                                              </td>
+                                                               <td style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                                   <span class="fw-bold text-dark shift-name-label d-block" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $sf->name }}</span>
+                                                                   <small class="text-muted font-monospace shift-code-label fs-11" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $sf->code }}</small>
+                                                               </td>
+                                                               <td style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                                   @if($sf->company)
+                                                                       <span class="text-muted fs-12" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $sf->company->company_name }}</span>
+                                                                   @else
+                                                                       <span class="badge bg-soft-secondary text-secondary" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ __('hrms.roster.shared_all') }}</span>
+                                                                   @endif
+                                                               </td>
                                                               <td><span class="font-monospace text-dark">{{ substr($sf->start_time, 0, 5) }} - {{ substr($sf->end_time, 0, 5) }}</span></td>
                                                               <td><span>{{ $sf->break_minutes ?? 0 }} {{ __('hrms.roster.mins') }}</span></td>
                                                               <td>
@@ -560,7 +560,7 @@
                                 </div>
                             @elseif($tab === 'weekly_patterns')
                                 <!-- WEEKLY PATTERNS TAB -->
-                                 <x-ui.card title="Weekly Shift Patterns" bodyClass="p-0" stretch>
+                                 <x-ui.card title="{{ __('hrms.roster.weekly_shift_patterns') }}" bodyClass="p-0" stretch>
                                      <x-slot name="headerAction">
                                          <form method="GET" action="{{ route('hrms.roster.index') }}" id="weeklyPatternFilterForm" class="d-flex align-items-center gap-2">
                                              <input type="hidden" name="tab" value="weekly_patterns">
@@ -1344,6 +1344,11 @@
                         } else {
                             oldPagination.empty();
                         }
+
+                        // Push state to sync browser URL with current pagination & filter params
+                        if (window.history.pushState) {
+                            window.history.pushState({path: url}, '', url);
+                        }
                     }
                 });
             }
@@ -1888,6 +1893,11 @@
                             $('#shiftsTable').parent().append(newPagination);
                         } else {
                             oldPagination.empty();
+                        }
+
+                        // Push state to sync browser URL with current pagination & filter params
+                        if (window.history.pushState) {
+                            window.history.pushState({path: url}, '', url);
                         }
                     }
                 });

@@ -446,6 +446,157 @@ class EmployeeApiController extends Controller
     }
 
     // ==========================================
+    // 4b. EMPLOYEE DOCUMENTS APIs
+    // ==========================================
+
+    public function requestDocument(Request $request, Employee $employee): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $request->validate([
+            'name'        => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+            'has_expiry'  => 'nullable|boolean',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+
+        $document = Document::create([
+            'tenant_id'         => $tenantId,
+            'documentable_id'   => $employee->id,
+            'documentable_type' => Employee::class,
+            'name'              => $request->string('name')->value(),
+            'description'       => $request->input('description'),
+            'status'            => 'requested',
+            'has_expiry'        => $request->boolean('has_expiry'),
+            'requested_by_id'   => auth()->id(),
+        ]);
+
+        return $this->sendSuccess($document, 'Document request created successfully', 201);
+    }
+
+    public function uploadDocument(Request $request, Employee $employee): JsonResponse
+    {
+        $isHR = auth()->user()->hasHrPermission('hr.settings.manage');
+        $isOwnProfile = auth()->id() === ($employee->user_id ?? null);
+        
+        if (!$isHR && !$isOwnProfile) {
+            return $this->sendError('Unauthorized access.', 403);
+        }
+
+        $request->validate([
+            'document_id' => 'nullable|exists:documents,id',
+            'name'        => 'nullable|required_without:document_id|string|max:255',
+            'file'        => 'required|file|max:10240', // Max 10MB
+            'expiry_date' => 'nullable|date',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+        $file = $request->file('file');
+
+        if ($request->filled('document_id')) {
+            $document = Document::findOrFail($request->integer('document_id'));
+            
+            if ($document->has_expiry && !$request->filled('expiry_date')) {
+                return $this->sendError('Expiry date is required for this requested document.', 422, [
+                    'expiry_date' => ['Expiry date is required for this requested document.']
+                ]);
+            }
+
+            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+
+            $document->update([
+                'file_name'   => $file->getClientOriginalName(),
+                'file_path'   => $path,
+                'file_type'   => $file->getClientMimeType(),
+                'file_size'   => $file->getSize(),
+                'expiry_date' => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status'      => 'uploaded',
+            ]);
+        } else {
+            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+
+            $document = Document::create([
+                'tenant_id'         => $tenantId,
+                'documentable_id'   => $employee->id,
+                'documentable_type' => Employee::class,
+                'name'              => $request->string('name')->value(),
+                'file_name'         => $file->getClientOriginalName(),
+                'file_path'         => $path,
+                'file_type'         => $file->getClientMimeType(),
+                'file_size'         => $file->getSize(),
+                'expiry_date'       => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status'            => 'uploaded',
+                'has_expiry'        => $request->filled('expiry_date'),
+            ]);
+        }
+
+        return $this->sendSuccess($document, 'Document uploaded successfully', 201);
+    }
+
+    public function destroyDocument(Document $document): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
+            Storage::disk('public')->delete($document->file_path);
+        }
+
+        $document->delete();
+
+        return $this->sendSuccess(null, 'Document record deleted successfully');
+    }
+
+    public function approveDocument(Document $document): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $document->update([
+            'status' => 'approved',
+        ]);
+
+        return $this->sendSuccess($document, 'Document approved successfully');
+    }
+
+    public function rejectDocument(Document $document): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $document->update([
+            'status' => 'rejected',
+        ]);
+
+        return $this->sendSuccess($document, 'Document rejected successfully');
+    }
+
+    public function updateDocumentStatus(Request $request, Document $document): JsonResponse
+    {
+        if ($authError = $this->authorizeUser()) {
+            return $authError;
+        }
+
+        $validated = $request->validate([
+            'status' => 'required|in:approved,rejected',
+        ]);
+
+        $document->update([
+            'status' => $validated['status'],
+        ]);
+
+        $msg = $validated['status'] === 'approved' ? 'Document approved successfully.' : 'Document marked as rejected.';
+
+        return $this->sendSuccess($document, $msg);
+    }
+
+    // ==========================================
     // 5. IMPORT / EXPORT APIs
     // ==========================================
 

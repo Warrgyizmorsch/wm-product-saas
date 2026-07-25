@@ -52,6 +52,42 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Production\Repositories\RoutingRepository::class
         );
 
+        // ── HRMS: Repositories ───────────────────────────────────────────
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\AssetRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\AssetRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\EmployeeRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\EmployeeRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\SalaryStructureRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\SalaryStructureRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\RosterRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\RosterRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\LeaveStructureRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\LeaveStructureRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\OrgRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\OrgRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\LeaveRequestRepository::class
+        );
+
         // ── Projects: Project ─────────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Projects\Repositories\ProjectRepositoryInterface::class,

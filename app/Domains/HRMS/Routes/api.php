@@ -243,6 +243,14 @@ Route::prefix('api/hrms/employees')
         // Employment Histories APIs
         Route::post('/{employee}/employment-histories', [EmployeeApiController::class, 'storeEmploymentHistory'])->name('employment-histories.store');
         Route::delete('/{employee}/employment-histories/{history}', [EmployeeApiController::class, 'destroyEmploymentHistory'])->name('employment-histories.destroy');
+
+        // Employee Documents APIs
+        Route::post('/{employee}/documents/request', [EmployeeApiController::class, 'requestDocument'])->name('documents.request');
+        Route::post('/{employee}/documents/upload', [EmployeeApiController::class, 'uploadDocument'])->name('documents.upload');
+        Route::patch('/documents/{document}/approve', [EmployeeApiController::class, 'approveDocument'])->name('documents.approve');
+        Route::patch('/documents/{document}/reject', [EmployeeApiController::class, 'rejectDocument'])->name('documents.reject');
+        Route::patch('/documents/{document}/status', [EmployeeApiController::class, 'updateDocumentStatus'])->name('documents.status.update');
+        Route::delete('/documents/{document}', [EmployeeApiController::class, 'destroyDocument'])->name('documents.destroy');
     });
 
 // ==========================================

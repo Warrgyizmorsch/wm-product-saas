@@ -410,6 +410,11 @@
                     } else if (oldPagination.length) {
                         oldPagination.remove();
                     }
+
+                    // Push state to sync browser URL with current pagination & filter params
+                    if (window.history.pushState) {
+                        window.history.pushState({path: url}, '', url);
+                    }
                 }
             });
         }
@@ -451,6 +456,11 @@
                         $('#adhocComponentsTable').parent().after(newPagination);
                     } else if (oldPagination.length) {
                         oldPagination.remove();
+                    }
+
+                    // Push state to sync browser URL with current pagination & filter params
+                    if (window.history.pushState) {
+                        window.history.pushState({path: url}, '', url);
                     }
                 }
             });

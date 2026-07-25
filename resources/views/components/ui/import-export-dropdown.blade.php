@@ -69,18 +69,18 @@
     <ul class="dropdown-menu dropdown-menu-end fs-13 shadow-lg">
         <li>
             <a href="{{ $exportRoute ?? route('production.import-export.export', $type) . '?' . http_build_query(request()->all()) }}" class="dropdown-item">
-                <i class="feather-download me-2 text-muted fs-12"></i>Export Excel
+                <i class="feather-download me-2 text-muted fs-12"></i>{{ __('hrms.common.export_excel') }}
             </a>
         </li>
         <li>
             <a href="{{ $downloadTemplateRoute ?? route('production.import-export.download-template', $type) }}" class="dropdown-item">
-                <i class="feather-file-text me-2 text-muted fs-12"></i>Download Template
+                <i class="feather-file-text me-2 text-muted fs-12"></i>{{ __('hrms.common.download_template') }}
             </a>
         </li>
         <li><hr class="dropdown-divider"></li>
         <li>
             <a href="javascript:void(0);" class="dropdown-item" data-bs-toggle="modal" data-bs-target="{{ $importModalTarget ?? '#import' . \Illuminate\Support\Str::studly($type) . 'Modal' }}">
-                <i class="feather-upload me-2 text-muted fs-12"></i>Import
+                <i class="feather-upload me-2 text-muted fs-12"></i>{{ __('hrms.common.import') }}
             </a>
         </li>
     </ul>

@@ -338,12 +338,6 @@
             color: #f59e0b !important;
             font-weight: 500;
         }
-        .badge-no-expiry {
-            background-color: rgba(16, 185, 129, 0.08) !important;
-            color: #10b981 !important;
-            font-weight: 500;
-        }
-
         .erp-pagination {
             display: flex;
             align-items: center;
@@ -390,6 +384,8 @@
             color: #94a3b8;
             cursor: not-allowed;
         }
+
+
 
         .profile-page {
             padding: 24px;
@@ -565,12 +561,32 @@
             box-shadow: 0 8px 18px rgba(var(--bs-primary-rgb), 0.22);
         }
 
+        .leave-rules-masonry-grid {
+            column-count: 2;
+            column-gap: 16px;
+        }
+
+        @media (max-width: 767.98px) {
+            .leave-rules-masonry-grid {
+                column-count: 1;
+            }
+        }
+
+        .leave-rule-detail-card {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
         .leave-rule-detail-section {
             border: 1px solid #e2e8f0;
             border-radius: 14px;
             padding: 16px;
             background: #fff;
-            height: 100%;
+            height: auto;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
         }
 
         .leave-rule-detail-title {
@@ -1199,7 +1215,7 @@
                                     <div class="p-5 text-center text-muted">
                                         <i class="feather-alert-octagon fs-32 d-block mb-3 text-danger"></i>
                                         <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_slab_match') }}</div>
-                                        <div>The employee's CTC (₹{{ number_format($employee->current_salary, 2) }}) does not fall inside any Salary Structure slab configured for the <strong>{{ $employee->payGroup->name }}</strong> Pay Group.</div>
+                                        <div>The employee's CTC (₹{{ number_format($employee->current_salary, 2) }}) does not fall inside any Salary Structure slab configured for the <strong>{{ $employee->payGroup->name }}</strong>.</div>
                                     </div>
                                 @else
                                     <!-- Component Table -->
@@ -1288,8 +1304,8 @@
                             <div class="card-body p-4">
                                 <div class="d-flex flex-column gap-3">
                                     <div>
-                                        <div class="info-label">Pay Group</div>
-                                        <div class="info-value text-dark">{{ $employee->payGroup?->name ?? 'Not Assigned' }}</div>
+                                        <div class="info-label">{{ __('hrms.employees.lbl_pay_group') }}</div>
+                                        <div class="info-value text-dark">{{ $employee->payGroup?->name ?? __('hrms.employees.lbl_not_assigned') }}</div>
                                     </div>
                                     <div>
                                         <div class="info-label">{{ __('hrms.employees.lbl_annual_ctc') }}</div>
@@ -1360,6 +1376,151 @@
 
             <!-- 3. LEAVES TAB -->
             <div class="tab-pane fade {{ $activeTabName === 'leaves' ? 'show active' : '' }}" id="leaves-pane" role="tabpanel" aria-labelledby="leaves-tab">
+                @php
+                    $formatLeaveRulePoints = static function (?array $rules = null): array {
+                        if (empty($rules)) {
+                            return [];
+                        }
+
+                        $humanize = static fn ($value) => strtolower(str_replace('_', ' ', (string) $value));
+                        $formatNumber = static fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
+                        $sections = [];
+
+                        if (!empty($rules['application'])) {
+                            $application = $rules['application'];
+                            $points = [];
+
+                            if (!empty($application['apply_in_advance'])) {
+                                $points[] = 'You have to apply for this leave at least ' . ($application['advance_days'] ?? 0) . ' day(s) in advance.';
+                            } else {
+                                $points[] = 'You can apply for this leave without an advance-day restriction.';
+                            }
+
+                            $points[] = 'One request can be from ' . ($application['min_duration'] ?? 1) . ' to ' . ($application['max_duration'] ?? 10) . ' day(s).';
+
+                            if (!empty($application['require_attachment'])) {
+                                $points[] = 'You must attach supporting documents when the leave duration is more than ' . ($application['attachment_days'] ?? 0) . ' day(s).';
+                            } else {
+                                $points[] = 'No supporting document is required for applying.';
+                            }
+
+                            $sections[] = ['title' => 'Application Rules', 'icon' => 'feather-file-text', 'points' => $points];
+                        }
+
+                        if (!empty($rules['approval'])) {
+                            $approval = $rules['approval'];
+                            $points = [];
+
+                            if (($approval['workflow_level'] ?? null) === 'auto') {
+                                $points[] = 'This leave is approved automatically after submission.';
+                            } elseif (($approval['workflow_level'] ?? null) === '2_level') {
+                                $points[] = 'This leave needs two approvals: first by ' . $humanize($approval['first_approver'] ?? 'reporting_manager') . ', then by ' . $humanize($approval['second_approver'] ?? 'hr_manager') . '.';
+                            } else {
+                                $points[] = 'This leave needs approval from ' . $humanize($approval['first_approver'] ?? 'reporting_manager') . '.';
+                            }
+
+                            $sections[] = ['title' => 'Approval Rules', 'icon' => 'feather-check-square', 'points' => $points];
+                        }
+
+                        if (!empty($rules['accrual'])) {
+                            $accrual = $rules['accrual'];
+                            $points = [];
+                            $unit = $humanize($accrual['calculate_in'] ?? 'days');
+
+                            if (($accrual['quota_type'] ?? 'fixed') === 'unlimited') {
+                                $points[] = 'This leave has unlimited quota.';
+                            } else {
+                                $points[] = 'You get ' . $formatNumber($accrual['quota_value'] ?? 0) . ' ' . $unit . ' of this leave.';
+                            }
+
+                            $rate = $accrual['rate'] ?? 'immediate';
+                            if ($rate === 'attendance') {
+                                $points[] = 'Leave is earned based on attendance: ' . ($accrual['attendance_earn'] ?? 1) . ' day for every ' . ($accrual['attendance_period'] ?? 20) . ' present day(s).';
+                            } elseif ($rate === 'periodic') {
+                                $freq = ucfirst($accrual['frequency'] ?? 'monthly');
+                                $prorate = !empty($accrual['prorate']) ? ' (Prorated)' : '';
+                                $points[] = 'Leave is credited ' . strtolower($freq) . ' as configured in the leave policy' . $prorate . '.';
+                            } else {
+                                $points[] = 'Leave is credited immediately.';
+                            }
+
+                            if (!empty($accrual['limit_carry'])) {
+                                $points[] = 'Maximum accumulated balance is limited to ' . ($accrual['max_accum'] ?? 0) . ' day(s).';
+                            } else {
+                                $points[] = 'No accumulated balance cap enforced.';
+                            }
+
+                            $sections[] = ['title' => 'Accrual Rules', 'icon' => 'feather-calendar', 'points' => $points];
+                        }
+
+                        if (!empty($rules['yearend'])) {
+                            $yearend = $rules['yearend'];
+                            $points = [];
+
+                            if (($yearend['action'] ?? 'lapse') === 'carry_forward') {
+                                $points[] = 'Unused leave can be carried forward at year end.';
+                                $points[] = 'Maximum carry-forward limit is ' . ($yearend['max_carry'] ?? 0) . ' day(s).';
+                            } elseif (($yearend['action'] ?? null) === 'encash') {
+                                $points[] = 'Unused leave can be encashed at year end.';
+                                $points[] = 'Maximum encashment limit is ' . ($yearend['max_encash'] ?? 0) . ' day(s).';
+                            } else {
+                                $points[] = 'Unused leave lapses at year end.';
+                            }
+
+                            $sections[] = ['title' => 'Year-End Policy', 'icon' => 'feather-rotate-ccw', 'points' => $points];
+                        }
+
+                        if (!empty($rules['encashment'])) {
+                            $encash = $rules['encashment'];
+                            $points = [];
+
+                            if (!empty($encash['enabled'])) {
+                                $freq = $humanize($encash['frequency'] ?? 'anytime');
+                                $points[] = 'Encashment is enabled for this leave type (' . $freq . ').';
+                                $points[] = 'Maximum encashment per request is ' . ($encash['max_days_per_request'] ?? 5) . ' day(s).';
+                                $points[] = 'Minimum leave balance to maintain is ' . ($encash['min_balance_to_keep'] ?? 10) . ' day(s).';
+                            } else {
+                                $points[] = 'Encashment is not enabled for this leave type.';
+                            }
+
+                            $sections[] = ['title' => 'Encashment Rules', 'icon' => 'feather-dollar-sign', 'points' => $points];
+                        }
+
+                        if (!empty($rules['probation'])) {
+                            $probation = $rules['probation'];
+                            $points = [];
+                            $rule = $probation['rule'] ?? 'allow';
+
+                            if ($rule === 'allow') {
+                                $points[] = 'Employees can apply for this leave during their probation period.';
+                            } elseif ($rule === 'allow_after_months') {
+                                $points[] = 'Employees can apply for this leave after completing ' . ($probation['months'] ?? 3) . ' month(s) of service.';
+                            } else {
+                                $points[] = 'Applying for this leave is not allowed during the probation period.';
+                            }
+
+                            $sections[] = ['title' => 'Probation Period Rules', 'icon' => 'feather-user-check', 'points' => $points];
+                        }
+
+                        if (!empty($rules['notice'])) {
+                            $notice = $rules['notice'];
+                            $points = [];
+                            $rule = $notice['rule'] ?? 'allow';
+
+                            if ($rule === 'allow') {
+                                $points[] = 'Employees can apply for this leave during their notice period.';
+                            } elseif ($rule === 'allow_with_permission') {
+                                $points[] = 'Applying for this leave during notice period requires special HR/Manager permission.';
+                            } else {
+                                $points[] = 'Applying for this leave is not allowed during the notice period.';
+                            }
+
+                            $sections[] = ['title' => 'Notice Period Rules', 'icon' => 'feather-alert-triangle', 'points' => $points];
+                        }
+
+                        return $sections;
+                    };
+                @endphp
                 <div class="row g-4">
                     <!-- LEFT COLUMN: Assigned Leave Plan & Brief Allowances -->
                     <div class="col-lg-4 col-12">
@@ -1369,22 +1530,16 @@
                             </div>
                             <div class="card-body p-3">
                                 @if($employee->leavePlan)
-                                    @if(!$employee->leavePlan->status)
-                                        <div class="alert alert-warning py-1.5 px-3 mb-2 fs-12 d-flex align-items-center gap-2 border-0" style="background-color: #fef3c7; color: #92400e;">
-                                            <i class="feather-alert-triangle"></i>
-                                            <span>This leave plan is currently inactive.</span>
-                                        </div>
-                                    @endif
-                                    <div class="mb-2">
+                                    <div class="p-3 bg-light rounded border border-light-subtle">
                                         <div class="d-flex align-items-center justify-content-between">
                                             <h6 class="fw-bold mb-0 text-dark fs-14">{{ $employee->leavePlan->name }}</h6>
                                             @if(!$employee->leavePlan->status)
-                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-10 px-2 py-0.5 rounded">Inactive</span>
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-10 px-2 py-0.5 rounded">{{ __('hrms.employees.lbl_inactive') }}</span>
                                             @else
-                                                <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 px-2 py-0.5 rounded">Active</span>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 px-2 py-0.5 rounded">{{ __('hrms.employees.lbl_active') }}</span>
                                             @endif
                                         </div>
-                                        <p class="text-muted fs-12 mb-0 mt-1">{{ $employee->leavePlan->description ?: 'No description provided.' }}</p>
+                                        <p class="text-muted fs-12 mb-0 mt-1">{{ $employee->leavePlan->description ?: __('hrms.employees.lbl_no_description') }}</p>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center my-3">
                                         <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('hrms.employees.lbl_effective_from') }}</span>
@@ -1397,9 +1552,9 @@
                                             <table class="table table-sm table-hover align-middle mb-0 fs-12" style="table-layout: fixed; width: 100%;">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th class="py-1 ps-2" style="width: 58%;">TYPE NAME</th>
-                                                        <th class="text-center py-1" style="width: 27%;">BALANCE</th>
-                                                        <th class="text-end py-1 pe-2" style="width: 15%;">RULES</th>
+                                                        <th class="py-1 ps-2" style="width: 58%;">{{ __('hrms.employees.tbl_type_name') }}</th>
+                                                        <th class="text-center py-1" style="width: 27%;">{{ __('hrms.employees.tbl_balance') }}</th>
+                                                        <th class="text-end py-1 pe-2" style="width: 15%;">{{ __('hrms.employees.tbl_rules') }}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1430,10 +1585,13 @@
                                                             <td class="text-end py-2 pe-2" style="white-space: nowrap;">
                                                                 <button
                                                                     type="button"
-                                                                    class="leave-rules-icon-btn btn btn-light border d-inline-flex align-items-center justify-content-center p-0 rounded"
+                                                                    class="leave-rules-icon-btn btn btn-light border d-inline-flex align-items-center justify-content-center p-0 rounded view-emp-leave-rules-btn"
                                                                     style="width: 22px; height: 22px;"
-                                                                    data-bs-toggle="modal"
-                                                                    data-bs-target="#leaveRulesModal{{ $ltype->id }}"
+                                                                    data-name="{{ $ltype->name }}"
+                                                                    data-code="{{ $ltype->code }}"
+                                                                    data-type="{{ ucfirst($ltype->type) }}"
+                                                                    data-quota="{{ floatval($ltype->quota) }}"
+                                                                    data-rules='@json($ltype->rules ?? [])'
                                                                     title="View leave rules"
                                                                     aria-label="View rules for {{ $ltype->name }}"
                                                                 >
@@ -1452,12 +1610,12 @@
                                         <button type="button"
                                             class="btn btn-sm btn-primary flex-grow-1 fw-bold text-uppercase d-flex align-items-center justify-content-center gap-1"
                                             data-bs-toggle="modal" data-bs-target="#empApplyLeaveModal">
-                                            <i class="feather-plus fs-12"></i> Apply Leave
+                                            <i class="feather-plus fs-12"></i> {{ __('hrms.leave.app.apply_for_leave') }}
                                         </button>
                                         <button type="button"
                                             class="btn btn-sm btn-primary flex-grow-1 fw-bold text-uppercase d-flex align-items-center justify-content-center gap-1"
                                             data-bs-toggle="modal" data-bs-target="#empApplyEncashmentModal">
-                                            <i class="feather-dollar-sign fs-12"></i> Encashment
+                                            <i class="feather-dollar-sign fs-12"></i> {{ __('hrms.leave.encashment_app.apply_for_encashment') }}
                                         </button>
                                     </div>
                                 @else
@@ -1551,9 +1709,9 @@
                                             </x-ui.odoo-form-ui>
                                         </div>
                                         <div class="mb-3" style="min-width: 220px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Leave Type</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.leave.leave_type') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="leave_type_id" id="empLeaveAppFilterType">
-                                                <option value="">All Types</option>
+                                                <option value="">{{ __('hrms.common.all_types') ?? 'All Types' }}</option>
                                                 @foreach($allLeaveTypes as $lt)
                                                     <option value="{{ $lt->id }}">{{ $lt->name }}</option>
                                                 @endforeach
@@ -1610,9 +1768,9 @@
                                             </x-ui.odoo-form-ui>
                                         </div>
                                         <div class="mb-3" style="min-width: 220px;">
-                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Leave Type</label>
+                                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.leave.leave_type') }}</label>
                                             <x-ui.odoo-form-ui type="select" name="leave_type_id" id="empLeaveEncFilterType">
-                                                <option value="">All Types</option>
+                                                <option value="">{{ __('hrms.common.all_types') ?? 'All Types' }}</option>
                                                 @foreach($allLeaveTypes as $lt)
                                                     <option value="{{ $lt->id }}">{{ $lt->name }}</option>
                                                 @endforeach
@@ -1634,18 +1792,18 @@
                                 <div class="d-flex align-items-center gap-2">
                                     <div id="leaveAppsHeaderTitle" class="d-flex align-items-center gap-2">
                                         <h5 class="card-custom-title mb-0">
-                                            <i class="feather-calendar text-primary me-1.5"></i> Leave Applications & History
+                                            <i class="feather-calendar text-primary me-1.5"></i> {{ __('hrms.employees.lbl_leave_apps_history') }}
                                         </h5>
                                         <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1 fs-11 ms-1 fw-bold">
-                                            {{ $empLeaveRequests->count() }} {{ $empLeaveRequests->count() === 1 ? 'Application' : 'Applications' }}
+                                            {{ $empLeaveRequests->count() }} {{ $empLeaveRequests->count() === 1 ? __('hrms.employees.lbl_application') : __('hrms.employees.lbl_applications') }}
                                         </span>
                                     </div>
                                     <div id="leaveEncashmentsHeaderTitle" class="d-flex align-items-center gap-2 d-none">
                                         <h5 class="card-custom-title mb-0">
-                                            <i class="feather-dollar-sign text-primary me-1.5"></i> Leave Encashments
+                                            <i class="feather-dollar-sign text-primary me-1.5"></i> {{ __('hrms.employees.lbl_leave_encashments') }}
                                         </h5>
                                         <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1 fs-11 ms-1 fw-bold">
-                                            {{ $empLeaveEncashments->count() }} {{ $empLeaveEncashments->count() === 1 ? 'Encashment' : 'Encashments' }}
+                                            {{ $empLeaveEncashments->count() }} {{ $empLeaveEncashments->count() === 1 ? __('hrms.employees.lbl_encashment') : __('hrms.employees.lbl_encashments') }}
                                         </span>
                                     </div>
                                 </div>
@@ -1659,7 +1817,7 @@
                                         class="fw-bold text-uppercase" 
                                         style="font-size: 11px;"
                                     >
-                                        <span id="toggleBtnLabel"><i class="feather-dollar-sign me-1"></i> Encashment Details</span>
+                                        <span id="toggleBtnLabel"><i class="feather-dollar-sign me-1"></i> {{ __('hrms.leave.encashment_details') ?? 'Encashment Details' }}</span>
                                     </x-ui.button>
                                 </div>
                             </div>
@@ -1669,19 +1827,19 @@
                                     @if($empLeaveRequests->isEmpty())
                                         <div class="p-5 text-center text-muted">
                                             <i class="feather-calendar fs-24 text-secondary d-block mb-2"></i>
-                                            No leave applications submitted by this employee yet.
+                                            {{ __('hrms.leave.app.no_requests') ?? 'No leave applications submitted by this employee yet.' }}
                                         </div>
                                     @else
                                         <div style="overflow-x: hidden; width: 100%;">
                                             <table class="table table-hover align-middle mb-0" id="leaveAppTable" style="table-layout: fixed; width: 100%;">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 22%;">Leave Type</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 26%;">Period</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">Days</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 22%;">Status</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">File</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 10%;">Detail</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 18%;">{{ __('hrms.leave.leave_type') }}</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 24%;">{{ __('hrms.leave.app.period') ?? 'Period' }}</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">{{ __('hrms.leave.days') }}</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 18%;">{{ __('ui.status') }}</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 15%;">{{ __('hrms.employees.tbl_file') }}</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 15%;">{{ __('hrms.common.detail') ?? 'Detail' }}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1695,11 +1853,11 @@
                                                                 : $startStr . ' – ' . $endStr;
 
                                                             $statusBadge = match($req->status) {
-                                                                'approved'     => ['cls' => 'bg-soft-success text-success',  'icon' => 'feather-check-circle', 'lbl' => 'Approved'],
-                                                                'pending'      => ['cls' => 'bg-soft-warning text-warning',  'icon' => 'feather-clock',         'lbl' => 'Pending'],
-                                                                'rejected'     => ['cls' => 'bg-soft-danger text-danger',    'icon' => 'feather-x-circle',      'lbl' => 'Rejected'],
-                                                                'unauthorized' => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',        'lbl' => 'Unauthorized'],
-                                                                'unpaid'       => ['cls' => 'bg-soft-info text-info',        'icon' => 'feather-alert-circle',  'lbl' => 'Unpaid'],
+                                                                'approved'     => ['cls' => 'bg-soft-success text-success',  'icon' => 'feather-check-circle', 'lbl' => __('hrms.leave.app.status_approved')],
+                                                                'pending'      => ['cls' => 'bg-soft-warning text-warning',  'icon' => 'feather-clock',         'lbl' => __('hrms.leave.app.status_pending')],
+                                                                'rejected'     => ['cls' => 'bg-soft-danger text-danger',    'icon' => 'feather-x-circle',      'lbl' => __('hrms.leave.app.status_rejected')],
+                                                                'unauthorized' => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',        'lbl' => __('hrms.leave.app.status_unauthorized')],
+                                                                'unpaid'       => ['cls' => 'bg-soft-info text-info',        'icon' => 'feather-alert-circle',  'lbl' => __('hrms.leave.app.status_unpaid')],
                                                                 default        => ['cls' => 'bg-light text-secondary',       'icon' => 'feather-circle',        'lbl' => ucfirst($req->status)],
                                                             };
 
@@ -1917,14 +2075,14 @@
                         </div>
 
                                     {{-- Leave Detail Offcanvas Drawer --}}
-                                    <x-ui.drawer id="leaveDetailDrawer" title="Leave Application Detail" style="width:420px;max-width:100%;">
+                                    <x-ui.drawer id="leaveDetailDrawer" :title="__('hrms.employees.lbl_leave_app_detail')" style="width:420px;max-width:100%;">
                                         {{-- Leave Type Banner (with balance) --}}
                                         <div class="d-flex align-items-start gap-3 mb-3 p-3 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
                                             <span id="ld-color-dot" class="rounded-circle flex-shrink-0 mt-1" style="width:12px;height:12px;display:inline-block;"></span>
                                             <div class="flex-grow-1">
                                                 <div class="fw-bold fs-14 text-dark" id="ld-leave-type">—</div>
                                                 <div class="fs-12 text-muted mt-1" id="ld-balance-inline"></div>
-                                                <div class="fs-11 text-muted mt-1">Applied On: <span class="fw-semibold text-dark" id="ld-applied">—</span></div>
+                                                <div class="fs-11 text-muted mt-1">{{ __('hrms.leave.app.applied_on') }} <span class="fw-semibold text-dark" id="ld-applied">—</span></div>
                                             </div>
                                             <span class="badge rounded-pill px-2 py-1 fs-11 flex-shrink-0" id="ld-status-badge"></span>
                                         </div>
@@ -1932,12 +2090,12 @@
                                         {{-- Period & Duration --}}
                                         <div class="d-flex justify-content-between align-items-start mb-3">
                                             <div>
-                                                <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Period</div>
+                                                <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.period') }}</div>
                                                 <div class="fw-semibold text-dark fs-13" id="ld-date-range">—</div>
                                                 <div class="text-muted fs-12 mt-1" id="ld-session-info"></div>
                                             </div>
                                             <div class="text-end">
-                                                <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Duration</div>
+                                                <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.duration') }}</div>
                                                 <div class="fw-bold fs-22 text-primary" id="ld-duration">—</div>
                                             </div>
                                         </div>
@@ -1946,32 +2104,32 @@
 
                                         {{-- Reason --}}
                                         <div class="mb-3">
-                                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Reason</div>
+                                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.reason') }}</div>
                                             <div class="fs-13 text-dark" id="ld-reason" style="white-space:pre-line;">—</div>
                                         </div>
 
                                         {{-- Rejection Reason --}}
                                         <div class="mb-3 d-none" id="ld-rejection-wrap">
-                                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Rejection Reason</div>
+                                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.rejection_reason') }}</div>
                                             <div class="alert alert-soft-danger py-2 px-3 fs-13 mb-0" id="ld-rejection"></div>
                                         </div>
                                          {{-- Workflow Level & Attachment --}}
                                          <div class="d-flex justify-content-between align-items-center mb-3">
                                              <div>
-                                                 <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Workflow Level</div>
+                                                 <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.workflow_level') }}</div>
                                                  <div class="fs-13 text-dark" id="ld-workflow">—</div>
                                              </div>
                                              <div class="d-none text-end" id="ld-attach-wrap">
-                                                 <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Attachment</div>
+                                                 <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.upload_attachment') }}</div>
                                                  <a id="ld-attach-link" href="#" target="_blank" class="btn btn-sm btn-soft-primary d-inline-flex align-items-center gap-1">
-                                                     <i class="feather-paperclip fs-12"></i> View Attachment
+                                                     <i class="feather-paperclip fs-12"></i> {{ __('hrms.leave.app.view_attachment') }}
                                                  </a>
                                              </div>
                                          </div>
 
                                          {{-- Notified Members --}}
                                          <div class="mb-3 d-none" id="ld-notified-wrap">
-                                             <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Notified Members</div>
+                                             <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.notify_members') }}</div>
                                              <div class="fs-13 text-dark" id="ld-notified-names">—</div>
                                          </div>
 
@@ -1979,33 +2137,33 @@
                                         @if(auth()->user()->hasHrPermission('hr.settings.manage'))
                                             <hr class="my-3">
                                             <div>
-                                                <div class="text-muted fs-11 text-uppercase fw-semibold mb-2" style="letter-spacing:.5px;">Update Status</div>
+                                                <div class="text-muted fs-11 text-uppercase fw-semibold mb-2" style="letter-spacing:.5px;">{{ __('hrms.employees.lbl_update_status') }}</div>
                                                 <form method="POST" id="ld-status-form" action="">
                                                     @csrf
                                                     <div class="d-flex gap-2 align-items-center">
                                                         <div class="flex-grow-1" style="margin-bottom: -1rem;">
                                                             <x-ui.select name="status" id="ld-status-select" class="odoo-select2">
-                                                                <option value="pending">Pending</option>
-                                                                <option value="approved">Approved</option>
-                                                                <option value="rejected">Rejected</option>
-                                                                <option value="unauthorized">Unauthorized</option>
-                                                                <option value="unpaid">Unpaid</option>
+                                                                <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
+                                                                <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
+                                                                <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
+                                                                <option value="unauthorized">{{ __('hrms.leave.app.status_unauthorized') }}</option>
+                                                                <option value="unpaid">{{ __('hrms.leave.app.status_unpaid') }}</option>
                                                             </x-ui.select>
                                                         </div>
                                                         <button type="submit" class="btn btn-primary btn-sm fw-bold px-3 d-flex align-items-center gap-1" style="height: 38px; border-radius: 6px;">
-                                                            <i class="feather-check fs-12"></i> Apply
+                                                            <i class="feather-check fs-12"></i> {{ __('hrms.common.apply') }}
                                                         </button>
                                                     </div>
                                                     <div class="mt-2 d-none" id="ld-rejection-input-wrap">
-                                                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-2 mt-2" style="letter-spacing:.5px;">Rejection Reason</div>
-                                                        <x-ui.textarea name="rejection_reason" id="ld-rejection-reason-input" rows="2" placeholder="Enter reason for rejection..." />
+                                                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-2 mt-2" style="letter-spacing:.5px;">{{ __('hrms.leave.app.rejection_reason') }}</div>
+                                                        <x-ui.textarea name="rejection_reason" id="ld-rejection-reason-input" rows="2" placeholder="{{ __('hrms.leave.app.rejection_reason_placeholder') }}" />
                                                     </div>
                                                 </form>
                                             </div>
                                         @endif
 
                                         <x-slot:footer>
-                                            <button type="button" class="btn btn-light border fw-semibold text-uppercase" data-bs-dismiss="offcanvas">CLOSE PANEL</button>
+                                            <button type="button" class="btn btn-light border fw-semibold text-uppercase" data-bs-dismiss="offcanvas">{{ __('hrms.common.close_panel') }}</button>
                                         </x-slot:footer>
                                     </x-ui.drawer>
                         </div>
@@ -2050,19 +2208,14 @@
                                                         <td class="fw-semibold">{{ $penalty->date ? $penalty->date->format('d M, Y') : 'N/A' }}</td>
                                                         <td>
                                                             <div class="text-dark fw-bold">{{ ucwords(str_replace('_', ' ', $penalty->rule_type)) }}</div>
-                                                            @if($penalty->remarks)
-                                                                @if(str_contains($penalty->remarks, ' ('))
-                                                                    @php
-                                                                        [$first, $second] = explode(' (', $penalty->remarks, 2);
-                                                                    @endphp
-                                                                    <small class="text-muted d-block">{{ $first }}</small>
-                                                                    <small class="text-secondary fs-11 d-block">({{ $second }}</small>
-                                                                @else
-                                                                    <small class="text-muted d-block">{{ $penalty->remarks }}</small>
-                                                                @endif
-                                                            @else
-                                                                <small class="text-muted d-block">No remarks</small>
-                                                            @endif
+                                                             @if(!empty($penalty->remarks))
+                                                                 <small class="text-muted d-block">{{ \Illuminate\Support\Str::before($penalty->remarks, ' (') }}</small>
+                                                                 @if(str_contains($penalty->remarks, ' ('))
+                                                                     <small class="text-secondary fs-11 d-block">({{ \Illuminate\Support\Str::after($penalty->remarks, ' (') }}</small>
+                                                                 @endif
+                                                             @else
+                                                                 <small class="text-muted d-block">No remarks</small>
+                                                             @endif
                                                         </td>
                                                         <td>
                                                             @if($penalty->status === 'applied')
@@ -2258,11 +2411,11 @@
                                     <table class="table table-hover mb-0 align-middle documents-table">
                                         <thead class="bg-light text-uppercase fs-11 text-muted fw-semibold" style="letter-spacing: .5px;">
                                             <tr>
-                                                <th class="text-start py-3 ps-3" style="min-width: 240px; max-width: 320px; overflow-wrap: anywhere; word-break: break-word;">{{ __('hrms.employees.tbl_doc_title') }}</th>
-                                                <th class="text-start py-3" style="width: 170px;">Source & Expiry</th>
-                                                <th class="text-start py-3" style="min-width: 240px; max-width: 300px;">{{ __('hrms.employees.tbl_file') }}</th>
-                                                <th class="text-center py-3" style="width: 140px;">{{ __('hrms.employees.tbl_status') }}</th>
-                                                <th class="text-end py-3 pe-3" style="min-width: 185px;">{{ __('hrms.employees.tbl_actions') }}</th>
+                                                <th class="text-start py-3 ps-3" style="min-width: 160px; max-width: 260px; overflow-wrap: anywhere; word-break: break-word;">{{ __('hrms.employees.tbl_doc_title') }}</th>
+                                                <th class="text-start py-3" style="width: 150px;">{{ __('hrms.employees.tbl_source_expiry') }}</th>
+                                                <th class="text-start py-3" style="min-width: 200px; max-width: 260px;">{{ __('hrms.employees.tbl_file') }}</th>
+                                                <th class="text-center py-3" style="width: 130px;">{{ __('hrms.employees.tbl_status') }}</th>
+                                                <th class="text-end py-3 pe-3" style="min-width: 175px;">{{ __('hrms.employees.tbl_actions') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -2287,7 +2440,7 @@
                                                     data-has-expiry="{{ $doc->has_expiry ? '1' : '0' }}"
                                                     data-expiry="{{ $doc->expiry_date ? $doc->expiry_date->timestamp : '' }}">
                                                     <!-- Col 1: Document Title & Description -->
-                                                    <td class="text-start font-semibold" style="min-width: 240px; max-width: 320px; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                    <td class="text-start font-semibold" style="min-width: 160px; max-width: 260px; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
                                                         <div class="text-dark fw-bold fs-13 lh-sm" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $doc->name }}</div>
                                                         @if($doc->description)
                                                             <div class="text-muted fs-11 lh-sm mt-1" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $doc->description }}</div>
@@ -2295,12 +2448,12 @@
                                                     </td>
 
                                                     <!-- Col 2: Source & Expiry Badges -->
-                                                    <td class="text-start" style="width: 170px;">
+                                                    <td class="text-start" style="width: 150px;">
                                                         <div class="mb-1">
                                                             @if($doc->requestedBy)
                                                                 <span class="badge bg-soft-primary text-primary fs-11 font-medium"><i class="feather-user me-1"></i>{{ $doc->requestedBy->name }}</span>
                                                             @else
-                                                                <span class="badge bg-soft-secondary text-secondary fs-11 font-medium"><i class="feather-upload-cloud me-1"></i>Direct Upload</span>
+                                                                <span class="badge bg-soft-secondary text-secondary fs-11 font-medium"><i class="feather-upload-cloud me-1"></i>{{ __('hrms.employees.lbl_direct_upload') }}</span>
                                                             @endif
                                                         </div>
                                                         <div>
@@ -2311,20 +2464,23 @@
                                                                         $isNearExpiry = !$isExpired && $doc->expiry_date->diffInDays(now()) <= 30;
                                                                     @endphp
                                                                     @if($isExpired)
-                                                                        <span class="badge badge-mandatory"><i class="feather-alert-circle me-1"></i>Expired ({{ $doc->expiry_date->format('d M Y') }})</span>
+                                                                        <span class="badge badge-mandatory"><i class="feather-alert-circle me-1"></i>{{ __('hrms.employees.lbl_expired') }} ({{ $doc->expiry_date->format('d M Y') }})</span>
                                                                     @elseif($isNearExpiry)
-                                                                        <span class="badge badge-expiry"><i class="feather-clock me-1"></i>Near Expiry ({{ $doc->expiry_date->format('d M Y') }})</span>
+                                                                        <span class="badge badge-expiry"><i class="feather-clock me-1"></i>{{ __('hrms.employees.lbl_near_expiry') }} ({{ $doc->expiry_date->format('d M Y') }})</span>
                                                                     @else
                                                                         <span class="badge bg-soft-info text-info"><i class="feather-calendar me-1"></i>{{ $doc->expiry_date->format('d M Y') }}</span>
                                                                     @endif
                                                                 @else
-                                                                    <span class="badge bg-soft-warning text-warning"><i class="feather-info me-1"></i>Expiry required</span>
+                                                                    <span class="badge bg-soft-warning text-warning"><i class="feather-info me-1"></i>{{ __('hrms.employees.lbl_expiry_required') }}</span>
                                                                 @endif
                                                             @else
                                                                 <span class="badge bg-soft-light text-muted border"><i class="feather-check-circle me-1 text-success"></i>{{ __('hrms.employees.lbl_no_expiry') }}</span>
                                                             @endif
-                                                              <!-- Col 3: File Attachment / Inline Upload Selector -->
-                                                     <td class="text-start" style="min-width: 240px; max-width: 300px; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                        </div>
+                                                    </td>
+                                                    
+                                                    <!-- Col 3: File Attachment / Inline Upload Selector -->
+                                                     <td class="text-start" style="min-width: 200px; max-width: 260px; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
                                                          @if($doc->file_path)
                                                              <div class="file-card-container">
                                                                  <div class="d-flex align-items-center gap-2 overflow-hidden">
@@ -2363,18 +2519,18 @@
                                                                          <div class="input-group input-group-sm">
                                                                              <label class="form-control form-control-sm bg-white text-muted d-flex align-items-center text-truncate cursor-pointer mb-0" for="reupload_file_input_{{ $doc->id }}" style="font-size: 11px; height: 30px; border-color: #cbd5e1; border-top-left-radius: 6px; border-bottom-left-radius: 6px;" title="Choose replacement file">
                                                                                  <i class="feather-upload-cloud me-1.5 text-primary fs-12 flex-shrink-0"></i>
-                                                                                 <span class="file-text text-truncate" id="reupload_file_text_{{ $doc->id }}">New File</span>
+                                                                                 <span class="file-text text-truncate" id="reupload_file_text_{{ $doc->id }}">{{ __('hrms.employees.lbl_new_file') }}</span>
                                                                                  <input type="file" name="file" id="reupload_file_input_{{ $doc->id }}" class="d-none" required onchange="var name = this.files[0]?.name || 'New File'; var span = document.getElementById('reupload_file_text_{{ $doc->id }}'); span.innerText = name; span.parentElement.setAttribute('title', name);">
                                                                              </label>
                                                                              <button type="submit" class="btn btn-primary px-2.5 d-flex align-items-center gap-1" style="font-size: 11px; height: 30px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; font-weight: 500;">
-                                                                                 <i class="feather-upload-cloud"></i> Re-upload
+                                                                                 <i class="feather-upload-cloud"></i> {{ __('hrms.employees.lbl_reupload') }}
                                                                              </button>
                                                                          </div>
 
                                                                          @if($doc->has_expiry)
                                                                              <div class="d-flex align-items-center gap-1.5 bg-white p-1 px-2 rounded border">
                                                                                  <span class="text-secondary fs-10 font-semibold text-uppercase d-flex align-items-center gap-1">
-                                                                                     <i class="feather-calendar text-primary fs-11"></i> Expiry:
+                                                                                     <i class="feather-calendar text-primary fs-11"></i> {{ __('hrms.employees.lbl_expiry') }}
                                                                                  </span>
                                                                                  <input type="date" name="expiry_date" value="{{ $doc->expiry_date ? $doc->expiry_date->format('Y-m-d') : '' }}" class="form-control form-control-sm py-0 px-1.5 bg-white" required style="font-size: 11px; height: 24px; max-width: 125px; border-radius: 4px;">
                                                                              </div>
@@ -2399,7 +2555,7 @@
                                                                  </div>
                                                                  @if($doc->has_expiry)
                                                                      <div class="d-flex align-items-center gap-1 mt-1">
-                                                                         <span class="text-secondary fs-9 text-uppercase fw-semibold" style="font-size: 8.5px;">Expiry:</span>
+                                                                         <span class="text-secondary fs-9 text-uppercase fw-semibold" style="font-size: 8.5px;">{{ __('hrms.employees.lbl_expiry') }}</span>
                                                                          <input type="date" name="expiry_date" value="{{ $doc->expiry_date ? $doc->expiry_date->format('Y-m-d') : '' }}" class="form-control form-control-sm py-0 px-1" required style="font-size: 10px; height: 22px; width: 120px;">
                                                                      </div>
                                                                  @endif
@@ -2410,25 +2566,25 @@
                                                     <!-- Col 4: Status -->
                                                     <td>
                                                         @if($doc->status === 'approved')
-                                                            <span class="badge bg-soft-success text-success"><i class="feather-check-circle me-1"></i>Approved</span>
+                                                            <span class="badge bg-soft-success text-success"><i class="feather-check-circle me-1"></i>{{ __('hrms.leave.app.status_approved') }}</span>
                                                         @elseif($doc->status === 'rejected')
-                                                            <span class="badge bg-soft-danger text-danger"><i class="feather-x-circle me-1"></i>Rejected</span>
+                                                            <span class="badge bg-soft-danger text-danger"><i class="feather-x-circle me-1"></i>{{ __('hrms.leave.app.status_rejected') }}</span>
                                                         @elseif($doc->file_path)
-                                                            <span class="badge bg-soft-info text-info"><i class="feather-clock me-1"></i>Pending Verification</span>
+                                                            <span class="badge bg-soft-info text-info"><i class="feather-clock me-1"></i>{{ __('hrms.employees.lbl_pending_verification') }}</span>
                                                         @else
                                                             <span class="badge bg-soft-warning text-warning"><i class="feather-clock me-1"></i>{{ __('hrms.employees.lbl_pending_upload') }}</span>
                                                         @endif
                                                     </td>
 
                                                     <!-- Col 5: Actions (Primary Theme Dropdown Button + Delete Button) -->
-                                                     <td class="text-end px-3" style="min-width: 185px;">
+                                                     <td class="text-end px-3" style="min-width: 175px;">
                                                          <div class="d-flex align-items-center justify-content-end gap-2">
                                                              @if(auth()->user()->hasHrPermission('hr.settings.manage'))
                                                                  @if($doc->file_path)
                                                                      <!-- Primary Theme Colored Dropdown -->
                                                                      <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
                                                                          <button class="btn btn-sm btn-primary dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px;" title="Change Document Status">
-                                                                             <span>{{ $doc->status === 'approved' ? 'Approved' : ($doc->status === 'rejected' ? 'Rejected' : 'Select Status') }}</span>
+                                                                             <span>{{ $doc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($doc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.employees.lbl_select_status')) }}</span>
                                                                          </button>
                                                                          <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0;">
                                                                              <li>
@@ -2437,7 +2593,7 @@
                                                                                      @method('PATCH')
                                                                                      <input type="hidden" name="status" value="approved">
                                                                                      <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $doc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}">
-                                                                                         <span>Approved</span>
+                                                                                         <span>{{ __('hrms.leave.app.status_approved') }}</span>
                                                                                      </button>
                                                                                  </form>
                                                                              </li>
@@ -2447,7 +2603,7 @@
                                                                                      @method('PATCH')
                                                                                      <input type="hidden" name="status" value="rejected">
                                                                                      <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $doc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}">
-                                                                                         <span>Rejected</span>
+                                                                                         <span>{{ __('hrms.leave.app.status_rejected') }}</span>
                                                                                      </button>
                                                                                  </form>
                                                                              </li>
@@ -2628,11 +2784,12 @@
                                     <tr>
                                         <th class="text-start" style="padding-left: 20px; min-width: 160px; max-width: 280px; overflow-wrap: anywhere; word-break: break-word;">{{ __('hrms.employees.tbl_asset_name') }}</th>
                                         <th>{{ __('hrms.employees.tbl_category') }}</th>
-                                        <th>Qty</th>
-                                        <th>Assigned At</th>
+                                        <th>{{ __('hrms.employees.tbl_qty') }}</th>
+                                        <th>{{ __('hrms.employees.tbl_assigned_at') }}</th>
                                         <th class="text-end" style="width: 180px; padding-right: 20px;">{{ __('hrms.employees.tbl_actions') }}</th>
                                     </tr>
                                 </thead>
+                                <tbody>
                                         @php
                                         $groupedAssets = $employee->assets->groupBy('asset_item_id');
                                     @endphp
@@ -2775,7 +2932,7 @@
                                         <tr>
                                             <th class="text-start" style="padding-left: 20px; min-width: 160px; max-width: 260px; overflow-wrap: anywhere; word-break: break-word;">{{ __('hrms.employees.tbl_requested_category') }}</th>
                                             <th>{{ __('hrms.employees.tbl_request_date') }}</th>
-                                            <th>Allocated / Req Qty</th>
+                                            <th>{{ __('hrms.employees.tbl_allocated_req_qty') }}</th>
                                             <th class="text-start">{{ __('hrms.employees.tbl_reason') }}</th>
                                             <th>{{ __('hrms.employees.tbl_status') }}</th>
                                             <th class="text-start" style="padding-right: 20px;">{{ __('hrms.employees.tbl_admin_notes') }}</th>
@@ -2828,17 +2985,17 @@
                                                     @endif
                                                 </td>
                                                 <td>
-                                                    @if($req->status === 'pending')
-                                                        <span class="badge bg-soft-warning text-warning px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
-                                                    @elseif(in_array($req->status, ['allocated', 'approved', 'fulfilled']))
-                                                        <span class="badge bg-soft-success text-success px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
-                                                    @elseif($req->status === 'partially_allocated')
-                                                        <span class="badge bg-soft-info text-info px-2 py-1 text-capitalize fs-11">Partial</span>
-                                                    @elseif($req->status === 'rejected')
-                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
-                                                    @else
-                                                        <span class="badge bg-light text-secondary px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
-                                                    @endif
+                                                     @if($req->status === 'pending')
+                                                         <span class="badge bg-soft-warning text-warning px-2 py-1 text-capitalize fs-11">{{ __('hrms.leave.app.status_pending') }}</span>
+                                                     @elseif(in_array($req->status, ['allocated', 'approved', 'fulfilled']))
+                                                         <span class="badge bg-soft-success text-success px-2 py-1 text-capitalize fs-11">{{ __('hrms.leave.app.status_approved') }}</span>
+                                                     @elseif($req->status === 'partially_allocated')
+                                                         <span class="badge bg-soft-info text-info px-2 py-1 text-capitalize fs-11">{{ __('hrms.employees.status_partial') }}</span>
+                                                     @elseif($req->status === 'rejected')
+                                                         <span class="badge bg-soft-danger text-danger px-2 py-1 text-capitalize fs-11">{{ __('hrms.leave.app.status_rejected') }}</span>
+                                                     @else
+                                                         <span class="badge bg-light text-secondary px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
+                                                     @endif
                                                 </td>
                                                 <td class="text-start text-muted fs-11" style="padding-right: 20px; min-width: 180px; max-width: 260px; white-space: normal; word-break: break-word;">
                                                     <div class="lh-sm" style="white-space: normal; word-break: break-word;">{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '-') }}</div>
@@ -3015,7 +3172,8 @@
                                         @php
                                             $month = now()->addMonths($i);
                                             $val = $month->format('Y-m');
-                                            $label = $month->format('F Y');
+                                            $monthKey = strtolower($month->format('F'));
+                                            $label = __('hrms.months.' . $monthKey) . ' ' . $month->format('Y');
                                             $selected = ($i === 0) ? 'selected' : '';
                                         @endphp
                                         <option value="{{ $val }}" {{ $selected }}>{{ $label }}</option>
@@ -3070,7 +3228,8 @@
                                         @php
                                             $month = now()->addMonths($i);
                                             $val = $month->format('Y-m');
-                                            $label = $month->format('F Y');
+                                            $monthKey = strtolower($month->format('F'));
+                                            $label = __('hrms.months.' . $monthKey) . ' ' . $month->format('Y');
                                             $selected = ($i === 0) ? 'selected' : '';
                                         @endphp
                                         <option value="{{ $val }}" {{ $selected }}>{{ $label }}</option>
@@ -3091,58 +3250,27 @@
         </div>
     </div>
 
-    @if($employee->leavePlan && $employee->leavePlan->types->isNotEmpty())
-        @foreach($employee->leavePlan->types as $ltype)
-            @php($rulePoints = $formatLeaveRulePoints($ltype->rules ?? []))
-            <div class="modal fade" id="leaveRulesModal{{ $ltype->id }}" tabindex="-1" aria-labelledby="leaveRulesModalLabel{{ $ltype->id }}" aria-hidden="true">
-                <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-                    <div class="modal-content border-0 shadow-lg">
-                        <div class="modal-header">
-                            <div>
-                                <h5 class="modal-title fw-bold" id="leaveRulesModalLabel{{ $ltype->id }}">
-                                    <i class="feather-sliders text-primary me-2"></i>{{ $ltype->name }} {{ __('hrms.employees.mdl_leave_rules_title') }}
-                                </h5>
-                                <div class="text-muted fs-12 mt-1">
-                                    {{ $ltype->code }} · {{ ucfirst($ltype->type) }} · {{ floatval($ltype->quota) }} {{ __('hrms.employees.mdl_yearly_quota') }}
-                                </div>
-                            </div>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body bg-light">
-                            @if(empty($rulePoints))
-                                <div class="text-center py-5 text-muted">
-                                    <i class="feather-check-circle d-block fs-32 mb-3 text-success"></i>
-                                    <div class="fw-bold text-dark mb-1">{{ __('hrms.employees.mdl_std_rules') }}</div>
-                                    <div>{{ __('hrms.employees.mdl_no_custom_rules') }}</div>
-                                </div>
-                            @else
-                                <div class="row g-3">
-                                    @foreach($rulePoints as $section)
-                                        <div class="col-md-6 col-12">
-                                            <div class="leave-rule-detail-section">
-                                                <div class="leave-rule-detail-title">
-                                                    <i class="{{ $section['icon'] }} text-primary"></i>
-                                                    <span>{{ $section['title'] }}</span>
-                                                </div>
-                                                <ul class="leave-rule-points">
-                                                    @foreach($section['points'] as $point)
-                                                        <li class="leave-rule-point">{{ $point }}</li>
-                                                    @endforeach
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                        <div class="modal-footer bg-white">
-                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.employees.mdl_btn_close') }}</button>
-                        </div>
+    <!-- SINGLE DYNAMIC LEAVE RULES MODAL -->
+    <div class="modal fade" id="empLeaveRulesDynamicModal" tabindex="-1" aria-hidden="true" style="display: none;">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title fw-bold">
+                            <i class="feather-sliders text-primary me-2"></i><span id="empDynamicLeaveTypeName"></span> {{ __('hrms.employees.mdl_leave_rules_title') }}
+                        </h5>
+                        <div class="text-muted fs-12 mt-1" id="empDynamicLeaveTypeMeta"></div>
                     </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body bg-light" id="empDynamicLeaveRulesBody">
+                </div>
+                <div class="modal-footer bg-white">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.employees.mdl_btn_close') }}</button>
                 </div>
             </div>
-        @endforeach
-    @endif
+        </div>
+    </div>
 
     <!-- RETURN ASSET MODAL FOR PROFILE TAB -->
     <div class="modal fade" id="returnAssetModal" tabindex="-1" aria-labelledby="returnAssetModalLabel" aria-hidden="true">
@@ -3164,11 +3292,11 @@
                                 <input type="text" id="return_asset_name_display" class="form-control bg-light" readonly>
                             </div>
                             <div class="col-12">
-                                <label class="info-label mb-2 fw-bold text-dark d-block">Select Serialized Assets to Return</label>
+                                <label class="info-label mb-2 fw-bold text-dark d-block">{{ __('hrms.employees.mdl_select_serialized_assets') }}</label>
                                 <div id="return_assets_checklist" class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
                                     <!-- Checklist populated via JS -->
                                 </div>
-                                <small class="text-muted mt-1 d-block">Select the specific physical units being returned.</small>
+                                <small class="text-muted mt-1 d-block">{{ __('hrms.employees.mdl_select_units_desc') }}</small>
                             </div>
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.mdl_return_date') }}" name="returned_at" inputType="date" :required="true" value="{{ date('Y-m-d') }}" />
@@ -3202,24 +3330,24 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="viewAssetDetailsModalLabel">
-                        <i class="feather-info me-2 text-primary"></i>Assigned Asset Units Details
+                        <i class="feather-info me-2 text-primary"></i>{{ __('hrms.employees.mdl_assigned_units_details') }}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="info-label mb-1">Asset Item</label>
+                        <label class="info-label mb-1">{{ __('hrms.employees.tbl_item') }}</label>
                         <input type="text" id="detail_asset_item_name" class="form-control bg-light fw-bold text-dark" readonly>
                     </div>
                     <div class="table-responsive border rounded bg-white">
                         <table class="table table-hover align-middle mb-0 text-center">
                             <thead class="table-light text-uppercase fs-11">
                                 <tr>
-                                    <th class="text-start py-2.5 px-3">Asset Code</th>
-                                    <th class="py-2.5">Serial Number</th>
-                                    <th class="py-2.5">Assigned Date</th>
-                                    <th class="py-2.5">Condition</th>
-                                    <th class="py-2.5 px-3">Notes</th>
+                                    <th class="text-start py-2.5 px-3">{{ __('hrms.employees.tbl_asset_code') }}</th>
+                                    <th class="py-2.5">{{ __('hrms.employees.tbl_serial_number') }}</th>
+                                    <th class="py-2.5">{{ __('hrms.employees.tbl_assigned_date') }}</th>
+                                    <th class="py-2.5">{{ __('hrms.employees.tbl_condition') }}</th>
+                                    <th class="py-2.5 px-3">{{ __('hrms.employees.tbl_notes') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="detail_assets_table_body" style="font-size: 13px;">
@@ -3229,7 +3357,7 @@
                     </div>
                 </div>
                 <div class="modal-footer bg-light py-2">
-                    <button type="button" class="btn btn-secondary px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Close</button>
+                    <button type="button" class="btn btn-secondary px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.employees.mdl_btn_cancel') }}</button>
                 </div>
             </div>
         </div>
@@ -3255,25 +3383,25 @@
                             </div>
                             <div class="col-12">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <label class="info-label fw-bold text-dark mb-0">Requested Item(s) & Quantities *</label>
+                                    <label class="info-label fw-bold text-dark mb-0">{{ __('hrms.employees.mdl_req_items_qty') }}</label>
                                     <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" id="btn-add-req-item-row" style="font-size: 11px;">
-                                        <i class="feather-plus me-1"></i>Add Another Item
+                                        <i class="feather-plus me-1"></i>{{ __('hrms.employees.mdl_add_another_item') }}
                                     </button>
                                 </div>
                                 <div class="table-responsive border rounded bg-white req-item-table-container">
                                     <table class="table table-sm align-middle mb-0" id="req-items-table" style="table-layout: fixed; width: 100%;">
                                         <thead class="table-light text-uppercase fs-11">
                                             <tr>
-                                                <th class="py-2 px-3 text-start" style="width: 62%;">Item *</th>
-                                                <th class="py-2 text-center" style="width: 95px;">Quantity *</th>
-                                                <th class="py-2 text-center px-2" style="width: 50px;">Action</th>
+                                                <th class="py-2 px-3 text-start" style="width: 62%;">{{ __('hrms.employees.tbl_item') }}</th>
+                                                <th class="py-2 text-center" style="width: 95px;">{{ __('hrms.employees.tbl_quantity') }}</th>
+                                                <th class="py-2 text-center px-2" style="width: 50px;">{{ __('hrms.employees.tbl_action') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody id="req-items-tbody">
                                             <tr>
                                                 <td class="py-2 px-3" style="overflow: hidden; max-width: 0;">
                                                     <select name="items[0][asset_item_id]" class="form-select form-select-sm req-item-select" required style="width: 100%;">
-                                                        <option value="">Select Item</option>
+                                                        <option value="">{{ __('hrms.employees.mdl_select_item') }}</option>
                                                         @foreach(\App\Domains\HRMS\Models\AssetItem::whereHas('category', function($q) use ($employee) { $q->where('company_id', $employee->company_id); })->get() as $item)
                                                             <option value="{{ $item->id }}">{{ $item->name }} (Category: {{ $item->category->name ?? 'N/A' }})</option>
                                                         @endforeach
@@ -3670,7 +3798,7 @@
                         $(this).select2({
                             theme: 'bootstrap-5',
                             dropdownParent: modal,
-                            placeholder: $(this).attr('placeholder') || "Select Item",
+                            placeholder: $(this).attr('placeholder') || "{{ __('hrms.employees.mdl_select_item') }}",
                             width: '100%'
                         });
                     });
@@ -3745,7 +3873,7 @@
                             invalid = true;
                             $(this).addClass('is-invalid');
                             if (parent.find('.invalid-feedback').length === 0) {
-                                $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">Please select an item.</div>');
+                                $(this).after('<div class="invalid-feedback fs-11 text-start mt-1">{{ __("hrms.employees.err_item_required") }}</div>');
                             }
                         } else {
                             $(this).removeClass('is-invalid');
@@ -3760,7 +3888,7 @@
                             invalid = true;
                             $(this).addClass('is-invalid');
                             if (parent.find('.invalid-feedback').length === 0) {
-                                $(this).after('<div class="invalid-feedback fs-11 text-center mt-1">Min quantity is 1.</div>');
+                                $(this).after('<div class="invalid-feedback fs-11 text-center mt-1">{{ __("hrms.employees.err_qty_min") }}</div>');
                             }
                         } else {
                             $(this).removeClass('is-invalid');
@@ -3773,7 +3901,7 @@
                         invalid = true;
                         reasonInput.addClass('is-invalid');
                         if (reasonInput.parent().find('.invalid-feedback').length === 0) {
-                            reasonInput.after('<div class="invalid-feedback fs-11 text-start mt-1">Reason is required.</div>');
+                            reasonInput.after('<div class="invalid-feedback fs-11 text-start mt-1">{{ __("hrms.employees.err_reason_required") }}</div>');
                         }
                     } else {
                         reasonInput.removeClass('is-invalid');
@@ -4311,7 +4439,7 @@
                 // Banner
                 $('#ld-color-dot').css('background', d.leaveColor);
                 $('#ld-leave-type').text(d.leaveType);
-                $('#ld-balance-inline').text('Remaining: ' + (d.remaining !== undefined ? d.remaining : '0') + ' / ' + (d.allocated !== undefined ? d.allocated : '0') + ' Days');
+                $('#ld-balance-inline').text("{{ __('hrms.leave.app.remaining') }}: " + (d.remaining !== undefined ? d.remaining : '0') + ' / ' + (d.allocated !== undefined ? d.allocated : '0') + ' ' + "{{ __('hrms.leave.days') }}");
 
                 // Status badge
                 var statusHtml = '<i class="' + d.statusIcon + ' me-1"></i>' + d.statusLabel;
@@ -4336,7 +4464,7 @@
                 $('#ld-session-info').text(session);
 
                 // Duration
-                $('#ld-duration').text(d.duration + (d.duration == 1 ? ' Day' : ' Days'));
+                $('#ld-duration').text(d.duration + ' ' + (d.duration == 1 ? "{{ __('hrms.leave.day') }}" : "{{ __('hrms.leave.days') }}"));
 
                 // Reason
                 $('#ld-reason').text(d.reason || '—');
@@ -4393,7 +4521,7 @@
                     $('#leaveEncashmentsHeaderTitle').removeClass('d-none');
                     $('#leaveEncashmentsToolbar').removeClass('d-none');
 
-                    $('#toggleBtnLabel').html('<i class="feather-calendar me-1"></i> Leave Applications');
+                    $('#toggleBtnLabel').html('<i class="feather-calendar me-1"></i> ' + "{{ __('hrms.employees.lbl_leave_applications') }}");
                 } else {
                     $('#leaveEncashmentsViewContainer').addClass('d-none');
                     $('#leaveEncashmentsHeaderTitle').addClass('d-none');
@@ -4403,7 +4531,7 @@
                     $('#leaveAppsHeaderTitle').removeClass('d-none');
                     $('#leaveAppsToolbar').removeClass('d-none');
 
-                    $('#toggleBtnLabel').html('<i class="feather-dollar-sign me-1"></i> Encashment Details');
+                    $('#toggleBtnLabel').html('<i class="feather-dollar-sign me-1"></i> ' + "{{ __('hrms.leave.encashment_details') }}");
                 }
             });
 
@@ -4698,6 +4826,268 @@
                     $('#ld-rejection-input-wrap').removeClass('d-none');
                 } else {
                     $('#ld-rejection-input-wrap').addClass('d-none');
+                }
+            });
+
+            // ── Dynamic Leave Rules Modal Handler ─────────────────────────────
+            const langLeaveRules = {
+                yearlyQuota: "{{ __('hrms.employees.mdl_yearly_quota') ?? 'Yearly Quota' }}",
+                standardRules: "{{ __('hrms.employees.mdl_std_rules') ?? 'Standard Rules' }}",
+                noCustomRules: "{{ __('hrms.employees.mdl_no_custom_rules') ?? 'No custom rules defined.' }}",
+                
+                applicationRules: "{{ __('hrms.leave_rules.application_rules') }}",
+                approvalRules: "{{ __('hrms.leave_rules.approval_rules') }}",
+                accrualRules: "{{ __('hrms.leave_rules.accrual_rules') }}",
+                yearendPolicy: "{{ __('hrms.leave_rules.yearend_policy') }}",
+                encashmentRules: "{{ __('hrms.leave_rules.encashment_rules') }}",
+                probationRules: "{{ __('hrms.leave_rules.probation_rules') }}",
+                noticeRules: "{{ __('hrms.leave_rules.notice_rules') }}",
+
+                applyAdvance: "{{ __('hrms.leave_rules.apply_advance', ['days' => ':days']) }}",
+                applyNoAdvance: "{{ __('hrms.leave_rules.apply_no_advance') }}",
+                durationLimit: "{{ __('hrms.leave_rules.duration_limit', ['min' => ':min', 'max' => ':max']) }}",
+                requireAttachment: "{{ __('hrms.leave_rules.require_attachment', ['days' => ':days']) }}",
+                noAttachment: "{{ __('hrms.leave_rules.no_attachment') }}",
+
+                autoApproved: "{{ __('hrms.leave_rules.auto_approved') }}",
+                twoApprovals: "{{ __('hrms.leave_rules.two_approvals', ['first' => ':first', 'second' => ':second']) }}",
+                oneApproval: "{{ __('hrms.leave_rules.one_approval', ['first' => ':first']) }}",
+
+                unlimitedQuota: "{{ __('hrms.leave_rules.unlimited_quota') }}",
+                quotaAllowance: "{{ __('hrms.leave_rules.quota_allowance', ['value' => ':value', 'unit' => ':unit']) }}",
+                earnAttendance: "{{ __('hrms.leave_rules.earn_attendance', ['earn' => ':earn', 'period' => ':period']) }}",
+                creditPeriodic: "{{ __('hrms.leave_rules.credit_periodic', ['freq' => ':freq', 'prorate' => ':prorate']) }}",
+                creditImmediate: "{{ __('hrms.leave_rules.credit_immediate') }}",
+                accumLimit: "{{ __('hrms.leave_rules.accum_limit', ['max' => ':max']) }}",
+                noAccumLimit: "{{ __('hrms.leave_rules.no_accum_limit') }}",
+
+                carryForward: "{{ __('hrms.leave_rules.carry_forward') }}",
+                carryForwardLimit: "{{ __('hrms.leave_rules.carry_forward_limit', ['max' => ':max']) }}",
+                encashYearend: "{{ __('hrms.leave_rules.encash_yearend') }}",
+                encashLimit: "{{ __('hrms.leave_rules.encash_limit', ['max' => ':max']) }}",
+                lapseYearend: "{{ __('hrms.leave_rules.lapse_yearend') }}",
+
+                encashEnabled: "{{ __('hrms.leave_rules.encash_enabled', ['freq' => ':freq']) }}",
+                encashMaxPerRequest: "{{ __('hrms.leave_rules.encash_max_per_request', ['max' => ':max']) }}",
+                encashMinBalance: "{{ __('hrms.leave_rules.encash_min_balance', ['min' => ':min']) }}",
+                encashDisabled: "{{ __('hrms.leave_rules.encash_disabled') }}",
+
+                probationAllow: "{{ __('hrms.leave_rules.probation_allow') }}",
+                probationAfterMonths: "{{ __('hrms.leave_rules.probation_after_months', ['months' => ':months']) }}",
+                probationDeny: "{{ __('hrms.leave_rules.probation_deny') }}",
+
+                noticeAllow: "{{ __('hrms.leave_rules.notice_allow') }}",
+                noticePermission: "{{ __('hrms.leave_rules.notice_permission') }}",
+                noticeDeny: "{{ __('hrms.leave_rules.notice_deny') }}",
+                prorated: "{{ __('hrms.leave_rules.prorated') }}",
+                
+                reporting_manager: "{{ __('hrms.leave.reporting_manager') }}",
+                department_head: "{{ __('hrms.leave.department_head') }}",
+                hr_manager: "{{ __('hrms.leave.hr_manager') }}",
+                ceo: "{{ __('hrms.leave.ceo') }}",
+                
+                days: "{{ __('hrms.leave.days') }}",
+                hours: "{{ __('hrms.leave.hours') }}",
+                
+                frequency_anytime: "{{ __('hrms.leave.frequency_anytime') }}",
+                frequency_monthly: "{{ __('hrms.leave.frequency_monthly') }}",
+                frequency_quarterly: "{{ __('hrms.leave.frequency_quarterly') }}",
+                frequency_half_yearly: "{{ __('hrms.leave.frequency_half_yearly') }}",
+                frequency_yearly: "{{ __('hrms.leave.frequency_yearly') }}"
+            };
+
+            $(document).on('click', '.view-emp-leave-rules-btn', function () {
+                var name = $(this).attr('data-name') || '';
+                var code = $(this).attr('data-code') || '';
+                var type = $(this).attr('data-type') || '';
+                var quota = $(this).attr('data-quota') || '0';
+                var rulesStr = $(this).attr('data-rules');
+                var rules = {};
+                try {
+                    rules = rulesStr ? JSON.parse(rulesStr) : {};
+                } catch(e) {
+                    rules = {};
+                }
+
+                $('#empDynamicLeaveTypeName').text(name);
+                var metaParts = [];
+                if (code) metaParts.push(code);
+                if (type) metaParts.push(type);
+                if (quota) metaParts.push(quota + ' ' + (langLeaveRules.yearlyQuota || 'days yearly quota'));
+                $('#empDynamicLeaveTypeMeta').text(metaParts.join(' · '));
+
+                var sections = [];
+                var humanize = function(val) {
+                    return (val || '').toString().replace(/_/g, ' ').toLowerCase();
+                };
+
+                var translateRole = function(role) {
+                    if (!role) return '';
+                    var roleLower = role.toLowerCase();
+                    return langLeaveRules[roleLower] || humanize(role);
+                };
+
+                var translateFrequency = function(freq) {
+                    if (!freq) return '';
+                    var freqKey = 'frequency_' + freq.toLowerCase();
+                    return langLeaveRules[freqKey] || humanize(freq);
+                };
+
+                var translateUnit = function(unit) {
+                    if (!unit) return '';
+                    var unitLower = unit.toLowerCase();
+                    return langLeaveRules[unitLower] || humanize(unit);
+                };
+
+                // 1. Application Rules
+                if (rules.application) {
+                    var app = rules.application;
+                    var points = [];
+                    if (app.apply_in_advance) {
+                        points.push(langLeaveRules.applyAdvance.replace(':days', app.advance_days || 0));
+                    } else {
+                        points.push(langLeaveRules.applyNoAdvance);
+                    }
+                    points.push(langLeaveRules.durationLimit.replace(':min', app.min_duration || 1).replace(':max', app.max_duration || 10));
+                    if (app.require_attachment) {
+                        points.push(langLeaveRules.requireAttachment.replace(':days', app.attachment_days || 0));
+                    } else {
+                        points.push(langLeaveRules.noAttachment);
+                    }
+                    sections.push({ title: langLeaveRules.applicationRules, icon: 'feather-file-text', points: points });
+                }
+
+                // 2. Approval Rules
+                if (rules.approval) {
+                    var appr = rules.approval;
+                    var points = [];
+                    if (appr.workflow_level === 'auto') {
+                        points.push(langLeaveRules.autoApproved);
+                    } else if (appr.workflow_level === '2_level') {
+                        points.push(langLeaveRules.twoApprovals
+                            .replace(':first', translateRole(appr.first_approver || 'reporting_manager'))
+                            .replace(':second', translateRole(appr.second_approver || 'hr_manager'))
+                        );
+                    } else {
+                        points.push(langLeaveRules.oneApproval.replace(':first', translateRole(appr.first_approver || 'reporting_manager')));
+                    }
+                    sections.push({ title: langLeaveRules.approvalRules, icon: 'feather-check-square', points: points });
+                }
+
+                // 3. Accrual Rules
+                if (rules.accrual) {
+                    var acc = rules.accrual;
+                    var points = [];
+                    var unit = translateUnit(acc.calculate_in || 'days');
+                    if (acc.quota_type === 'unlimited') {
+                        points.push(langLeaveRules.unlimitedQuota);
+                    } else {
+                        var quotaVal = (acc.quota_value !== undefined ? acc.quota_value : quota);
+                        var formattedQuota = parseFloat(quotaVal).toString();
+                        points.push(langLeaveRules.quotaAllowance.replace(':value', formattedQuota).replace(':unit', unit));
+                    }
+                    if (acc.rate === 'attendance') {
+                        points.push(langLeaveRules.earnAttendance.replace(':earn', acc.attendance_earn || 1).replace(':period', acc.attendance_period || 20));
+                    } else if (acc.rate === 'periodic') {
+                        var freq = translateFrequency(acc.frequency || 'monthly');
+                        var prorate = acc.prorate ? ' (' + langLeaveRules.prorated + ')' : '';
+                        points.push(langLeaveRules.creditPeriodic.replace(':freq', freq.toLowerCase()).replace(':prorate', prorate));
+                    } else {
+                        points.push(langLeaveRules.creditImmediate);
+                    }
+                    if (acc.limit_carry) {
+                        points.push(langLeaveRules.accumLimit.replace(':max', acc.max_accum || 0));
+                    } else {
+                        points.push(langLeaveRules.noAccumLimit);
+                    }
+                    sections.push({ title: langLeaveRules.accrualRules, icon: 'feather-calendar', points: points });
+                }
+
+                // 4. Year-End Policy
+                if (rules.yearend) {
+                    var ye = rules.yearend;
+                    var points = [];
+                    if (ye.action === 'carry_forward') {
+                        points.push(langLeaveRules.carryForward);
+                        points.push(langLeaveRules.carryForwardLimit.replace(':max', ye.max_carry || 0));
+                    } else if (ye.action === 'encash') {
+                        points.push(langLeaveRules.encashYearend);
+                        points.push(langLeaveRules.encashLimit.replace(':max', ye.max_encash || 0));
+                    } else {
+                        points.push(langLeaveRules.lapseYearend);
+                    }
+                    sections.push({ title: langLeaveRules.yearendPolicy, icon: 'feather-rotate-ccw', points: points });
+                }
+
+                // 5. Encashment Rules
+                if (rules.encashment) {
+                    var enc = rules.encashment;
+                    var points = [];
+                    if (enc.enabled) {
+                        var freq = translateFrequency(enc.frequency || 'anytime');
+                        points.push(langLeaveRules.encashEnabled.replace(':freq', freq));
+                        points.push(langLeaveRules.encashMaxPerRequest.replace(':max', enc.max_days_per_request || 5));
+                        points.push(langLeaveRules.encashMinBalance.replace(':min', enc.min_balance_to_keep || 10));
+                    } else {
+                        points.push(langLeaveRules.encashDisabled);
+                    }
+                    sections.push({ title: langLeaveRules.encashmentRules, icon: 'feather-dollar-sign', points: points });
+                }
+
+                // 6. Probation Period Rules
+                if (rules.probation) {
+                    var prob = rules.probation;
+                    var points = [];
+                    if (prob.rule === 'allow') {
+                        points.push(langLeaveRules.probationAllow);
+                    } else if (prob.rule === 'allow_after_months') {
+                        points.push(langLeaveRules.probationAfterMonths.replace(':months', prob.months || 3));
+                    } else {
+                        points.push(langLeaveRules.probationDeny);
+                    }
+                    sections.push({ title: langLeaveRules.probationRules, icon: 'feather-user-check', points: points });
+                }
+
+                // 7. Notice Period Rules
+                if (rules.notice) {
+                    var not = rules.notice;
+                    var points = [];
+                    if (not.rule === 'allow') {
+                        points.push(langLeaveRules.noticeAllow);
+                    } else if (not.rule === 'allow_with_permission') {
+                        points.push(langLeaveRules.noticePermission);
+                    } else {
+                        points.push(langLeaveRules.noticeDeny);
+                    }
+                    sections.push({ title: langLeaveRules.noticeRules, icon: 'feather-alert-triangle', points: points });
+                }
+
+                var html = '';
+                if (sections.length === 0) {
+                    html = '<div class="text-center py-5 text-muted">' +
+                           '<i class="feather-check-circle d-block fs-32 mb-3 text-success"></i>' +
+                           '<div class="fw-bold text-dark mb-1">' + langLeaveRules.standardRules + '</div>' +
+                           '<div>' + langLeaveRules.noCustomRules + '</div>' +
+                           '</div>';
+                } else {
+                    html = '<div class="leave-rules-masonry-grid">';
+                    sections.forEach(function(sec) {
+                        html += '<div class="leave-rule-detail-card">';
+                        html += '<div class="leave-rule-detail-section">';
+                        html += '<div class="leave-rule-detail-title"><i class="' + sec.icon + ' text-primary me-2"></i> <span>' + sec.title + '</span></div>';
+                        html += '<ul class="leave-rule-points">';
+                        sec.points.forEach(function(pt) {
+                            html += '<li class="leave-rule-point">' + pt + '</li>';
+                        });
+                        html += '</ul></div></div>';
+                    });
+                    html += '</div>';
+                }
+
+                $('#empDynamicLeaveRulesBody').html(html);
+                var $modal = $('#empLeaveRulesDynamicModal');
+                if ($modal.length) {
+                    $modal.appendTo('body').modal('show');
                 }
             });
 
