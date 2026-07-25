@@ -197,6 +197,16 @@ class AdvancedMesTest extends TestCase
             'status'           => 'draft',
         ]);
 
+        ProductionSchedule::create([
+            'tenant_id'           => $this->tenant->id,
+            'schedule_number'     => 'SCH-MOCK-1',
+            'production_order_id' => $order->id,
+            'scheduling_type'     => 'forward',
+            'status'              => 'scheduled',
+            'scheduled_at'        => now(),
+            'created_by'          => $this->admin->id,
+        ]);
+
         $op = ProductionOrderOperation::create([
             'tenant_id'           => $this->tenant->id,
             'production_order_id' => $order->id,
@@ -226,6 +236,16 @@ class AdvancedMesTest extends TestCase
             'start_date'       => today(),
             'end_date'         => today()->addDays(5),
             'status'           => 'draft',
+        ]);
+
+        ProductionSchedule::create([
+            'tenant_id'           => $this->tenant->id,
+            'schedule_number'     => 'SCH-MOCK-2',
+            'production_order_id' => $order->id,
+            'scheduling_type'     => 'forward',
+            'status'              => 'scheduled',
+            'scheduled_at'        => now(),
+            'created_by'          => $this->admin->id,
         ]);
 
         $op = ProductionOrderOperation::create([
@@ -259,6 +279,46 @@ class AdvancedMesTest extends TestCase
             'action'                 => 'assigned',
             'new_operator_id'        => $this->operator->id,
         ]);
+    }
+
+    /**
+     * Test operator assignment fails when order has no schedule.
+     */
+    public function test_operator_assignment_fails_when_order_not_scheduled(): void
+    {
+        $order = ProductionOrder::create([
+            'tenant_id'        => $this->tenant->id,
+            'order_number'     => 'ORD-MOCK-3',
+            'product_id'       => $this->product->id,
+            'quantity_ordered' => 10,
+            'start_date'       => today(),
+            'end_date'         => today()->addDays(5),
+            'status'           => 'draft',
+        ]);
+
+        $op = ProductionOrderOperation::create([
+            'tenant_id'           => $this->tenant->id,
+            'production_order_id' => $order->id,
+            'sequence'            => 10,
+            'operation_number'    => 'OP-10',
+            'name'                => 'Welding',
+            'work_center_id'      => $this->workCenter->id,
+            'machine_id'          => $this->machine->id,
+            'status'              => 'waiting',
+        ]);
+
+        // Assign skills
+        ProductionOperatorSkill::create([
+            'tenant_id'      => $this->tenant->id,
+            'user_id'        => $this->operator->id,
+            'skill_code'     => 'WELD',
+            'work_center_id' => $this->workCenter->id,
+            'active'         => true,
+        ]);
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage("Cannot assign operator: A schedule must be generated for the production order first.");
+        $this->assignmentService->assign($this->tenant->id, $op->id, $this->operator->id, $this->admin->id);
     }
 
     /**
