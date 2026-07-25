@@ -8,14 +8,17 @@ use App\Domains\Production\Models\ProductionSchedule;
 use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\WorkCenter;
 use App\Domains\Production\Requests\StoreProductionScheduleRequest;
+use App\Domains\Production\Requests\ProductionScheduleCalendarRequest;
 use App\Domains\Production\Services\SchedulingService;
+use App\Domains\Production\Services\SchedulingCalendarService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class ProductionScheduleController extends Controller
 {
     public function __construct(
-        private readonly SchedulingService $schedulingService
+        private readonly SchedulingService $schedulingService,
+        private readonly SchedulingCalendarService $calendarService
     ) {}
 
     public function index(Request $request)
@@ -137,6 +140,22 @@ class ProductionScheduleController extends Controller
             return redirect()->back()->with('error', 'Completed or cancelled schedules cannot be deleted.');
         }
 
+        if ($this->schedulingService->hasExecutionHistory($schedule)) {
+            // Write alert event to timeline
+            app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($schedule->tenant_id, [
+                'production_order_id' => $schedule->production_order_id,
+                'event_type' => 'Schedule Blocked',
+                'title' => 'Deletion Blocked',
+                'description' => "Attempted deletion of Schedule [{$schedule->schedule_number}] was blocked because it has active execution or WIP records.",
+                'severity' => 'danger',
+                'event_source' => 'SchedulingService',
+            ]);
+
+            return redirect()->back()->with('error', 'Cannot delete schedule: Active MES execution, progress logs, or WIP movements exist.');
+        }
+
+        // Explicitly delete schedule operations
+        \App\Domains\Production\Models\ProductionScheduleOperation::where('production_schedule_id', $schedule->id)->delete();
         $schedule->delete();
 
         return redirect()
@@ -222,37 +241,14 @@ class ProductionScheduleController extends Controller
         }
     }
 
-    public function calendarView(Request $request)
+    public function calendarView(ProductionScheduleCalendarRequest $request)
     {
         $tenantId = require_tenant_id();
+        $validated = $request->validated();
 
-        $view = $request->input('view', 'week'); // day | week | month
+        $data = $this->calendarService->buildCalendarData($tenantId, $validated);
 
-        $startDate = $request->filled('start')
-            ? Carbon::parse($request->input('start'))
-            : now()->startOfWeek();
-
-        $endDate = match ($view) {
-            'day'   => $startDate->copy()->endOfDay(),
-            'month' => $startDate->copy()->endOfMonth(),
-            default => $startDate->copy()->endOfWeek(),
-        };
-
-        $operations = ProductionScheduleOperation::with([
-            'schedule', 'order.product', 'workCenter', 'machine',
-        ])
-        ->whereHas('schedule', fn ($q) =>
-            $q->whereIn('status', [
-                ProductionSchedule::STATUS_SCHEDULED,
-                ProductionSchedule::STATUS_RELEASED,
-                ProductionSchedule::STATUS_IN_PROGRESS
-            ])
-        )
-        ->whereBetween('planned_start', [$startDate, $endDate])
-        ->orderBy('planned_start')
-        ->get();
-
-        return view('modules.production.schedules.calendar', compact('operations', 'startDate', 'endDate', 'view'));
+        return view('modules.production.schedules.calendar', $data);
     }
 
     public function workCenterView(Request $request)

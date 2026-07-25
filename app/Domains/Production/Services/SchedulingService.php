@@ -81,17 +81,55 @@ class SchedulingService
         Carbon $date,
         string $type = ProductionSchedule::TYPE_FORWARD
     ): ProductionSchedule {
-        if ($type === ProductionSchedule::TYPE_FORWARD) {
-            return $this->generateForwardSchedule($order, $date);
-        }
+        return DB::transaction(function () use ($order, $date, $type) {
+            // Lock order for update
+            $order = ProductionOrder::lockForUpdate()->findOrFail($order->id);
 
-        if ($type === ProductionSchedule::TYPE_BACKWARD) {
-            return $this->generateBackwardSchedule($order, $date);
-        }
+            // Fetch existing draft/scheduled schedules for the order
+            $existingSchedules = ProductionSchedule::withoutGlobalScopes()
+                ->where('production_order_id', $order->id)
+                ->whereIn('status', [
+                    ProductionSchedule::STATUS_DRAFT,
+                    ProductionSchedule::STATUS_SCHEDULED,
+                    ProductionSchedule::STATUS_RELEASED,
+                    ProductionSchedule::STATUS_IN_PROGRESS
+                ])
+                ->lockForUpdate()
+                ->get();
 
-        throw new \InvalidArgumentException(
-            "Scheduling strategy [{$type}] is not supported in this release. Supported: forward, backward."
-        );
+            $hasExecution = false;
+            $execSchedule = null;
+            foreach ($existingSchedules as $s) {
+                if ($this->hasExecutionHistory($s)) {
+                    $hasExecution = true;
+                    $execSchedule = $s;
+                    break;
+                }
+            }
+
+            if ($hasExecution && $execSchedule) {
+                // Safely perform partial reschedule in-place
+                return $this->partialReschedule($execSchedule, $date, $type);
+            }
+
+            // Otherwise, explicitly delete old schedules (checked)
+            foreach ($existingSchedules as $s) {
+                ProductionScheduleOperation::where('production_schedule_id', $s->id)->delete();
+                $s->delete();
+            }
+
+            if ($type === ProductionSchedule::TYPE_FORWARD) {
+                return $this->generateForwardSchedule($order, $date);
+            }
+
+            if ($type === ProductionSchedule::TYPE_BACKWARD) {
+                return $this->generateBackwardSchedule($order, $date);
+            }
+
+            throw new \InvalidArgumentException(
+                "Scheduling strategy [{$type}] is not supported in this release. Supported: forward, backward."
+            );
+        });
     }
 
     /**
@@ -122,11 +160,25 @@ class SchedulingService
                 }
             }
 
-            // Delete existing active/draft schedules for this order
-            ProductionSchedule::withoutGlobalScopes()
+            // Safe checked deletion instead of cascading delete
+            $existing = ProductionSchedule::withoutGlobalScopes()
                 ->where('production_order_id', $order->id)
-                ->whereIn('status', [ProductionSchedule::STATUS_DRAFT, ProductionSchedule::STATUS_SCHEDULED])
-                ->delete();
+                ->whereIn('status', [
+                    ProductionSchedule::STATUS_DRAFT,
+                    ProductionSchedule::STATUS_SCHEDULED,
+                    ProductionSchedule::STATUS_RELEASED,
+                    ProductionSchedule::STATUS_IN_PROGRESS
+                ])
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($existing as $s) {
+                if ($this->hasExecutionHistory($s)) {
+                    throw new \LogicException("Cannot replace schedule: Schedule [{$s->schedule_number}] has active MES execution or WIP records.");
+                }
+                ProductionScheduleOperation::where('production_schedule_id', $s->id)->delete();
+                $s->delete();
+            }
 
             $tenantId = $order->tenant_id;
 
@@ -258,10 +310,25 @@ class SchedulingService
                 }
             }
 
-            ProductionSchedule::withoutGlobalScopes()
+            // Safe checked deletion instead of cascading delete
+            $existing = ProductionSchedule::withoutGlobalScopes()
                 ->where('production_order_id', $order->id)
-                ->whereIn('status', [ProductionSchedule::STATUS_DRAFT, ProductionSchedule::STATUS_SCHEDULED])
-                ->delete();
+                ->whereIn('status', [
+                    ProductionSchedule::STATUS_DRAFT,
+                    ProductionSchedule::STATUS_SCHEDULED,
+                    ProductionSchedule::STATUS_RELEASED,
+                    ProductionSchedule::STATUS_IN_PROGRESS
+                ])
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($existing as $s) {
+                if ($this->hasExecutionHistory($s)) {
+                    throw new \LogicException("Cannot replace schedule: Schedule [{$s->schedule_number}] has active MES execution or WIP records.");
+                }
+                ProductionScheduleOperation::where('production_schedule_id', $s->id)->delete();
+                $s->delete();
+            }
 
             $tenantId = $order->tenant_id;
 
@@ -815,14 +882,14 @@ class SchedulingService
             ];
         }
 
-        // Sort candidates: earliest start slot first, priority as tie-breaker
-        usort($evaluated, function ($a, $b) {
+        // Sort candidates: if forward: earliest start slot first. If backward: latest start slot first. Priority as tie-breaker.
+        usort($evaluated, function ($a, $b) use ($forward) {
             $startA = $a['slot']['start'];
             $startB = $b['slot']['start'];
             if ($startA->eq($startB)) {
                 return $a['priority'] <=> $b['priority'];
             }
-            return $startA <=> $startB;
+            return $forward ? ($startA <=> $startB) : ($startB <=> $startA);
         });
 
         $winner = $evaluated[0];
@@ -867,27 +934,32 @@ class SchedulingService
         $shifts = $this->getCachedShifts($wc);
         if ($shifts->isEmpty()) {
             // Standard shift default (480 minutes)
-            return 480.0 * (($wc->efficiency_percentage ?? 100.0) / 100.0);
+            $totalMinutes = 480.0;
+        } else {
+            $totalMinutes = 0.0;
+            foreach ($shifts as $shift) {
+                $start = Carbon::parse($shift->start_time);
+                $end = Carbon::parse($shift->end_time);
+
+                if ($end->lt($start)) {
+                    $end->addDay();
+                }
+
+                $diff = $start->diffInMinutes($end);
+                if ($shift->break_minutes > 0) {
+                    $diff -= $shift->break_minutes;
+                }
+
+                $totalMinutes += max(0.0, $diff);
+            }
         }
 
-        $totalMinutes = 0.0;
-        foreach ($shifts as $shift) {
-            $start = Carbon::parse($shift->start_time);
-            $end = Carbon::parse($shift->end_time);
-
-            if ($end->lt($start)) {
-                $end->addDay();
-            }
-
-            $diff = $start->diffInMinutes($end);
-            if ($shift->break_minutes > 0) {
-                $diff -= $shift->break_minutes;
-            }
-
-            $totalMinutes += max(0.0, $diff);
+        $machineCount = $wc->machines()->where('status', Machine::STATUS_ACTIVE)->count();
+        if ($machineCount <= 0) {
+            $machineCount = 1;
         }
 
-        return $totalMinutes * (($wc->efficiency_percentage ?? 100.0) / 100.0);
+        return $totalMinutes * $machineCount * (($wc->efficiency_percentage ?? 100.0) / 100.0);
     }
 
     /**
@@ -1429,5 +1501,291 @@ class SchedulingService
         $efficiencyFactor = $efficiency / 100.0;
 
         return $totalOverlap * $efficiencyFactor;
+    }
+
+    /**
+     * Check if a schedule has any MES or WIP execution history.
+     */
+    public function hasExecutionHistory(ProductionSchedule $schedule): bool
+    {
+        // 1. Started, paused or completed operations
+        $hasExecutionStatus = ProductionScheduleOperation::where('production_schedule_id', $schedule->id)
+            ->whereIn('status', [
+                ProductionScheduleOperation::STATUS_RUNNING,
+                ProductionScheduleOperation::STATUS_PAUSED,
+                ProductionScheduleOperation::STATUS_COMPLETED
+            ])
+            ->exists();
+        if ($hasExecutionStatus) {
+            return true;
+        }
+
+        // 2. Actual start/finish times on schedule operations
+        $hasActualTimes = ProductionScheduleOperation::where('production_schedule_id', $schedule->id)
+            ->where(fn($q) => $q->whereNotNull('actual_start')->orWhereNotNull('actual_finish'))
+            ->exists();
+        if ($hasActualTimes) {
+            return true;
+        }
+
+        // 3. Lookups on related progress logs, WIP records and quantities
+        $schedOpIds = ProductionScheduleOperation::where('production_schedule_id', $schedule->id)->pluck('id')->toArray();
+        if (!empty($schedOpIds)) {
+            if (DB::table('production_wips')->whereIn('current_schedule_operation_id', $schedOpIds)->exists()) {
+                return true;
+            }
+        }
+
+        $opIds = ProductionScheduleOperation::where('production_schedule_id', $schedule->id)
+            ->pluck('production_order_operation_id')
+            ->filter()
+            ->toArray();
+
+        if (!empty($opIds)) {
+            if (DB::table('production_order_progress_logs')->whereIn('operation_id', $opIds)->exists()) {
+                return true;
+            }
+            $hasQuantity = ProductionOrderOperation::whereIn('id', $opIds)
+                ->where(fn($q) => $q->where('quantity_produced', '>', 0)
+                                   ->orWhere('quantity_rejected', '>', 0)
+                                   ->orWhere('quantity_scrapped', '>', 0))
+                ->exists();
+            if ($hasQuantity) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Perform an in-place reschedule of waiting/ready operations on a schedule.
+     */
+    public function partialReschedule(ProductionSchedule $schedule, Carbon $startDate, string $type = ProductionSchedule::TYPE_FORWARD): ProductionSchedule
+    {
+        return DB::transaction(function () use ($schedule, $startDate, $type) {
+            // Lock schedule for update
+            $schedule = ProductionSchedule::lockForUpdate()->findOrFail($schedule->id);
+            $order = $schedule->order;
+            if (!$order) {
+                throw new \LogicException("Cannot reschedule: Production Order is missing for Schedule [{$schedule->schedule_number}].");
+            }
+
+            $operations = $schedule->operations()->orderBy('sequence')->get();
+            if ($operations->isEmpty()) {
+                return $schedule;
+            }
+
+            $tenantId = $schedule->tenant_id;
+            $scheduledData = [];
+
+            // 1. Identify which operations are frozen
+            $frozenOpIds = [];
+            foreach ($operations as $op) {
+                $isFrozen = in_array($op->status, [
+                    ProductionScheduleOperation::STATUS_RUNNING,
+                    ProductionScheduleOperation::STATUS_PAUSED,
+                    ProductionScheduleOperation::STATUS_COMPLETED
+                ]) || !is_null($op->actual_start) || !is_null($op->actual_finish);
+
+                if ($isFrozen) {
+                    $frozenOpIds[] = $op->id;
+                    $scheduledData[$op->sequence] = [
+                        'sequence' => $op->sequence,
+                        'parallel_group' => $op->orderOperation?->parallel_group,
+                        'is_parallel' => $op->orderOperation?->is_parallel,
+                        'planned_start' => $op->planned_start,
+                        'planned_finish' => $op->planned_finish,
+                    ];
+                }
+            }
+
+            // 2. Reschedule only non-frozen (eligible pending) operations
+            if ($type === ProductionSchedule::TYPE_FORWARD) {
+                $isFirstPending = true;
+                foreach ($operations as $op) {
+                    if (in_array($op->id, $frozenOpIds)) {
+                        continue;
+                    }
+
+                    // Calculate earliest start based on predecessors
+                    $predecessors = collect($scheduledData)->filter(function ($prev) use ($op) {
+                        if ($prev['sequence'] >= $op->sequence) {
+                            return false;
+                        }
+                        if ($op->orderOperation?->is_parallel && $op->orderOperation?->parallel_group !== null && $prev['parallel_group'] === $op->orderOperation?->parallel_group) {
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    $earliestStart = $predecessors->isEmpty()
+                        ? $startDate->copy()
+                        : $predecessors->max('planned_finish')->copy();
+
+                    $times = $this->calculateOperationTimes($op->orderOperation, $order->quantity_ordered);
+                    $duration = $times['total_minutes'];
+
+                    // Find slot
+                    if ($op->orderOperation?->routing_operation_id) {
+                        $alloc = $this->findNextAvailableMachine($op->orderOperation->routing_operation_id, $earliestStart, $duration, $tenantId, true);
+                    } else {
+                        $slot = $this->calculateAvailableSlot($op->work_center_id, null, $earliestStart, $duration, true);
+                        $alloc = [
+                            'machine_id' => null,
+                            'start' => $slot['start'],
+                            'finish' => $slot['finish'],
+                            'warnings' => $slot['warnings'],
+                            'priority' => 1,
+                        ];
+                    }
+
+                    $plannedStart = $alloc['start'] ?? $earliestStart->copy();
+                    $plannedFinish = $alloc['finish'] ?? $earliestStart->copy()->addMinutes((int) ceil($duration));
+                    $warnings = $alloc['warnings'] ?? [];
+                    $machineId = $alloc['machine_id'] ?? null;
+                    $priority = $alloc['priority'] ?? 1;
+
+                    // Capture old values for audit logging
+                    $oldStart = $op->planned_start;
+                    $oldFinish = $op->planned_finish;
+                    $oldMachineId = $op->machine_id;
+
+                    $op->update([
+                        'planned_start' => $plannedStart,
+                        'planned_finish' => $plannedFinish,
+                        'machine_id' => $machineId,
+                        'priority' => $priority,
+                        'warnings' => $warnings,
+                        'resource_id' => $machineId ? 'Machine_' . $machineId : 'WorkCenter_' . $op->work_center_id,
+                        'status' => $isFirstPending
+                            ? ProductionScheduleOperation::STATUS_READY
+                            : ProductionScheduleOperation::STATUS_WAITING,
+                    ]);
+
+                    $isFirstPending = false;
+
+                    $scheduledData[$op->sequence] = [
+                        'sequence' => $op->sequence,
+                        'parallel_group' => $op->orderOperation?->parallel_group,
+                        'is_parallel' => $op->orderOperation?->is_parallel,
+                        'planned_start' => $plannedStart,
+                        'planned_finish' => $plannedFinish,
+                    ];
+
+                    // Write Event timeline entry
+                    app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($tenantId, [
+                        'production_order_id' => $order->id,
+                        'production_order_operation_id' => $op->production_order_operation_id,
+                        'machine_id' => $machineId,
+                        'event_type' => 'Schedule Rescheduled',
+                        'title' => 'Operation Rescheduled',
+                        'description' => "Operation Seq #{$op->sequence} Rescheduled: Start changed from {$oldStart?->format('Y-m-d H:i')} to {$plannedStart->format('Y-m-d H:i')}.",
+                        'severity' => 'warning',
+                        'event_source' => 'SchedulingService',
+                        'metadata' => [
+                            'old_start' => $oldStart?->toDateTimeString(),
+                            'new_start' => $plannedStart->toDateTimeString(),
+                            'old_finish' => $oldFinish?->toDateTimeString(),
+                            'new_finish' => $plannedFinish->toDateTimeString(),
+                            'old_machine_id' => $oldMachineId,
+                            'new_machine_id' => $machineId,
+                        ],
+                    ]);
+                }
+            } else {
+                // BACKWARD scheduling
+                $reversedOps = $operations->reverse();
+                foreach ($reversedOps as $op) {
+                    if (in_array($op->id, $frozenOpIds)) {
+                        continue;
+                    }
+
+                    $successors = collect($scheduledData)->filter(function ($succ) use ($op) {
+                        if ($succ['sequence'] <= $op->sequence) {
+                            return false;
+                        }
+                        if ($op->orderOperation?->is_parallel && $op->orderOperation?->parallel_group !== null && $succ['parallel_group'] === $op->orderOperation?->parallel_group) {
+                            return false;
+                        }
+                        return true;
+                    });
+
+                    $latestFinish = $successors->isEmpty()
+                        ? $startDate->copy() // here $startDate acts as due date
+                        : $successors->min('planned_start')->copy();
+
+                    $times = $this->calculateOperationTimes($op->orderOperation, $order->quantity_ordered);
+                    $duration = $times['total_minutes'];
+
+                    if ($op->orderOperation?->routing_operation_id) {
+                        $alloc = $this->findNextAvailableMachine($op->orderOperation->routing_operation_id, $latestFinish, $duration, $tenantId, false);
+                    } else {
+                        $slot = $this->calculateAvailableSlot($op->work_center_id, null, $latestFinish, $duration, false);
+                        $alloc = [
+                            'machine_id' => null,
+                            'start' => $slot['start'],
+                            'finish' => $slot['finish'],
+                            'warnings' => $slot['warnings'],
+                            'priority' => 1,
+                        ];
+                    }
+
+                    $plannedStart = $alloc['start'] ?? $latestFinish->copy()->subMinutes((int) ceil($duration));
+                    $plannedFinish = $alloc['finish'] ?? $latestFinish->copy();
+                    $warnings = $alloc['warnings'] ?? [];
+                    $machineId = $alloc['machine_id'] ?? null;
+                    $priority = $alloc['priority'] ?? 1;
+
+                    $oldStart = $op->planned_start;
+                    $oldFinish = $op->planned_finish;
+                    $oldMachineId = $op->machine_id;
+
+                    $op->update([
+                        'planned_start' => $plannedStart,
+                        'planned_finish' => $plannedFinish,
+                        'machine_id' => $machineId,
+                        'priority' => $priority,
+                        'warnings' => $warnings,
+                        'resource_id' => $machineId ? 'Machine_' . $machineId : 'WorkCenter_' . $op->work_center_id,
+                        'status' => ProductionScheduleOperation::STATUS_WAITING,
+                    ]);
+
+                    $scheduledData[$op->sequence] = [
+                        'sequence' => $op->sequence,
+                        'parallel_group' => $op->orderOperation?->parallel_group,
+                        'is_parallel' => $op->orderOperation?->is_parallel,
+                        'planned_start' => $plannedStart,
+                        'planned_finish' => $plannedFinish,
+                    ];
+
+                    app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($tenantId, [
+                        'production_order_id' => $order->id,
+                        'production_order_operation_id' => $op->production_order_operation_id,
+                        'machine_id' => $machineId,
+                        'event_type' => 'Schedule Rescheduled',
+                        'title' => 'Operation Rescheduled',
+                        'description' => "Operation Seq #{$op->sequence} Rescheduled: Start changed from {$oldStart?->format('Y-m-d H:i')} to {$plannedStart->format('Y-m-d H:i')}.",
+                        'severity' => 'warning',
+                        'event_source' => 'SchedulingService',
+                        'metadata' => [
+                            'old_start' => $oldStart?->toDateTimeString(),
+                            'new_start' => $plannedStart->toDateTimeString(),
+                            'old_finish' => $oldFinish?->toDateTimeString(),
+                            'new_finish' => $plannedFinish->toDateTimeString(),
+                            'old_machine_id' => $oldMachineId,
+                            'new_machine_id' => $machineId,
+                        ],
+                    ]);
+                }
+            }
+
+            // Update Capacity Utilization
+            $schedule->update([
+                'capacity_utilization' => $this->calculateOverallUtilization($schedule),
+            ]);
+
+            return $schedule;
+        });
     }
 }

@@ -140,75 +140,104 @@
                         </div>
 
                         <!-- Rows -->
-                        @foreach($allWorkCenters as $wc)
-                            @php
-                                $wcOps = $groupedOperations->get($wc->id, collect());
-                            @endphp
-                            <div class="gantt-row d-flex align-items-stretch border-bottom bg-white" style="min-height: 64px;">
-                                <div class="gantt-label-col border-end d-flex flex-column justify-content-center px-3 py-2" style="width: 250px; flex-shrink: 0; background-color: #fafafa; z-index: 10;">
-                                    <span class="fw-bold text-dark fs-13">{{ $wc->name }}</span>
-                                    <span class="text-muted font-monospace" style="font-size: 10px;">{{ __('production.code') ?? 'Code' }}: {{ $wc->code }}</span>
-                                </div>
-                                <div class="gantt-timeline-col position-relative flex-grow-1 py-3" style="min-height: 64px;">
-                                    <!-- Grid lines background -->
-                                    <div class="position-absolute w-100 h-100 d-flex top-0 left-0" style="pointer-events: none; z-index: 1;">
-                                        @foreach($columns as $col)
-                                            <div class="flex-grow-1 border-end border-light" style="opacity: 0.7;"></div>
-                                        @endforeach
+                        @foreach($workCentersData as $wc)
+                            <!-- Work Center Header Line -->
+                            <div class="gantt-wc-group border-bottom bg-light px-3 py-2 fw-bold text-dark d-flex justify-content-between align-items-center" style="font-size: 13px;">
+                                <span>
+                                    <i class="feather-settings text-primary me-1"></i> {{ $wc['name'] }}
+                                    @if(!empty($wc['code']))
+                                        <small class="text-muted font-monospace fs-10">({{ $wc['code'] }})</small>
+                                    @endif
+                                    <span class="badge bg-soft-secondary text-secondary ms-2 text-capitalize fs-9" style="font-size: 9px;">{{ str_replace('_', ' ', $wc['classification']) }}</span>
+                                </span>
+                                @if($wc['conflicts_count'] > 0)
+                                    <span class="badge bg-soft-danger text-danger fs-9" style="font-size: 9px;"><i class="feather-alert-triangle me-1"></i>{{ $wc['conflicts_count'] }} Conflicts</span>
+                                @endif
+                            </div>
+
+                            @foreach($wc['machines'] as $machine)
+                                @php
+                                    $laneCount = max(1, count($machine['lanes']));
+                                    $rowHeight = 20 + ($laneCount * 46);
+                                @endphp
+                                <div class="gantt-row d-flex align-items-stretch border-bottom bg-white" style="min-height: {{ $rowHeight }}px;">
+                                    <div class="gantt-label-col border-end d-flex flex-column justify-content-center px-3 py-2" style="width: 250px; flex-shrink: 0; background-color: #fafafa; z-index: 10;">
+                                        <span class="fw-semibold text-dark fs-12">
+                                            {{ $machine['name'] }}
+                                            @if(!empty($machine['code']))
+                                                <small class="text-muted font-monospace d-block fs-10">{{ $machine['code'] }}</small>
+                                            @endif
+                                        </span>
+                                        @if(!empty($machine['badge']))
+                                            <span class="badge {{ !$machine['is_active'] ? 'bg-soft-danger text-danger' : 'bg-soft-warning text-warning' }} mt-1 align-self-start fs-9" style="font-size: 9px;">{{ $machine['badge'] }}</span>
+                                        @endif
                                     </div>
+                                    <div class="gantt-timeline-col position-relative flex-grow-1 py-2" style="min-height: {{ $rowHeight }}px;">
+                                        <!-- Grid lines background -->
+                                        <div class="position-absolute w-100 h-100 d-flex top-0 left-0" style="pointer-events: none; z-index: 1;">
+                                            @foreach($columns as $col)
+                                                <div class="flex-grow-1 border-end border-light" style="opacity: 0.7;"></div>
+                                            @endforeach
+                                        </div>
 
-                                    <!-- Task bars -->
-                                    @php $opIndex = 0; @endphp
-                                    @foreach($wcOps as $op)
-                                        @php
-                                            $opStart = $op->planned_start;
-                                            $opEnd = $op->planned_finish;
+                                        <!-- Task bars -->
+                                        @foreach($machine['lanes'] as $lane)
+                                            @foreach($lane['operations'] as $op)
+                                                @php
+                                                    $barBg = 'bg-primary text-white';
+                                                    if ($op['status'] === 'running') $barBg = 'bg-warning text-dark';
+                                                    elseif ($op['status'] === 'completed') $barBg = 'bg-success text-white';
+                                                    elseif ($op['status'] === 'paused') $barBg = 'bg-soft-danger text-danger border border-danger';
+                                                    elseif ($op['status'] === 'ready') $barBg = 'bg-info text-white';
 
-                                            // Clamp start/end times within timeline bounds
-                                            if ($opStart->lt($timelineStart)) $opStart = $timelineStart;
-                                            if ($opEnd->gt($timelineEnd)) $opEnd = $timelineEnd;
+                                                    $hasConflict = $op['conflict_data']['has_conflict'];
+                                                    $highestSeverity = $op['conflict_data']['highest_severity'];
+                                                    $borderClass = '';
+                                                    if ($hasConflict) {
+                                                        $borderClass = $highestSeverity === 'danger' ? 'border border-2 border-danger' : 'border border-2 border-warning';
+                                                    }
 
-                                            if ($opStart->lt($opEnd)) {
-                                                $leftDiff = $timelineStart->diffInSeconds($opStart);
-                                                $leftPercent = ($leftDiff / $totalSeconds) * 100;
+                                                    $tooltipHtml = "<strong>" . e($op['name']) . " (" . e($op['operation_number']) . ")</strong><br>"
+                                                                 . "Order: " . e($op['order_number']) . "<br>"
+                                                                 . "Product: " . e($op['product_name']) . "<br>"
+                                                                 . "WC: " . e($wc['name']) . "<br>"
+                                                                 . "Start: " . e($op['planned_start'] ? $op['planned_start']->format('d/m H:i') : 'N/A') . "<br>"
+                                                                 . "End: " . e($op['planned_finish'] ? $op['planned_finish']->format('d/m H:i') : 'N/A') . "<br>"
+                                                                 . "Status: <span class='badge bg-light text-dark'>" . ucfirst($op['status']) . "</span>";
 
-                                                $duration = $opStart->diffInSeconds($opEnd);
-                                                $widthPercent = ($duration / $totalSeconds) * 100;
-                                                $widthPercent = max(2.5, $widthPercent); // Ensure visibility
-                                            } else {
-                                                $leftPercent = 0;
-                                                $widthPercent = 0;
-                                            }
+                                                    if ($hasConflict) {
+                                                        $tooltipHtml .= "<br><strong class='text-danger mt-1 d-block'>Warnings:</strong>";
+                                                        foreach ($op['conflict_data']['conflicts'] as $c) {
+                                                            $tooltipHtml .= "• " . e($c['message']) . "<br>";
+                                                        }
+                                                    }
+                                                @endphp
+                                                @if($op['width_percent'] > 0)
+                                                    <div class="position-absolute rounded shadow-sm text-truncate px-2 py-1 fs-11 fw-bold {{ $barBg }} {{ $borderClass }} d-flex align-items-center justify-content-between cursor-pointer"
+                                                         style="left: {{ $op['left_percent'] }}%; width: {{ $op['width_percent'] }}%; top: {{ 10 + ($op['visual_lane'] * 46) }}px; height: 36px; z-index: 5;"
+                                                         data-bs-toggle="tooltip"
+                                                         data-bs-html="true"
+                                                         title="{!! $tooltipHtml !!}">
+                                                        <span class="text-truncate flex-grow-1" style="max-width: calc(100% - 20px);">
+                                                            {{ $op['order_number'] }} – {{ $op['name'] }}
+                                                        </span>
+                                                        @if($hasConflict)
+                                                            <i class="feather-alert-triangle text-{{ $highestSeverity === 'danger' ? 'danger' : 'warning' }} ms-1 fs-12 flex-shrink-0" style="background: white; border-radius: 50%; padding: 1px;"></i>
+                                                        @endif
+                                                    </div>
+                                                @endif
+                                            @endforeach
+                                        @endforeach
 
-                                            // Assign color classes based on state
-                                            $barBg = 'bg-primary text-white';
-                                            if ($op->status === 'running') $barBg = 'bg-warning text-dark';
-                                            elseif ($op->status === 'completed') $barBg = 'bg-success text-white';
-                                            elseif ($op->status === 'paused') $barBg = 'bg-soft-danger text-danger border border-danger';
-                                            elseif ($op->status === 'ready') $barBg = 'bg-info text-white';
-                                        @endphp
-
-                                        @if($widthPercent > 0)
-                                            <div class="position-absolute rounded shadow-sm text-truncate px-2 py-1 fs-11 fw-bold {{ $barBg }} d-flex align-items-center justify-content-between cursor-pointer"
-                                                 style="left: {{ $leftPercent }}%; width: {{ $widthPercent }}%; top: 14px; height: 36px; z-index: 5;"
-                                                 data-bs-toggle="tooltip"
-                                                 data-bs-html="true"
-                                                 title="&lt;strong&gt;{{ $op->orderOperation->name ?? 'Operation' }}&lt;/strong&gt;&lt;br&gt;Schedule: {{ $op->schedule->schedule_number ?? '—' }}&lt;br&gt;Order: {{ $op->order->order_number ?? '' }}&lt;br&gt;Product: {{ $op->order->product->name ?? '' }}&lt;br&gt;WC: {{ $wc->name }}&lt;br&gt;Machine: {{ $op->machine->name ?? '—' }}&lt;br&gt;Start: {{ $op->planned_start->format('d/m H:i') }}&lt;br&gt;End: {{ $op->planned_finish->format('d/m H:i') }}&lt;br&gt;Status: &lt;span class='badge bg-light text-dark'&gt;{{ ucfirst($op->status) }}&lt;/span&gt;">
-                                                <span class="text-truncate" style="max-width: 100%;">
-                                                    {{ $op->order->order_number ?? '' }} – {{ $op->orderOperation->name ?? 'OP' }}
-                                                </span>
+                                        @if(empty($machine['lanes']))
+                                            <div class="text-muted fs-11 text-center py-2 position-relative" style="z-index: 2; opacity: 0.4;">
+                                                {{ __('production.no_operations_scheduled') }}
                                             </div>
                                         @endif
-                                    @endforeach
-
-                                    @if($wcOps->isEmpty())
-                                         <div class="text-muted fs-11 text-center py-2 position-relative" style="z-index: 2; opacity: 0.4;">
-                                             {{ __('production.no_operations_scheduled') }}
-                                         </div>
-                                     @endif
-                                 </div>
-                             </div>
-                         @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        @endforeach
                      </div>
                  </div>
 
@@ -233,60 +262,60 @@
         @else
             {{-- Operations List (Table-based calendar) --}}
             @if($operations->count() > 0)
-                <div class="table-responsive">
-                    <x-ui.odoo-form-ui type="table">
-                        <thead>
+            <div class="table-responsive">
+                <x-ui.odoo-form-ui type="table">
+                    <thead>
+                        <tr>
+                            <th style="width: 12%">{{ __('production.planned_start') }}</th>
+                            <th style="width: 12%">{{ __('production.planned_finish') }}</th>
+                            <th style="width: 15%">{{ __('production.schedule_number') }}</th>
+                            <th style="width: 20%">{{ __('production.production_order') }} / {{ __('production.product') }}</th>
+                            <th style="width: 18%">{{ __('production.operations') }}</th>
+                            <th style="width: 12%">{{ __('production.work_centers') }}</th>
+                            <th style="width: 10%">{{ __('production.assigned_machine') ?? 'Machine' }}</th>
+                            <th style="width: 10%">{{ __('production.status') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($operations->sortBy('planned_start') as $op)
                             <tr>
-                                <th style="width: 12%">{{ __('production.planned_start') }}</th>
-                                <th style="width: 12%">{{ __('production.planned_finish') }}</th>
-                                <th style="width: 15%">{{ __('production.schedule_number') }}</th>
-                                <th style="width: 20%">{{ __('production.production_order') }} / {{ __('production.product') }}</th>
-                                <th style="width: 18%">{{ __('production.operations') }}</th>
-                                <th style="width: 12%">{{ __('production.work_centers') }}</th>
-                                <th style="width: 10%">{{ __('production.assigned_machine') ?? 'Machine' }}</th>
-                                <th style="width: 10%">{{ __('production.status') }}</th>
+                                <td class="fs-12 fw-semibold text-dark">{{ $op->planned_start->format('d/m H:i') }}</td>
+                                <td class="fs-12 text-muted">{{ $op->planned_finish->format('d/m H:i') }}</td>
+                                <td>
+                                    <a href="{{ route('production.schedules.show', $op->production_schedule_id) }}" class="fw-bold text-primary">
+                                        {{ $op->schedule->schedule_number ?? '—' }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-semibold text-dark fs-12">{{ $op->order->product->name ?? '—' }}</span>
+                                        <small class="text-muted">{{ $op->order->order_number ?? '' }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="fw-semibold text-dark fs-12">{{ $op->orderOperation->name ?? '—' }}</span>
+                                    <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
+                                </td>
+                                <td class="fs-12">{{ $op->workCenter->name ?? '—' }}</td>
+                                <td class="fs-12 text-muted">{{ $op->machine->name ?? '—' }}</td>
+                                <td>
+                                    @if($op->status === 'running')
+                                        <span class="badge bg-soft-warning text-warning">{{ __('production.running') }}</span>
+                                    @elseif($op->status === 'ready')
+                                        <span class="badge bg-soft-info text-info">{{ __('production.ready') }}</span>
+                                    @elseif($op->status === 'completed')
+                                        <span class="badge bg-soft-success text-success">{{ __('production.completed') }}</span>
+                                    @elseif($op->status === 'paused')
+                                        <span class="badge bg-soft-warning text-warning">{{ __('production.paused') ?? 'Paused' }}</span>
+                                    @else
+                                        <span class="erp-badge-draft">{{ ucfirst($op->status) }}</span>
+                                    @endif
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($operations->sortBy('planned_start') as $op)
-                                <tr>
-                                    <td class="fs-12 fw-semibold text-dark">{{ $op->planned_start->format('d/m H:i') }}</td>
-                                    <td class="fs-12 text-muted">{{ $op->planned_finish->format('d/m H:i') }}</td>
-                                    <td>
-                                        <a href="{{ route('production.schedules.show', $op->production_schedule_id) }}" class="fw-bold text-primary">
-                                            {{ $op->schedule->schedule_number ?? '—' }}
-                                        </a>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex flex-column">
-                                            <span class="fw-semibold text-dark fs-12">{{ $op->order->product->name ?? '—' }}</span>
-                                            <small class="text-muted">{{ $op->order->order_number ?? '' }}</small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="fw-semibold text-dark fs-12">{{ $op->orderOperation->name ?? '—' }}</span>
-                                        <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
-                                    </td>
-                                    <td class="fs-12">{{ $op->workCenter->name ?? '—' }}</td>
-                                    <td class="fs-12 text-muted">{{ $op->machine->name ?? '—' }}</td>
-                                    <td>
-                                        @if($op->status === 'running')
-                                            <span class="badge bg-soft-warning text-warning">{{ __('production.running') }}</span>
-                                        @elseif($op->status === 'ready')
-                                            <span class="badge bg-soft-info text-info">{{ __('production.ready') }}</span>
-                                        @elseif($op->status === 'completed')
-                                            <span class="badge bg-soft-success text-success">{{ __('production.completed') }}</span>
-                                        @elseif($op->status === 'paused')
-                                            <span class="badge bg-soft-warning text-warning">{{ __('production.paused') ?? 'Paused' }}</span>
-                                        @else
-                                            <span class="erp-badge-draft">{{ ucfirst($op->status) }}</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </x-ui.odoo-form-ui>
-                </div>
+                        @endforeach
+                    </tbody>
+                </x-ui.odoo-form-ui>
+            </div>
             @else
                 <div class="text-center py-5 text-muted">
                     <i class="feather-calendar fs-36 mb-3 d-block"></i>
