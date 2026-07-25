@@ -100,47 +100,73 @@
             table-layout: fixed !important;
             width: 100% !important;
         }
-        .roster-grid-table th.employee-head,
-        .roster-grid-table td.employee-cell {
-            width: 200px !important;
-            min-width: 200px !important;
-            max-width: 200px !important;
-            text-align: left !important;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        #weeklyPatternsGrid,
+        #rosterBoardGrid {
+            overflow-x: hidden !important;
+            width: 100% !important;
         }
-        .roster-grid-table th.date-head,
-        .roster-grid-table td.date-cell {
-            width: 108px !important;
-            min-width: 108px !important;
-            max-width: 108px !important;
-            padding: 4px !important;
+        #weeklyPatternsGrid .roster-grid-table,
+        #rosterBoardGrid .roster-grid-table {
+            table-layout: fixed !important;
+            width: 100% !important;
+        }
+        #weeklyPatternsGrid th.employee-head,
+        #weeklyPatternsGrid td.employee-cell,
+        #rosterBoardGrid th.employee-head,
+        #rosterBoardGrid td.employee-cell {
+            width: 23% !important;
+            min-width: 150px !important;
+            max-width: 23% !important;
+            text-align: left !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+            overflow-wrap: anywhere !important;
+            padding: 10px 14px !important;
+        }
+        .employee-name-label,
+        .employee-designation-label {
+            white-space: normal !important;
+            word-break: break-word !important;
+            overflow-wrap: anywhere !important;
+            display: block !important;
+            width: 100% !important;
+        }
+        #weeklyPatternsGrid th.date-head,
+        #weeklyPatternsGrid td.date-cell,
+        #rosterBoardGrid th.date-head,
+        #rosterBoardGrid td.date-cell {
+            width: 11% !important;
+            min-width: 0 !important;
+            max-width: 11% !important;
+            padding: 8px 6px !important;
         }
         .roster-grid-table th {
-            font-size: 11px;
+            font-size: 12px !important;
+            font-weight: 700 !important;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             vertical-align: middle;
+            padding: 12px 8px !important;
+            color: #334155 !important;
         }
         .roster-cell-select, .weekly-pattern-select {
             cursor: pointer;
-            font-size: 10px !important;
-            font-weight: 700 !important;
+            font-size: 12px !important;
+            font-weight: 600 !important;
             text-align: center !important;
             text-align-last: center !important;
-            padding: 2px 14px 2px 4px !important;
-            height: 28px !important;
-            border: 1px solid transparent !important;
-            background-color: transparent !important;
-            border-radius: 4px;
+            padding: 4px 18px 4px 8px !important;
+            height: 36px !important;
+            border: 1px solid #e2e8f0 !important;
+            background-color: #f8fafc !important;
+            border-radius: 8px !important;
             transition: all 0.15s ease-in-out;
             width: 100%;
             text-overflow: ellipsis;
             white-space: nowrap;
             overflow: hidden;
-            background-position: right 4px center !important;
-            background-size: 8px 10px !important;
+            background-position: right 6px center !important;
+            background-size: 9px 11px !important;
         }
         .roster-cell-select:hover, .roster-cell-select:focus,
         .weekly-pattern-select:hover, .weekly-pattern-select:focus {
@@ -264,13 +290,21 @@
         
         /* Dropdown options styling */
         .select2-container--bootstrap-5 .select2-dropdown {
+            min-width: 125px !important;
+            width: max-content !important;
+            max-width: 170px !important;
             border-color: var(--bs-primary) !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
+            z-index: 1060 !important;
         }
         .select2-container--bootstrap-5 .select2-results__option {
-            font-size: 11px !important;
-            padding: 4px 8px !important;
-            font-weight: 700 !important;
+            font-size: 11.5px !important;
+            padding: 5px 10px !important;
+            font-weight: 600 !important;
+            white-space: nowrap !important;
+            word-break: keep-all !important;
         }
         .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected] {
             background-color: var(--bs-primary) !important;
@@ -526,7 +560,7 @@
                                 </div>
                             @elseif($tab === 'weekly_patterns')
                                 <!-- WEEKLY PATTERNS TAB -->
-                                 <x-ui.card title="Weekly Shift Patterns" stretch>
+                                 <x-ui.card title="Weekly Shift Patterns" bodyClass="p-0" stretch>
                                      <x-slot name="headerAction">
                                          <form method="GET" action="{{ route('hrms.roster.index') }}" id="weeklyPatternFilterForm" class="d-flex align-items-center gap-2">
                                              <input type="hidden" name="tab" value="weekly_patterns">
@@ -605,7 +639,7 @@
                                      </x-slot>
  
                                      <!-- Weekly Defaults Grid Matrix -->
-                                     <div class="table-responsive border rounded bg-white" id="weeklyPatternsGrid">
+                                     <div class="bg-white border-top" id="weeklyPatternsGrid">
                                          <table class="table table-bordered table-hover mb-0 align-middle text-center roster-grid-table">
                                              <thead class="table-light">
                                                  <tr>
@@ -624,13 +658,13 @@
                                                      <tr>
                                                          <td class="employee-cell">
                                                              <div class="d-flex align-items-center gap-2">
-                                                                 <div class="avatar-text avatar-sm bg-soft-primary text-primary fw-bold" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; font-size: 11px;">
-                                                                     {{ strtoupper(substr($employee->full_name, 0, 2)) ?: 'EM' }}
-                                                                 </div>
-                                                                 <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">
-                                                                     <div class="fw-bold text-dark fs-12 employee-name-label" style="font-size: 12px; line-height: 1.2;">{{ $employee->full_name }}</div>
-                                                                     <div class="text-muted fs-10 employee-designation-label" style="font-size: 10px; line-height: 1.2;">{{ $employee->designation?->name ?? __('hrms.roster.no_designation') }}</div>
-                                                                 </div>
+                                                                  <div class="avatar-text avatar-sm bg-soft-primary text-primary fw-bold rounded-circle flex-shrink-0" style="width: 36px; height: 36px; min-width: 36px; min-height: 36px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center;">
+                                                                      {{ strtoupper(substr($employee->full_name, 0, 2)) ?: 'EM' }}
+                                                                  </div>
+                                                                  <div style="white-space: normal; word-break: break-word; overflow-wrap: anywhere; min-width: 0; flex-grow: 1;">
+                                                                      <div class="fw-bold text-dark fs-13 employee-name-label" style="font-size: 13px; line-height: 1.3; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $employee->full_name }}</div>
+                                                                      <div class="text-muted fs-11 employee-designation-label" style="font-size: 11px; line-height: 1.3; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $employee->designation?->name ?? __('hrms.roster.no_designation') }}</div>
+                                                                  </div>
                                                              </div>
                                                          </td>
                                                          @foreach([1 => 'monday', 2 => 'tuesday', 3 => 'wednesday', 4 => 'thursday', 5 => 'friday', 6 => 'saturday', 0 => 'sunday'] as $dayVal => $dayName)
@@ -695,7 +729,7 @@
                                  </x-ui.card>
                             @else
                                 <!-- ROSTER BOARD TAB -->
-                                 <x-ui.card title="{{ __('hrms.roster.roster_scheduler_grid') }}" stretch>
+                                 <x-ui.card title="{{ __('hrms.roster.roster_scheduler_grid') }}" bodyClass="p-0" stretch>
                                      <x-slot name="headerAction">
                                          <form method="GET" action="{{ route('hrms.roster.index') }}" id="rosterFilterForm" class="d-flex align-items-center gap-2">
                                              <input type="hidden" name="tab" value="roster">
@@ -781,40 +815,39 @@
                                          </form>
                                      </x-slot>
 
-                                    <!-- Grid Board Matrix (Fixed Column Width Layout to prevent viewport overflow) -->
-                                    <div class="table-responsive border rounded bg-white" id="rosterBoardGrid">
-                                        <table class="table table-bordered table-hover mb-0 align-middle text-center roster-grid-table">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th class="employee-head">{{ __('hrms.roster.employee_name') }}</th>
-                                                    @foreach($dates as $date)
-                                                        <th class="date-head">
-                                                            <div class="fw-bold text-dark">{{ $date->format('D') }}</div>
-                                                            <div class="text-muted" style="font-size: 10px; font-weight: 500;">{{ $date->format('d M') }}</div>
-                                                        </th>
-                                                    @endforeach
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($employees as $employee)
-                                                    <tr>
-                                                        <td class="employee-cell">
-                                                            <div class="d-flex align-items-center gap-2">
-                                                                <div class="avatar-text avatar-sm bg-soft-primary text-primary fw-bold" style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; font-size: 11px;">
-                                                                    {{ strtoupper(substr($employee->full_name, 0, 2)) ?: 'EM' }}
-                                                                </div>
-                                                                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">
-                                                                    <div class="fw-bold text-dark fs-12 employee-name-label" style="font-size: 12px; line-height: 1.2;">{{ $employee->full_name }}</div>
-                                                                    <div class="text-muted fs-10 employee-designation-label" style="font-size: 10px; line-height: 1.2;">{{ $employee->designation?->name ?? __('hrms.roster.no_designation') }}</div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        @foreach($dates as $date)
+                                     <!-- Grid Board Matrix (Fixed Column Width Layout to prevent viewport overflow) -->
+                                     <div class="bg-white border-top" id="rosterBoardGrid">
+                                         <table class="table table-bordered table-hover mb-0 align-middle text-center roster-grid-table">
+                                             <thead class="table-light">
+                                                 <tr>
+                                                     <th class="employee-head">{{ __('hrms.roster.employee_name') }}</th>
+                                                     @foreach($dates as $date)
+                                                         <th class="date-head">
+                                                             <div class="fw-bold text-dark">{{ $date->format('D') }}</div>
+                                                             <div class="text-muted" style="font-size: 10px; font-weight: 500;">{{ $date->format('d M') }}</div>
+                                                         </th>
+                                                     @endforeach
+                                                 </tr>
+                                             </thead>
+                                             <tbody>
+                                                 @foreach($employees as $employee)
+                                                     <tr>
+                                                         <td class="employee-cell">
+                                                             <div class="d-flex align-items-center gap-2">
+                                                                  <div class="avatar-text avatar-sm bg-soft-primary text-primary fw-bold rounded-circle flex-shrink-0" style="width: 36px; height: 36px; min-width: 36px; min-height: 36px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center;">
+                                                                      {{ strtoupper(substr($employee->full_name, 0, 2)) ?: 'EM' }}
+                                                                  </div>
+                                                                  <div style="white-space: normal; word-break: break-word; overflow-wrap: anywhere; min-width: 0; flex-grow: 1;">
+                                                                      <div class="fw-bold text-dark fs-13 employee-name-label" style="font-size: 13px; line-height: 1.3; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $employee->full_name }}</div>
+                                                                      <div class="text-muted fs-11 employee-designation-label" style="font-size: 11px; line-height: 1.3; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $employee->designation?->name ?? __('hrms.roster.no_designation') }}</div>
+                                                                  </div>
+                                                             </div>
+                                                         </td>
+                                                         @foreach($dates as $date)
                                                             @php
                                                                 $dateStr = $date->format('Y-m-d');
                                                                 $roster = $rosterMap[$employee->id][$dateStr] ?? null;
                                                                 $assignedShiftId = $roster ? $roster->shift_id : null;
-                                                                
                                                                 $dayOfWeek = $date->dayOfWeek;
                                                                 $weeklyPatternShiftId = (isset($employee->weekly_pattern) && isset($employee->weekly_pattern[$dayOfWeek])) ? $employee->weekly_pattern[$dayOfWeek] : null;
 

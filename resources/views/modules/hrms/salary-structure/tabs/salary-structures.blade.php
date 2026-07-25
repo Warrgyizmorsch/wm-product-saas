@@ -136,11 +136,18 @@
                                 </td>
                             </tr>
                             <tr id="structure-details-{{ $structure->id }}" class="table-light d-none">
-                                <td></td>
-                                <td colspan="3" class="p-3">
-                                    <div class="card border-0 shadow-none m-0 bg-light">
-                                        <div class="card-body p-3">
-                                            <div class="row g-3">
+                                <td colspan="4" class="p-3">
+                                    <div class="bg-white border rounded-3 overflow-hidden shadow-sm">
+                                        <table class="table table-sm table-hover align-middle mb-0 fs-12" style="width: 100%; table-layout: fixed;">
+                                            <thead class="table-light text-uppercase fs-10 text-muted" style="letter-spacing: 0.5px;">
+                                                <tr>
+                                                    <th style="width: 40%;" class="ps-3 py-2.5">Component Name</th>
+                                                    <th style="width: 18%;" class="py-2.5">Type</th>
+                                                    <th style="width: 22%;" class="py-2.5">Calculation Type</th>
+                                                    <th style="width: 20%;" class="pe-3 py-2.5 text-end">Value / Rate</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
                                                 @forelse($structure->items as $item)
                                                     @php
                                                         $calcTypeLabel = match($item->calculation_type) {
@@ -150,37 +157,36 @@
                                                             'balancing' => __('hrms.salary.balancing'),
                                                             default => $item->calculation_type
                                                         };
-                                                        $typeBadge = $item->component->type == 'earning' 
-                                                            ? '<span class="badge bg-soft-success text-success">' . __('hrms.org.earning') . '</span>' 
-                                                            : '<span class="badge bg-soft-warning text-warning">' . __('hrms.org.deduction') . '</span>';
                                                     @endphp
-                                                    <div class="col-md-6 col-lg-4">
-                                                        <div class="p-2 border rounded bg-white">
-                                                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                                                <span class="fw-bold text-dark fs-13">{{ $item->component->name }}</span>
-                                                                {!! $typeBadge !!}
-                                                            </div>
-                                                            <div class="d-flex justify-content-between align-items-center text-muted fs-12">
-                                                                <span>{{ $calcTypeLabel }}:</span>
-                                                                <span class="fw-bold text-dark">
-                                                                    @if($item->calculation_type == 'fixed')
-                                                                        ₹{{ number_format($item->value, 2) }}
-                                                                    @elseif(in_array($item->calculation_type, ['percentage_of_ctc', 'percentage_of_basic']))
-                                                                        {{ $item->value }}%
-                                                                    @else
-                                                                        Balancing
-                                                                    @endif
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                    <tr>
+                                                        <td class="ps-3 py-2 fw-semibold text-dark" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $item->component->name }}</td>
+                                                        <td class="py-2">
+                                                            @if($item->component->type == 'earning')
+                                                                <span class="badge bg-soft-success text-success px-2 py-1 fs-10 rounded-pill">{{ __('hrms.org.earning') }}</span>
+                                                            @else
+                                                                <span class="badge bg-soft-warning text-warning px-2 py-1 fs-10 rounded-pill">{{ __('hrms.org.deduction') }}</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="py-2 text-muted" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $calcTypeLabel }}</td>
+                                                        <td class="pe-3 py-2 text-end fw-bold text-dark" style="white-space: nowrap;">
+                                                            @if($item->calculation_type == 'fixed')
+                                                                ₹{{ number_format($item->value, 2) }}
+                                                            @elseif(in_array($item->calculation_type, ['percentage_of_ctc', 'percentage_of_basic']))
+                                                                {{ number_format($item->value, 2) }}%
+                                                            @else
+                                                                Balancing
+                                                            @endif
+                                                        </td>
+                                                    </tr>
                                                 @empty
-                                                    <div class="col-12 text-muted fs-12">
-                                                        {{ __('hrms.salary.no_components_configured') }}
-                                                    </div>
+                                                    <tr>
+                                                        <td colspan="4" class="text-center py-3 text-muted fs-12">
+                                                            {{ __('hrms.salary.no_components_configured') }}
+                                                        </td>
+                                                    </tr>
                                                 @endforelse
-                                            </div>
-                                        </div>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </td>
                             </tr>

@@ -1782,23 +1782,30 @@
                                                     @endif
                                                 </td>
                                                 @if($isAdmin)
-                                                    <td class="text-end">
-                                                        @if($enc->status === 'pending')
-                                                            <form method="POST" action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" class="d-inline-block me-1">
-                                                                @csrf
-                                                                <button type="submit" class="btn btn-sm btn-success px-2 py-1 fs-12 fw-semibold" title="{{ __('hrms.leave.encashment_app.approve') }}"><i class="feather-check me-1"></i> {{ __('hrms.leave.encashment_app.approve') }}</button>
-                                                            </form>
-                                                            <form method="POST" action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" class="d-inline-block">
-                                                                @csrf
-                                                                <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-1 fs-12 fw-semibold" title="{{ __('hrms.leave.encashment_app.reject') }}"><i class="feather-x me-1"></i> {{ __('hrms.leave.encashment_app.reject') }}</button>
-                                                            </form>
-                                                        @else
-                                                            <form method="POST" action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" class="d-inline-block" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.leave.encashment_app.confirm_delete') }}', { title: 'Delete Encashment Application', variant: 'danger', confirmButtonText: 'Delete' });">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <button type="submit" class="btn btn-sm btn-light border text-danger px-2 py-1 fs-12" title="{{ __('hrms.common.delete') }}"><i class="feather-trash-2"></i></button>
-                                                            </form>
-                                                        @endif
+                                                    <td class="text-end pe-3" style="white-space: nowrap;">
+                                                        <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                            <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background-color: #8c4444 !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
+                                                                <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
+                                                            </button>
+                                                            <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0; background: #ffffff;">
+                                                                <li>
+                                                                    <form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST">
+                                                                        @csrf
+                                                                        <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'approved' ? 'color: #8c4444 !important;' : '' }}">
+                                                                            <span>{{ __('hrms.leave.app.status_approved') }}</span>
+                                                                        </button>
+                                                                    </form>
+                                                                </li>
+                                                                <li>
+                                                                    <form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST">
+                                                                        @csrf
+                                                                        <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'rejected' ? 'color: #8c4444 !important;' : '' }}">
+                                                                            <span>{{ __('hrms.leave.app.status_rejected') }}</span>
+                                                                        </button>
+                                                                    </form>
+                                                                </li>
+                                                            </ul>
+                                                        </div>
                                                     </td>
                                                 @endif
                                             </tr>

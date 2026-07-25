@@ -151,13 +151,21 @@ class LeaveRequestController extends Controller
             // Silence errors in case migration is not fully run yet
         }
 
-        $isAdmin = auth()->user()->hasHrPermission('hr.settings.manage');
-        $employee = Employee::where('personal_email', auth()->user()->email)
-            ->orWhere('office_email', auth()->user()->email)
+        $user = auth()->user();
+        $isAdmin = $user->hasHrPermission('hr.settings.manage') 
+            || $user->hasHrPermission('hr.leaves.manage') 
+            || !empty($user->role_id);
+
+        $employee = Employee::where('personal_email', $user->email)
+            ->orWhere('office_email', $user->email)
             ->first();
 
         // Prepare employee balances mapping for JavaScript dynamically
-        $allEmployees = $isAdmin ? Employee::where('status', true)->get() : collect([$employee])->filter();
+        $allEmployees = Employee::where('status', true)->get();
+        if (!$isAdmin && $employee) {
+            $allEmployees = collect([$employee]);
+        }
+
         $employeeDataMap = [];
         foreach ($allEmployees as $emp) {
             $balances = LeaveBalance::where('employee_id', $emp->id)
@@ -198,14 +206,12 @@ class LeaveRequestController extends Controller
                 $query->where('status', $request->status);
                 $encashQuery->where('status', $request->status);
             }
-        } else {
-            if ($employee) {
-                $query->where('employee_id', $employee->id);
-                $encashQuery->where('employee_id', $employee->id);
-            } else {
-                $query->where('id', 0);
-                $encashQuery->where('id', 0);
-            }
+        } elseif ($employee) {
+            $query->where('employee_id', $employee->id);
+            $encashQuery->where('employee_id', $employee->id);
+        } elseif ($request->filled('employee_id')) {
+            $query->where('employee_id', $request->employee_id);
+            $encashQuery->where('employee_id', $request->employee_id);
         }
 
         // Apply dynamic Search query filtering
@@ -231,7 +237,7 @@ class LeaveRequestController extends Controller
         $isAdmin = auth()->user()->hasHrPermission('hr.settings.manage');
 
         $request->validate([
-            'employee_id' => $isAdmin ? 'required|exists:employees,id' : 'nullable',
+            'employee_id' => 'nullable|exists:employees,id',
             'leave_type_id' => 'required|exists:leave_types,id',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
@@ -243,22 +249,26 @@ class LeaveRequestController extends Controller
             'notified_contacts.*' => 'exists:employees,id'
         ]);
 
-        if ($isAdmin && $request->filled('employee_id')) {
-            $employee = Employee::findOrFail($request->employee_id);
-        } else {
+        $employee = null;
+        if ($request->filled('employee_id')) {
+            $employee = Employee::find($request->employee_id);
+        }
+        
+        if (!$employee) {
             $employee = Employee::where('personal_email', auth()->user()->email)
                 ->orWhere('office_email', auth()->user()->email)
                 ->first();
-            if (!$employee) {
-                return redirect()->back()->with('error', __('hrms.leave.app.emp_not_found'));
-            }
+        }
+
+        if (!$employee) {
+            return $this->returnLeaveError($request, $request->employee_id, ['employee_id' => __('hrms.leave.app.emp_not_found')]);
         }
 
         $leaveType = LeaveType::findOrFail($request->leave_type_id);
         
         // Block leave applications if the leave type's plan is inactive
         if ($leaveType->plan && !$leaveType->plan->status) {
-            return redirect()->back()->with('error', __('hrms.leave.app.plan_inactive'));
+            return $this->returnLeaveError($request, $employee->id, ['leave_type_id' => __('hrms.leave.app.plan_inactive')]);
         }
 
         $rules = $leaveType->rules ?? [];
@@ -293,7 +303,7 @@ class LeaveRequestController extends Controller
         }
 
         if ($duration == 0) {
-            return redirect()->back()->withErrors(['end_date' => __('hrms.leave.app.duration_zero')]);
+            return $this->returnLeaveError($request, $employee->id, ['end_date' => __('hrms.leave.app.duration_zero')]);
         }
 
         // Prevent overlapping active (pending or approved) leave requests for this employee
@@ -306,7 +316,7 @@ class LeaveRequestController extends Controller
             ->exists();
 
         if ($overlapExists) {
-            return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.overlap_exists')]);
+            return $this->returnLeaveError($request, $employee->id, ['start_date' => __('hrms.leave.app.overlap_exists')]);
         }
 
         $appRules = $rules['application'] ?? [];
@@ -318,12 +328,12 @@ class LeaveRequestController extends Controller
             $doj = $employee->date_of_joining;
             
             if ($probRule === 'disallow' && $employee->employee_stage === 'Probation') {
-                return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.probation_restricted')]);
+                return $this->returnLeaveError($request, $employee->id, ['start_date' => __('hrms.leave.app.probation_restricted')]);
             }
             if ($probRule === 'allow_after_months') {
                 $requiredMonths = intval($probationRules['probation_months'] ?? 3);
                 if ($doj && Carbon::parse($doj)->addMonths($requiredMonths)->isFuture()) {
-                    return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.probation_months_restricted', ['months' => $requiredMonths])]);
+                    return $this->returnLeaveError($request, $employee->id, ['start_date' => __('hrms.leave.app.probation_months_restricted', ['months' => $requiredMonths])]);
                 }
             }
         }
@@ -332,7 +342,7 @@ class LeaveRequestController extends Controller
         $noticeRules = $rules['notice'] ?? [];
         if (!empty($noticeRules['notice_rule']) && $noticeRules['notice_rule'] === 'disallow') {
             if ($employee->employee_stage === 'Notice Period') {
-                return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.notice_restricted')]);
+                return $this->returnLeaveError($request, $employee->id, ['start_date' => __('hrms.leave.app.notice_restricted')]);
             }
         }
 
@@ -341,7 +351,7 @@ class LeaveRequestController extends Controller
             $advanceDays = intval($appRules['advance_days'] ?? 3);
             $minAllowedDate = Carbon::today()->addDays($advanceDays);
             if ($startDate->lt($minAllowedDate)) {
-                return redirect()->back()->withErrors(['start_date' => __('hrms.leave.app.advance_restricted', ['days' => $advanceDays, 'date' => $minAllowedDate->format('d M, Y')])]);
+                return $this->returnLeaveError($request, $employee->id, ['start_date' => __('hrms.leave.app.advance_restricted', ['days' => $advanceDays, 'date' => $minAllowedDate->format('d M, Y')])]);
             }
         }
 
@@ -349,17 +359,17 @@ class LeaveRequestController extends Controller
         $minDuration = floatval($appRules['min_duration'] ?? 1);
         $maxDuration = floatval($appRules['max_duration'] ?? 10);
         if ($duration < $minDuration) {
-            return redirect()->back()->withErrors(['end_date' => __('hrms.leave.app.min_duration_restricted', ['min' => $minDuration])]);
+            return $this->returnLeaveError($request, $employee->id, ['end_date' => __('hrms.leave.app.min_duration_restricted', ['min' => $minDuration])]);
         }
         if ($duration > $maxDuration) {
-            return redirect()->back()->withErrors(['end_date' => __('hrms.leave.app.max_duration_restricted', ['max' => $maxDuration])]);
+            return $this->returnLeaveError($request, $employee->id, ['end_date' => __('hrms.leave.app.max_duration_restricted', ['max' => $maxDuration])]);
         }
 
         // 5. Validate Attachment Requirements
         if (!empty($appRules['require_attachment'])) {
             $attachmentDays = intval($appRules['attachment_days'] ?? 3);
             if ($duration >= $attachmentDays && !$request->hasFile('attachment')) {
-                return redirect()->back()->withErrors(['attachment' => __('hrms.leave.app.attachment_required', ['days' => $attachmentDays])]);
+                return $this->returnLeaveError($request, $employee->id, ['attachment' => __('hrms.leave.app.attachment_required', ['days' => $attachmentDays])]);
             }
         }
 
@@ -374,7 +384,7 @@ class LeaveRequestController extends Controller
             
             $remaining = $balance ? floatval($balance->remaining) : 0.0;
             if ($duration > $remaining) {
-                return redirect()->back()->withErrors(['end_date' => __('hrms.leave.app.insufficient_balance', ['remaining' => $remaining, 'duration' => $duration])]);
+                return $this->returnLeaveError($request, $employee->id, ['end_date' => __('hrms.leave.app.insufficient_balance', ['remaining' => $remaining, 'duration' => $duration])]);
             }
         }
 
@@ -390,8 +400,8 @@ class LeaveRequestController extends Controller
         }
 
         $leaveRequest = LeaveRequest::create([
-            'tenant_id' => auth()->user()->tenant_id,
-            'company_id' => $employee->company_id,
+            'tenant_id' => $employee->tenant_id ?? auth()->user()->tenant_id,
+            'company_id' => $employee->company_id ?? auth()->user()->company_id,
             'employee_id' => $employee->id,
             'leave_type_id' => $leaveType->id,
             'start_date' => $startDate->format('Y-m-d'),
@@ -416,12 +426,31 @@ class LeaveRequestController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', $status === 'approved' ? __('hrms.leave.app.submitted_auto_approved') : __('hrms.leave.app.submitted_successfully'));
+        $message = $status === 'approved' ? __('hrms.leave.app.submitted_auto_approved') : __('hrms.leave.app.submitted_successfully');
+
+        if ($request->filled('redirect_tab') && $employee) {
+            return redirect()->route('hrms.employees.show', ['employee' => $employee->id, 'tab' => $request->redirect_tab])->with('success', $message);
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    private function returnLeaveError(Request $request, $employeeId, $errors): RedirectResponse
+    {
+        if ($request->filled('redirect_tab') && $employeeId) {
+            return redirect()->route('hrms.employees.show', ['employee' => $employeeId, 'tab' => $request->redirect_tab])
+                ->withInput()
+                ->withErrors($errors);
+        }
+        return redirect()->back()->withInput()->withErrors($errors);
     }
 
     public function approve(LeaveRequest $leaveRequest): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $isAuthorized = auth()->user()->hasHrPermission('hr.settings.manage') 
+            || auth()->user()->hasHrPermission('hr.leaves.manage') 
+            || !empty(auth()->user()->role_id);
+        abort_unless($isAuthorized, 403);
 
         $adminEmployee = Employee::where('personal_email', auth()->user()->email)
             ->orWhere('office_email', auth()->user()->email)
@@ -464,7 +493,10 @@ class LeaveRequestController extends Controller
 
     public function reject(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $isAuthorized = auth()->user()->hasHrPermission('hr.settings.manage') 
+            || auth()->user()->hasHrPermission('hr.leaves.manage') 
+            || !empty(auth()->user()->role_id);
+        abort_unless($isAuthorized, 403);
 
         $request->validate([
             'rejection_reason' => 'required|string|max:500'
@@ -481,7 +513,10 @@ class LeaveRequestController extends Controller
 
     public function updateStatus(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $isAuthorized = auth()->user()->hasHrPermission('hr.settings.manage') 
+            || auth()->user()->hasHrPermission('hr.leaves.manage') 
+            || !empty(auth()->user()->role_id);
+        abort_unless($isAuthorized, 403);
 
         $request->validate([
             'status' => 'required|string|in:pending,approved,rejected,unauthorized,unpaid',

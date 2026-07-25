@@ -160,7 +160,6 @@
             background-color: #f1f5f9 !important;
             border-color: #f1f5f9 !important;
             border-left-color: var(--bs-primary) !important;
-            color: var(--bs-primary) !important;
         }
         .plan-item:hover:not(.active) {
             background-color: #f8fafc !important;
@@ -250,7 +249,7 @@
                                        data-status="{{ $pg->status ? 'active' : 'inactive' }}"
                                        data-company-id="{{ $pg->company_id }}"
                                        data-created-at="{{ $pg->created_at ? $pg->created_at->timestamp : 0 }}">
-                                        <span class="fw-bold {{ $isActive ? 'text-primary' : 'text-dark' }}" style="font-size: 14px;">
+                                        <span class="fw-bold text-dark" style="font-size: 14px;">
                                             {{ $pg->name }}
                                         </span>
                                         <div class="fs-11 text-muted text-capitalize mt-1">

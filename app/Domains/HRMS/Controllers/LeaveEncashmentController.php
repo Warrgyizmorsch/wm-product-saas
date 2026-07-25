@@ -80,7 +80,10 @@ class LeaveEncashmentController extends Controller
 
     public function approve(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $isAuthorized = auth()->user()->hasHrPermission('hr.settings.manage') 
+            || auth()->user()->hasHrPermission('hr.leaves.manage') 
+            || !empty(auth()->user()->role_id);
+        abort_unless($isAuthorized, 403);
 
         $leaveEncashment->update([
             'status' => 'approved',
@@ -96,7 +99,10 @@ class LeaveEncashmentController extends Controller
 
     public function reject(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        $isAuthorized = auth()->user()->hasHrPermission('hr.settings.manage') 
+            || auth()->user()->hasHrPermission('hr.leaves.manage') 
+            || !empty(auth()->user()->role_id);
+        abort_unless($isAuthorized, 403);
 
         $leaveEncashment->update([
             'status' => 'rejected',

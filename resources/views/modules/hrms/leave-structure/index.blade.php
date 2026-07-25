@@ -304,7 +304,7 @@
                                        data-status="{{ $plan->status ? 'active' : 'inactive' }}"
                                        data-company-id="{{ $plan->company_id }}"
                                        data-created-at="{{ $plan->created_at ? $plan->created_at->timestamp : 0 }}">
-                                        <span class="fw-bold {{ $isActive ? 'text-primary' : 'text-dark' }}" style="font-size: 14px;">
+                                        <span class="fw-bold text-dark" style="font-size: 14px;">
                                             {{ $plan->name }}
                                         </span>
                                     </a>
@@ -1350,10 +1350,7 @@
 
                 // Switch active class in list items
                 $('.plan-switch-btn').removeClass('active');
-                $('.plan-switch-btn span').removeClass('text-primary').addClass('text-dark');
-                
                 clicked.addClass('active');
-                clicked.find('span').removeClass('text-dark').addClass('text-primary');
 
                 // Update URL parameter without reload
                 if (history.pushState) {
