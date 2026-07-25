@@ -866,10 +866,20 @@ class AssetController extends Controller
                 }
             }
 
-            $assetCodes = $assets->pluck('asset_code')->implode(', ');
+            $codesArray = $assets->pluck('asset_code')->toArray();
+            $count = count($codesArray);
+            if ($count === 1) {
+                $formattedCodes = $codesArray[0];
+            } elseif ($count === 2) {
+                $formattedCodes = $codesArray[0] . ' and ' . $codesArray[1];
+            } else {
+                $last = array_pop($codesArray);
+                $formattedCodes = implode(', ', $codesArray) . ' and ' . $last;
+            }
+
             $assetRequest->update([
                 'status' => 'allocated',
-                'admin_notes' => "Directly allocated assets: {$assetCodes} on " . date('d M, Y'),
+                'admin_notes' => "Allocated: {$formattedCodes} on " . date('d M, Y'),
             ]);
         });
 
@@ -947,14 +957,27 @@ class AssetController extends Controller
                 }
             }
 
-            $assetCodes = $assets->pluck('asset_code')->implode(', ');
+            $codesArray = $assets->pluck('asset_code')->toArray();
+            $count = count($codesArray);
+            if ($count === 1) {
+                $formattedCodes = $codesArray[0];
+            } elseif ($count === 2) {
+                $formattedCodes = $codesArray[0] . ' and ' . $codesArray[1];
+            } else {
+                $last = array_pop($codesArray);
+                $formattedCodes = implode(', ', $codesArray) . ' and ' . $last;
+            }
+
             $totalAllocated = $hasRequestColumn ? $assetRequest->allocatedAssets()->count() : ($currentAllocatedCount + $assets->count());
             $newStatus = ($totalAllocated >= $assetRequest->quantity) ? 'allocated' : 'partially_allocated';
 
-            $existingNotes = $assetRequest->admin_notes ? $assetRequest->admin_notes . " | " : "";
+            $newNote = "Allocated: {$formattedCodes} on " . date('d M, Y');
+            $existingNotes = $assetRequest->admin_notes ? trim($assetRequest->admin_notes) : "";
+            $updatedNotes = $existingNotes ? ($existingNotes . " | " . $newNote) : $newNote;
+
             $assetRequest->update([
                 'status' => $newStatus,
-                'admin_notes' => $existingNotes . "Allocated: {$assetCodes} on " . date('d M, Y'),
+                'admin_notes' => $updatedNotes,
             ]);
         });
 
@@ -1223,8 +1246,18 @@ class AssetController extends Controller
             $requestedQty = (int) ($assetRequest->quantity ?? 1);
             $newStatus = ($currentAllocatedCount >= $requestedQty) ? 'allocated' : 'partially_allocated';
 
-            $noteText = 'Allocated: ' . implode(', ', $allocatedCodes) . ' on ' . date('d M, Y') . ' via bulk allocation.';
-            $existingNotes = $assetRequest->admin_notes;
+            $count = count($allocatedCodes);
+            if ($count === 1) {
+                $formattedCodes = $allocatedCodes[0];
+            } elseif ($count === 2) {
+                $formattedCodes = $allocatedCodes[0] . ' and ' . $allocatedCodes[1];
+            } else {
+                $last = array_pop($allocatedCodes);
+                $formattedCodes = implode(', ', $allocatedCodes) . ' and ' . $last;
+            }
+
+            $noteText = 'Allocated: ' . $formattedCodes . ' on ' . date('d M, Y');
+            $existingNotes = $assetRequest->admin_notes ? trim($assetRequest->admin_notes) : "";
             $updatedNotes = $existingNotes ? ($existingNotes . ' | ' . $noteText) : $noteText;
 
             $assetRequest->update([

@@ -287,10 +287,7 @@
                                                 <td class="text-start px-4" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                                     <div class="fw-bold text-dark fs-13">{{ $category->name }}</div>
                                                     @if($category->description)
-                                                        <div class="text-muted fs-11 mt-1 d-flex align-items-center gap-1 desc-expandable-container">
-                                                            <span class="text-truncate desc-text-truncate" style="max-width: 240px;" title="{{ $category->description }}">{{ $category->description }}</span>
-                                                            <a href="javascript:void(0)" class="text-primary text-decoration-none fw-bold fs-10 btn-read-more-dynamic d-none" data-title="{{ $category->name }}" data-desc="{{ $category->description }}" style="white-space: nowrap;">(Read More)</a>
-                                                        </div>
+                                                        <div class="text-muted fs-11 mt-1" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $category->description }}</div>
                                                     @else
                                                         <div class="text-muted fs-11 mt-1 fst-italic">{{ __('hrms.assets.no_description_provided') }}</div>
                                                     @endif
@@ -445,10 +442,7 @@
                                                  <td class="py-3 px-4 text-start" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">
                                                      <div class="fw-bold text-dark fs-13">{{ $itemObj->name }}</div>
                                                      @if($itemObj->description)
-                                                         <div class="text-muted fs-11 mt-0.5 d-flex align-items-center gap-1 desc-expandable-container">
-                                                             <span class="text-truncate desc-text-truncate" style="max-width: 240px;" title="{{ $itemObj->description }}">{{ $itemObj->description }}</span>
-                                                             <a href="javascript:void(0)" class="text-primary text-decoration-none fw-bold fs-10 btn-read-more-dynamic d-none" data-title="{{ $itemObj->name }}" data-desc="{{ $itemObj->description }}" style="white-space: nowrap;">(Read More)</a>
-                                                         </div>
+                                                         <div class="text-muted fs-11 mt-0.5" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $itemObj->description }}</div>
                                                      @endif
                                                  </td>
                                                  <td class="py-3 text-muted" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $itemObj->category->name ?? 'N/A' }}</td>
@@ -917,7 +911,7 @@
                                                             data-date="{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}"
                                                             data-action-date="{{ $req->updated_at ? $req->updated_at->format('d M, Y') : '-' }}"
                                                             data-reason="{{ $req->reason ?: 'No reason provided.' }}"
-                                                            data-admin-notes="{{ $req->admin_notes ?: '' }}"
+                                                            data-admin-notes="{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '') }}"
                                                             data-allocated-units="{{ base64_encode(json_encode($allocatedUnitsData)) }}">
                                                             <i class="feather-eye"></i>
                                                         </button>
@@ -1747,7 +1741,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-3.5" style="max-height: 80vh; overflow-y: auto;">
-                    <!-- EMPLOYEE & COMPANY CARD WITH REQUEST DATE -->
+                    <!-- EMPLOYEE & COMPANY CARD WITH REQUEST DATE & REASON -->
                     <div class="card border shadow-none bg-light mb-2.5">
                         <div class="card-body p-3">
                             <div class="d-flex align-items-start justify-content-between">
@@ -1762,6 +1756,10 @@
                                         <i class="feather-calendar me-1 text-primary"></i><span id="req_detail_date">-</span>
                                     </div>
                                 </div>
+                            </div>
+                            <div class="mt-2.5 pt-2 border-top">
+                                <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1"><i class="feather-message-square me-1 text-primary"></i>Reason for Request</span>
+                                <div class="fs-12 text-dark" id="req_detail_reason" style="white-space: pre-wrap; line-height: 1.4;">No reason provided.</div>
                             </div>
                         </div>
                     </div>
@@ -1793,12 +1791,6 @@
                                 <strong class="fs-12 text-danger" id="req_detail_rem_qty">0</strong>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- REASON FOR REQUEST -->
-                    <div class="border rounded-3 p-3 bg-white mb-2.5">
-                        <span class="fs-10 text-uppercase fw-bold text-muted d-block mb-1"><i class="feather-message-square me-1 text-primary"></i>Reason for Request</span>
-                        <div class="fs-12 text-dark" id="req_detail_reason" style="white-space: pre-wrap; line-height: 1.4;">No reason provided.</div>
                     </div>
 
                     <!-- DYNAMIC FULFILLMENT / REJECTION DETAILS SECTION -->

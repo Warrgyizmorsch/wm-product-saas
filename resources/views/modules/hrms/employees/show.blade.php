@@ -1391,15 +1391,15 @@
                                         <span class="fw-bold text-dark fs-12">{{ $employee->leavePlan->effective_from ? $employee->leavePlan->effective_from->format('d M, Y') : 'N/A' }}</span>
                                     </div>
 
-                                    <!-- Compact Leave Allowances Table (Without Division Lines & Large Gaps) -->
+                                    <!-- Compact Leave Allowances Table (Fixed Table Layout to prevent Horizontal Scrollbars) -->
                                     @if(!$employee->leavePlan->types->isEmpty())
-                                        <div class="table-responsive mt-2">
-                                            <table class="table table-sm table-hover align-middle mb-0 fs-12">
+                                        <div class="mt-2" style="overflow-x: hidden; width: 100%;">
+                                            <table class="table table-sm table-hover align-middle mb-0 fs-12" style="table-layout: fixed; width: 100%;">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th class="py-1">TYPE NAME</th>
-                                                        <th class="text-center py-1">BALANCE</th>
-                                                        <th class="text-end py-1">RULES</th>
+                                                        <th class="py-1 ps-2" style="width: 58%;">TYPE NAME</th>
+                                                        <th class="text-center py-1" style="width: 27%;">BALANCE</th>
+                                                        <th class="text-end py-1 pe-2" style="width: 15%;">RULES</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1412,18 +1412,22 @@
                                                             $allocatedVal = $balance ? floatval($balance->allocated) : floatval($ltype->quota);
                                                         @endphp
                                                         <tr>
-                                                            <td class="py-1">
-                                                                <div class="d-flex align-items-center gap-2">
-                                                                    <span class="d-inline-block rounded-circle flex-shrink-0 me-1" style="width: 8px; height: 8px; background-color: {{ $ltype->color ?: '#3b82f6' }};"></span>
-                                                                    <span class="fw-bold text-dark fs-12">{{ $ltype->name }}</span>
-                                                                    <span class="text-muted fs-10 text-uppercase ms-1" style="font-size: 10px;">{{ $ltype->code }}</span>
+                                                            <td class="py-2 ps-2" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                                <div class="d-flex align-items-start gap-2">
+                                                                    <span class="d-inline-block rounded-circle flex-shrink-0 mt-1 me-2" style="width: 8px; height: 8px; background-color: {{ $ltype->color ?: '#3b82f6' }}; margin-top: 4px; margin-right: 8px !important;"></span>
+                                                                    <div style="min-width: 0; flex-grow: 1; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                                        <span class="fw-bold text-dark fs-12" style="line-height: 1.3;">{{ $ltype->name }}</span>
+                                                                        @if($ltype->code)
+                                                                            <span class="text-muted fs-10 text-uppercase ms-1 fw-semibold" style="font-size: 10px;">{{ $ltype->code }}</span>
+                                                                        @endif
+                                                                    </div>
                                                                 </div>
                                                             </td>
-                                                            <td class="text-center py-1" style="white-space: nowrap;">
+                                                            <td class="text-center py-2" style="white-space: nowrap;">
                                                                 <span class="fw-bold text-dark fs-12">{{ $balanceVal }}</span>
                                                                 <span class="text-muted fs-10">/ {{ $allocatedVal }}</span>
                                                             </td>
-                                                            <td class="text-end py-1">
+                                                            <td class="text-end py-2 pe-2" style="white-space: nowrap;">
                                                                 <button
                                                                     type="button"
                                                                     class="leave-rules-icon-btn btn btn-light border d-inline-flex align-items-center justify-content-center p-0 rounded"
@@ -1468,10 +1472,36 @@
 
                     <!-- RIGHT COLUMN: Leave Applications & History / Encashment Toggle Container -->
                     <div class="col-lg-8 col-12">
+                        @if(session('success'))
+                            <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+                                <i class="feather-check-circle me-2"></i>{{ session('success') }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        @endif
+
+                        @if(session('error'))
+                            <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                                <i class="feather-alert-triangle me-2"></i>{{ session('error') }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        @endif
+
+                        @if($errors->any())
+                            <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                                <i class="feather-alert-triangle me-2"></i>
+                                <ul class="mb-0 ps-3">
+                                    @foreach($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        @endif
+
                         @php
-                            $empLeaveRequests = $leaveRequests ?? \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
-                            $empLeaveEncashments = $leaveEncashments ?? \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
-                            $isAdminUser      = auth()->user() && auth()->user()->hasHrPermission('hr.settings.manage');
+                            $empLeaveRequests = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
+                            $empLeaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
+                            $isAdminUser      = auth()->user() && (auth()->user()->hasHrPermission('hr.settings.manage') || !empty(auth()->user()->role_id));
                             $allLeaveTypes    = $employee->leavePlan ? $employee->leavePlan->types : \App\Domains\HRMS\Models\LeaveType::where('is_active', true)->orderBy('name')->get();
                         @endphp
 
@@ -1642,16 +1672,16 @@
                                             No leave applications submitted by this employee yet.
                                         </div>
                                     @else
-                                        <div class="table-responsive">
-                                            <table class="table table-hover align-middle mb-0" id="leaveAppTable">
+                                        <div style="overflow-x: hidden; width: 100%;">
+                                            <table class="table table-hover align-middle mb-0" id="leaveAppTable" style="table-layout: fixed; width: 100%;">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="min-width:130px;">Leave Type</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:160px;">Period</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:80px;">Days</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:95px;">Status</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:70px;">File</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width:70px;">Detail</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 22%;">Leave Type</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 26%;">Period</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">Days</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 22%;">Status</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">File</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 10%;">Detail</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1666,7 +1696,7 @@
 
                                                             $statusBadge = match($req->status) {
                                                                 'approved'     => ['cls' => 'bg-soft-success text-success',  'icon' => 'feather-check-circle', 'lbl' => 'Approved'],
-                                                             'pending'      => ['cls' => 'bg-soft-warning text-warning',  'icon' => 'feather-clock',         'lbl' => 'Pending'],
+                                                                'pending'      => ['cls' => 'bg-soft-warning text-warning',  'icon' => 'feather-clock',         'lbl' => 'Pending'],
                                                                 'rejected'     => ['cls' => 'bg-soft-danger text-danger',    'icon' => 'feather-x-circle',      'lbl' => 'Rejected'],
                                                                 'unauthorized' => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',        'lbl' => 'Unauthorized'],
                                                                 'unpaid'       => ['cls' => 'bg-soft-info text-info',        'icon' => 'feather-alert-circle',  'lbl' => 'Unpaid'],
@@ -1713,34 +1743,36 @@
                                                             data-remaining="{{ $rowRemaining }}"
                                                             data-allocated="{{ $rowAllocated }}"
                                                         >
-                                                            <td class="ps-3">
+                                                            <td class="ps-3" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
                                                                 <div class="d-flex align-items-center gap-2">
                                                                     <span class="flex-shrink-0 rounded-circle" style="width:9px;height:9px;background:{{ $req->leaveType?->color ?: '#3b82f6' }};display:inline-block;"></span>
-                                                                    <div>
-                                                                        <div class="fw-semibold text-dark fs-13">{{ $req->leaveType?->name ?: 'N/A' }}</div>
+                                                                    <div style="min-width:0; flex-grow:1; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                                        <div class="fw-semibold text-dark fs-13" style="line-height:1.3;">{{ $req->leaveType?->name ?: 'N/A' }}</div>
                                                                         <code class="fs-10 text-muted">{{ $req->leaveType?->code }}</code>
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td>
-                                                                <div class="fs-13 text-dark">{{ $dateRange }}</div>
+                                                            <td style="white-space: nowrap;">
+                                                                <span class="fw-semibold text-dark fs-13">{{ $dateRange }}</span>
                                                             </td>
-                                                            <td class="text-center">
-                                                                <span class="fw-bold fs-13 text-dark">{{ floatval($req->duration) }}</span>
+                                                            <td class="text-center" style="white-space: nowrap;">
+                                                                <span class="badge bg-light text-dark fw-bold fs-12">{{ floatval($req->duration) }}</span>
                                                             </td>
-                                                            <td>
-                                                                <span class="badge {{ $statusBadge['cls'] }} rounded-pill px-2 py-1 fs-11">
+                                                            <td style="white-space: nowrap;">
+                                                                <span class="badge {{ $statusBadge['cls'] }} rounded-pill px-2.5 py-1 fs-11">
                                                                     <i class="{{ $statusBadge['icon'] }} me-1"></i>{{ $statusBadge['lbl'] }}
                                                                 </span>
                                                             </td>
-                                                            <td class="text-center">
+                                                            <td class="text-center" style="white-space: nowrap;">
                                                                 @if($req->attachment_path)
-                                                                    <i class="feather-paperclip text-primary fs-13" title="Has attachment" data-bs-toggle="tooltip"></i>
+                                                                    <a href="{{ asset('storage/'.$req->attachment_path) }}" target="_blank" class="text-primary text-decoration-none" onclick="event.stopPropagation();">
+                                                                        <i class="feather-paperclip fs-14"></i>
+                                                                    </a>
                                                                 @else
                                                                     <span class="text-muted fs-13">—</span>
                                                                 @endif
                                                             </td>
-                                                            <td class="text-end pe-3">
+                                                            <td class="text-end pe-3" style="white-space: nowrap;">
                                                                 <button type="button"
                                                                     class="btn btn-sm btn-light border open-leave-detail px-2 py-1"
                                                                     title="View Details"
@@ -1780,17 +1812,15 @@
                                             No leave encashment requests submitted by this employee yet.
                                         </div>
                                     @else
-                                        <div class="table-responsive">
-                                            <table class="table table-hover align-middle mb-0" id="empLeaveEncashmentTable">
+                                        <div class="table-responsive" style="overflow: visible; width: 100%;">
+                                            <table class="table table-hover align-middle mb-0" id="empLeaveEncashmentTable" style="table-layout: fixed; width: 100%;">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold ps-3">Leave Type</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center">Requested Days</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold">Reason</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold">Submitted Date</th>
-                                                        <th class="fs-12 text-uppercase text-muted fw-semibold">Status</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 25%;">{{ __('hrms.leave.leave_type_and_detail') }}</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 35%;">{{ __('hrms.leave.encashment_app.reason') }}</th>
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 15%;">{{ __('ui.status') ?? 'Status' }}</th>
                                                         @if($isAdminUser)
-                                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3">Actions</th>
+                                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-4" style="width: 25%;">{{ __('hrms.leave.app.actions') }}</th>
                                                         @endif
                                                     </tr>
                                                 </thead>
@@ -1798,9 +1828,9 @@
                                                     @foreach($empLeaveEncashments as $enc)
                                                         @php
                                                             $encStatusBadge = match($enc->status) {
-                                                                'approved' => ['cls' => 'bg-soft-success text-success', 'icon' => 'feather-check-circle', 'lbl' => 'Approved'],
-                                                                'pending'  => ['cls' => 'bg-soft-warning text-warning', 'icon' => 'feather-clock',        'lbl' => 'Pending'],
-                                                                'rejected' => ['cls' => 'bg-soft-danger text-danger',   'icon' => 'feather-x-circle',     'lbl' => 'Rejected'],
+                                                                'approved' => ['cls' => 'bg-soft-success text-success', 'icon' => 'feather-check-circle', 'lbl' => __('hrms.leave.app.status_approved')],
+                                                                'pending'  => ['cls' => 'bg-soft-warning text-warning', 'icon' => 'feather-clock',        'lbl' => __('hrms.leave.app.status_pending')],
+                                                                'rejected' => ['cls' => 'bg-soft-danger text-danger',   'icon' => 'feather-x-circle',     'lbl' => __('hrms.leave.app.status_rejected')],
                                                                 default    => ['cls' => 'bg-light text-secondary',      'icon' => 'feather-circle',       'lbl' => ucfirst($enc->status)],
                                                             };
                                                         @endphp
@@ -1813,41 +1843,52 @@
                                                             data-days="{{ floatval($enc->requested_days) }}"
                                                             data-created-at="{{ $enc->created_at?->timestamp ?: 0 }}"
                                                         >
-                                                            <td class="ps-3">
-                                                                <span class="badge bg-light text-primary fw-semibold fs-12">{{ $enc->leaveType?->name ?: 'N/A' }}</span>
+                                                            <td class="ps-3" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                                <div>
+                                                                    <span class="badge bg-light text-primary fw-semibold fs-12 mb-1" style="white-space: normal; word-break: break-word; text-align: left; display: inline-block; max-width: 100%;">{{ $enc->leaveType?->name ?: 'N/A' }}</span>
+                                                                    <div class="text-muted fs-11 d-flex align-items-center gap-1">
+                                                                        <i class="feather-calendar text-muted" style="font-size: 11px;"></i>
+                                                                        <span>{{ $enc->created_at ? $enc->created_at->format('d M Y') : '—' }}</span>
+                                                                    </div>
+                                                                    <div class="fw-bold fs-12 text-dark mt-1 d-flex align-items-center gap-1">
+                                                                        <i class="feather-clock text-secondary" style="font-size: 11px;"></i>
+                                                                        <span>{{ floatval($enc->requested_days) }} {{ __('hrms.leave.days') }}</span>
+                                                                    </div>
+                                                                </div>
                                                             </td>
-                                                            <td class="text-center">
-                                                                <span class="fw-bold fs-13 text-dark">{{ floatval($enc->requested_days) }} {{ __('hrms.leave.days') }}</span>
+                                                            <td style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                                <span class="fs-12 text-muted" style="line-height: 1.3;">{{ $enc->reason ?: __('hrms.leave.app.no_reason_provided') }}</span>
                                                             </td>
-                                                            <td>
-                                                                <span class="fs-12 text-muted">{{ $enc->reason ?: 'No reason provided.' }}</span>
-                                                            </td>
-                                                            <td>
-                                                                <span class="fs-12 text-dark">{{ $enc->created_at ? $enc->created_at->format('d M Y') : '—' }}</span>
-                                                            </td>
-                                                            <td>
-                                                                <span class="badge {{ $encStatusBadge['cls'] }} rounded-pill px-2 py-1 fs-11">
+                                                            <td class="text-center" style="white-space: nowrap;">
+                                                                <span class="badge {{ $encStatusBadge['cls'] }} rounded-pill px-2.5 py-1 fs-11">
                                                                     <i class="{{ $encStatusBadge['icon'] }} me-1"></i>{{ $encStatusBadge['lbl'] }}
                                                                 </span>
                                                             </td>
                                                             @if($isAdminUser)
-                                                                <td class="text-end pe-3">
-                                                                    @if($enc->status === 'pending')
-                                                                        <form method="POST" action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" class="d-inline-block me-1">
-                                                                            @csrf
-                                                                            <button type="submit" class="btn btn-sm btn-success px-2 py-1 fs-11 fw-semibold" title="Approve Encashment"><i class="feather-check me-1"></i> Approve</button>
-                                                                        </form>
-                                                                        <form method="POST" action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" class="d-inline-block">
-                                                                            @csrf
-                                                                            <button type="submit" class="btn btn-sm btn-outline-danger px-2 py-1 fs-11 fw-semibold" title="Reject Encashment"><i class="feather-x me-1"></i> Reject</button>
-                                                                        </form>
-                                                                    @else
-                                                                        <form method="POST" action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" class="d-inline-block" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this encashment request?', { title: 'Delete Encashment', variant: 'danger', confirmButtonText: 'Delete' });">
-                                                                            @csrf
-                                                                            @method('DELETE')
-                                                                            <button type="submit" class="btn btn-sm btn-light border text-danger px-2 py-1 fs-11" title="Delete"><i class="feather-trash-2"></i></button>
-                                                                        </form>
-                                                                    @endif
+                                                                <td class="text-end pe-3" style="white-space: nowrap;">
+                                                                    <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background-color: #8c4444 !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
+                                                                            <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
+                                                                        </button>
+                                                                        <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0; background: #ffffff;">
+                                                                            <li>
+                                                                                <form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST">
+                                                                                    @csrf
+                                                                                    <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'approved' ? 'color: #8c4444 !important;' : '' }}">
+                                                                                        <span>{{ __('hrms.leave.app.status_approved') }}</span>
+                                                                                    </button>
+                                                                                </form>
+                                                                            </li>
+                                                                            <li>
+                                                                                <form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST">
+                                                                                    @csrf
+                                                                                    <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'rejected' ? 'color: #8c4444 !important;' : '' }}">
+                                                                                        <span>{{ __('hrms.leave.app.status_rejected') }}</span>
+                                                                                    </button>
+                                                                                </form>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </div>
                                                                 </td>
                                                             @endif
                                                         </tr>
@@ -2213,20 +2254,22 @@
                                 @if(session('error'))
                                     <div class="alert alert-danger mb-3">{{ session('error') }}</div>
                                 @endif
-                                <div class="table-responsive border rounded bg-white">
-                                    <table class="table table-bordered table-hover mb-0 align-middle text-center documents-table">
-                                        <thead class="table-light">
+                                <div class="table-responsive border rounded bg-white shadow-sm">
+                                    <table class="table table-hover mb-0 align-middle documents-table">
+                                        <thead class="bg-light text-uppercase fs-11 text-muted fw-semibold" style="letter-spacing: .5px;">
                                             <tr>
-                                                <th class="text-start" style="width: 250px;">{{ __('hrms.employees.tbl_doc_title') }}</th>
-                                                <th>{{ __('hrms.employees.tbl_doc_source') }}</th>
-                                                <th>{{ __('hrms.employees.tbl_expiry_date') }}</th>
-                                                <th>{{ __('hrms.employees.tbl_file') }}</th>
-                                                <th>{{ __('hrms.employees.tbl_status') }}</th>
-                                                <th style="width: 280px;">{{ __('hrms.employees.tbl_actions') }}</th>
+                                                <th class="text-start py-3 ps-3" style="min-width: 240px; max-width: 320px; overflow-wrap: anywhere; word-break: break-word;">{{ __('hrms.employees.tbl_doc_title') }}</th>
+                                                <th class="text-start py-3" style="width: 170px;">Source & Expiry</th>
+                                                <th class="text-start py-3" style="min-width: 240px; max-width: 300px;">{{ __('hrms.employees.tbl_file') }}</th>
+                                                <th class="text-center py-3" style="width: 140px;">{{ __('hrms.employees.tbl_status') }}</th>
+                                                <th class="text-end py-3 pe-3" style="min-width: 185px;">{{ __('hrms.employees.tbl_actions') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @foreach($employee->documents as $doc)
+                                            @php
+                                                $docsList = isset($documents) ? $documents : $employee->documents;
+                                            @endphp
+                                            @foreach($docsList as $doc)
                                                 @php
                                                     $documentSearchText = trim(implode(' ', array_filter([
                                                         $doc->name,
@@ -2243,41 +2286,45 @@
                                                     data-status="{{ $doc->status }}"
                                                     data-has-expiry="{{ $doc->has_expiry ? '1' : '0' }}"
                                                     data-expiry="{{ $doc->expiry_date ? $doc->expiry_date->timestamp : '' }}">
-                                                    <td class="text-start font-semibold">
-                                                        <div class="text-dark fw-bold fs-13">{{ $doc->name }}</div>
+                                                    <!-- Col 1: Document Title & Description -->
+                                                    <td class="text-start font-semibold" style="min-width: 240px; max-width: 320px; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                        <div class="text-dark fw-bold fs-13 lh-sm" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $doc->name }}</div>
                                                         @if($doc->description)
-                                                            <div class="text-muted fs-10" style="font-size: 10px;">{{ $doc->description }}</div>
+                                                            <div class="text-muted fs-11 lh-sm mt-1" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $doc->description }}</div>
                                                         @endif
                                                     </td>
-                                                    <td>
-                                                        @if($doc->requestedBy)
-                                                            <span class="text-secondary fw-medium fs-12">Requested by {{ $doc->requestedBy->name }}</span>
-                                                        @else
-                                                            <span class="text-muted fs-11">Direct Upload</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        @if($doc->has_expiry)
-                                                            @if($doc->expiry_date)
-                                                                @php
-                                                                    $isExpired = $doc->expiry_date->isPast();
-                                                                    $isNearExpiry = !$isExpired && $doc->expiry_date->diffInDays(now()) <= 30; // default 30 days alert
-                                                                @endphp
-                                                                @if($isExpired)
-                                                                    <span class="badge badge-mandatory"><i class="feather-alert-circle me-1"></i>Expired ({{ $doc->expiry_date->format('d M, Y') }})</span>
-                                                                @elseif($isNearExpiry)
-                                                                    <span class="badge badge-expiry"><i class="feather-clock me-1"></i>Near Expiry ({{ $doc->expiry_date->format('d M, Y') }})</span>
+
+                                                    <!-- Col 2: Source & Expiry Badges -->
+                                                    <td class="text-start" style="width: 170px;">
+                                                        <div class="mb-1">
+                                                            @if($doc->requestedBy)
+                                                                <span class="badge bg-soft-primary text-primary fs-11 font-medium"><i class="feather-user me-1"></i>{{ $doc->requestedBy->name }}</span>
+                                                            @else
+                                                                <span class="badge bg-soft-secondary text-secondary fs-11 font-medium"><i class="feather-upload-cloud me-1"></i>Direct Upload</span>
+                                                            @endif
+                                                        </div>
+                                                        <div>
+                                                            @if($doc->has_expiry)
+                                                                @if($doc->expiry_date)
+                                                                    @php
+                                                                        $isExpired = $doc->expiry_date->isPast();
+                                                                        $isNearExpiry = !$isExpired && $doc->expiry_date->diffInDays(now()) <= 30;
+                                                                    @endphp
+                                                                    @if($isExpired)
+                                                                        <span class="badge badge-mandatory"><i class="feather-alert-circle me-1"></i>Expired ({{ $doc->expiry_date->format('d M Y') }})</span>
+                                                                    @elseif($isNearExpiry)
+                                                                        <span class="badge badge-expiry"><i class="feather-clock me-1"></i>Near Expiry ({{ $doc->expiry_date->format('d M Y') }})</span>
+                                                                    @else
+                                                                        <span class="badge bg-soft-info text-info"><i class="feather-calendar me-1"></i>{{ $doc->expiry_date->format('d M Y') }}</span>
+                                                                    @endif
                                                                 @else
-                                                                    <span class="text-dark fw-semibold">{{ $doc->expiry_date->format('d M, Y') }}</span>
+                                                                    <span class="badge bg-soft-warning text-warning"><i class="feather-info me-1"></i>Expiry required</span>
                                                                 @endif
                                                             @else
-                                                                <span class="text-muted fs-11">Required on Upload</span>
+                                                                <span class="badge bg-soft-light text-muted border"><i class="feather-check-circle me-1 text-success"></i>{{ __('hrms.employees.lbl_no_expiry') }}</span>
                                                             @endif
-                                                        @else
-                                                            <span class="text-muted fs-11">{{ __('hrms.employees.lbl_no_expiry') }}</span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="text-start">
+                                                              <!-- Col 3: File Attachment / Inline Upload Selector -->
+                                                     <td class="text-start" style="min-width: 240px; max-width: 300px; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
                                                          @if($doc->file_path)
                                                              <div class="file-card-container">
                                                                  <div class="d-flex align-items-center gap-2 overflow-hidden">
@@ -2285,85 +2332,150 @@
                                                                          <i class="feather-file fs-16"></i>
                                                                      </div>
                                                                      <div class="overflow-hidden">
-                                                                         <div class="text-dark fw-bold fs-12 text-truncate" style="max-width: 130px;" title="{{ $doc->file_name }}">
+                                                                         <div class="text-dark fw-bold fs-12 text-truncate" style="max-width: 110px;" title="{{ $doc->file_name }}">
                                                                              {{ $doc->file_name }}
                                                                          </div>
                                                                          <div class="text-muted fs-10">{{ number_format($doc->file_size / 1024, 1) }} KB</div>
                                                                      </div>
                                                                  </div>
-                                                                 <div class="hstack gap-1">
+                                                                 <div class="hstack gap-1 me-1">
                                                                      <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="file-action-btn" title="View Document" data-bs-toggle="tooltip">
                                                                          <i class="feather-eye fs-12"></i>
                                                                      </a>
                                                                      <a href="{{ asset('storage/' . $doc->file_path) }}" download="{{ $doc->file_name }}" class="file-action-btn" title="Download Document" data-bs-toggle="tooltip">
                                                                          <i class="feather-download fs-12"></i>
                                                                      </a>
+                                                                     @if($doc->status === 'rejected')
+                                                                         <button type="button" class="file-action-btn text-primary" title="Re-upload File" data-bs-toggle="collapse" data-bs-target="#reupload_form_{{ $doc->id }}">
+                                                                             <i class="feather-upload-cloud fs-12"></i>
+                                                                         </button>
+                                                                     @endif
                                                                  </div>
                                                              </div>
+
+                                                             @if($doc->status === 'rejected')
+                                                                 <!-- Collapsible Re-upload Form for Rejected Document -->
+                                                                 <div class="collapse mt-2" id="reupload_form_{{ $doc->id }}">
+                                                                     <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column gap-1.5 p-2 bg-light rounded border border-warning-subtle">
+                                                                         @csrf
+                                                                         <input type="hidden" name="document_id" value="{{ $doc->id }}">
+                                                                         
+                                                                         <div class="input-group input-group-sm">
+                                                                             <label class="form-control form-control-sm bg-white text-muted d-flex align-items-center text-truncate cursor-pointer mb-0" for="reupload_file_input_{{ $doc->id }}" style="font-size: 11px; height: 30px; border-color: #cbd5e1; border-top-left-radius: 6px; border-bottom-left-radius: 6px;" title="Choose replacement file">
+                                                                                 <i class="feather-upload-cloud me-1.5 text-primary fs-12 flex-shrink-0"></i>
+                                                                                 <span class="file-text text-truncate" id="reupload_file_text_{{ $doc->id }}">New File</span>
+                                                                                 <input type="file" name="file" id="reupload_file_input_{{ $doc->id }}" class="d-none" required onchange="var name = this.files[0]?.name || 'New File'; var span = document.getElementById('reupload_file_text_{{ $doc->id }}'); span.innerText = name; span.parentElement.setAttribute('title', name);">
+                                                                             </label>
+                                                                             <button type="submit" class="btn btn-primary px-2.5 d-flex align-items-center gap-1" style="font-size: 11px; height: 30px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; font-weight: 500;">
+                                                                                 <i class="feather-upload-cloud"></i> Re-upload
+                                                                             </button>
+                                                                         </div>
+
+                                                                         @if($doc->has_expiry)
+                                                                             <div class="d-flex align-items-center gap-1.5 bg-white p-1 px-2 rounded border">
+                                                                                 <span class="text-secondary fs-10 font-semibold text-uppercase d-flex align-items-center gap-1">
+                                                                                     <i class="feather-calendar text-primary fs-11"></i> Expiry:
+                                                                                 </span>
+                                                                                 <input type="date" name="expiry_date" value="{{ $doc->expiry_date ? $doc->expiry_date->format('Y-m-d') : '' }}" class="form-control form-control-sm py-0 px-1.5 bg-white" required style="font-size: 11px; height: 24px; max-width: 125px; border-radius: 4px;">
+                                                                             </div>
+                                                                         @endif
+                                                                     </form>
+                                                                 </div>
+                                                             @endif
                                                          @else
-                                                             <span class="text-muted fs-11 d-block text-center">No File Uploaded</span>
-                                                         @endif
-                                                    </td>
-                                                    <td>
-                                                        @if($doc->status === 'requested')
-                                                            <span class="badge bg-soft-warning text-warning">{{ __('hrms.employees.lbl_pending_upload') }}</span>
-                                                        @elseif($doc->status === 'uploaded')
-                                                            <span class="badge bg-soft-success text-success">{{ __('hrms.employees.lbl_uploaded') }}</span>
-                                                        @else
-                                                            <span class="badge bg-soft-secondary text-secondary">{{ ucfirst($doc->status) }}</span>
-                                                        @endif
-                                                    </td>
-                                                    <td>
-                                                        @if($doc->status === 'requested')
-                                                            <!-- File Upload Form for Pending Request -->
-                                                            <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
-                                                                @csrf
+                                                             <!-- File Upload Form for Pending Files -->
+                                                             <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column gap-1">
+                                                                 @csrf
                                                                  <input type="hidden" name="document_id" value="{{ $doc->id }}">
-                                                                <div class="flex-grow-1 text-start">
-                                                                    <div class="erp-custom-file-upload">
-                                                                        <label class="file-upload-label py-1.5 px-3" style="font-size: 11px; cursor: pointer; border-style: dashed; border-width: 1px;" for="table_file_{{ $doc->id }}">
-                                                                            <i class="feather-upload-cloud me-1 text-primary fs-12"></i>
-                                                                            <span class="file-text text-muted" id="file_text_{{ $doc->id }}">{{ __('hrms.employees.lbl_choose_file') }}</span>
-                                                                            <input type="file" name="file" id="table_file_{{ $doc->id }}" class="d-none" required onchange="document.getElementById('file_text_{{ $doc->id }}').innerText = this.files[0]?.name || 'Choose File'">
-                                                                        </label>
-                                                                    </div>
-                                                                    @if($doc->has_expiry)
-                                                                        <div class="mt-1 d-flex align-items-center gap-1">
-                                                                            <span class="text-secondary fs-9 text-uppercase" style="font-size: 8px;">Expiry:</span>
-                                                                            <input type="date" name="expiry_date" class="form-control form-control-sm py-0 px-1" required style="font-size: 10px; height: 20px; width: 120px;">
-                                                                        </div>
-                                                                    @endif
-                                                                </div>
-                                                                <button type="submit" class="btn btn-sm btn-primary py-1 px-2 d-flex align-items-center justify-content-center" style="border-radius: 6px; font-size: 11px; height: 28px;">
-                                                                    <i class="feather-upload-cloud me-1"></i> {{ __('hrms.employees.btn_upload') }}
-                                                                </button>
-                                                            </form>
+                                                                 <div class="d-flex align-items-center gap-2">
+                                                                     <label class="file-upload-label py-1 ps-3 pe-2 d-inline-flex align-items-center overflow-hidden flex-grow-1 mb-0" style="font-size: 11px; cursor: pointer; border: 1px dashed #cbd5e1; border-radius: 6px; background: #f8fafc; height: 28px; box-sizing: border-box;" for="table_file_{{ $doc->id }}" title="{{ __('hrms.employees.lbl_choose_file') }}">
+                                                                         <i class="feather-upload-cloud me-2 text-primary fs-12 flex-shrink-0"></i>
+                                                                         <span class="file-text text-muted text-truncate d-inline-block" style="max-width: 90px; font-size: 11px; vertical-align: middle;" id="file_text_{{ $doc->id }}">{{ __('hrms.employees.lbl_choose_file') }}</span>
+                                                                         <input type="file" name="file" id="table_file_{{ $doc->id }}" class="d-none" required onchange="var name = this.files[0]?.name || 'Choose File'; var span = document.getElementById('file_text_{{ $doc->id }}'); span.innerText = name; span.parentElement.setAttribute('title', name);">
+                                                                     </label>
+                                                                     <button type="submit" class="btn btn-sm btn-primary py-0 px-2 flex-shrink-0 d-inline-flex align-items-center justify-content-center gap-1" style="border-radius: 6px; font-size: 10px; height: 28px; box-sizing: border-box; font-weight: 500;" title="Upload File">
+                                                                         <i class="feather-upload-cloud fs-11"></i> {{ __('hrms.employees.btn_upload') }}
+                                                                     </button>
+                                                                 </div>
+                                                                 @if($doc->has_expiry)
+                                                                     <div class="d-flex align-items-center gap-1 mt-1">
+                                                                         <span class="text-secondary fs-9 text-uppercase fw-semibold" style="font-size: 8.5px;">Expiry:</span>
+                                                                         <input type="date" name="expiry_date" value="{{ $doc->expiry_date ? $doc->expiry_date->format('Y-m-d') : '' }}" class="form-control form-control-sm py-0 px-1" required style="font-size: 10px; height: 22px; width: 120px;">
+                                                                     </div>
+                                                                 @endif
+                                                             </form>
+                                                         @endif
+                                                     </td>
+
+                                                    <!-- Col 4: Status -->
+                                                    <td>
+                                                        @if($doc->status === 'approved')
+                                                            <span class="badge bg-soft-success text-success"><i class="feather-check-circle me-1"></i>Approved</span>
+                                                        @elseif($doc->status === 'rejected')
+                                                            <span class="badge bg-soft-danger text-danger"><i class="feather-x-circle me-1"></i>Rejected</span>
+                                                        @elseif($doc->file_path)
+                                                            <span class="badge bg-soft-info text-info"><i class="feather-clock me-1"></i>Pending Verification</span>
                                                         @else
-                                                            <div class="d-flex justify-content-center gap-2">
-                                                                @if(auth()->user()->hasHrPermission('hr.settings.manage'))
-                                                                    <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this document record?', { title: 'Delete Document Record', variant: 'danger', confirmButtonText: 'Delete' });">
-                                                                        @csrf
-                                                                        @method('DELETE')
-                                                                        <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-1 px-3" style="border-radius: 6px; font-size: 11px;">
-                                                                            <i class="feather-trash-2"></i> {{ __('hrms.employees.btn_remove_record') }}
-                                                                        </button>
-                                                                    </form>
-                                                                @endif
-                                                            </div>
+                                                            <span class="badge bg-soft-warning text-warning"><i class="feather-clock me-1"></i>{{ __('hrms.employees.lbl_pending_upload') }}</span>
                                                         @endif
                                                     </td>
+
+                                                    <!-- Col 5: Actions (Primary Theme Dropdown Button + Delete Button) -->
+                                                     <td class="text-end px-3" style="min-width: 185px;">
+                                                         <div class="d-flex align-items-center justify-content-end gap-2">
+                                                             @if(auth()->user()->hasHrPermission('hr.settings.manage'))
+                                                                 @if($doc->file_path)
+                                                                     <!-- Primary Theme Colored Dropdown -->
+                                                                     <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                         <button class="btn btn-sm btn-primary dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px;" title="Change Document Status">
+                                                                             <span>{{ $doc->status === 'approved' ? 'Approved' : ($doc->status === 'rejected' ? 'Rejected' : 'Select Status') }}</span>
+                                                                         </button>
+                                                                         <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0;">
+                                                                             <li>
+                                                                                 <form action="{{ route('hrms.employees.documents.status', $doc->id) }}" method="POST">
+                                                                                     @csrf
+                                                                                     @method('PATCH')
+                                                                                     <input type="hidden" name="status" value="approved">
+                                                                                     <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $doc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}">
+                                                                                         <span>Approved</span>
+                                                                                     </button>
+                                                                                 </form>
+                                                                             </li>
+                                                                             <li>
+                                                                                 <form action="{{ route('hrms.employees.documents.status', $doc->id) }}" method="POST">
+                                                                                     @csrf
+                                                                                     @method('PATCH')
+                                                                                     <input type="hidden" name="status" value="rejected">
+                                                                                     <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $doc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}">
+                                                                                         <span>Rejected</span>
+                                                                                     </button>
+                                                                                 </form>
+                                                                             </li>
+                                                                         </ul>
+                                                                     </div>
+                                                                 @endif
+
+                                                                 <!-- Separate Delete Button using Common UI Element x-ui.icon-btn -->
+                                                                 <form action="{{ route('hrms.employees.documents.destroy', $doc->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this document record and file?', { title: 'Delete Document Record', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                                     @csrf
+                                                                     @method('DELETE')
+                                                                     <x-ui.icon-btn variant="danger" size="sm" icon="feather-trash-2" title="Delete Document Record" type="submit" style="border-radius: 8px; height: 32px; width: 32px;" />
+                                                                 </form>
+                                                             @endif
+                                                         </div>
+                                                     </td>
                                                 </tr>
                                             @endforeach
-                                            @if($employee->documents->isEmpty())
+                                            @if($docsList->isEmpty())
                                                 <tr>
-                                                    <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                                    <td colspan="5" class="text-center py-5 text-muted fs-12">
                                                         <i class="feather-file fs-24 d-block mb-2 text-secondary"></i>
                                                         {{ __('hrms.employees.lbl_no_docs_uploaded') }}
                                                     </td>
                                                 </tr>
                                             @else
                                                 <tr id="documentNoResultsRow" class="d-none">
-                                                    <td colspan="6" class="text-center py-5 text-muted fs-12">
+                                                    <td colspan="5" class="text-center py-5 text-muted fs-12">
                                                         <i class="feather-search fs-24 d-block mb-2 text-secondary"></i>
                                                         {{ __('hrms.employees.lbl_no_docs_match') }}
                                                     </td>
@@ -2372,6 +2484,18 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                @if(isset($documents) && $documents->hasPages())
+                                     <div class="px-4 py-3 border-top bg-white doc-pagination-container">
+                                         <x-ui.pagination 
+                                             :currentPage="$documents->currentPage()" 
+                                             :totalPages="$documents->lastPage()" 
+                                             :totalResults="$documents->total()" 
+                                             :perPage="$documents->perPage()" 
+                                             pageParam="doc_page" 
+                                             tab="documents" 
+                                         />
+                                     </div>
+                                 @endif
                             </div>
                         </div>
                     </div>
@@ -2502,8 +2626,9 @@
                             <table class="table table-hover align-middle mb-0 text-center assigned-assets-table">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="text-start" style="padding-left: 20px;">{{ __('hrms.employees.tbl_asset_name') }}</th>
+                                        <th class="text-start" style="padding-left: 20px; min-width: 160px; max-width: 280px; overflow-wrap: anywhere; word-break: break-word;">{{ __('hrms.employees.tbl_asset_name') }}</th>
                                         <th>{{ __('hrms.employees.tbl_category') }}</th>
+                                        <th>Qty</th>
                                         <th>Assigned At</th>
                                         <th class="text-end" style="width: 180px; padding-right: 20px;">{{ __('hrms.employees.tbl_actions') }}</th>
                                     </tr>
@@ -2521,7 +2646,7 @@
                                                 $itemObj?->name,
                                                 $firstAsset->brand,
                                                 $firstAsset->model_number,
-                                                $firstAsset->category?->name,
+                                                $firstAsset->category?->name ?: $itemObj?->category?->name,
                                                 $assetCodes,
                                                 $serialNumbers,
                                             ])));
@@ -2530,26 +2655,29 @@
                                         <tr class="assigned-asset-row"
                                             data-name="{{ \Illuminate\Support\Str::lower($itemObj?->name) }}"
                                             data-search="{{ \Illuminate\Support\Str::lower($assetSearchText) }}"
-                                            data-category="{{ \Illuminate\Support\Str::lower($itemObj?->category?->name) }}"
+                                            data-category="{{ \Illuminate\Support\Str::lower($itemObj?->category?->name ?: $firstAsset->category?->name) }}"
                                             data-has-serial="{{ $assets->first(fn($a) => !empty($a->serial_number)) ? '1' : '0' }}"
                                             data-assigned="{{ $firstAsset->allocated_at ? $firstAsset->allocated_at->timestamp : '' }}">
-                                            <td class="text-start" style="padding-left: 20px;">
-                                                <div class="fw-bold text-dark fs-13">{{ $itemObj?->name }}</div>
-                                                <small class="text-muted fs-11">{{ $firstAsset->brand }} {{ $firstAsset->model_number }}</small>
+                                            <td class="text-start" style="padding-left: 20px; min-width: 160px; max-width: 280px; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                <div class="fw-bold text-dark fs-13 lh-sm" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $itemObj?->name ?: $firstAsset->name }}</div>
+                                                <small class="text-muted fs-11 lh-sm d-block mt-1" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $firstAsset->brand }} {{ $firstAsset->model_number }}</small>
                                             </td>
                                             <td>
-                                                <span class="badge bg-soft-primary text-primary">{{ $itemObj?->category?->name }}</span>
+                                                <span class="badge bg-soft-primary text-primary">{{ $itemObj?->category?->name ?: $firstAsset->category?->name }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-light text-dark border px-2 py-1 fs-12 font-monospace" title="Assigned Quantity">{{ $assets->count() }}</span>
                                             </td>
                                             <td>
                                                 <span class="text-secondary fs-13">{{ $firstAsset->allocated_at ? $firstAsset->allocated_at->format('d M, Y') : 'N/A' }}</span>
                                             </td>
                                             <td class="text-end" style="padding-right: 20px;">
                                                 <div class="d-flex justify-content-end align-items-center gap-2">
-                                                    <button type="button" class="btn btn-sm btn-icon btn-light border" style="border-radius: 8px; width: 32px; height: 32px;" data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" data-item-name="{{ $itemObj?->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}" title="View Details">
+                                                    <button type="button" class="btn btn-sm btn-icon btn-light border" style="border-radius: 8px; width: 32px; height: 32px;" data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" data-item-name="{{ $itemObj?->name ?: $firstAsset->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}" title="View Details">
                                                         <i class="feather-eye" style="font-size: 14px; color: #475569;"></i>
                                                     </button>
                                                     @if(auth()->user()->hasHrPermission('hr.settings.manage'))
-                                                        <button type="button" class="btn btn-sm btn-light border text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center" style="border-color: #cbd5e1; background-color: #ffffff; color: #475569; font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $itemObj?->id }}" data-item-name="{{ $itemObj?->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}">
+                                                        <button type="button" class="btn btn-sm btn-light border text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center" style="border-color: #cbd5e1; background-color: #ffffff; color: #475569; font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $itemObj?->id }}" data-item-name="{{ $itemObj?->name ?: $firstAsset->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}">
                                                              {{ __('hrms.employees.btn_return_asset') }}
                                                          </button>
                                                     @endif
@@ -2558,7 +2686,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="4" class="text-center py-5 text-muted fs-12">
+                                            <td colspan="5" class="text-center py-5 text-muted fs-12">
                                                 <i class="feather-package fs-24 d-block mb-2 text-secondary"></i>
                                                 {{ __('hrms.employees.lbl_no_assets_assigned') }}
                                             </td>
@@ -2566,7 +2694,7 @@
                                     @endforelse
                                     @if($employee->assets->isNotEmpty())
                                         <tr id="assignedAssetNoResultsRow" class="d-none">
-                                            <td colspan="4" class="text-center py-5 text-muted fs-12">
+                                            <td colspan="5" class="text-center py-5 text-muted fs-12">
                                                 <i class="feather-search fs-24 d-block mb-2 text-secondary"></i>
                                                 {{ __('hrms.employees.lbl_no_assets_match') }}
                                             </td>
@@ -2645,8 +2773,9 @@
                                 <table class="table align-middle mb-0 text-center asset-requests-table">
                                     <thead class="table-light text-uppercase fs-10" style="letter-spacing: 0.5px;">
                                         <tr>
-                                            <th class="text-start" style="padding-left: 20px;">{{ __('hrms.employees.tbl_requested_category') }}</th>
+                                            <th class="text-start" style="padding-left: 20px; min-width: 160px; max-width: 260px; overflow-wrap: anywhere; word-break: break-word;">{{ __('hrms.employees.tbl_requested_category') }}</th>
                                             <th>{{ __('hrms.employees.tbl_request_date') }}</th>
+                                            <th>Allocated / Req Qty</th>
                                             <th class="text-start">{{ __('hrms.employees.tbl_reason') }}</th>
                                             <th>{{ __('hrms.employees.tbl_status') }}</th>
                                             <th class="text-start" style="padding-right: 20px;">{{ __('hrms.employees.tbl_admin_notes') }}</th>
@@ -2657,47 +2786,74 @@
                                             @php
                                                 $requestSearchText = trim(implode(' ', array_filter([
                                                     $req->category?->name,
+                                                    $req->item?->name,
                                                     $req->reason,
                                                     $req->status,
                                                     $req->admin_notes,
                                                 ])));
+                                                $requestedQty = $req->quantity ?: 1;
+                                                $allocatedQty = 0;
+                                                if ($req->relationLoaded('allocatedAssets') && $req->allocatedAssets->isNotEmpty()) {
+                                                    $allocatedQty = $req->allocatedAssets->count();
+                                                } elseif ($req->allocated_asset_id) {
+                                                    $allocatedQty = 1;
+                                                } elseif (in_array($req->status, ['allocated', 'approved', 'fulfilled'])) {
+                                                    $allocatedQty = $requestedQty;
+                                                }
                                             @endphp
                                             <tr class="asset-request-row"
                                                 data-category="{{ \Illuminate\Support\Str::lower($req->category?->name) }}"
                                                 data-status="{{ $req->status }}"
                                                 data-search="{{ \Illuminate\Support\Str::lower($requestSearchText) }}"
                                                 data-date="{{ $req->request_date ? $req->request_date->timestamp : '' }}">
-                                                <td class="text-start" style="padding-left: 20px;">
-                                                    <span class="badge bg-soft-primary text-primary mb-1">{{ $req->category->name }}</span>
-                                                    @if($req->requestedAsset)
-                                                        <div class="fs-11 text-muted">Req Asset: <strong class="text-dark">{{ $req->requestedAsset->name }} ({{ $req->requestedAsset->asset_code }})</strong></div>
+                                                <td class="text-start" style="padding-left: 20px; min-width: 160px; max-width: 260px; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
+                                                    <span class="badge bg-soft-primary text-primary mb-1" style="white-space: normal; word-break: break-word; max-width: 100%;">{{ $req->category?->name ?: 'Asset' }}</span>
+                                                    @if($req->item)
+                                                        <div class="fw-semibold text-dark fs-12 lh-sm" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">{{ $req->item->name }}</div>
+                                                    @elseif($req->requestedAsset)
+                                                        <div class="fs-11 text-muted lh-sm" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">Req Asset: <strong class="text-dark">{{ $req->requestedAsset->name }} ({{ $req->requestedAsset->asset_code }})</strong></div>
                                                     @endif
                                                 </td>
                                                 <td><span class="text-secondary fs-12">{{ $req->request_date ? $req->request_date->format('d M, Y') : '-' }}</span></td>
-                                                <td class="text-start text-muted fs-12" style="max-width: 250px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ $req->reason }}">{{ $req->reason }}</td>
+                                                <td>
+                                                    <span class="badge {{ $allocatedQty >= $requestedQty ? 'bg-soft-success text-success border border-success-subtle' : ($allocatedQty > 0 ? 'bg-soft-warning text-warning border border-warning-subtle' : 'bg-light text-dark border') }} px-2 py-1 fs-11 font-monospace" title="{{ $allocatedQty }} allocated out of {{ $requestedQty }} requested">
+                                                        <strong class="fs-12">{{ $allocatedQty }}</strong> / {{ $requestedQty }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-start text-dark fs-12" style="min-width: 200px; max-width: 300px; white-space: normal; word-break: break-word;">
+                                                    @if($req->reason)
+                                                        <div class="lh-sm" style="white-space: normal; word-break: break-word;">{{ $req->reason }}</div>
+                                                    @else
+                                                        <span class="text-muted fs-11">-</span>
+                                                    @endif
+                                                </td>
                                                 <td>
                                                     @if($req->status === 'pending')
                                                         <span class="badge bg-soft-warning text-warning px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
-                                                    @elseif($req->status === 'allocated')
+                                                    @elseif(in_array($req->status, ['allocated', 'approved', 'fulfilled']))
                                                         <span class="badge bg-soft-success text-success px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
+                                                    @elseif($req->status === 'partially_allocated')
+                                                        <span class="badge bg-soft-info text-info px-2 py-1 text-capitalize fs-11">Partial</span>
                                                     @elseif($req->status === 'rejected')
                                                         <span class="badge bg-soft-danger text-danger px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
                                                     @else
                                                         <span class="badge bg-light text-secondary px-2 py-1 text-capitalize fs-11">{{ $req->status }}</span>
                                                     @endif
                                                 </td>
-                                                <td class="text-start text-muted fs-11" style="padding-right: 20px;">{{ $req->admin_notes ?: '-' }}</td>
+                                                <td class="text-start text-muted fs-11" style="padding-right: 20px; min-width: 180px; max-width: 260px; white-space: normal; word-break: break-word;">
+                                                    <div class="lh-sm" style="white-space: normal; word-break: break-word;">{{ $req->formatted_admin_notes ?: ($req->admin_notes ?: '-') }}</div>
+                                                </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="5" class="text-center py-4 text-muted fs-11">
+                                                <td colspan="6" class="text-center py-4 text-muted fs-11">
                                                     {{ __('hrms.employees.lbl_no_asset_requests') }}
                                                 </td>
                                             </tr>
                                         @endforelse
                                         @if($employee->assetRequests->isNotEmpty())
                                             <tr id="assetRequestNoResultsRow" class="d-none">
-                                                <td colspan="5" class="text-center py-4 text-muted fs-11">
+                                                <td colspan="6" class="text-center py-4 text-muted fs-11">
                                                     <i class="feather-search fs-20 d-block mb-2 text-secondary"></i>
                                                     {{ __('hrms.employees.lbl_no_asset_requests_match') }}
                                                 </td>
@@ -3081,7 +3237,7 @@
 
     <!-- REQUEST ASSET MODAL FOR PROFILE TAB -->
     <div class="modal fade" id="requestAssetModal" aria-labelledby="requestAssetModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" style="max-width: 520px;">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 620px;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark" id="requestAssetModalLabel">
@@ -3105,18 +3261,18 @@
                                     </button>
                                 </div>
                                 <div class="table-responsive border rounded bg-white req-item-table-container">
-                                    <table class="table table-sm align-middle mb-0" id="req-items-table">
+                                    <table class="table table-sm align-middle mb-0" id="req-items-table" style="table-layout: fixed; width: 100%;">
                                         <thead class="table-light text-uppercase fs-11">
                                             <tr>
-                                                <th class="py-2 px-3 text-start">Item *</th>
-                                                <th class="py-2 text-center" style="width: 85px;">Quantity *</th>
-                                                <th class="py-2 text-center px-2" style="width: 45px;">Action</th>
+                                                <th class="py-2 px-3 text-start" style="width: 62%;">Item *</th>
+                                                <th class="py-2 text-center" style="width: 95px;">Quantity *</th>
+                                                <th class="py-2 text-center px-2" style="width: 50px;">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody id="req-items-tbody">
                                             <tr>
-                                                <td class="py-2 px-3">
-                                                    <select name="items[0][asset_item_id]" class="form-select form-select-sm req-item-select" required>
+                                                <td class="py-2 px-3" style="overflow: hidden; max-width: 0;">
+                                                    <select name="items[0][asset_item_id]" class="form-select form-select-sm req-item-select" required style="width: 100%;">
                                                         <option value="">Select Item</option>
                                                         @foreach(\App\Domains\HRMS\Models\AssetItem::whereHas('category', function($q) use ($employee) { $q->where('company_id', $employee->company_id); })->get() as $item)
                                                             <option value="{{ $item->id }}">{{ $item->name }} (Category: {{ $item->category->name ?? 'N/A' }})</option>
@@ -3157,6 +3313,7 @@
                 <form action="{{ route('hrms.leaves.store') }}" method="POST" enctype="multipart/form-data" id="empApplyLeaveForm">
                     @csrf
                     <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                    <input type="hidden" name="redirect_tab" value="leaves">
                     <div class="modal-body p-4">
                         @if ($errors->any())
                             <div class="alert alert-danger">
@@ -3466,6 +3623,16 @@
 
                     return duration;
                 }
+
+                @if($errors->any())
+                    setTimeout(function() {
+                        var modalEl = document.getElementById('empApplyLeaveModal');
+                        if (modalEl) {
+                            var bsModal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                            bsModal.show();
+                        }
+                    }, 200);
+                @endif
 
                 // Dynamic Encashment Leave Type Population (filtered by encashment-enabled rules)
                 function empUpdateEncashmentLeaveTypes() {
@@ -4380,6 +4547,9 @@
                 }
             });
 
+            // Initial trigger to refresh rows on load
+            refreshEmpLeaveAppRows();
+
             // ── Employee Leave Encashments Search, Sort & Filter & Pagination ────
             var empLeaveEncSortMode = 'date_desc';
             var empLeaveEncFilters = { status: '', leave_type_id: '' };
@@ -4597,6 +4767,19 @@
         #requestAssetModal .odoo-form-label {
             width: 180px !important;
         }
+        .req-item-table-container {
+            overflow-x: hidden !important;
+        }
+        .req-item-table-container #req-items-table {
+            table-layout: fixed !important;
+            width: 100% !important;
+        }
+        .req-item-table-container .select2-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            display: block !important;
+            box-sizing: border-box !important;
+        }
         .req-item-table-container .select2-container--bootstrap-5 .select2-selection {
             min-height: 34px !important;
             height: 34px !important;
@@ -4604,10 +4787,23 @@
             padding-bottom: 2px !important;
             font-size: 12.5px !important;
             border-radius: 0.375rem !important;
+            display: flex !important;
+            align-items: center !important;
+            overflow: hidden !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
         }
         .req-item-table-container .select2-container--bootstrap-5 .select2-selection__rendered {
             line-height: 28px !important;
             font-size: 12.5px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+            display: block !important;
+            width: 100% !important;
+            max-width: calc(100% - 15px) !important;
+            padding-right: 15px !important;
+            box-sizing: border-box !important;
         }
         .select2-container--bootstrap-5 .select2-selection {
             min-height: 38px !important;
@@ -4619,6 +4815,13 @@
             border-radius: 0.375rem !important;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
             z-index: 9999 !important;
+        }
+        .select2-container--bootstrap-5 .select2-results__option {
+            white-space: normal !important;
+            word-break: break-word !important;
+            font-size: 12.5px !important;
+            padding: 6px 12px !important;
+            line-height: 1.4 !important;
         }
         .select2-container--bootstrap-5 .select2-results__option--highlighted {
             background-color: var(--bs-primary) !important;

@@ -75,6 +75,9 @@ Route::prefix('hrms')
             
             Route::post('/{employee}/documents/request', [EmployeeController::class, 'requestDocument'])->name('employees.documents.request');
             Route::post('/{employee}/documents/upload', [EmployeeController::class, 'uploadDocument'])->name('employees.documents.upload');
+            Route::patch('/documents/{document}/approve', [EmployeeController::class, 'approveDocument'])->name('employees.documents.approve');
+            Route::patch('/documents/{document}/reject', [EmployeeController::class, 'rejectDocument'])->name('employees.documents.reject');
+            Route::patch('/documents/{document}/status', [EmployeeController::class, 'updateDocumentStatus'])->name('employees.documents.status');
             Route::delete('/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
 
             Route::post('/{employee}/adhoc-components', [EmployeeController::class, 'storeAdhocComponent'])->name('employees.adhoc-components.store');

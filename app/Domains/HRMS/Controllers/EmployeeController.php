@@ -503,8 +503,18 @@ class EmployeeController extends Controller
             ];
         }
 
-        // Load employee penalties, adhoc components, documents, and employment histories
-        $employee->load(['documents.requestedBy', 'employmentHistories', 'assetRequests.requestedAsset']);
+        // Load employee penalties, adhoc components, documents, employment histories, and asset relations
+        $employee->load([
+            'documents.requestedBy',
+            'employmentHistories',
+            'assets.item.category',
+            'assets.category',
+            'assetRequests.category',
+            'assetRequests.item',
+            'assetRequests.requestedAsset',
+            'assetRequests.allocatedAsset',
+            'assetRequests.allocatedAssets',
+        ]);
 
         $availableAssets = \App\Domains\HRMS\Models\Asset::query()
             ->where('company_id', $employee->company_id)
@@ -627,6 +637,13 @@ class EmployeeController extends Controller
             $employeeDataMap[$emp->id] = $typesList;
         }
 
+        // Load paginated employee documents for Document Registry tab
+        $documents = $employee->documents()
+            ->with('requestedBy')
+            ->orderBy('created_at', 'desc')
+            ->paginate(10, ['*'], 'doc_page')
+            ->withQueryString();
+
         return view('modules.hrms.employees.show', compact(
             'employee',
             'salaryStructure',
@@ -641,7 +658,8 @@ class EmployeeController extends Controller
             'leaveEncashments',
             'empBalancesList',
             'allEmployees',
-            'employeeDataMap'
+            'employeeDataMap',
+            'documents'
         ));
     }
 
@@ -815,6 +833,49 @@ class EmployeeController extends Controller
         return redirect()->route('hrms.employees.show', [$employeeId, 'tab' => 'documents'])
             ->with('success', 'Document record deleted successfully.');
     }
+
+    public function approveDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $document->update([
+            'status' => 'approved',
+        ]);
+
+        return redirect()->route('hrms.employees.show', [$document->documentable_id, 'tab' => 'documents'])
+            ->with('success', 'Document approved successfully.');
+    }
+
+    public function rejectDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $document->update([
+            'status' => 'rejected',
+        ]);
+
+        return redirect()->route('hrms.employees.show', [$document->documentable_id, 'tab' => 'documents'])
+            ->with('success', 'Document rejected successfully.');
+    }
+
+    public function updateDocumentStatus(Request $request, \App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'status' => 'required|in:approved,rejected',
+        ]);
+
+        $document->update([
+            'status' => $validated['status'],
+        ]);
+
+        $msg = $validated['status'] === 'approved' ? 'Document approved successfully.' : 'Document marked as rejected.';
+
+        return redirect()->route('hrms.employees.show', [$document->documentable_id, 'tab' => 'documents'])
+            ->with('success', $msg);
+    }
+
 
     public function storeEmploymentHistory(Request $request, Employee $employee): RedirectResponse
     {
