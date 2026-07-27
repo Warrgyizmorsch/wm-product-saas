@@ -206,17 +206,30 @@ class ProductionBomService
             throw new InvalidArgumentException("Only BOMs pending approval can be approved.");
         }
 
-        return DB::transaction(function () use ($bom, $approverUserId) {
-            // 1. Deactivate previously approved BOMs for the same product
-            ProductionBom::withoutGlobalScopes()
+        return DB::transaction(function () use ($id, $approverUserId) {
+            $bom = ProductionBom::withoutGlobalScopes()
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (!$bom->isPendingApproval()) {
+                throw new InvalidArgumentException("Only BOMs pending approval can be approved.");
+            }
+
+            // 1. Deactivate previously approved BOMs for the same product and BOM type
+            $deactivateQuery = ProductionBom::withoutGlobalScopes()
                 ->where('tenant_id', $bom->tenant_id)
                 ->where('product_id', $bom->product_id)
                 ->where('status', 'approved')
-                ->where('id', '!=', $bom->id)
-                ->update([
-                    'status' => 'inactive',
-                    'expiry_date' => Carbon::now()->toDateString(),
-                ]);
+                ->where('id', '!=', $bom->id);
+
+            if (!empty($bom->bom_type)) {
+                $deactivateQuery->where('bom_type', $bom->bom_type);
+            }
+
+            $deactivateQuery->update([
+                'status' => 'inactive',
+                'expiry_date' => Carbon::now()->toDateString(),
+            ]);
 
             // 2. Approve current BOM
             $bom->update([

@@ -536,13 +536,24 @@ class SchedulingService
                 $plannedStart = $alloc['start'] ?? $earliestStart->copy();
                 $plannedFinish = $alloc['finish'] ?? $earliestStart->copy()->addMinutes((int) ceil($op->planned_duration_minutes));
 
+                $targetMachine = $alloc['machine_id'] ?? $op->machine_id;
+                if ($targetMachine) {
+                    app(CapacityPlanningService::class)->validateMachineAvailability(
+                        $schedule->tenant_id,
+                        (int) $targetMachine,
+                        $plannedStart,
+                        $plannedFinish,
+                        $op->id
+                    );
+                }
+
                 $op->update([
-                    'machine_id' => $alloc['machine_id'] ?? $op->machine_id,
+                    'machine_id' => $targetMachine,
                     'planned_start' => $plannedStart,
                     'planned_finish' => $plannedFinish,
                     'warnings' => $alloc['warnings'] ?? [],
                     'priority' => $alloc['priority'] ?? 1,
-                    'resource_id' => ($alloc['machine_id'] ?? null) ? 'Machine_' . $alloc['machine_id'] : $op->resource_id,
+                    'resource_id' => $targetMachine ? 'Machine_' . $targetMachine : $op->resource_id,
                 ]);
 
                 $scheduledData[] = [

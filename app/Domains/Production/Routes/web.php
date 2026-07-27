@@ -167,6 +167,7 @@ Route::prefix('production')
         Route::post('mes/{op}/log-progress', [MesController::class, 'logProgress'])->name('mes.log-progress');
         Route::post('mes/{op}/hold', [MesController::class, 'hold'])->name('mes.hold');
         Route::post('mes/{op}/cancel', [MesController::class, 'cancel'])->name('mes.cancel');
+        Route::post('mes/{op}/andon-alert', [MesController::class, 'reportAndonAlert'])->name('mes.andon-alert');
 
         // ── Advanced MES Refinements ───────────────────────────────────────────
         // Touch Operator Dashboard and My Operations

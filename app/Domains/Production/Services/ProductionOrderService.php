@@ -2,6 +2,7 @@
 
 namespace App\Domains\Production\Services;
 
+use App\Domains\Inventory\Models\Product;
 use App\Domains\Inventory\Models\ProductWarehouseStock;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Services\StockService;
@@ -37,6 +38,11 @@ class ProductionOrderService
                 throw new InvalidArgumentException('Only approved or MRP-generated production plans can be converted to production orders.');
             }
 
+            $product = Product::find($plan->product_id);
+            $productionMode = !empty($plan->production_mode)
+                ? $plan->production_mode
+                : ($product ? $product->getDefaultProductionMode() : 'standard');
+
             // 1. Create order header
             $order = ProductionOrder::create([
                 'tenant_id' => $plan->tenant_id,
@@ -50,6 +56,7 @@ class ProductionOrderService
                 'quantity_ordered' => $plan->quantity,
                 'start_date' => $plan->start_date,
                 'end_date' => $plan->end_date,
+                'production_mode' => $productionMode,
                 'status' => ProductionOrder::STATUS_DRAFT,
                 'created_by' => $userId,
             ]);
@@ -190,6 +197,10 @@ class ProductionOrderService
                 throw new InvalidArgumentException('Cannot create order: No approved BOM and/or active Routing exists for this product.');
             }
 
+            $product = Product::find($productId);
+            $defaultMode = $product ? $product->getDefaultProductionMode() : 'standard';
+            $productionMode = !empty($data['production_mode']) ? $data['production_mode'] : $defaultMode;
+
             $order = ProductionOrder::create([
                 'tenant_id' => $tenantId,
                 'order_number' => $this->numberService->generateNextNumber($tenantId),
@@ -202,6 +213,7 @@ class ProductionOrderService
                 'quantity_ordered' => $quantity,
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
+                'production_mode' => $productionMode,
                 'status' => ProductionOrder::STATUS_DRAFT,
                 'description' => $data['description'] ?? null,
                 'created_by' => $userId,

@@ -148,7 +148,7 @@ class ProductionOrderController extends Controller
             'reworks.operation', 'reworks.user',
             'wips.currentRoutingOperation', 'wips.currentWorkCenter', 'wips.transactions.fromOperation', 'wips.transactions.toOperation',
             'requisitionSlips.items.product', 'requisitionSlips.items.uom', 'requisitionSlips.purchaseRequisitions.items',
-            'schedules',
+            'schedules', 'batches', 'serialNumbers',
         ])->findOrFail($id);
 
         Gate::authorize('view', $order);
@@ -446,9 +446,11 @@ class ProductionOrderController extends Controller
 
         $request->validate([
             'operation_id' => 'nullable|exists:production_order_operations,id',
-            'product_id' => 'nullable|exists:products,id',
-            'quantity' => 'required|numeric|min:0.0001',
-            'reason' => 'nullable|string|max:255',
+            'product_id'   => 'nullable|exists:products,id',
+            'quantity'     => 'required|numeric|min:0.0001',
+            'reason'       => 'nullable|string|max:255',
+            'create_ncr'   => 'nullable|boolean',
+            'ncr_category' => 'nullable|string|max:100',
         ]);
 
         if ($request->filled('operation_id')) {
@@ -464,7 +466,10 @@ class ProductionOrderController extends Controller
                 $request->input('product_id'),
                 (float) $request->input('quantity'),
                 $request->input('reason'),
-                Auth::id()
+                Auth::id(),
+                null,
+                (bool) $request->boolean('create_ncr'),
+                $request->filled('ncr_category') ? ['category' => $request->input('ncr_category')] : []
             );
 
             return redirect()->back()->with('success', 'Production scrap logged successfully.');

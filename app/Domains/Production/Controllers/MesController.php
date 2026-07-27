@@ -167,6 +167,33 @@ class MesController extends Controller
         }
     }
 
+    public function reportAndonAlert(Request $request, int $op)
+    {
+        abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
+
+        $request->validate([
+            'category' => 'required|string|max:100',
+            'severity' => 'nullable|string|in:info,warning,critical',
+            'reason'   => 'required|string|max:255',
+            'remarks'  => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            $this->mesService->reportAndonAlert(
+                $op,
+                $request->input('category'),
+                $request->input('severity', 'warning'),
+                $request->input('reason'),
+                $request->input('remarks'),
+                auth()->id()
+            );
+
+            return redirect()->back()->with('success', 'Andon alert reported to supervisors successfully.');
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
     /**
      * Touch-Friendly Operator Dashboard.
      */

@@ -243,6 +243,13 @@
                                 </option>
                             @endforeach
                         </x-ui.odoo-form-ui>
+
+                        <x-ui.odoo-form-ui type="select" label="{{ __('production.production_mode') }}" name="production_mode" id="production_mode_select">
+                            <option value="standard" @selected(old('production_mode') === 'standard')>{{ __('production.mode_standard') }}</option>
+                            <option value="batch" @selected(old('production_mode', 'batch') === 'batch')>{{ __('production.mode_batch') }}</option>
+                            <option value="serial" @selected(old('production_mode') === 'serial')>{{ __('production.mode_serial') }}</option>
+                            <option value="batch_and_serial" @selected(old('production_mode') === 'batch_and_serial')>{{ __('production.mode_batch_and_serial') }}</option>
+                        </x-ui.odoo-form-ui>
                     </div>
 
                     <!-- Right Column -->
