@@ -16,6 +16,7 @@ use App\Domains\Production\Models\ProductionOrderScrap;
 use App\Domains\Production\Models\ProductionQualityInspection;
 use App\Domains\Production\Models\ProductionSerialNumber;
 use App\Domains\Production\Models\ProductionNcr;
+use App\Domains\Production\Models\ProductionWip;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -319,13 +320,15 @@ class ProductionExecutionService
         float   $quantity,
         ?string $reason      = null,
         ?int    $userId      = null,
-        ?int    $warehouseId = null
+        ?int    $warehouseId = null,
+        bool    $createNcr   = false,
+        array   $ncrParams   = []
     ): ProductionOrderScrap {
         if ($quantity <= 0) {
             throw new InvalidArgumentException('Scrap quantity must be greater than zero.');
         }
 
-        return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId, $warehouseId) {
+        return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId, $warehouseId, $createNcr, $ncrParams) {
             $order     = ProductionOrder::findOrFail($orderId);
             $scrapProductId = $productId ?? $order->product_id;
 
@@ -341,6 +344,18 @@ class ProductionExecutionService
                 'recorded_at'                   => now(),
                 'stock_transaction_id'          => null,
             ]);
+
+            // Optional Quality NCR creation
+            if ($createNcr) {
+                app(NcrService::class)->createNcr($order->tenant_id, array_merge([
+                    'production_order_id'           => $order->id,
+                    'production_order_operation_id' => $operationId,
+                    'operator_id'                    => $userId,
+                    'category'                       => $ncrParams['category'] ?? 'Material Scrap',
+                    'description'                    => $reason ?: "Scrap logged: {$quantity} units of product #{$scrapProductId}",
+                    'disposition_type'               => 'scrap',
+                ], $ncrParams));
+            }
 
             // ── Idempotent stock outflow posting ──────────────────────────────
             // If stock_transaction_id is already set, the posting has occurred.
@@ -503,6 +518,23 @@ class ProductionExecutionService
 
             if ($order->isClosed() || $order->isCancelled()) {
                 throw new InvalidArgumentException('Cannot receive finished goods on a closed or cancelled order.');
+            }
+
+            // Check for WIP quality hold or active rework loops
+            $hasWipHold = ProductionWip::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->whereIn('status', ['quality_hold', 'rework'])
+                ->exists();
+
+            $hasPendingRework = ProductionOrderRework::where('tenant_id', $order->tenant_id)
+                ->where('production_order_id', $order->id)
+                ->where('status', 'pending')
+                ->exists();
+
+            if ($hasWipHold || $hasPendingRework) {
+                throw new InvalidArgumentException(
+                    'Cannot receive finished goods: This production order has Work-in-Progress (WIP) on Quality Hold or pending Rework. Quality clearance is required before receiving finished goods into inventory.'
+                );
             }
 
             $warehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);

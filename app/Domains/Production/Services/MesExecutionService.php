@@ -714,6 +714,79 @@ class MesExecutionService
         });
     }
 
+    /**
+     * Report an MES Operator Andon Alert / Machine Breakdown.
+     */
+    public function reportAndonAlert(
+        int $schedOpId,
+        string $category,
+        string $severity,
+        string $reason,
+        ?string $remarks = null,
+        ?int $userId = null
+    ): array {
+        return DB::transaction(function () use ($schedOpId, $category, $severity, $reason, $remarks, $userId) {
+            $schedOp = ProductionScheduleOperation::with(['schedule.order', 'workCenter', 'machine'])->findOrFail($schedOpId);
+            $tenantId = $schedOp->schedule->tenant_id;
+
+            if ($schedOp->status === ProductionScheduleOperation::STATUS_COMPLETED || $schedOp->status === ProductionScheduleOperation::STATUS_CANCELLED) {
+                throw new InvalidArgumentException("Cannot report Andon alert: Operation is completed or cancelled.");
+            }
+
+            $order = $schedOp->schedule->order;
+            $machineId = $schedOp->machine_id;
+
+            $downtime = null;
+            if ($machineId && in_array($category, ['Breakdown', 'Maintenance', 'Equipment Failure', 'Machine Breakdown'], true)) {
+                $downtimeCategory = match ($category) {
+                    'Maintenance' => 'Preventive Maintenance',
+                    default => 'Breakdown',
+                };
+
+                $downtimeService = app(DowntimeService::class);
+                $downtime = $downtimeService->startDowntime($tenantId, $machineId, $downtimeCategory, $reason, $userId, [
+                    'production_order_id'           => $order->id,
+                    'production_order_operation_id' => $schedOp->production_order_operation_id,
+                    'remarks'                        => $remarks,
+                ]);
+
+                if ($schedOp->status === ProductionScheduleOperation::STATUS_RUNNING) {
+                    $schedOp->update([
+                        'status'         => ProductionScheduleOperation::STATUS_PAUSED,
+                        'last_paused_at' => now(),
+                    ]);
+
+                    $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
+                    if ($orderOp) {
+                        $orderOp->status = ProductionOrderOperation::STATUS_PAUSED;
+                        $orderOp->save();
+                    }
+                }
+            } else {
+                app(ProductionEventService::class)->writeEvent($tenantId, [
+                    'production_order_id' => $order->id,
+                    'machine_id'           => $machineId,
+                    'event_type'           => 'Andon Alert Fired',
+                    'title'                => "Operator Andon Alert: {$category}",
+                    'description'          => "Alert raised by operator for sequence #{$schedOp->sequence}: {$reason}. Remarks: {$remarks}",
+                    'severity'             => $severity,
+                    'event_source'         => 'MES Execution',
+                ]);
+
+                if ($schedOp->status === ProductionScheduleOperation::STATUS_RUNNING && in_array($severity, ['critical', 'warning'], true)) {
+                    $this->pauseOperation($schedOpId, "Andon Alert ({$category}): {$reason}", $userId);
+                }
+            }
+
+            return [
+                'operation_id' => $schedOp->id,
+                'category'     => $category,
+                'severity'     => $severity,
+                'downtime_id'  => $downtime?->id,
+            ];
+        });
+    }
+
     // ─── Private Helpers ─────────────────────────────────────────────────────
 
     /**

@@ -279,15 +279,14 @@ class CapacityPlanningService
                 throw new InvalidArgumentException("Reschedule failed: Target date is not a valid working day on calendar.");
             }
 
-            // Validate Machine Eligibility
-            if ($newMachineId) {
-                $machine = Machine::findOrFail($newMachineId);
+            // Validate Machine Eligibility & Downtime Overlaps
+            $targetMachineId = $newMachineId ?: $schedOp->machine_id;
+            if ($targetMachineId) {
+                $machine = Machine::where('tenant_id', $tenantId)->findOrFail($targetMachineId);
                 if ($machine->work_center_id !== $schedOp->work_center_id) {
                     throw new InvalidArgumentException("Reschedule failed: Selected machine does not belong to Work Center.");
                 }
-                if (!$machine->isActive() || $machine->isUnderMaintenance()) {
-                    throw new InvalidArgumentException("Reschedule failed: Selected machine is inactive or under maintenance.");
-                }
+                $this->validateMachineAvailability($tenantId, $targetMachineId, $newStart, $newFinish, $schedOp->id);
             }
 
             // Update
@@ -444,5 +443,42 @@ class CapacityPlanningService
             }
         }
         return true;
+    }
+
+    /**
+     * Validate that a target machine is active, available, and free of open downtime conflicts.
+     */
+    public function validateMachineAvailability(
+        int $tenantId,
+        int $machineId,
+        Carbon $start,
+        Carbon $finish,
+        ?int $excludeScheduleOpId = null
+    ): void {
+        $machine = Machine::where('tenant_id', $tenantId)->find($machineId);
+        if (!$machine) {
+            throw new InvalidArgumentException("Reschedule failed: Selected machine #{$machineId} does not exist.");
+        }
+
+        if (!$machine->isActive() || $machine->isUnderMaintenance()) {
+            throw new InvalidArgumentException("Reschedule failed: Selected machine '{$machine->name}' is inactive or under maintenance.");
+        }
+
+        // Check overlapping machine downtime (planned maintenance or active breakdown)
+        $hasDowntimeConflict = ProductionMachineDowntime::where('tenant_id', $tenantId)
+            ->where('machine_id', $machineId)
+            ->where('status', ProductionMachineDowntime::STATUS_OPEN)
+            ->where('start_time', '<', $finish)
+            ->where(function ($query) use ($start) {
+                $query->whereNull('end_time')
+                    ->orWhere('end_time', '>', $start);
+            })
+            ->exists();
+
+        if ($hasDowntimeConflict) {
+            throw new InvalidArgumentException(
+                "Reschedule conflict: Target machine '{$machine->name}' has active downtime or maintenance during requested slot ({$start->format('Y-m-d H:i')} to {$finish->format('Y-m-d H:i')})."
+            );
+        }
     }
 }

@@ -77,6 +77,20 @@ class Product extends BaseModel
         'variant_values' => 'array',
     ];
 
+    public function getDefaultProductionMode(): string
+    {
+        if ($this->track_batch && $this->track_serial_number) {
+            return 'batch_and_serial';
+        }
+        if ($this->track_batch) {
+            return 'batch';
+        }
+        if ($this->track_serial_number) {
+            return 'serial';
+        }
+        return 'standard';
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'parent_id');
