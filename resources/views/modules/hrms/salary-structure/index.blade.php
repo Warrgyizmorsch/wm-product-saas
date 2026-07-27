@@ -132,6 +132,15 @@
         }
 
         /* Underlined Horizontal Tabs to match Org Structure style */
+        #salaryStructureTabs {
+            flex-wrap: nowrap !important;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none; /* Firefox */
+        }
+        #salaryStructureTabs::-webkit-scrollbar {
+            display: none; /* Safari and Chrome */
+        }
         #salaryStructureTabs .nav-link {
             border: none !important;
             background-color: transparent !important;
@@ -140,6 +149,7 @@
             padding: 12px 20px;
             border-bottom: 2px solid transparent !important;
             transition: all 0.2s ease-in-out;
+            white-space: nowrap !important;
         }
         #salaryStructureTabs .nav-link:hover {
             color: var(--bs-primary);

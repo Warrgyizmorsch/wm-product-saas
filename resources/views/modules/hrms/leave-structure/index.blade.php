@@ -7,7 +7,7 @@
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <a href="{{ route('hrms.leave-structure.transition') }}" class="btn btn-outline-primary fw-bold text-uppercase d-flex align-items-center gap-1">
-            <i class="feather-shuffle me-1"></i> Transition Leave Plans
+            <i class="feather-shuffle me-1"></i> {{ __('hrms.leave.plan_transition') }}
         </a>
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addLeavePlanModal">
             {{ __('hrms.leave.add_plan') }}
@@ -363,7 +363,7 @@
                                                 @method('DELETE')
                                                 <x-ui.action-dropdown>
                                                     <li>
-                                                        <a class="dropdown-item edit-plan-btn" href="javascript:void(0)" data-plan="{{ base64_encode($selectedPlan->toJson()) }}">
+                                                        <a class="dropdown-item edit-plan-btn" href="javascript:void(0)" data-plan="{{ base64_encode($selectedPlan->toJson()) }}" style="white-space: normal;">
                                                             <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.leave.edit_plan') }}
                                                         </a>
                                                     </li>
@@ -379,12 +379,12 @@
                                                                    'action' => $t->rules['yearend']['action'] ?? 'lapse',
                                                                    'max_carry' => floatval($t->rules['yearend']['max_carry'] ?? 0.0),
                                                                ];
-                                                           }))) }}">
+                                                           }))) }}" style="white-space: normal;">
                                                             <i class="feather-refresh-cw me-2 text-muted fs-12"></i>{{ __('hrms.leave.renew_plan_balances') }}
                                                         </a>
                                                     </li>
                                                     <li>
-                                                        <button type="submit" class="dropdown-item text-danger">
+                                                        <button type="submit" class="dropdown-item text-danger" style="white-space: normal;">
                                                             <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.leave.delete_plan') }}
                                                         </button>
                                                     </li>
@@ -1905,6 +1905,11 @@
                                     });
                                 }
                             });
+                        }
+
+                        // Push state to sync browser URL with current pagination & filter params
+                        if (window.history.pushState) {
+                            window.history.pushState({path: url}, '', url);
                         }
                     }
                 });

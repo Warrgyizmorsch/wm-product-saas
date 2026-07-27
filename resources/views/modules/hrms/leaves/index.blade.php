@@ -253,10 +253,6 @@
             background-color: #f3e8ff;
             color: #7c3aed;
         }
-        .badge-unpaid {
-            background-color: #f1f5f9;
-            color: #475569;
-        }
         .erp-pagination-container {
             display: flex;
             flex-direction: column;
@@ -315,6 +311,8 @@
             font-size: 12px;
             color: #64748b;
         }
+
+
         .odoo-underline-input {
             border: none !important;
             border-bottom: 2px solid #cbd5e1 !important;
@@ -844,6 +842,12 @@
                 if (page && !$(this).parent().hasClass('disabled')) {
                     currentPage = parseInt(page);
                     updatePagination();
+
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('leaves_page', currentPage);
+                    if (window.history.pushState) {
+                        window.history.pushState({path: url.toString()}, '', url.toString());
+                    }
                 }
             });
 
@@ -992,6 +996,12 @@
                 if (page && !$(this).parent().hasClass('disabled')) {
                     encashCurrentPage = parseInt(page);
                     updateEncashmentsPagination();
+
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('encash_page', encashCurrentPage);
+                    if (window.history.pushState) {
+                        window.history.pushState({path: url.toString()}, '', url.toString());
+                    }
                 }
             });
 
@@ -1130,7 +1140,7 @@
             // Leave type banner
             $('#lid-color-dot').css('background', d.leaveColor || '#3b82f6');
             $('#lid-leave-type').text(d.leaveType || '—');
-            $('#lid-balance-inline').text('Remaining: ' + (d.remaining !== undefined ? d.remaining : '0') + ' / ' + (d.allocated !== undefined ? d.allocated : '0') + ' Days');
+            $('#lid-balance-inline').text("{{ __('hrms.leave.app.remaining') }}: " + (d.remaining !== undefined ? d.remaining : '0') + ' / ' + (d.allocated !== undefined ? d.allocated : '0') + ' ' + "{{ __('hrms.leave.days') }}");
 
             // Status badge
             $('#lid-status-badge')
@@ -1143,7 +1153,7 @@
 
             // Duration
             var dur = parseFloat(d.duration) || 0;
-            $('#lid-duration').text(dur + (dur === 1 ? ' Day' : ' Days'));
+            $('#lid-duration').text(dur + ' ' + (dur == 1 ? "{{ __('hrms.leave.day') }}" : "{{ __('hrms.leave.days') }}"));
 
             // Reason / Workflow / Applied
             $('#lid-reason').text(d.reason || '—');
@@ -1545,7 +1555,7 @@
                 </div>
 
                 {{-- Leave Detail Offcanvas Drawer (for Leave Applications index) --}}
-                <x-ui.drawer id="leaveDetailDrawerIdx" title="{{ __('hrms.leave.app.title') }} Detail" style="width:440px;max-width:100%;">
+                <x-ui.drawer id="leaveDetailDrawerIdx" :title="__('hrms.employees.lbl_leave_app_detail')" style="width:440px;max-width:100%;">
                     {{-- Merged Employee & Leave Type Card --}}
                     <div class="mb-3 p-3 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
                         @if($isAdmin)
@@ -1563,7 +1573,7 @@
                             <div class="flex-grow-1">
                                 <div class="fw-bold fs-14 text-dark" id="lid-leave-type">—</div>
                                 <div class="fs-12 text-muted mt-1" id="lid-balance-inline"></div>
-                                <div class="fs-11 text-muted mt-1">Applied On: <span class="fw-semibold text-dark" id="lid-applied">—</span></div>
+                                <div class="fs-11 text-muted mt-1">{{ __('hrms.leave.app.applied_on') }} <span class="fw-semibold text-dark" id="lid-applied">—</span></div>
                             </div>
                             <span class="badge rounded-pill px-2 py-1 fs-11 flex-shrink-0" id="lid-status-badge"></span>
                         </div>
@@ -1579,7 +1589,7 @@
                             <div class="text-muted fs-12 mt-1" id="lid-session-info"></div>
                         </div>
                         <div class="text-end">
-                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Duration</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.duration') }}</div>
                             <div class="fw-bold fs-22 text-primary" id="lid-duration">—</div>
                         </div>
                     </div>
@@ -1614,7 +1624,7 @@
 
                     {{-- Notified Members --}}
                     <div class="mb-3 d-none" id="lid-notified-wrap">
-                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.notify_members') ?? 'Notified Members' }}</div>
+                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.notify_members') }}</div>
                         <div class="fs-13 text-dark" id="lid-notified-names">—</div>
                     </div>
 
@@ -1622,26 +1632,26 @@
                     @if($isAdmin)
                         <hr class="my-3">
                         <div>
-                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-2" style="letter-spacing:.5px;">Update Status</div>
+                            <div class="text-muted fs-11 text-uppercase fw-semibold mb-2" style="letter-spacing:.5px;">{{ __('hrms.employees.lbl_update_status') }}</div>
                             <form method="POST" id="lid-status-form" action="">
                                 @csrf
                                 <div class="d-flex gap-2 align-items-center">
                                     <div class="flex-grow-1" style="margin-bottom: -1rem;">
                                         <x-ui.select name="status" id="lid-status-select" class="odoo-select2">
-                                            <option value="pending">Pending</option>
-                                            <option value="approved">Approved</option>
-                                            <option value="rejected">Rejected</option>
-                                            <option value="unauthorized">Unauthorized</option>
-                                            <option value="unpaid">Unpaid</option>
+                                            <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
+                                            <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
+                                            <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
+                                            <option value="unauthorized">{{ __('hrms.leave.app.status_unauthorized') }}</option>
+                                            <option value="unpaid">{{ __('hrms.leave.app.status_unpaid') }}</option>
                                         </x-ui.select>
                                     </div>
                                     <button type="submit" class="btn btn-primary btn-sm fw-bold px-3 d-flex align-items-center gap-1" style="height: 38px; border-radius: 6px;">
-                                        <i class="feather-check fs-12"></i> Apply
+                                        <i class="feather-check fs-12"></i> {{ __('hrms.common.apply') }}
                                     </button>
                                 </div>
                                 <div class="mt-2 d-none" id="lid-rejection-input-wrap">
-                                    <div class="text-muted fs-11 text-uppercase fw-semibold mb-2 mt-2" style="letter-spacing:.5px;">Rejection Reason</div>
-                                    <x-ui.textarea name="rejection_reason" id="lid-rejection-reason-input" rows="2" placeholder="Enter reason for rejection..." />
+                                    <div class="text-muted fs-11 text-uppercase fw-semibold mb-2 mt-2" style="letter-spacing:.5px;">{{ __('hrms.leave.app.rejection_reason') }}</div>
+                                    <x-ui.textarea name="rejection_reason" id="lid-rejection-reason-input" rows="2" placeholder="{{ __('hrms.leave.app.rejection_reason_placeholder') }}" />
                                 </div>
                             </form>
                         </div>

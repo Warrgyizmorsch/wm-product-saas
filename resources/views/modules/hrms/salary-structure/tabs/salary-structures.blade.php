@@ -141,10 +141,9 @@
                                         <table class="table table-sm table-hover align-middle mb-0 fs-12" style="width: 100%; table-layout: fixed;">
                                             <thead class="table-light text-uppercase fs-10 text-muted" style="letter-spacing: 0.5px;">
                                                 <tr>
-                                                    <th style="width: 40%;" class="ps-3 py-2.5">Component Name</th>
-                                                    <th style="width: 18%;" class="py-2.5">Type</th>
-                                                    <th style="width: 22%;" class="py-2.5">Calculation Type</th>
-                                                    <th style="width: 20%;" class="pe-3 py-2.5 text-end">Value / Rate</th>
+                                                    <th style="width: 38%;" class="ps-3 py-2.5">{{ __('hrms.salary.tbl_component_name') }}</th>
+                                                    <th style="width: 26%;" class="py-2.5">{{ __('hrms.salary.tbl_type') }}</th>
+                                                    <th style="width: 36%;" class="pe-3 py-2.5 text-end">{{ __('hrms.salary.tbl_value_rate') }}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -160,27 +159,26 @@
                                                     @endphp
                                                     <tr>
                                                         <td class="ps-3 py-2 fw-semibold text-dark" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $item->component->name }}</td>
-                                                        <td class="py-2">
+                                                        <td class="py-2" style="white-space: nowrap;">
                                                             @if($item->component->type == 'earning')
                                                                 <span class="badge bg-soft-success text-success px-2 py-1 fs-10 rounded-pill">{{ __('hrms.org.earning') }}</span>
                                                             @else
                                                                 <span class="badge bg-soft-warning text-warning px-2 py-1 fs-10 rounded-pill">{{ __('hrms.org.deduction') }}</span>
                                                             @endif
                                                         </td>
-                                                        <td class="py-2 text-muted" style="word-break: break-word; overflow-wrap: anywhere; white-space: normal;">{{ $calcTypeLabel }}</td>
                                                         <td class="pe-3 py-2 text-end fw-bold text-dark" style="white-space: nowrap;">
                                                             @if($item->calculation_type == 'fixed')
-                                                                ₹{{ number_format($item->value, 2) }}
+                                                                ₹{{ number_format($item->value, 2) }} <span class="text-muted fw-normal fs-11">({{ __('hrms.salary.fixed_amount') }})</span>
                                                             @elseif(in_array($item->calculation_type, ['percentage_of_ctc', 'percentage_of_basic']))
-                                                                {{ number_format($item->value, 2) }}%
+                                                                {{ number_format($item->value, 2) }}% <span class="text-muted fw-normal fs-11">{{ $calcTypeLabel }}</span>
                                                             @else
-                                                                Balancing
+                                                                <span class="text-muted fw-normal fs-11">{{ __('hrms.salary.balancing') }}</span>
                                                             @endif
                                                         </td>
                                                     </tr>
                                                 @empty
                                                     <tr>
-                                                        <td colspan="4" class="text-center py-3 text-muted fs-12">
+                                                        <td colspan="3" class="text-center py-3 text-muted fs-12">
                                                             {{ __('hrms.salary.no_components_configured') }}
                                                         </td>
                                                     </tr>
@@ -587,6 +585,11 @@
                         $('#salaryStructuresTable').parent().after(newPagination);
                     } else {
                         oldPagination.empty();
+                    }
+
+                    // Push state to sync browser URL with current pagination & filter params
+                    if (window.history.pushState) {
+                        window.history.pushState({path: url}, '', url);
                     }
                 }
             });

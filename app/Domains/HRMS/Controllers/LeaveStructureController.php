@@ -2,72 +2,25 @@
 
 namespace App\Domains\HRMS\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Domains\HRMS\Models\Company;
 use App\Domains\HRMS\Models\LeavePlan;
 use App\Domains\HRMS\Models\LeaveType;
-use App\Domains\HRMS\Models\Employee;
-use App\Domains\HRMS\Models\LeaveBalance;
+use App\Domains\HRMS\Repositories\LeaveStructureRepositoryInterface;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class LeaveStructureController extends Controller
 {
+    public function __construct(
+        private readonly LeaveStructureRepositoryInterface $leaveStructureRepository
+    ) {}
+
     public function index(Request $request)
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
-        $companies = Company::all();
-        $leavePlans = LeavePlan::with(['company', 'types'])->get();
+        $data = $this->leaveStructureRepository->getIndexData($request->all());
 
-        $selectedPlanId = $request->query('plan_id');
-        $selectedPlan = null;
-        if ($selectedPlanId) {
-            $selectedPlan = $leavePlans->firstWhere('id', $selectedPlanId);
-        }
-        if (!$selectedPlan && $leavePlans->isNotEmpty()) {
-            $selectedPlan = $leavePlans->first();
-        }
-
-        $leaveTypes = collect();
-
-        $ltSearch = $request->string('lt_search')->trim()->value();
-        $ltSort = $request->string('lt_sort')->value() ?: 'name_asc';
-        $ltType = $request->filled('lt_type') ? $request->string('lt_type')->value() : null;
-
-        if ($selectedPlan) {
-            $typesQuery = $selectedPlan->types();
-
-            if ($ltSearch !== '') {
-                $typesQuery->where(function ($query) use ($ltSearch): void {
-                    $query->where('name', 'like', "%{$ltSearch}%")
-                        ->orWhere('code', 'like', "%{$ltSearch}%");
-                });
-            }
-
-            if ($ltType !== null && $ltType !== '') {
-                $typesQuery->where('type', $ltType);
-            }
-
-            switch ($ltSort) {
-                case 'name_desc':
-                    $typesQuery->orderBy('name', 'desc');
-                    break;
-                case 'quota_asc':
-                    $typesQuery->orderBy('quota', 'asc');
-                    break;
-                case 'quota_desc':
-                    $typesQuery->orderBy('quota', 'desc');
-                    break;
-                case 'name_asc':
-                default:
-                    $typesQuery->orderBy('name', 'asc');
-                    break;
-            }
-
-            $leaveTypes = $typesQuery->paginate(10, ['*'], 'lt_page')->withQueryString();
-        }
-
-        return view('modules.hrms.leave-structure.index', compact('companies', 'leavePlans', 'leaveTypes', 'selectedPlan', 'ltSearch', 'ltSort', 'ltType'));
+        return view('modules.hrms.leave-structure.index', $data);
     }
 
     public function storePlan(Request $request)
@@ -84,7 +37,7 @@ class LeaveStructureController extends Controller
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
-        $newPlan = LeavePlan::create([
+        $newPlan = $this->leaveStructureRepository->storePlan([
             'company_id' => $request->company_id,
             'name' => $request->name,
             'effective_from' => $request->effective_from,
@@ -109,7 +62,7 @@ class LeaveStructureController extends Controller
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
-        $leavePlan->update([
+        $this->leaveStructureRepository->updatePlan($leavePlan, [
             'company_id' => $request->company_id,
             'name' => $request->name,
             'effective_from' => $request->effective_from,
@@ -124,7 +77,8 @@ class LeaveStructureController extends Controller
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
-        $leavePlan->delete();
+        $this->leaveStructureRepository->destroyPlan($leavePlan);
+
         return redirect()->route('hrms.leave-structure.index')->with('success', __('hrms.leave.plan_deleted'));
     }
 
@@ -133,26 +87,40 @@ class LeaveStructureController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $request->validate([
-            'leave_plan_id' => 'required|integer|exists:leave_plans,id',
+            'leave_plan_id' => 'required|exists:leave_plans,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
+            'color' => 'nullable|string|max:20',
             'type' => 'required|in:paid,unpaid',
-            'color' => 'required|max:20',
+            'unit' => 'required|in:days,hours',
             'quota' => 'required|numeric|min:0',
-            'description' => 'nullable',
+            'carry_forward' => 'required|boolean',
+            'max_carry_forward' => 'nullable|numeric|min:0',
+            'encashable' => 'required|boolean',
+            'max_encashable' => 'nullable|numeric|min:0',
+            'encashment_rate' => 'nullable|numeric|min:0',
+            'min_encashment' => 'nullable|numeric|min:0',
+            'encashment_calc_type' => 'nullable|string',
             'status' => 'required',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
-        LeaveType::create([
+        $this->leaveStructureRepository->storeType([
             'leave_plan_id' => $request->leave_plan_id,
             'name' => $request->name,
             'code' => $request->code,
+            'color' => $request->color ?: '#3b82f6',
             'type' => $request->type,
-            'color' => $request->color,
+            'unit' => $request->unit,
             'quota' => $request->quota,
-            'description' => $request->description,
+            'carry_forward' => $request->boolean('carry_forward'),
+            'max_carry_forward' => $request->max_carry_forward,
+            'encashable' => $request->boolean('encashable'),
+            'max_encashable' => $request->max_encashable,
+            'encashment_rate' => $request->encashment_rate,
+            'min_encashment' => $request->min_encashment,
+            'encashment_calc_type' => $request->encashment_calc_type ?: 'gross_salary',
             'status' => $status,
         ]);
 
@@ -164,30 +132,42 @@ class LeaveStructureController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $request->validate([
-            'leave_plan_id' => 'required|integer|exists:leave_plans,id',
             'name' => 'required|max:255',
             'code' => 'required|max:50',
+            'color' => 'nullable|string|max:20',
             'type' => 'required|in:paid,unpaid',
-            'color' => 'required|max:20',
+            'unit' => 'required|in:days,hours',
             'quota' => 'required|numeric|min:0',
-            'description' => 'nullable',
+            'carry_forward' => 'required|boolean',
+            'max_carry_forward' => 'nullable|numeric|min:0',
+            'encashable' => 'required|boolean',
+            'max_encashable' => 'nullable|numeric|min:0',
+            'encashment_rate' => 'nullable|numeric|min:0',
+            'min_encashment' => 'nullable|numeric|min:0',
+            'encashment_calc_type' => 'nullable|string',
             'status' => 'required',
         ]);
 
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
-        $leaveType->update([
-            'leave_plan_id' => $request->leave_plan_id,
+        $this->leaveStructureRepository->updateType($leaveType, [
             'name' => $request->name,
             'code' => $request->code,
+            'color' => $request->color ?: '#3b82f6',
             'type' => $request->type,
-            'color' => $request->color,
+            'unit' => $request->unit,
             'quota' => $request->quota,
-            'description' => $request->description,
+            'carry_forward' => $request->boolean('carry_forward'),
+            'max_carry_forward' => $request->max_carry_forward,
+            'encashable' => $request->boolean('encashable'),
+            'max_encashable' => $request->max_encashable,
+            'encashment_rate' => $request->encashment_rate,
+            'min_encashment' => $request->min_encashment,
+            'encashment_calc_type' => $request->encashment_calc_type ?: 'gross_salary',
             'status' => $status,
         ]);
 
-        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $request->leave_plan_id])->with('success', __('hrms.leave.type_updated'));
+        return redirect()->route('hrms.leave-structure.index', ['plan_id' => $leaveType->leave_plan_id])->with('success', __('hrms.leave.type_updated'));
     }
 
     public function destroyType(LeaveType $leaveType)
@@ -195,211 +175,8 @@ class LeaveStructureController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $planId = $leaveType->leave_plan_id;
-        $leaveType->delete();
+        $this->leaveStructureRepository->destroyType($leaveType);
+
         return redirect()->route('hrms.leave-structure.index', ['plan_id' => $planId])->with('success', __('hrms.leave.type_deleted'));
-    }
-
-    public function updateRules(Request $request, LeaveType $leaveType)
-    {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
-        $request->validate([
-            'rules' => 'required|array'
-        ]);
-
-        $leaveType->update([
-            'rules' => $request->rules
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Rules updated successfully.'
-        ]);
-    }
-
-    public function renewPlanBalances(Request $request)
-    {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
-        try {
-            $request->validate([
-                'leave_plan_id' => 'required|exists:leave_plans,id',
-                'yearend_rules' => 'nullable|array',
-            ]);
-
-            $leavePlan = LeavePlan::findOrFail($request->leave_plan_id);
-
-            // 1. Update rules persistently in database if yearend_rules are provided
-            if ($request->filled('yearend_rules')) {
-                foreach ($request->yearend_rules as $typeId => $ruleSet) {
-                    $ltype = LeaveType::where('leave_plan_id', $leavePlan->id)->find($typeId);
-                    if ($ltype) {
-                        $currentRules = $ltype->rules ?? [];
-                        $currentRules['yearend'] = [
-                            'action' => $ruleSet['action'] ?? 'lapse',
-                            'max_carry' => floatval($ruleSet['max_carry'] ?? 0.0),
-                            'max_encash' => floatval($currentRules['yearend']['max_encash'] ?? 0.0),
-                        ];
-                        $ltype->update(['rules' => $currentRules]);
-                    }
-                }
-                $leavePlan->load('types');
-            }
-
-            // Fetch all active employees assigned to this plan
-            $employees = Employee::where('leave_plan_id', $leavePlan->id)
-                ->where('status', true)
-                ->get();
-
-            foreach ($employees as $employee) {
-                foreach ($leavePlan->types as $ltype) {
-                    $balance = LeaveBalance::firstOrCreate([
-                        'tenant_id' => $employee->tenant_id,
-                        'company_id' => $employee->company_id,
-                        'employee_id' => $employee->id,
-                        'leave_type_id' => $ltype->id,
-                    ], [
-                        'allocated' => floatval($ltype->quota),
-                        'used' => 0.0,
-                    ]);
-
-                    // Calculate rollover & encashment based on Year-End Rules
-                    $rules = $ltype->rules ?? [];
-                    $action = $rules['yearend']['action'] ?? 'lapse';
-                    $maxCarry = floatval($rules['yearend']['max_carry'] ?? 0.0);
-                    $maxEncash = floatval($rules['yearend']['max_encash'] ?? 0.0);
-
-                    $remaining = floatval($balance->remaining);
-                    $rollover = 0.0;
-                    $autoEncashDays = 0.0;
-
-                    if ($action === 'carry_forward' && $remaining > 0.0) {
-                        $rollover = min($remaining, $maxCarry);
-                        $leftoverAfterCarry = max(0.0, $remaining - $rollover);
-                        if ($maxEncash > 0.0 && $leftoverAfterCarry > 0.0) {
-                            $autoEncashDays = min($leftoverAfterCarry, $maxEncash);
-                        }
-                    } elseif ($remaining > 0.0 && $maxEncash > 0.0) {
-                        $autoEncashDays = min($remaining, $maxEncash);
-                    }
-
-                    if ($autoEncashDays > 0.0) {
-                        \App\Domains\HRMS\Models\LeaveEncashment::create([
-                            'tenant_id' => $employee->tenant_id,
-                            'company_id' => $employee->company_id,
-                            'employee_id' => $employee->id,
-                            'leave_type_id' => $ltype->id,
-                            'requested_days' => $autoEncashDays,
-                            'status' => 'approved',
-                            'reason' => 'Year-end renewal automatic encashment',
-                            'approved_by' => auth()->id(),
-                            'approved_at' => now(),
-                        ]);
-                    }
-
-                    $newAllocated = floatval($ltype->quota) + $rollover;
-                    $newAllocated = round($newAllocated * 2) / 2;
-
-                    $balance->update([
-                        'allocated' => $newAllocated,
-                        'used' => 0.0,
-                        'encashed' => 0.0,
-                    ]);
-                }
-            }
-
-            // Update effective_from to today to start the new cycle today, set last_renewed_at to today, and activate the plan if it was inactive
-            $leavePlan->update([
-                'effective_from' => now()->toDateString(),
-                'last_renewed_at' => now()->toDateString(),
-                'status' => true,
-            ]);
-
-            return redirect()->route('hrms.leave-structure.index', ['plan_id' => $leavePlan->id])
-                ->with('success', 'Leave plan balances renewed successfully for all assigned employees.');
-
-        } catch (\Exception $e) {
-            return redirect()->back()
-                ->with('error', 'Failed to renew leave plan balances: ' . $e->getMessage());
-        }
-    }
-
-    public function transitionView(Request $request)
-    {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
-        $companies = \App\Domains\HRMS\Models\Company::all();
-        $departments = \App\Domains\HRMS\Models\Department::all();
-        $leavePlans = LeavePlan::where('status', true)->get();
-        $employees = \App\Domains\HRMS\Models\Employee::where('status', true)->with('leavePlan')->get();
-
-        return view('modules.hrms.leave-structure.transition', compact('companies', 'departments', 'leavePlans', 'employees'));
-    }
-
-    public function processTransition(Request $request)
-    {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
-        $request->validate([
-            'employee_ids' => 'required|array',
-            'employee_ids.*' => 'exists:employees,id',
-            'new_leave_plan_id' => 'required|exists:leave_plans,id',
-            'leave_transition_action' => 'required|in:transfer,prorate',
-            'leave_transition_unused' => 'required|in:carry,lapse,encash',
-        ]);
-
-        try {
-            $employeeIds = $request->employee_ids;
-            $newPlanId = $request->new_leave_plan_id;
-            $action = $request->leave_transition_action;
-            $unusedAction = $request->leave_transition_unused;
-
-            // Check if any of the transitioning employees have pending leave requests
-            $pendingEmployees = [];
-            foreach ($employeeIds as $empId) {
-                $employee = \App\Domains\HRMS\Models\Employee::find($empId);
-                if ($employee && (int)$employee->leave_plan_id !== (int)$newPlanId) {
-                    $hasPendingLeave = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
-                        ->where('status', 'pending')
-                        ->exists();
-                    $hasPendingEncash = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
-                        ->where('status', 'pending')
-                        ->exists();
-
-                    if ($hasPendingLeave || $hasPendingEncash) {
-                        $pendingEmployees[] = $employee->full_name;
-                    }
-                }
-            }
-
-            if (!empty($pendingEmployees)) {
-                $names = implode(', ', $pendingEmployees);
-                return redirect()->route('hrms.leaves.index', ['tab' => 'encashments'])
-                    ->with('error', 'Cannot transition leave plans. The following employee(s) have pending leave or encashment requests that must be resolved first: ' . $names);
-            }
-
-            $count = 0;
-            foreach ($employeeIds as $empId) {
-                $employee = \App\Domains\HRMS\Models\Employee::find($empId);
-                if ($employee && (int)$employee->leave_plan_id !== (int)$newPlanId) {
-                    $oldPlanId = $employee->leave_plan_id;
-                    
-                    // Update employee plan ID
-                    $employee->update([
-                        'leave_plan_id' => $newPlanId
-                    ]);
-
-                    // Run transition logic
-                    $employee->migrateToLeavePlan($oldPlanId, $newPlanId, $action, $unusedAction);
-                    $count++;
-                }
-            }
-
-            return redirect()->route('hrms.leave-structure.index', ['plan_id' => $newPlanId])
-                ->with('success', __('hrms.leave.transition_success', ['count' => $count]));
-        } catch (\Exception $e) {
-            return redirect()->back()
-                ->with('error', __('hrms.leave.transition_error', ['message' => $e->getMessage()]));
-        }
     }
 }

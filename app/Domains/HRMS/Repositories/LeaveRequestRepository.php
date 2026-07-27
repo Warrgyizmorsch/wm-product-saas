@@ -1,0 +1,342 @@
+<?php
+
+namespace App\Domains\HRMS\Repositories;
+
+use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\LeaveBalance;
+use App\Domains\HRMS\Models\LeaveEncashment;
+use App\Domains\HRMS\Models\LeavePlan;
+use App\Domains\HRMS\Models\LeaveRequest;
+use App\Domains\HRMS\Models\LeaveType;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schema;
+
+class LeaveRequestRepository implements LeaveRequestRepositoryInterface
+{
+    public function getIndexData(array $inputs): array
+    {
+        // Programmatically run migrations on-the-fly if table or column doesn't exist
+        try {
+            if (!Schema::hasTable('leave_encashments') || !Schema::hasColumn('leave_balances', 'encashed')) {
+                Artisan::call('migrate', ['--force' => true]);
+            }
+        } catch (\Exception $e) {
+            // Silently log or ignore migration execution errors
+        }
+
+        // On-the-fly plan-level automatic year-end renewal check
+        try {
+            $now = Carbon::now();
+            $plans = LeavePlan::where('status', true)->get();
+
+            foreach ($plans as $plan) {
+                if (!$plan->effective_from) {
+                    continue;
+                }
+
+                $startDate = Carbon::parse($plan->effective_from);
+                $diffInYears = $startDate->diffInYears($now);
+                
+                if ($diffInYears > 0) {
+                    $currentCycleStart = $startDate->copy()->addYears($diffInYears);
+                    if ($currentCycleStart->isAfter($now)) {
+                        $currentCycleStart->subYear();
+                    }
+
+                    $lastRenewed = $plan->last_renewed_at ? Carbon::parse($plan->last_renewed_at) : null;
+                    
+                    if (!$lastRenewed || $lastRenewed->isBefore($currentCycleStart)) {
+                        $employees = Employee::where('leave_plan_id', $plan->id)
+                            ->where('status', true)
+                            ->get();
+
+                        foreach ($employees as $employee) {
+                            foreach ($plan->types as $ltype) {
+                                $balance = LeaveBalance::firstOrCreate([
+                                    'tenant_id' => $employee->tenant_id,
+                                    'company_id' => $employee->company_id,
+                                    'employee_id' => $employee->id,
+                                    'leave_type_id' => $ltype->id,
+                                ], [
+                                    'allocated' => floatval($ltype->quota),
+                                    'used' => 0.0,
+                                ]);
+
+                                $rules = $ltype->rules ?? [];
+                                $action = $rules['yearend']['action'] ?? 'lapse';
+                                $maxCarry = floatval($rules['yearend']['max_carry'] ?? 0.0);
+
+                                $remaining = floatval($balance->remaining);
+                                $rollover = 0.0;
+
+                                if ($action === 'carry_forward' && $remaining > 0.0) {
+                                    $rollover = min($remaining, $maxCarry);
+                                }
+
+                                $newAllocated = floatval($ltype->quota) + $rollover;
+
+                                $balance->update([
+                                    'allocated' => $newAllocated,
+                                    'used' => 0.0,
+                                ]);
+                            }
+                        }
+
+                        $plan->update([
+                            'last_renewed_at' => $currentCycleStart->toDateString(),
+                        ]);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Silence errors in case migration is not fully run yet
+        }
+
+        // Reconcile used balances
+        try {
+            $allBalances = LeaveBalance::with('employee.leavePlan')->get();
+            foreach ($allBalances as $bal) {
+                $currentCycleStart = null;
+                $emp = $bal->employee;
+                if ($emp && $emp->leavePlan && $emp->leavePlan->effective_from) {
+                    $startDate = Carbon::parse($emp->leavePlan->effective_from);
+                    $now = Carbon::now();
+                    $diffInYears = $startDate->diffInYears($now);
+                    $currentCycleStart = $startDate->copy()->addYears($diffInYears);
+                    if ($currentCycleStart->isAfter($now)) {
+                        $currentCycleStart->subYear();
+                    }
+                }
+
+                $query = LeaveRequest::where('employee_id', $bal->employee_id)
+                    ->where('leave_type_id', $bal->leave_type_id)
+                    ->where('status', 'approved');
+
+                if ($currentCycleStart) {
+                    $query->where('start_date', '>=', $currentCycleStart);
+                }
+
+                $approvedDuration = $query->sum('duration');
+
+                $encashQuery = LeaveEncashment::where('employee_id', $bal->employee_id)
+                    ->where('leave_type_id', $bal->leave_type_id)
+                    ->where('status', 'approved');
+
+                if ($currentCycleStart) {
+                    $encashQuery->where('created_at', '>=', $currentCycleStart);
+                }
+
+                $approvedEncashSum = $encashQuery->sum('requested_days');
+
+                $updates = [];
+                if (floatval($bal->used) !== floatval($approvedDuration)) {
+                    $updates['used'] = round($approvedDuration * 2) / 2;
+                }
+                if (floatval($bal->encashed ?? 0.0) !== floatval($approvedEncashSum)) {
+                    $updates['encashed'] = round($approvedEncashSum * 2) / 2;
+                }
+
+                if (!empty($updates)) {
+                    $bal->update($updates);
+                }
+            }
+        } catch (\Exception $e) {
+            // Silence errors
+        }
+
+        $user = auth()->user();
+        $isAdmin = $user->hasHrPermission('hr.settings.manage') 
+            || $user->hasHrPermission('hr.leaves.manage') 
+            || !empty($user->role_id);
+
+        $employee = Employee::where('personal_email', $user->email)
+            ->orWhere('office_email', $user->email)
+            ->first();
+
+        $allEmployees = Employee::where('status', true)->get();
+        if (!$isAdmin && $employee) {
+            $allEmployees = collect([$employee]);
+        }
+
+        $employeeDataMap = [];
+        foreach ($allEmployees as $emp) {
+            $balances = LeaveBalance::where('employee_id', $emp->id)
+                ->whereHas('leaveType.plan', function($q) {
+                    $q->where('status', true);
+                })
+                ->whereHas('leaveType', function($q) {
+                    $q->where('status', true);
+                })
+                ->with('leaveType')
+                ->get();
+            $typesList = [];
+            foreach ($balances as $bal) {
+                $typesList[] = [
+                    'id' => $bal->leaveType->id,
+                    'name' => $bal->leaveType->name,
+                    'quota' => floatval($bal->allocated),
+                    'remaining' => floatval($bal->remaining),
+                    'type' => $bal->leaveType->type,
+                    'rules' => $bal->leaveType->rules ?? [],
+                ];
+            }
+            $employeeDataMap[$emp->id] = $typesList;
+        }
+
+        $balances = $employee ? LeaveBalance::where('employee_id', $employee->id)->with('leaveType')->get() : collect();
+
+        $query = LeaveRequest::query()->with(['employee', 'leaveType']);
+        $encashQuery = LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
+
+        if ($isAdmin) {
+            if (!empty($inputs['employee_id'])) {
+                $query->where('employee_id', $inputs['employee_id']);
+                $encashQuery->where('employee_id', $inputs['employee_id']);
+            }
+        } else {
+            if ($employee) {
+                $query->where('employee_id', $employee->id);
+                $encashQuery->where('employee_id', $employee->id);
+            } else {
+                $query->whereRaw('1 = 0');
+                $encashQuery->whereRaw('1 = 0');
+            }
+        }
+
+        if (!empty($inputs['leave_type_id'])) {
+            $query->where('leave_type_id', $inputs['leave_type_id']);
+            $encashQuery->where('leave_type_id', $inputs['leave_type_id']);
+        }
+
+        if (!empty($inputs['status'])) {
+            $query->where('status', $inputs['status']);
+            $encashQuery->where('status', $inputs['status']);
+        }
+
+        if (!empty($inputs['search'])) {
+            $search = $inputs['search'];
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('employee', function ($eq) use ($search) {
+                    $eq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%");
+                })->orWhereHas('leaveType', function ($tq) use ($search) {
+                    $tq->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
+            });
+            $encashQuery->where(function ($q) use ($search) {
+                $q->whereHas('employee', function ($eq) use ($search) {
+                    $eq->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_id', 'like', "%{$search}%");
+                })->orWhereHas('leaveType', function ($tq) use ($search) {
+                    $tq->where('name', 'like', "%{$search}%")
+                        ->orWhere('code', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        $requests = $query->orderBy('created_at', 'desc')->get();
+        $encashments = $encashQuery->orderBy('created_at', 'desc')->get();
+
+        $employees = Employee::where('status', true)->get();
+        $leaveTypes = LeaveType::where('status', true)->get();
+
+        return compact(
+            'requests',
+            'balances',
+            'employees',
+            'leaveTypes',
+            'isAdmin',
+            'employeeDataMap',
+            'encashments'
+        );
+    }
+
+    public function storeLeaveRequest(array $validated, Request $request): LeaveRequest
+    {
+        $attachmentPath = null;
+        if ($request->hasFile('attachment')) {
+            $attachmentPath = $request->file('attachment')->store('leave_attachments', 'public');
+        }
+
+        return LeaveRequest::create([
+            'company_id' => $validated['company_id'],
+            'employee_id' => $validated['employee_id'],
+            'leave_type_id' => $validated['leave_type_id'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'session' => $validated['session'] ?? 'full_day',
+            'duration' => $validated['duration'],
+            'reason' => $validated['reason'],
+            'attachment_path' => $attachmentPath,
+            'status' => 'pending',
+            'current_level' => 1,
+        ]);
+    }
+
+    public function updateStatus(LeaveRequest $leaveRequest, array $validated, Request $request): bool
+    {
+        $action = $validated['action'];
+        $comment = $validated['rejection_reason'] ?? null;
+
+        if ($action === 'approved') {
+            $leaveRequest->update([
+                'status' => 'approved',
+                'rejection_reason' => null,
+            ]);
+
+            $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
+                ->where('leave_type_id', $leaveRequest->leave_type_id)
+                ->first();
+
+            if ($balance) {
+                $balance->increment('used', floatval($leaveRequest->duration));
+            }
+        } elseif ($action === 'rejected') {
+            $oldStatus = $leaveRequest->status;
+
+            $leaveRequest->update([
+                'status' => 'rejected',
+                'rejection_reason' => $comment,
+            ]);
+
+            if ($oldStatus === 'approved') {
+                $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
+                    ->where('leave_type_id', $leaveRequest->leave_type_id)
+                    ->first();
+
+                if ($balance) {
+                    $balance->decrement('used', floatval($leaveRequest->duration));
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public function getPolicyRules(int $employeeId, int $leaveTypeId): array
+    {
+        $employee = Employee::find($employeeId);
+        $leaveType = LeaveType::find($leaveTypeId);
+
+        if (!$employee || !$leaveType) {
+            return [
+                'probation' => ['probation_rule' => 'allow'],
+                'notice' => ['notice_rule' => 'allow'],
+                'attachment' => ['require_attachment' => false],
+                'approval' => ['workflow_level' => '1_level'],
+            ];
+        }
+
+        $rules = $leaveType->rules ?? [];
+        
+        return [
+            'probation' => $rules['probation'] ?? ['probation_rule' => 'allow'],
+            'notice' => $rules['notice'] ?? ['notice_rule' => 'allow'],
+            'attachment' => $rules['attachment'] ?? ['require_attachment' => false],
+            'approval' => $rules['approval'] ?? ['workflow_level' => '1_level'],
+        ];
+    }
+}

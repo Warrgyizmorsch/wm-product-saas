@@ -6,12 +6,12 @@
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
-        <x-ui.button variant="outline-primary" icon="feather-upload" data-bs-toggle="modal" data-bs-target="#importEmployeeModal" class="fw-bold text-uppercase">
-            {{ __('hrms.employees.import') }}
-        </x-ui.button>
-        <x-ui.button variant="outline-primary" icon="feather-download" href="{{ route('hrms.employees.export') }}" class="fw-bold text-uppercase">
-            {{ __('hrms.employees.export') }}
-        </x-ui.button>
+        <x-ui.import-export-dropdown 
+            type="employee" 
+            :exportRoute="route('hrms.employees.export')" 
+            :downloadTemplateRoute="route('hrms.employees.import.template')" 
+            importModalTarget="#importEmployeeModal" 
+        />
         <x-ui.button variant="primary" icon="feather-plus" data-bs-toggle="modal" data-bs-target="#addEmployeeModal" class="fw-bold text-uppercase">
             {{ __('hrms.employees.create_employee') }}
         </x-ui.button>
@@ -476,7 +476,6 @@
                             <tr>
                                 <th width="70">#</th>
                                 <th>{{ __('hrms.employees.tbl_employee') }}</th>
-                                <th>{{ __('hrms.employees.tbl_code') }}</th>
                                 <th>{{ __('hrms.employees.tbl_department') }}</th>
                                 <th>{{ __('hrms.employees.tbl_designation') }}</th>
                                 <th>{{ __('hrms.employees.tbl_company') }}</th>
@@ -499,11 +498,11 @@
                                             </div>
                                             <div>
                                                 <div class="fw-bold text-dark">{{ $employee->display_name }}</div>
+                                                <div class="mt-1" style="font-size: 11px;"><code>{{ $employee->employee_id }}</code></div>
                                                 <div class="text-muted fs-12">{{ $employee->personal_email ?: 'No personal email' }}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td><code>{{ $employee->employee_id }}</code></td>
                                     <td>{{ $employee->department?->name ?? 'Not assigned' }}</td>
                                     <td>{{ $employee->designation?->name ?? 'Not assigned' }}</td>
                                     <td>{{ $employee->company?->company_name ?? 'Not assigned' }}</td>
@@ -547,7 +546,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="employee-empty-state">
+                                    <td colspan="7" class="employee-empty-state">
                                         <i class="feather-users fs-32 d-block mb-3 text-secondary"></i>
                                         <div class="fw-semibold text-dark mb-1">No employees found.</div>
                                         <div>Create your first employee record or broaden the filters.</div>
@@ -1275,6 +1274,11 @@
                         if (closeFilter) {
                             $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
                             $('.erp-filter-dropdown.show').removeClass('show');
+                        }
+
+                        // Push state to sync browser URL with current pagination & filter params
+                        if (window.history.pushState) {
+                            window.history.pushState({path: url}, '', url);
                         }
                     },
                     complete: function() {
