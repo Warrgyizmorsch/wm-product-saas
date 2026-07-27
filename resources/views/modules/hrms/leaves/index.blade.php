@@ -480,7 +480,7 @@
                 $('#employee_select').trigger('change');
             } else {
                 // If normal employee (who doesn't have the employee select dropdown), populate leave types directly using their own ID
-                var defaultEmpId = "{{ $employee ? $employee->id : '' }}";
+                var defaultEmpId = "{{ (isset($employee) && $employee) ? $employee->id : '' }}";
                 if (defaultEmpId && employeeDataMap[defaultEmpId]) {
                     var $leaveTypeSelect = $('#leave_type_select');
                     $leaveTypeSelect.empty().append('<option value="">{{ __('hrms.leave.app.select_leave_type') }}</option>');
@@ -1369,7 +1369,7 @@
                                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_employee_id">
                                                     <option value="">{{ __('hrms.common.all_employees') ?? 'All Employees' }}</option>
-                                                    @foreach($allEmployees as $emp)
+                                                    @foreach(($allEmployees ?? $employees ?? []) as $emp)
                                                         <option value="{{ $emp->id }}">
                                                             {{ $emp->full_name }}
                                                         </option>
@@ -1416,7 +1416,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="leavesTableBody">
-                                        @forelse($leaveRequests as $req)
+                                        @forelse(($leaveRequests ?? $requests ?? []) as $req)
                                             @php
                                                 $sameYear = $req->start_date->format('Y') === $req->end_date->format('Y');
                                                 $startStr = $req->start_date->format($sameYear ? 'd M' : 'd M Y');
@@ -1708,7 +1708,7 @@
                                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.leave.encashment_app.employee') }}</label>
                                                 <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_encashment_employee_id">
                                                     <option value="">{{ __('hrms.common.all_employees') }}</option>
-                                                    @foreach($allEmployees as $emp)
+                                                    @foreach(($allEmployees ?? $employees ?? []) as $emp)
                                                         <option value="{{ $emp->id }}">
                                                             {{ $emp->full_name }}
                                                         </option>
@@ -1757,7 +1757,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="encashmentsTableBody">
-                                        @forelse($leaveEncashments as $enc)
+                                        @forelse(($leaveEncashments ?? $encashments ?? []) as $enc)
                                             <tr class="encashment-row"
                                                 data-employee="{{ strtolower($enc->employee->full_name) }} {{ strtolower($enc->employee->employee_id) }}"
                                                 data-employee-id="{{ $enc->employee_id }}"
@@ -1880,7 +1880,7 @@
                             <div class="row mb-3">
                                 <div class="col-12">
                                     <x-ui.odoo-form-ui type="select" :label="__('hrms.employees.tbl_employee') ?? 'Employee'" name="employee_id" id="employee_select" :required="true" class="odoo-select2-custom">
-                                        @foreach ($allEmployees as $emp)
+                                        @foreach (($allEmployees ?? $employees ?? []) as $emp)
                                             <option value="{{ $emp->id }}" {{ ($employee && $employee->id == $emp->id) ? 'selected' : '' }}>
                                                 {{ $emp->full_name }} ({{ $emp->employee_id }})
                                             </option>
@@ -1947,7 +1947,7 @@
 
                         <div class="mb-3">
                             <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.app.notify_members')" name="notified_contacts[]" id="notified_contacts" :required="false" :multiple="true" class="odoo-select2-custom" :placeholder="__('hrms.leave.app.notify_placeholder')">
-                                @foreach ($allEmployees as $emp)
+                                @foreach (($allEmployees ?? $employees ?? []) as $emp)
                                     @if (!$employee || $emp->id !== $employee->id)
                                         <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                                     @endif
@@ -1979,7 +1979,7 @@
                             <div class="mb-3">
                                 <x-ui.odoo-form-ui type="select" :label="__('hrms.leave.encashment_app.select_employee')" name="employee_id" id="encashment_employee_id" :required="true" class="odoo-select2-custom">
                                     <option value="">{{ __('hrms.leave.encashment_app.select_employee') }}...</option>
-                                    @foreach($allEmployees as $emp)
+                                    @foreach(($allEmployees ?? $employees ?? []) as $emp)
                                         <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>

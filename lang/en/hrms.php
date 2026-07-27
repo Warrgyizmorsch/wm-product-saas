@@ -1,6 +1,13 @@
 <?php
 
 return [
+    'wfh' => [
+        'title' => 'WFH Applications',
+        'apply_wfh' => 'Apply Work From Home',
+        'submitted_successfully' => 'WFH application submitted successfully.',
+        'approved_successfully' => 'WFH application approved successfully.',
+        'rejected_successfully' => 'WFH application rejected successfully.',
+    ],
     'assets' => [
         'title' => 'Asset Management',
         'tab_registry' => 'Asset Registry',

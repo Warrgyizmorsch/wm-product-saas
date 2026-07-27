@@ -1194,7 +1194,7 @@
                                     <h5 class="card-custom-title"><i class="feather-dollar-sign text-primary"></i> {{ __('hrms.employees.lbl_computed_salary') }}</h5>
                                     <small class="text-muted d-block mt-1">{{ __('hrms.employees.lbl_computed_salary_desc') }}</small>
                                 </div>
-                                @if($salaryStructure)
+                                @if(isset($salaryStructure) && $salaryStructure)
                                     <span class="badge bg-soft-primary text-primary px-3 py-2 rounded-pill fs-12">
                                         {{ $salaryStructure->name }}
                                     </span>
@@ -1211,7 +1211,7 @@
                                         <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_pay_group') }}</div>
                                         <div>{{ __('hrms.employees.lbl_no_pay_group_desc') }}</div>
                                     </div>
-                                @elseif(!$salaryStructure)
+                                @elseif(!isset($salaryStructure) || !$salaryStructure)
                                     <div class="p-5 text-center text-muted">
                                         <i class="feather-alert-octagon fs-32 d-block mb-3 text-danger"></i>
                                         <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_slab_match') }}</div>
@@ -1235,7 +1235,7 @@
                                                     $totalEarningsMonthly = 0;
                                                     $totalDeductionsMonthly = 0;
                                                 @endphp
-                                                @foreach($computedComponents as $compId => $compData)
+                                                @foreach(($computedComponents ?? []) as $compId => $compData)
                                                     @php
                                                         $item = $compData['item'];
                                                         $amt = $compData['amount'];
@@ -1330,7 +1330,7 @@
                                 </x-ui.button>
                             </div>
                             <div class="card-body p-0">
-                                @if($adhocComponents->isEmpty())
+                                @if(!isset($adhocComponents) || $adhocComponents->isEmpty())
                                     <div class="p-4 text-center text-muted fs-13">
                                         {{ __('hrms.employees.lbl_no_adhoc_components') }}
                                     </div>
@@ -1824,7 +1824,7 @@
                             <div class="card-body p-0">
                                 <!-- 1. LEAVE APPLICATIONS VIEW -->
                                 <div id="leaveApplicationsViewContainer">
-                                    @if($empLeaveRequests->isEmpty())
+                                    @if(!isset($empLeaveRequests) || $empLeaveRequests->isEmpty())
                                         <div class="p-5 text-center text-muted">
                                             <i class="feather-calendar fs-24 text-secondary d-block mb-2"></i>
                                             {{ __('hrms.leave.app.no_requests') ?? 'No leave applications submitted by this employee yet.' }}
@@ -1964,7 +1964,7 @@
 
                                 <!-- 2. LEAVE ENCASHMENTS VIEW -->
                                 <div id="leaveEncashmentsViewContainer" class="d-none">
-                                    @if($empLeaveEncashments->isEmpty())
+                                    @if(!isset($empLeaveEncashments) || $empLeaveEncashments->isEmpty())
                                         <div class="p-5 text-center text-muted">
                                             <i class="feather-dollar-sign fs-24 text-secondary d-block mb-2"></i>
                                             No leave encashment requests submitted by this employee yet.
@@ -2178,12 +2178,12 @@
                         <div class="card-custom">
                             <div class="card-custom-header">
                                 <h5 class="card-custom-title"><i class="feather-list text-primary"></i> {{ __('hrms.employees.lbl_penalization_history') }}</h5>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addPenaltyModal" @disabled(!$attendancePenalty)>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addPenaltyModal" @disabled(!isset($attendancePenalty) || !$attendancePenalty)>
                                     {{ __('hrms.employees.btn_log_instance') }}
                                 </button>
                             </div>
                             <div class="card-body p-0">
-                                @if($penalties->isEmpty())
+                                @if(!isset($penalties) || $penalties->isEmpty())
                                     <div class="p-5 text-center text-muted">
                                         <i class="feather-check-circle fs-32 d-block mb-3 text-success"></i>
                                         <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_penalties') }}</div>
@@ -2252,7 +2252,7 @@
                                 <h5 class="card-custom-title"><i class="feather-shield text-primary"></i> {{ __('hrms.employees.lbl_penalization_policy') }}</h5>
                             </div>
                             <div class="card-body p-4">
-                                @if($attendancePenalties && $attendancePenalties->isNotEmpty())
+                                @if(isset($attendancePenalties) && $attendancePenalties && $attendancePenalties->isNotEmpty())
                                     @foreach($attendancePenalties as $index => $policy)
                                         <div class="policy-info-pane {{ $index === 0 ? '' : 'd-none' }}" data-index="{{ $index }}" data-policy-type="{{ $policy->rule_type }}">
                                             <div class="mb-4 d-flex justify-content-between align-items-center">
@@ -2640,7 +2640,7 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                @if(isset($documents) && $documents->hasPages())
+                                @if(isset($documents) && ($documents instanceof \Illuminate\Pagination\LengthAwarePaginator || method_exists($documents, 'hasPages')) && $documents->hasPages())
                                      <div class="px-4 py-3 border-top bg-white doc-pagination-container">
                                          <x-ui.pagination 
                                              :currentPage="$documents->currentPage()" 
@@ -3157,7 +3157,7 @@
                             <div class="col-12">
                                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.mdl_adhoc_component') }}" name="salary_component_id" select2-selector="default" :required="true">
                                     <option value="">{{ __('hrms.employees.mdl_select_component') }}</option>
-                                    @foreach($availableAdhocComponents as $ac)
+                                    @foreach(($availableAdhocComponents ?? []) as $ac)
                                         <option value="{{ $ac->id }}">{{ $ac->name }} [{{ $ac->code }}]</option>
                                     @endforeach
                                 </x-ui.odoo-form-ui>
@@ -3561,7 +3561,7 @@
     @push('scripts')
         <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
         <script>
-            var empProfileDataMap = @json($employeeDataMap);
+            var empProfileDataMap = @json($employeeDataMap ?? []);
 
             $(document).ready(function() {
                 // Move modals to body root to prevent Bootstrap backdrop overlay issues inside tabs

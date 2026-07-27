@@ -238,19 +238,25 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         }
 
         $requests = $query->orderBy('created_at', 'desc')->get();
+        $leaveRequests = $requests;
         $encashments = $encashQuery->orderBy('created_at', 'desc')->get();
+        $leaveEncashments = $encashments;
 
         $employees = Employee::where('status', true)->get();
         $leaveTypes = LeaveType::where('status', true)->get();
 
         return compact(
             'requests',
+            'leaveRequests',
             'balances',
             'employees',
+            'allEmployees',
+            'employee',
             'leaveTypes',
             'isAdmin',
             'employeeDataMap',
-            'encashments'
+            'encashments',
+            'leaveEncashments'
         );
     }
 
@@ -262,18 +268,21 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         }
 
         return LeaveRequest::create([
-            'company_id' => $validated['company_id'],
-            'employee_id' => $validated['employee_id'],
-            'leave_type_id' => $validated['leave_type_id'],
-            'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'],
-            'session' => $validated['session'] ?? 'full_day',
-            'duration' => $validated['duration'],
-            'reason' => $validated['reason'],
+            'company_id'      => $validated['company_id'],
+            'employee_id'     => $validated['employee_id'],
+            'leave_type_id'   => $validated['leave_type_id'],
+            'start_date'      => $validated['start_date'],
+            'end_date'        => $validated['end_date'],
+            'start_date_type' => $validated['start_date_type'] ?? 'full_day',
+            'end_date_type'   => $validated['end_date_type']   ?? 'full_day',
+            'session'         => $validated['session'] ?? 'full_day',
+            'duration'        => $validated['duration'],
+            'reason'          => $validated['reason'],
             'attachment_path' => $attachmentPath,
-            'status' => 'pending',
-            'current_level' => 1,
+            'status'          => 'pending',
+            'current_level'   => 1,
         ]);
+
     }
 
     public function updateStatus(LeaveRequest $leaveRequest, array $validated, Request $request): bool

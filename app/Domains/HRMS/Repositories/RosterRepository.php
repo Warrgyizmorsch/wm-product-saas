@@ -144,35 +144,7 @@ class RosterRepository implements RosterRepositoryInterface
         $patternSort = !empty($inputs['pattern_sort']) ? (string) $inputs['pattern_sort'] : 'name_asc';
         $patternCompanyId = !empty($inputs['pattern_company_id']) ? (int) $inputs['pattern_company_id'] : null;
 
-        $patternsQuery = \App\Domains\HRMS\Models\WeeklyShiftPattern::with(['company']);
-        if ($patternSearch !== '') {
-            $patternsQuery->where(function ($query) use ($patternSearch): void {
-                $query->where('name', 'like', "%{$patternSearch}%")
-                    ->orWhere('code', 'like', "%{$patternSearch}%");
-            });
-        }
-
-        if ($patternCompanyId) {
-            $patternsQuery->where('company_id', $patternCompanyId);
-        }
-
-        switch ($patternSort) {
-            case 'name_desc':
-                $patternsQuery->orderBy('name', 'desc');
-                break;
-            case 'code_asc':
-                $patternsQuery->orderBy('code', 'asc');
-                break;
-            case 'code_desc':
-                $patternsQuery->orderBy('code', 'desc');
-                break;
-            case 'name_asc':
-            default:
-                $patternsQuery->orderBy('name', 'asc');
-                break;
-        }
-
-        $weeklyPatterns = $patternsQuery->paginate(10, ['*'], 'pattern_page')->withQueryString();
+        $weeklyPatterns = collect();
 
         return compact(
             'tab',

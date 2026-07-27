@@ -162,7 +162,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
     {
         return DB::transaction(function () use ($validated) {
             $salaryStructure = SalaryStructure::create([
-                'company_id' => $validated['company_id'] ?? null,
+                'company_id' => $validated['company_id'] ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
                 'pay_group_id' => $validated['pay_group_id'] ?? null,
                 'name' => $validated['name'],
                 'min_ctc' => $validated['min_ctc'],
@@ -191,7 +191,7 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
     {
         return DB::transaction(function () use ($salaryStructure, $validated) {
             $salaryStructure->update([
-                'company_id' => $validated['company_id'] ?? $salaryStructure->company_id,
+                'company_id' => $validated['company_id'] ?? $salaryStructure->company_id ?? (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
                 'pay_group_id' => $validated['pay_group_id'] ?? $salaryStructure->pay_group_id,
                 'name' => $validated['name'],
                 'min_ctc' => $validated['min_ctc'],
@@ -225,6 +225,9 @@ class SalaryStructureRepository implements SalaryStructureRepositoryInterface
 
     public function storeComponent(array $validated): SalaryComponent
     {
+        if (empty($validated['company_id'])) {
+            $validated['company_id'] = \App\Domains\HRMS\Models\Company::first()?->id ?? 1;
+        }
         return SalaryComponent::create($validated);
     }
 
