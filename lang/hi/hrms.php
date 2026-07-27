@@ -196,6 +196,7 @@ return [
         'download_template' => 'टेम्पलेट डाउनलोड करें',
         'import' => 'आयात करें',
         'detail' => 'विवरण',
+        'action' => 'कार्य',
         'all_types' => 'सभी प्रकार',
         'close_panel' => 'पैनल बंद करें',
         'save_changes' => 'बदलाव सहेजें',

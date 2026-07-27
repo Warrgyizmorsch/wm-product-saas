@@ -184,6 +184,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
         $empLeaveRequests = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
         $empLeaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
+        $empWfhRequests = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
         $documents = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
             ->where('documentable_id', $employee->id)
             ->paginate(10, ['*'], 'doc_page')
@@ -244,6 +245,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'penalties'                 => $penalties,
             'empLeaveRequests'          => $empLeaveRequests,
             'empLeaveEncashments'       => $empLeaveEncashments,
+            'empWfhRequests'            => $empWfhRequests,
             'documents'                 => $documents,
             'attendancePenalty'         => $attendancePenalty,
             'attendancePenalties'       => $attendancePenalties,

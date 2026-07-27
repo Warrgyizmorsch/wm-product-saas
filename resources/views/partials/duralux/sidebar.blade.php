@@ -123,7 +123,7 @@
                 ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
                 ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
             ]],
-            ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'url' => '#', 'children' => [['label' => 'Employees', 'route' => 'hrms.employees.index'], 'Attendance', ['label' => 'Leave Applications', 'route' => 'hrms.leaves.index'], ['label' => 'WFH Applications', 'route' => 'hrms.wfh.index'], 'Payroll', ['label' => 'Setting', 'route' => 'hrms.org.index']]],
+            ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'url' => '#', 'children' => [['label' => 'Employees', 'route' => 'hrms.employees.index'], 'Attendance', ['label' => 'Leave', 'route' => 'hrms.leaves.index'], ['label' => 'WFH', 'route' => 'hrms.wfh.index'], 'Payroll', ['label' => 'Setting', 'route' => 'hrms.org.index']]],
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],
         __('ui.platform_admin') => [

@@ -14,4 +14,6 @@ interface LeaveRequestRepositoryInterface
     public function updateStatus(LeaveRequest $leaveRequest, array $validated, Request $request): bool;
 
     public function getPolicyRules(int $employeeId, int $leaveTypeId): array;
+
+    public function cancelLeaveRequest(LeaveRequest $leaveRequest): void;
 }
