@@ -32,12 +32,23 @@ class LabelController extends Controller
      * Print a label for a Production Order.
      * Barcode: PO:{order_number}
      */
-    public function printOrder(int $id)
+    public function printOrder(string|int $id)
     {
-        Gate::authorize('view', ProductionOrder::findOrFail($id));
+        $tenantId = require_tenant_id();
+        $order = ProductionOrder::withoutGlobalScopes()
+            ->with('product')
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($id) {
+                if (is_numeric($id)) {
+                    $q->where('id', (int) $id);
+                }
+                $q->orWhere('order_number', $id)->orWhere('barcode', $id);
+            })
+            ->firstOrFail();
 
-        $order    = ProductionOrder::with('product')->findOrFail($id);
-        $barcode  = 'PO:' . $order->order_number;
+        Gate::authorize('view', $order);
+
+        $barcode = 'PO:' . $order->order_number;
 
         return view('modules.production.labels.order', compact('order', 'barcode'));
     }
@@ -49,14 +60,21 @@ class LabelController extends Controller
      * Note: This is a production-lot label, not a product/SKU label.
      * Use printProductSku() for product identification labels.
      */
-    public function printBatch(int $id)
+    public function printBatch(string|int $id)
     {
-        Gate::authorize('view', ProductionOrder::class);
+        Gate::authorize('viewAny', ProductionOrder::class);
 
         $tenantId = require_tenant_id();
-        $batch    = ProductionBatch::with('product')
+        $batch = ProductionBatch::withoutGlobalScopes()
+            ->with('product')
             ->where('tenant_id', $tenantId)
-            ->findOrFail($id);
+            ->where(function ($q) use ($id) {
+                if (is_numeric($id)) {
+                    $q->where('id', (int) $id);
+                }
+                $q->orWhere('batch_number', $id)->orWhere('barcode', $id);
+            })
+            ->firstOrFail();
 
         $barcode = 'LOT:' . $batch->batch_number;
 
@@ -67,14 +85,21 @@ class LabelController extends Controller
      * Print a label for a Production Serial Number.
      * Barcode: SN:{serial_number}
      */
-    public function printSerial(int $id)
+    public function printSerial(string|int $id)
     {
-        Gate::authorize('view', ProductionOrder::class);
+        Gate::authorize('viewAny', ProductionOrder::class);
 
         $tenantId = require_tenant_id();
-        $serial   = ProductionSerialNumber::with('product')
+        $serial = ProductionSerialNumber::withoutGlobalScopes()
+            ->with('product')
             ->where('tenant_id', $tenantId)
-            ->findOrFail($id);
+            ->where(function ($q) use ($id) {
+                if (is_numeric($id)) {
+                    $q->where('id', (int) $id);
+                }
+                $q->orWhere('serial_number', $id)->orWhere('barcode', $id);
+            })
+            ->firstOrFail();
 
         $barcode = 'SN:' . $serial->serial_number;
 
@@ -88,13 +113,22 @@ class LabelController extends Controller
      * Correction #12: This labels the PRODUCT/SKU, not a specific inventory lot.
      * Use printBatch() for lot-level labels.
      */
-    public function printProductSku(int $id)
+    public function printProductSku(string|int $id)
     {
-        Gate::authorize('view', Product::class);
-
         $tenantId = require_tenant_id();
-        $product  = Product::where('tenant_id', $tenantId)->findOrFail($id);
-        $barcode  = 'PRD:' . $product->sku;
+        $product = Product::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function ($q) use ($id) {
+                if (is_numeric($id)) {
+                    $q->where('id', (int) $id);
+                }
+                $q->orWhere('sku', $id);
+            })
+            ->firstOrFail();
+
+        Gate::authorize('view', $product);
+
+        $barcode = 'PRD:' . $product->sku;
 
         return view('modules.production.labels.product-sku', compact('product', 'barcode'));
     }

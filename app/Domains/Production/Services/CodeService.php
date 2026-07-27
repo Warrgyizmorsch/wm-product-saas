@@ -105,29 +105,26 @@ class CodeService
             return [
                 'type'       => $type,
                 'identifier' => $identifier,
+                'raw_code'   => $code,
                 'format'     => 'business',
             ];
         }
 
-        // ── Legacy format  e.g.  ORD-00000001 ────────────────────────────────
+        // ── Standard & Legacy prefix format  e.g.  BAT-2026-000002 / ORD-00000001 ──
         $parts = explode('-', $code);
-        if (count($parts) < 2) {
-            throw new \InvalidArgumentException("Invalid barcode/QR code format: {$codeString}");
-        }
-
-        $prefix = strtoupper($parts[0]);
-        $numericId = (int) $parts[1];
+        $prefix = strtoupper($parts[0] ?? '');
 
         $type = match ($prefix) {
-            'ORD' => 'order',
-            'BAT' => 'batch',
-            'SER' => 'serial',
-            default => 'unknown',
+            'ORD', 'PO'  => 'order',
+            'BAT', 'LOT' => 'batch',
+            'SER', 'SN'  => 'serial',
+            default      => 'unknown',
         };
 
         return [
             'type'       => $type,
-            'identifier' => (string) $numericId, // numeric string for DB lookup
+            'identifier' => $code,
+            'raw_code'   => $code,
             'format'     => 'legacy',
         ];
     }
@@ -231,28 +228,62 @@ class CodeService
     {
         $type       = $decoded['type'];
         $identifier = $decoded['identifier'];
-        $isLegacy   = ($decoded['format'] === 'legacy');
+        $rawCode    = $decoded['raw_code'] ?? $identifier;
 
         return match ($type) {
-            'order' => $isLegacy
-                ? ProductionOrder::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', (int)$identifier)->first()
-                : ProductionOrder::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('order_number', $identifier)->first(),
+            'order' => ProductionOrder::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($identifier, $rawCode) {
+                    $q->where('order_number', $identifier)
+                      ->orWhere('order_number', $rawCode)
+                      ->orWhere('barcode', $rawCode)
+                      ->orWhere('barcode', 'PO:' . $identifier);
+                    if (is_numeric($identifier)) {
+                        $q->orWhere('id', (int) $identifier);
+                    }
+                })->first(),
 
-            'batch' => $isLegacy
-                ? ProductionBatch::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', (int)$identifier)->first()
-                : ProductionBatch::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('batch_number', $identifier)->first(),
+            'batch' => ProductionBatch::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($identifier, $rawCode) {
+                    $q->where('batch_number', $identifier)
+                      ->orWhere('batch_number', $rawCode)
+                      ->orWhere('barcode', $rawCode)
+                      ->orWhere('barcode', 'LOT:' . $identifier);
+                    if (is_numeric($identifier)) {
+                        $q->orWhere('id', (int) $identifier);
+                    }
+                })->first(),
 
-            'serial' => $isLegacy
-                ? ProductionSerialNumber::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('id', (int)$identifier)->first()
-                : ProductionSerialNumber::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('serial_number', $identifier)->first(),
+            'serial' => ProductionSerialNumber::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($identifier, $rawCode) {
+                    $q->where('serial_number', $identifier)
+                      ->orWhere('serial_number', $rawCode)
+                      ->orWhere('barcode', $rawCode)
+                      ->orWhere('barcode', 'SN:' . $identifier);
+                    if (is_numeric($identifier)) {
+                        $q->orWhere('id', (int) $identifier);
+                    }
+                })->first(),
 
-            'product' => Product::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('sku', $identifier)->first(),
+            'product' => Product::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($q) use ($identifier) {
+                    $q->where('sku', $identifier)->orWhere('barcode', $identifier);
+                })->first(),
 
-            'machine' => Machine::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', $identifier)->first(),
+            'machine' => Machine::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('code', $identifier)->first(),
 
-            'work_center' => WorkCenter::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', $identifier)->first(),
+            'work_center' => WorkCenter::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('code', $identifier)->first(),
 
-            'warehouse' => Warehouse::withoutGlobalScopes()->where('tenant_id', $tenantId)->where('code', $identifier)->first(),
+            'warehouse' => Warehouse::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('code', $identifier)->first(),
 
             'operator' => (function () use ($identifier, $tenantId) {
                 $employee = \App\Domains\HRMS\Models\Employee::where('employee_id', $identifier)->first();

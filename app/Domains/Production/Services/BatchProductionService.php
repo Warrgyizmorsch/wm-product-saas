@@ -146,13 +146,19 @@ class BatchProductionService
 
             $parents = ProductionBatch::whereIn('id', $parentBatchIds)->get();
 
-            // Validate same product
+            // Validate same product & check maximum total quantity
             $productId = $parents->first()->product_id;
             $orderId   = $parents->first()->production_order_id;
+            $sumPlannedQty = (float) $parents->sum('planned_quantity');
+
             foreach ($parents as $parent) {
                 if ($parent->product_id !== $productId) {
                     throw new \LogicException("Cannot merge batches with different products.");
                 }
+            }
+
+            if ($targetPlannedQty > $sumPlannedQty) {
+                throw new \InvalidArgumentException("Target merged quantity (" . number_format($targetPlannedQty, 2) . ") cannot exceed the combined quantity of selected source batches (" . number_format($sumPlannedQty, 2) . ").");
             }
 
             // Create target merged batch

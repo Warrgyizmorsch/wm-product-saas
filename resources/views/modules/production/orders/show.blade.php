@@ -68,6 +68,11 @@
             {{ __('production.back_to_list') }}
         </x-ui.icon-btn>
 
+        {{-- Print Order Label Button --}}
+        <x-ui.button href="{{ route('production.labels.orders.print', $order->id) }}" target="_blank" icon="feather-printer me-1" variant="outline-secondary" size="sm">
+            {{ __('production.print_label') }}
+        </x-ui.button>
+
         @if($order->isDraft())
             {{-- Release Order Button --}}
             <form method="POST" action="{{ route('production.orders.release', $order->id) }}" class="d-inline">
@@ -268,6 +273,17 @@
             ['id' => 'vtab-overview',         'label' => __('production.overview'),         'active' => $activeTab === 'vtab-overview',         'icon' => 'feather-activity'],
             ['id' => 'vtab-operations',       'label' => __('production.operations_routing'),'active' => $activeTab === 'vtab-operations',       'icon' => 'feather-cpu'],
             ['id' => 'vtab-wip',              'label' => __('production.wip_tracking'),     'active' => $activeTab === 'vtab-wip',              'icon' => 'feather-layers'],
+        ];
+
+        if ($order->production_mode === 'batch') {
+            $verticalTabs[] = ['id' => 'vtab-batches', 'label' => __('production.production_batches'), 'active' => $activeTab === 'vtab-batches', 'icon' => 'feather-box'];
+        } elseif ($order->production_mode === 'serial') {
+            $verticalTabs[] = ['id' => 'vtab-serials', 'label' => __('production.serial_numbers'), 'active' => $activeTab === 'vtab-serials', 'icon' => 'feather-hash'];
+        } elseif ($order->production_mode === 'batch_and_serial') {
+            $verticalTabs[] = ['id' => 'vtab-batches', 'label' => __('production.batches_and_serials'), 'active' => $activeTab === 'vtab-batches', 'icon' => 'feather-box'];
+        }
+
+        $verticalTabs = array_merge($verticalTabs, [
             ['id' => 'vtab-reservations',     'label' => __('production.material_reservations'), 'active' => $activeTab === 'vtab-reservations', 'icon' => 'feather-archive'],
             ['id' => 'vtab-issues',           'label' => __('production.material_issues'),  'active' => $activeTab === 'vtab-issues',           'icon' => 'feather-arrow-up-right'],
             ['id' => 'vtab-progress',         'label' => __('production.progress_logs'),    'active' => $activeTab === 'vtab-progress',         'icon' => 'feather-clock'],
@@ -276,7 +292,7 @@
             ['id' => 'vtab-cost-adjustments', 'label' => __('production.cost_adjustments'), 'active' => $activeTab === 'vtab-cost-adjustments', 'icon' => 'feather-dollar-sign'],
             ['id' => 'vtab-procurement',      'label' => __('production.procurement_requisitions'), 'active' => $activeTab === 'vtab-procurement', 'icon' => 'feather-shopping-cart'],
             ['id' => 'vtab-audit',            'label' => __('production.audit_trail_events'), 'active' => $activeTab === 'vtab-audit',        'icon' => 'feather-file-text'],
-        ];
+        ]);
     @endphp
 
     <div class="row mt-4">
@@ -518,6 +534,127 @@
                 </div>
             @endif
         </div>
+
+        {{-- Tab: Batches & Serials --}}
+        @if($order->production_mode === 'batch' || $order->production_mode === 'batch_and_serial')
+            <div class="tab-pane fade {{ $activeTab === 'vtab-batches' ? 'show active' : '' }}" id="vtab-batches" role="tabpanel" aria-labelledby="vtab-batches-tab">
+                <div class="row g-4">
+                    {{-- Active Batches --}}
+                    <div class="{{ $order->production_mode === 'batch_and_serial' ? 'col-lg-6' : 'col-12' }}">
+                        <x-ui.card title="Active Production Batches">
+                            <x-ui.odoo-form-ui type="table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30%">Batch Number</th>
+                                        <th style="width: 20%" class="text-end">Planned Qty</th>
+                                        <th style="width: 20%" class="text-end">Actual Qty</th>
+                                        <th style="width: 15%" class="text-center">Status</th>
+                                        <th style="width: 15%" class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse($order->batches as $batch)
+                                        <tr>
+                                            <td>
+                                                <div class="fw-bold text-dark font-monospace">{{ $batch->batch_number }}</div>
+                                                @if($batch->barcode)
+                                                    <div class="fs-10 text-muted"><i class="feather-tag me-1"></i>{{ $batch->barcode }}</div>
+                                                @endif
+                                            </td>
+                                            <td class="text-end fw-semibold text-dark">{{ number_format($batch->planned_quantity, 2) }}</td>
+                                            <td class="text-end text-success fw-semibold">{{ number_format($batch->actual_quantity, 2) }}</td>
+                                            <td class="text-center">
+                                                <span class="badge bg-soft-primary text-primary fs-11">{{ strtoupper($batch->status) }}</span>
+                                            </td>
+                                            <td class="text-center">
+                                                <x-ui.button size="sm" variant="light" class="border py-1 px-2" href="{{ route('production.labels.batches.print', $batch->id) }}" target="_blank" title="Print Barcode Label">
+                                                    <i class="feather-printer me-1"></i> Print Label
+                                                </x-ui.button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4 text-muted">No batches generated for this order yet.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </x-ui.odoo-form-ui>
+                        </x-ui.card>
+                    </div>
+
+                    @if($order->production_mode === 'batch_and_serial')
+                        {{-- Registered Serials inside combined view --}}
+                        <div class="col-lg-6">
+                            <x-ui.card title="Registered Serial Numbers">
+                                <x-ui.odoo-form-ui type="table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 45%">Serial Number</th>
+                                            <th style="width: 25%">Status</th>
+                                            <th style="width: 30%" class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($order->serialNumbers as $serial)
+                                            <tr>
+                                                <td class="fw-bold text-dark font-monospace">{{ $serial->serial_number }}</td>
+                                                <td>
+                                                    <span class="badge bg-soft-info text-info fs-11">{{ strtoupper($serial->status) }}</span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <x-ui.button size="sm" variant="light" class="border py-1 px-2" href="{{ route('production.labels.serials.print', $serial->id) }}" target="_blank" title="Print Barcode Label">
+                                                        <i class="feather-printer me-1"></i> Print Label
+                                                    </x-ui.button>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="3" class="text-center py-4 text-muted">No serial numbers registered yet.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </x-ui.odoo-form-ui>
+                            </x-ui.card>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endif
+
+        @if($order->production_mode === 'serial')
+            <div class="tab-pane fade {{ $activeTab === 'vtab-serials' ? 'show active' : '' }}" id="vtab-serials" role="tabpanel" aria-labelledby="vtab-serials-tab">
+                <x-ui.card title="Registered Serial Numbers">
+                    <x-ui.odoo-form-ui type="table">
+                        <thead>
+                            <tr>
+                                <th style="width: 45%">Serial Number</th>
+                                <th style="width: 25%">Status</th>
+                                <th style="width: 30%" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($order->serialNumbers as $serial)
+                                <tr>
+                                    <td class="fw-bold text-dark font-monospace">{{ $serial->serial_number }}</td>
+                                    <td>
+                                        <span class="badge bg-soft-info text-info fs-11">{{ strtoupper($serial->status) }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <x-ui.button size="sm" variant="light" class="border py-1 px-2" href="{{ route('production.labels.serials.print', $serial->id) }}" target="_blank" title="Print Barcode Label">
+                                            <i class="feather-printer me-1"></i> Print Label
+                                        </x-ui.button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="text-center py-4 text-muted">No serial numbers registered yet.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </x-ui.odoo-form-ui>
+                </x-ui.card>
+            </div>
+        @endif
 
         {{-- Tab 2: Operations --}}
         <div class="tab-pane fade {{ $activeTab === 'vtab-operations' ? 'show active' : '' }}" id="vtab-operations" role="tabpanel" aria-labelledby="vtab-operations-tab">

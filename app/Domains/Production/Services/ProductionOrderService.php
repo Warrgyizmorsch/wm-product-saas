@@ -202,6 +202,7 @@ class ProductionOrderService
                 'quantity_ordered' => $quantity,
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
+                'production_mode' => $data['production_mode'] ?? 'standard',
                 'status' => ProductionOrder::STATUS_DRAFT,
                 'description' => $data['description'] ?? null,
                 'created_by' => $userId,

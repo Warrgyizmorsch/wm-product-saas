@@ -45,6 +45,13 @@
                         <x-ui.odoo-form-ui type="input" :label="__('production.bill_of_materials')" name="bom_ref" :value="$order->bom ? ($order->bom->bom_number . ' - ' . ($order->bom->bom_name ?? '') . ' (v' . $order->bom->version . ')') : 'No BOM assigned'" :readonly="true" />
                         
                         <x-ui.odoo-form-ui type="input" :label="__('production.process_routing')" name="routing_ref" :value="$order->routing ? ($order->routing->routing_number . ' - ' . $order->routing->name . ' (v' . $order->routing->version . ')') : 'No Routing assigned'" :readonly="true" />
+                        
+                        <x-ui.odoo-form-ui type="select" label="{{ __('production.production_mode') }}" name="production_mode" id="production_mode_select">
+                            <option value="standard" @selected(old('production_mode', $order->production_mode) === 'standard')>{{ __('production.mode_standard') }}</option>
+                            <option value="batch" @selected(old('production_mode', $order->production_mode) === 'batch')>{{ __('production.mode_batch') }}</option>
+                            <option value="serial" @selected(old('production_mode', $order->production_mode) === 'serial')>{{ __('production.mode_serial') }}</option>
+                            <option value="batch_and_serial" @selected(old('production_mode', $order->production_mode) === 'batch_and_serial')>{{ __('production.mode_batch_and_serial') }}</option>
+                        </x-ui.odoo-form-ui>
                     </div>
 
                     <!-- Right Column -->

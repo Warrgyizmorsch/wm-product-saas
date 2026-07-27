@@ -99,6 +99,32 @@ class ProductionExecutionService
             $op->quantity_rejected      += $rejected;
             $op->quantity_scrapped      += $scrapped;
 
+            // 4. Update Active Production Batches actual_quantity for this order
+            if ($produced > 0) {
+                $activeBatches = ProductionBatch::where('production_order_id', $order->id)
+                    ->whereIn('status', [ProductionBatch::STATUS_PLANNED, ProductionBatch::STATUS_IN_PRODUCTION])
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                $rem = $produced;
+                foreach ($activeBatches as $b) {
+                    if ($rem <= 0) break;
+                    $unfilled = max(0.0, (float)$b->planned_quantity - (float)$b->actual_quantity);
+                    if ($unfilled > 0) {
+                        $alloc = min($rem, $unfilled);
+                        $b->actual_quantity += $alloc;
+                        $rem -= $alloc;
+
+                        if ($b->actual_quantity >= $b->planned_quantity) {
+                            $b->status = ProductionBatch::STATUS_COMPLETED;
+                        } else {
+                            $b->status = ProductionBatch::STATUS_IN_PRODUCTION;
+                        }
+                        $b->save();
+                    }
+                }
+            }
+
             // Handle Scrap automatically if logged
             if ($scrapped > 0) {
                 $this->logScrap(
