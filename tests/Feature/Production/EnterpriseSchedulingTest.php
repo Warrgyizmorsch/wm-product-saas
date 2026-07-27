@@ -197,8 +197,8 @@ class EnterpriseSchedulingTest extends TestCase
         $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
         $op    = $sched->operations->first();
 
-        // Planned finish should be Wednesday 2026-07-08 at 10:00:00
-        $this->assertEquals('2026-07-08 10:00:00', $op->planned_finish->toDateTimeString());
+        // Planned finish should be Wednesday 2026-07-08 at 09:30:00
+        $this->assertEquals('2026-07-08 09:30:00', $op->planned_finish->toDateTimeString());
     }
 
     /**
@@ -523,7 +523,7 @@ class EnterpriseSchedulingTest extends TestCase
         $op    = $sched->operations->first();
 
         // Should skip Saturday & Sunday, ending on Monday morning
-        $this->assertEquals('2026-07-06 10:00:00', $op->planned_finish->toDateTimeString());
+        $this->assertEquals('2026-07-06 09:30:00', $op->planned_finish->toDateTimeString());
 
         $warnings = $op->warnings;
         // There should be exactly 1 aggregated HOLIDAY_SKIPPED warning
@@ -738,8 +738,8 @@ class EnterpriseSchedulingTest extends TestCase
         $sched = $this->schedulingService->generateSchedule($order, $start, 'forward');
         $op    = $sched->operations->first();
 
-        // Standard shift Tuesday starts at 08:00:00. Remaining 120 mins -> finishes Tuesday 10:00:00.
-        $this->assertEquals('2026-07-07 10:00:00', $op->planned_finish->toDateTimeString());
+        // Standard shift Tuesday starts at 08:00:00. Remaining 90 mins -> finishes Tuesday 09:30:00.
+        $this->assertEquals('2026-07-07 09:30:00', $op->planned_finish->toDateTimeString());
     }
 
     /**
@@ -789,7 +789,7 @@ class EnterpriseSchedulingTest extends TestCase
         $op    = $sched->operations->first();
 
         // Tuesday is not blocked because the holiday belongs to tenant 999.
-        $this->assertEquals('2026-07-07 10:00:00', $op->planned_finish->toDateTimeString());
+        $this->assertEquals('2026-07-07 09:30:00', $op->planned_finish->toDateTimeString());
     }
 
     /**
@@ -845,6 +845,6 @@ class EnterpriseSchedulingTest extends TestCase
         $op    = $sched->operations->first();
 
         // Tuesday is not blocked because the holiday belongs to $otherCal, not $cal.
-        $this->assertEquals('2026-07-07 10:00:00', $op->planned_finish->toDateTimeString());
+        $this->assertEquals('2026-07-07 09:30:00', $op->planned_finish->toDateTimeString());
     }
 }

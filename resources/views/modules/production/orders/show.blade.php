@@ -325,38 +325,34 @@
 
                             <h6 class="fw-bold text-muted text-uppercase fs-11 mb-3 mt-4">{{ __('production.production_schedules') ?? 'Production Schedules' }}</h6>
                             @if($order->schedules && $order->schedules->isNotEmpty())
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered fs-12 text-dark">
-                                        <thead class="bg-light">
+                                <x-ui.table :bordered="true" :hoverable="true" class="fs-12 text-dark">
+                                    <thead>
+                                        <tr>
+                                            <th>Schedule #</th>
+                                            <th>Type</th>
+                                            <th>Status</th>
+                                            <th>Scheduled At</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($order->schedules as $schedule)
                                             <tr>
-                                                <th>Schedule #</th>
-                                                <th>Type</th>
-                                                <th>Status</th>
-                                                <th>Scheduled At</th>
-                                                <th>Actions</th>
+                                                <td class="fw-bold font-monospace">{{ $schedule->schedule_number }}</td>
+                                                <td>{{ ucfirst($schedule->scheduling_type) }}</td>
+                                                <td>
+                                                    <span class="badge bg-soft-{{ $schedule->status === 'released' ? 'success' : ($schedule->status === 'cancelled' ? 'danger' : 'secondary') }} text-{{ $schedule->status === 'released' ? 'success' : ($schedule->status === 'cancelled' ? 'danger' : 'secondary') }}">
+                                                        {{ ucfirst($schedule->status) }}
+                                                    </span>
+                                                </td>
+                                                <td>{{ $schedule->scheduled_at ? $schedule->scheduled_at->format('Y-m-d H:i') : '—' }}</td>
+                                                <td>
+                                                    <x-ui.action-dropdown :viewUrl="route('production.schedules.show', $schedule->id)" />
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($order->schedules as $schedule)
-                                                <tr>
-                                                    <td class="fw-bold font-monospace">{{ $schedule->schedule_number }}</td>
-                                                    <td>{{ ucfirst($schedule->scheduling_type) }}</td>
-                                                    <td>
-                                                        <span class="badge bg-soft-{{ $schedule->status === 'released' ? 'success' : ($schedule->status === 'cancelled' ? 'danger' : 'secondary') }} text-{{ $schedule->status === 'released' ? 'success' : ($schedule->status === 'cancelled' ? 'danger' : 'secondary') }}">
-                                                            {{ ucfirst($schedule->status) }}
-                                                        </span>
-                                                    </td>
-                                                    <td>{{ $schedule->scheduled_at ? $schedule->scheduled_at->format('Y-m-d H:i') : '—' }}</td>
-                                                    <td>
-                                                        <a href="{{ route('production.schedules.show', $schedule->id) }}" class="btn btn-xs btn-outline-primary py-0 px-1.5 fs-11">
-                                                            <i class="feather-eye"></i> View
-                                                        </a>
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        @endforeach
+                                    </tbody>
+                                </x-ui.table>
                             @else
                                 <div class="alert alert-warning py-2 px-3 fs-12 mb-0">
                                     <i class="feather-alert-triangle me-1"></i> No schedule has been generated for this production order yet.
@@ -569,12 +565,19 @@
                                                     <span class="badge bg-soft-warning text-warning fs-9 py-0.5 px-1">Pending</span>
                                                 @endif
                                                 @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
-                                                    <button type="button" class="btn btn-xs btn-outline-secondary p-0.5 border-0" 
-                                                            title="Reassign"
-                                                            data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
-                                                            onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
-                                                        <i class="feather-edit fs-11"></i>
-                                                    </button>
+                                                    @if($order->schedules->isNotEmpty())
+                                                        <button type="button" class="btn btn-xs btn-outline-secondary p-0.5 border-0" 
+                                                                title="Reassign"
+                                                                data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
+                                                                onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
+                                                            <i class="feather-edit fs-11"></i>
+                                                        </button>
+                                                    @else
+                                                        <button type="button" class="btn btn-xs btn-outline-secondary p-0.5 border-0" disabled
+                                                                title="Generate a schedule first to enable operator assignment" data-bs-toggle="tooltip">
+                                                            <i class="feather-edit fs-11"></i>
+                                                        </button>
+                                                    @endif
                                                 @endif
                                             </div>
                                         </div>
@@ -582,11 +585,18 @@
                                         <div class="d-flex align-items-center gap-1.5">
                                             <span class="text-muted fs-12">—</span>
                                             @if(($order->isReleased() || $order->isInProgress()) && $op->status !== 'completed')
-                                                <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-1.5"
-                                                        data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
-                                                        onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
-                                                    <i class="feather-user-plus me-1"></i> Assign
-                                                </button>
+                                                @if($order->schedules->isNotEmpty())
+                                                    <button type="button" class="btn btn-xs btn-outline-primary py-0.5 px-1.5"
+                                                            data-bs-toggle="modal" data-bs-target="#orderAssignOperatorModal"
+                                                            onclick="document.getElementById('assign_op_id').value = '{{ $op->id }}';">
+                                                        <i class="feather-user-plus me-1"></i> Assign
+                                                    </button>
+                                                @else
+                                                    <button type="button" class="btn btn-xs btn-outline-secondary py-0.5 px-1.5" disabled
+                                                            title="Generate a schedule first to enable operator assignment" data-bs-toggle="tooltip">
+                                                        <i class="feather-user-plus me-1"></i> Assign
+                                                    </button>
+                                                @endif
                                             @endif
                                         </div>
                                     @endif

@@ -18,6 +18,7 @@ class OperatorAssignmentService
         return DB::transaction(function () use ($tenantId, $operationId, $operatorId, $assignedBy, $remarks) {
             $op = ProductionOrderOperation::findOrFail($operationId);
 
+            $this->validateSchedulingRequirements($op);
             $this->validateOperatorQualification($operatorId, $op, $tenantId);
 
             // Cancel any existing pending/active assignments for this operation
@@ -62,6 +63,7 @@ class OperatorAssignmentService
             $assignment = ProductionOperatorAssignment::findOrFail($assignmentId);
             $op = ProductionOrderOperation::findOrFail($assignment->production_order_operation_id);
 
+            $this->validateSchedulingRequirements($op);
             $this->validateOperatorQualification($newOperatorId, $op, $tenantId);
 
             $oldOperatorId = $assignment->user_id;
@@ -234,6 +236,17 @@ class OperatorAssignmentService
 
         if (!$qualified) {
             throw new \LogicException("Operator lacks required skills/qualification for this operation.");
+        }
+    }
+
+    /**
+     * Validate that a schedule exists for the production order.
+     */
+    private function validateSchedulingRequirements(ProductionOrderOperation $op): void
+    {
+        $order = $op->order;
+        if (!$order || $order->schedules()->count() === 0) {
+            throw new \LogicException("Cannot assign operator: A schedule must be generated for the production order first.");
         }
     }
 }
