@@ -38,7 +38,7 @@ class LeaveStructureController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $newPlan = $this->leaveStructureRepository->storePlan([
-            'company_id' => $request->company_id,
+            'company_id' => $request->company_id ?: (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
             'name' => $request->name,
             'effective_from' => $request->effective_from,
             'description' => $request->description,
@@ -63,7 +63,7 @@ class LeaveStructureController extends Controller
         $status = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->leaveStructureRepository->updatePlan($leavePlan, [
-            'company_id' => $request->company_id,
+            'company_id' => $request->company_id ?: $leavePlan->company_id ?: (\App\Domains\HRMS\Models\Company::first()?->id ?? 1),
             'name' => $request->name,
             'effective_from' => $request->effective_from,
             'description' => $request->description,

@@ -87,7 +87,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         $employee->load([
             'company', 'businessUnit', 'branch', 'department', 'designation',
             'payGroup', 'salaryStructure', 'leavePlan', 'attendancePenalty',
-            'reportingManager', 'shift', 'employmentHistories',
+            'reportingManager', 'shift', 'employmentHistories', 'documents',
             'assetRequests.requestedAsset',
             'assetRequests.allocatedAsset',
             'assetRequests.allocatedAssets',
@@ -112,13 +112,144 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             ->orderBy('full_name')
             ->get();
 
+        $salaryStructure = null;
+        if ($employee->pay_group_id) {
+            $salaryStructure = \App\Domains\HRMS\Models\SalaryStructure::query()
+                ->where('pay_group_id', $employee->pay_group_id)
+                ->where('min_ctc', '<=', $employee->current_salary)
+                ->where('max_ctc', '>=', $employee->current_salary)
+                ->where('status', true)
+                ->first();
+        }
+        if (!$salaryStructure && $employee->salaryStructure) {
+            $salaryStructure = $employee->salaryStructure;
+        }
+
+        $computedComponents = [];
+        if ($salaryStructure) {
+            $items = $salaryStructure->items()->with('component')->get();
+            $ctc = (float) $employee->current_salary;
+            $basicAmount = 0.0;
+
+            foreach ($items as $item) {
+                if ($item->component && strtolower($item->component->code) === 'basic') {
+                    if ($item->calculation_type === 'fixed') {
+                        $basicAmount = (float) $item->value;
+                    } elseif ($item->calculation_type === 'percentage_of_ctc') {
+                        $basicAmount = ($item->value / 100) * $ctc;
+                    }
+                    break;
+                }
+            }
+
+            $totalOtherEarnings = 0.0;
+            $balancingItem = null;
+
+            foreach ($items as $item) {
+                if (!$item->component) {
+                    continue;
+                }
+                $amount = 0.0;
+                if ($item->calculation_type === 'fixed') {
+                    $amount = (float) $item->value;
+                } elseif ($item->calculation_type === 'percentage_of_ctc') {
+                    $amount = ($item->value / 100) * $ctc;
+                } elseif ($item->calculation_type === 'percentage_of_basic') {
+                    $amount = ($item->value / 100) * $basicAmount;
+                } elseif ($item->calculation_type === 'balancing') {
+                    $balancingItem = $item;
+                    continue;
+                }
+
+                $computedComponents[$item->id] = [
+                    'item'   => $item,
+                    'amount' => $amount,
+                ];
+
+                if ($item->component->type === 'earning') {
+                    $totalOtherEarnings += $amount;
+                }
+            }
+
+            if ($balancingItem && $balancingItem->component) {
+                $balancingAmount = max(0.0, $ctc - $totalOtherEarnings);
+                $computedComponents[$balancingItem->id] = [
+                    'item'   => $balancingItem,
+                    'amount' => $balancingAmount,
+                ];
+            }
+        }
+
+        $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::where('employee_id', $employee->id)->get();
+        $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
+        $empLeaveRequests = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
+        $empLeaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
+        $documents = \App\Domains\HRMS\Models\Document::where('documentable_type', Employee::class)
+            ->where('documentable_id', $employee->id)
+            ->paginate(10, ['*'], 'doc_page')
+            ->withQueryString();
+        $attendancePenalty = $employee->attendancePenalty;
+        $attendancePenalties = \App\Domains\HRMS\Models\AttendancePenalty::where('status', true)->get();
+
+        $user = auth()->user();
+        $isAdminUser = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hr.leaves.manage') || !empty($user->role_id));
+
+        $availableAdhocComponents = \App\Domains\HRMS\Models\SalaryComponent::adhoc()->where('status', true)->get();
+        if ($availableAdhocComponents->isEmpty()) {
+            $availableAdhocComponents = \App\Domains\HRMS\Models\SalaryComponent::where('status', true)->get();
+        }
+
+        $employeeDataMap = [];
+        $allEmpForMap = Employee::with(['leavePlan.types'])->get();
+        foreach ($allEmpForMap as $emp) {
+            $typesList = [];
+            if ($emp->leavePlan) {
+                foreach ($emp->leavePlan->types as $lt) {
+                    if ($lt->status) {
+                        $bal = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $emp->id)
+                            ->where('leave_type_id', $lt->id)
+                            ->first();
+
+                        $allocated = $bal ? floatval($bal->allocated) : floatval($lt->quota);
+                        $used = $bal ? floatval($bal->used) : 0;
+                        $remaining = max(0, $allocated - $used);
+
+                        $typesList[] = [
+                            'id'        => $lt->id,
+                            'name'      => $lt->name,
+                            'code'      => $lt->code,
+                            'type'      => $lt->type,
+                            'quota'     => $allocated,
+                            'used'      => $used,
+                            'remaining' => $remaining,
+                            'rules'     => $lt->rules ?? [],
+                        ];
+                    }
+                }
+            }
+            $employeeDataMap[$emp->id] = $typesList;
+        }
+
         $options = $this->getDropdownOptions();
 
         return array_merge([
-            'employee' => $employee,
-            'availableAssets' => $availableAssets,
-            'leaveTypes' => $leaveTypes,
-            'allEmployees' => $allEmployees,
+            'employee'                  => $employee,
+            'availableAssets'           => $availableAssets,
+            'leaveTypes'                => $leaveTypes,
+            'allEmployees'              => $allEmployees,
+            'salaryStructure'           => $salaryStructure,
+            'computedComponents'        => $computedComponents,
+            'adhocComponents'           => $adhocComponents,
+            'availableAdhocComponents'  => $availableAdhocComponents,
+            'penalties'                 => $penalties,
+            'empLeaveRequests'          => $empLeaveRequests,
+            'empLeaveEncashments'       => $empLeaveEncashments,
+            'documents'                 => $documents,
+            'attendancePenalty'         => $attendancePenalty,
+            'attendancePenalties'       => $attendancePenalties,
+            'isAdminUser'               => $isAdminUser,
+            'isAdmin'                   => $isAdminUser,
+            'employeeDataMap'           => $employeeDataMap,
         ], $options);
     }
 

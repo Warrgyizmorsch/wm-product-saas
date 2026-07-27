@@ -111,9 +111,9 @@ class EmployeeController extends Controller
                 'required', 'email', 'max:255',
                 Rule::unique('employees', 'personal_email')->ignore($employeeId),
             ],
-            'work_email' => [
+            'office_email' => [
                 'nullable', 'email', 'max:255',
-                Rule::unique('employees', 'work_email')->ignore($employeeId),
+                Rule::unique('employees', 'office_email')->ignore($employeeId),
             ],
             'company_id' => ['required', 'exists:companies,id'],
             'business_unit_id' => ['nullable', 'exists:business_units,id'],
@@ -134,7 +134,7 @@ class EmployeeController extends Controller
             'marital_status' => ['nullable', 'string', 'max:50'],
             'blood_group' => ['nullable', 'string', 'max:20'],
             'personal_mobile_number' => ['nullable', 'string', 'max:50'],
-            'work_mobile_number' => ['nullable', 'string', 'max:50'],
+            'home_phone' => ['nullable', 'string', 'max:50'],
             'current_salary' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);

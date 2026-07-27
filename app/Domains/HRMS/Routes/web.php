@@ -10,6 +10,8 @@ use App\Domains\HRMS\Controllers\AssetController;
 use App\Domains\HRMS\Controllers\LeaveRequestController;
 use Illuminate\Support\Facades\Route;
 
+use App\Domains\HRMS\Controllers\WfhRequestController;
+
 Route::prefix('hrms')
     ->as('hrms.')
     ->group(function (): void {
@@ -141,6 +143,15 @@ Route::prefix('hrms')
             Route::post('/encashment/{leaveEncashment}/approve', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'approve'])->name('leaves.encashment.approve');
             Route::post('/encashment/{leaveEncashment}/reject', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'reject'])->name('leaves.encashment.reject');
             Route::delete('/encashment/{leaveEncashment}', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'destroy'])->name('leaves.encashment.destroy');
+        });
+
+        // WFH Request Management
+        Route::prefix('wfh')->group(function (): void {
+            Route::get('/', [WfhRequestController::class, 'index'])->name('wfh.index');
+            Route::post('/store', [WfhRequestController::class, 'store'])->name('wfh.store');
+            Route::post('/{wfhRequest}/approve', [WfhRequestController::class, 'approve'])->name('wfh.approve');
+            Route::post('/{wfhRequest}/reject', [WfhRequestController::class, 'reject'])->name('wfh.reject');
+            Route::post('/{wfhRequest}/update-status', [WfhRequestController::class, 'updateStatus'])->name('wfh.update-status');
         });
 
         // Asset Management

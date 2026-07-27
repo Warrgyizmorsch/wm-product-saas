@@ -88,6 +88,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Repositories\LeaveRequestRepository::class
         );
 
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\WfhRequestRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\WfhRequestRepository::class
+        );
+
         // ── Projects: Project ─────────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Projects\Repositories\ProjectRepositoryInterface::class,

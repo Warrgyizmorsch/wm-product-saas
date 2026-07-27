@@ -10,6 +10,7 @@ use App\Domains\HRMS\Controllers\Api\AssetApiController;
 use App\Domains\HRMS\Controllers\Api\EmployeeApiController;
 use App\Domains\HRMS\Controllers\Api\LeaveRequestApiController;
 use App\Domains\HRMS\Controllers\Api\LeaveEncashmentApiController;
+use App\Domains\HRMS\Controllers\Api\WfhRequestApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -272,6 +273,22 @@ Route::prefix('api/hrms/leave-requests')
         Route::post('/{leaveRequest}/approve', [LeaveRequestApiController::class, 'approveRequest'])->name('approve');
         Route::post('/{leaveRequest}/reject', [LeaveRequestApiController::class, 'rejectRequest'])->name('reject');
         Route::put('/{leaveRequest}/status', [LeaveRequestApiController::class, 'updateStatus'])->name('status.update');
+    });
+
+// ==========================================
+// 8B. WFH REQUESTS & APPLICATIONS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/wfh-requests')
+    ->middleware(['web'])
+    ->name('api.hrms.wfh-requests.')
+    ->group(function () {
+        Route::get('/summary', [WfhRequestApiController::class, 'summary'])->name('summary');
+        Route::get('/', [WfhRequestApiController::class, 'indexRequests'])->name('index');
+        Route::post('/', [WfhRequestApiController::class, 'storeRequest'])->name('store');
+        Route::get('/{wfhRequest}', [WfhRequestApiController::class, 'showRequest'])->name('show');
+        Route::post('/{wfhRequest}/approve', [WfhRequestApiController::class, 'approveRequest'])->name('approve');
+        Route::post('/{wfhRequest}/reject', [WfhRequestApiController::class, 'rejectRequest'])->name('reject');
+        Route::put('/{wfhRequest}/status', [WfhRequestApiController::class, 'updateStatus'])->name('status.update');
     });
 
 // ==========================================

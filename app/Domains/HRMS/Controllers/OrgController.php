@@ -155,7 +155,7 @@ class OrgController extends Controller
         ]);
 
         $bu = BusinessUnit::find($request->business_unit_id);
-        $validated['company_id'] = $bu->company_id;
+        $validated['company_id'] = $bu ? $bu->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->storeBranch($validated);
@@ -180,7 +180,7 @@ class OrgController extends Controller
         ]);
 
         $bu = BusinessUnit::find($request->business_unit_id);
-        $validated['company_id'] = $bu->company_id;
+        $validated['company_id'] = $bu ? $bu->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->updateBranch($branch, $validated);
@@ -211,8 +211,8 @@ class OrgController extends Controller
         ]);
 
         $branch = Branch::find($request->branch_id);
-        $validated['company_id'] = $branch->company_id;
-        $validated['business_unit_id'] = $branch->business_unit_id;
+        $validated['company_id'] = $branch ? $branch->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
+        $validated['business_unit_id'] = $branch ? $branch->business_unit_id : null;
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->storeDepartment($validated);
@@ -234,8 +234,8 @@ class OrgController extends Controller
         ]);
 
         $branch = Branch::find($request->branch_id);
-        $validated['company_id'] = $branch->company_id;
-        $validated['business_unit_id'] = $branch->business_unit_id;
+        $validated['company_id'] = $branch ? $branch->company_id : (\App\Domains\HRMS\Models\Company::first()?->id ?? 1);
+        $validated['business_unit_id'] = $branch ? $branch->business_unit_id : null;
         $validated['status'] = ($request->status === '1' || $request->status === 'active' || $request->status === true);
 
         $this->orgRepository->updateDepartment($department, $validated);
