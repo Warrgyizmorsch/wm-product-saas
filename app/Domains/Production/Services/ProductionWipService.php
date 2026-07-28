@@ -156,9 +156,10 @@ class ProductionWipService
         float $setupMins,
         float $runMins,
         ?string $remarks = null,
-        ?int $userId = null
+        ?int $userId = null,
+        bool $isOperationCompleted = false
     ): void {
-        DB::transaction(function () use ($wipId, $orderOpId, $goodQty, $rejectedQty, $scrapQty, $setupMins, $runMins, $remarks, $userId) {
+        DB::transaction(function () use ($wipId, $orderOpId, $goodQty, $rejectedQty, $scrapQty, $setupMins, $runMins, $remarks, $userId, $isOperationCompleted) {
             $wip = ProductionWip::lockForUpdate()->findOrFail($wipId);
             $orderOp = ProductionOrderOperation::with(['workCenter', 'routingOperation'])->findOrFail($orderOpId);
 
@@ -200,13 +201,23 @@ class ProductionWipService
             $wip->rejected_quantity += $rejectedQty;
             $wip->scrap_quantity += $scrapQty;
 
-            if (!$nextOpExists && $orderOp->status === ProductionOrderOperation::STATUS_COMPLETED) {
+            $isCompleted = $isOperationCompleted || $orderOp->status === ProductionOrderOperation::STATUS_COMPLETED;
+
+            if (!$nextOpExists && $isCompleted) {
                 $wip->status = 'completed';
                 $wip->completed_at = now();
             }
 
             $wip->updated_by = $userId;
             $wip->save();
+
+            $txType = $isCompleted ? 'operation_completed' : 'progress_logged';
+            $defaultRemarks = $isCompleted ? 'Operation completed.' : 'Progress logged on operation.';
+
+            $finalRemarks = $remarks;
+            if (empty($finalRemarks) || $finalRemarks === 'Progress completed on operation.') {
+                $finalRemarks = $defaultRemarks;
+            }
 
             // Log Transaction
             ProductionWipTransaction::create([
@@ -220,7 +231,7 @@ class ProductionWipService
                 'to_work_center_id' => null,
                 'machine_id' => $orderOp->machine_used_id ?? $orderOp->machine_id,
                 'operator_id' => $userId,
-                'transaction_type' => 'operation_completed',
+                'transaction_type' => $txType,
                 'quantity' => $goodQty,
                 'good_quantity' => $goodQty,
                 'rejected_quantity' => $rejectedQty,
@@ -228,7 +239,7 @@ class ProductionWipService
                 'cost_before' => $costBefore,
                 'cost_added' => $totalCostAdded,
                 'cost_after' => $wip->total_value,
-                'remarks' => $remarks ?? 'Progress completed on operation.',
+                'remarks' => $finalRemarks,
                 'transaction_at' => now(),
                 'created_by' => $userId,
             ]);

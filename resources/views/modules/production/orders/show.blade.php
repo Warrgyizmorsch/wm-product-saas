@@ -508,7 +508,20 @@
                                         @forelse($wip->transactions as $tx)
                                             <tr>
                                                 <td class="font-monospace text-muted">{{ $tx->transaction_at->format('Y-m-d H:i') }}</td>
-                                                <td><span class="badge bg-soft-secondary text-secondary text-uppercase">{{ str_replace('_', ' ', $tx->transaction_type) }}</span></td>
+                                                <td>
+                                                    @php
+                                                        $badgeClass = match ($tx->transaction_type) {
+                                                            'created' => 'bg-soft-primary text-primary',
+                                                            'operation_started' => 'bg-soft-info text-info',
+                                                            'progress_logged' => 'bg-soft-primary text-primary',
+                                                            'operation_completed' => 'bg-soft-success text-success',
+                                                            'transferred' => 'bg-soft-warning text-warning',
+                                                            'converted_to_finished_goods' => 'bg-success text-white',
+                                                            default => 'bg-soft-secondary text-secondary'
+                                                        };
+                                                    @endphp
+                                                    <span class="badge {{ $badgeClass }} text-uppercase">{{ str_replace('_', ' ', $tx->transaction_type) }}</span>
+                                                </td>
                                                 <td>{{ $tx->fromOperation ? $tx->fromOperation->name : '—' }}</td>
                                                 <td>{{ $tx->toOperation ? $tx->toOperation->name : '—' }}</td>
                                                 <td class="text-end fw-semibold">{{ number_format($tx->quantity, 2) }}</td>

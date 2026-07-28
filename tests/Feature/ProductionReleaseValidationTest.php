@@ -68,7 +68,7 @@ class ProductionReleaseValidationTest extends TestCase
         parent::setUp();
 
         // Setup Tenant A
-        $this->tenantA = Tenant::create([
+        $this->tenantA = Tenant::firstOrCreate(['id' => 1], [
             'name' => 'Acme Manufacturing Inc',
             'slug' => 'acme-mfg',
             'status' => 'active',
@@ -597,5 +597,63 @@ class ProductionReleaseValidationTest extends TestCase
         $this->assertEquals(0, $tenantBOrdersCount);
 
         $this->assertNull(ProductionOrder::where('tenant_id', $this->tenantB->id)->find($order->id));
+    }
+
+    public function test_overproduction_automatically_creates_surplus_batch(): void
+    {
+        $orderService = app(ProductionOrderService::class);
+        $execService = app(ProductionExecutionService::class);
+
+        $order = $orderService->createDirect([
+            'product_id' => $this->diningTableFG->id,
+            'quantity_ordered' => 20.0,
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addDays(5)->toDateString(),
+            'production_mode' => 'batch',
+        ], $this->tenantA->id, $this->userA->id);
+
+        $order->update(['status' => 'released']);
+        app(\App\Domains\Production\Services\ProductionWipService::class)->initializeWip($order->id);
+
+        // Create Planned Batch of 10 items
+        $batch = ProductionBatch::create([
+            'tenant_id' => $this->tenantA->id,
+            'production_order_id' => $order->id,
+            'product_id' => $this->diningTableFG->id,
+            'batch_number' => 'BAT-PLAN-010',
+            'planned_quantity' => 10.0,
+            'actual_quantity' => 0.0,
+            'status' => ProductionBatch::STATUS_PLANNED,
+        ]);
+
+        $op = $order->operations->first();
+
+        // Log 12 units produced (2 units over the planned batch of 10)
+        $execService->logProgress(
+            $op->id,
+            12.0,
+            0.0,
+            0.0,
+            0.0,
+            30.0,
+            'Logged 12 units (10 planned + 2 extra)',
+            null,
+            $this->userA->id,
+            false
+        );
+
+        $batch->refresh();
+        $this->assertEquals(10.0, $batch->actual_quantity);
+        $this->assertEquals(ProductionBatch::STATUS_COMPLETED, $batch->status);
+
+        // Verify surplus batch of 2 units was automatically created
+        $allBatches = ProductionBatch::where('production_order_id', $order->id)->get();
+        $this->assertCount(2, $allBatches);
+
+        $surplusBatch = $allBatches->where('id', '!=', $batch->id)->first();
+        $this->assertNotNull($surplusBatch);
+        $this->assertEquals(2.0, $surplusBatch->planned_quantity);
+        $this->assertEquals(2.0, $surplusBatch->actual_quantity);
+        $this->assertEquals(ProductionBatch::STATUS_COMPLETED, $surplusBatch->status);
     }
 }
