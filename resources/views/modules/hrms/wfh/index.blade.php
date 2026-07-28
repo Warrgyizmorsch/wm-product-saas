@@ -4,6 +4,77 @@
 @section('page-title', 'WFH Applications')
 @section('breadcrumb', 'HRMS / WFH Applications')
 
+@push('styles')
+    <style>
+        .erp-pagination-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: auto !important;
+            padding: 20px 15px 15px 15px !important;
+            border-top: 1px solid #f1f5f9;
+        }
+        .erp-pagination {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 0;
+            padding-left: 0;
+            list-style: none;
+        }
+        .erp-pagination .page-item {
+            display: inline-block;
+        }
+        .erp-pagination .page-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50% !important;
+            border: 1px solid #cbd5e1;
+            background-color: #ffffff;
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .erp-pagination .page-link:hover {
+            background-color: rgba(var(--bs-primary-rgb), 0.08);
+            border-color: var(--bs-primary);
+            color: var(--bs-primary);
+        }
+        .erp-pagination .page-item.active .page-link {
+            background-color: var(--bs-primary) !important;
+            border-color: var(--bs-primary) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 10px rgba(var(--bs-primary-rgb), 0.2);
+        }
+        .erp-pagination .page-item.disabled .page-link {
+            background-color: #f8fafc;
+            border-color: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+        .erp-pagination-info {
+            font-size: 12px;
+            color: #64748b;
+        }
+        .odoo-underline-input {
+            border: none !important;
+            border-bottom: 2px solid #cbd5e1 !important;
+            border-radius: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            background: transparent !important;
+        }
+    </style>
+@endpush
+
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <button type="button" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#applyWfhModal" style="height: 38px;">
@@ -108,7 +179,7 @@
             </div>
             
             <div class="d-flex align-items-center gap-2">
-                <form method="GET" action="{{ route('hrms.wfh.index') }}" class="d-flex align-items-center gap-2 m-0" id="wfhFilterForm">
+                <form method="GET" action="javascript:void(0);" class="d-flex align-items-center gap-2 m-0" id="wfhFilterForm">
                     <!-- Search Input -->
                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
@@ -117,21 +188,17 @@
 
                     <!-- Sort Dropdown -->
                     <x-ui.sort-dropdown label="Sort">
-                        <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort', 'newest') == 'newest' ? 'active' : '' }}" href="#" onclick="setWfhSort('newest'); event.preventDefault();">
+                        <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="setWfhSort('newest', this); event.preventDefault();">
                             <span>Newest First</span>
-                            <i class="feather-check text-dark ms-auto sort-check {{ request('sort', 'newest') == 'newest' ? '' : 'd-none' }}"></i>
                         </a>
-                        <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') == 'oldest' ? 'active' : '' }}" href="#" onclick="setWfhSort('oldest'); event.preventDefault();">
+                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('oldest', this); event.preventDefault();">
                             <span>Oldest First</span>
-                            <i class="feather-check text-dark ms-auto sort-check {{ request('sort') == 'oldest' ? '' : 'd-none' }}"></i>
                         </a>
-                        <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') == 'duration_high' ? 'active' : '' }}" href="#" onclick="setWfhSort('duration_high'); event.preventDefault();">
+                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('duration_high', this); event.preventDefault();">
                             <span>Duration: High to Low</span>
-                            <i class="feather-check text-dark ms-auto sort-check {{ request('sort') == 'duration_high' ? '' : 'd-none' }}"></i>
                         </a>
-                        <a class="dropdown-item py-2 d-flex align-items-center {{ request('sort') == 'duration_low' ? 'active' : '' }}" href="#" onclick="setWfhSort('duration_low'); event.preventDefault();">
+                        <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('duration_low', this); event.preventDefault();">
                             <span>Duration: Low to High</span>
-                            <i class="feather-check text-dark ms-auto sort-check {{ request('sort') == 'duration_low' ? '' : 'd-none' }}"></i>
                         </a>
                     </x-ui.sort-dropdown>
 
@@ -169,14 +236,14 @@
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Apply</button>
-                            <a href="{{ route('hrms.wfh.index') }}" class="btn btn-light btn-sm border flex-grow-1 text-center">Reset</a>
+                            <button type="button" class="btn btn-light btn-sm border flex-grow-1">Reset</button>
                         </div>
                     </x-ui.filter>
                 </form>
             </div>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive" style="min-height: 260px; overflow: visible;">
+            <div class="table-responsive" style="overflow: visible;">
                 <table class="table table-hover align-middle mb-0" id="wfhTable">
                     <thead class="table-light">
                         <tr>
@@ -188,6 +255,7 @@
                             <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:240px;">Reason</th>
                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:65px;">File</th>
                             <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="min-width:130px;">Status</th>
+                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="min-width:110px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -201,10 +269,12 @@
                                     : '—';
 
                                 $statusBadge = match($req->status) {
-                                    'approved' => ['cls' => 'bg-soft-success text-success', 'icon' => 'feather-check-circle', 'lbl' => 'Approved'],
-                                    'pending'  => ['cls' => 'bg-soft-warning text-warning', 'icon' => 'feather-clock', 'lbl' => 'Pending'],
-                                    'rejected' => ['cls' => 'bg-soft-danger text-danger',   'icon' => 'feather-x-circle', 'lbl' => 'Rejected'],
-                                    default    => ['cls' => 'bg-light text-secondary',      'icon' => 'feather-circle', 'lbl' => ucfirst($req->status)],
+                                    'approved'               => ['cls' => 'bg-soft-success text-success', 'icon' => 'feather-check-circle',  'lbl' => 'Approved'],
+                                    'pending'                => ['cls' => 'bg-soft-warning text-warning', 'icon' => 'feather-clock',          'lbl' => 'Pending'],
+                                    'rejected'               => ['cls' => 'bg-soft-danger text-danger',   'icon' => 'feather-x-circle',       'lbl' => 'Rejected'],
+                                    'cancellation_requested' => ['cls' => 'bg-soft-info text-info',       'icon' => 'feather-rotate-ccw',     'lbl' => 'Cancellation Requested'],
+                                    'cancelled'              => ['cls' => 'bg-soft-secondary text-secondary', 'icon' => 'feather-slash',      'lbl' => 'Cancelled'],
+                                    default                  => ['cls' => 'bg-light text-secondary',      'icon' => 'feather-circle',         'lbl' => ucfirst($req->status)],
                                 };
 
                                 $startType = $req->start_date_type ?? 'full_day';
@@ -218,8 +288,15 @@
                                     : ($startTypeLabel . ' → ' . $endTypeLabel);
 
                                 $isLongReason = (mb_strlen($req->reason ?? '') > 70) || (substr_count($req->reason ?? '', "\n") > 1);
+                                $isLongCancelReason = (mb_strlen($req->cancellation_reason ?? '') > 70) || (substr_count($req->cancellation_reason ?? '', "\n") > 1);
                             @endphp
-                            <tr>
+                             <tr class="wfh-row"
+                                 data-employee="{{ strtolower($req->employee->full_name ?? '') }} {{ strtolower($req->employee->employee_id ?? '') }}"
+                                 data-employee-id="{{ $req->employee_id }}"
+                                 data-status="{{ $req->status }}"
+                                 data-duration="{{ $req->duration }}"
+                                 data-created-at="{{ $req->created_at ? $req->created_at->timestamp : 0 }}"
+                             >
                                 @if($isAdmin)
                                     <td class="ps-3">
                                         <div class="fw-semibold text-dark fs-13">{{ $req->employee->full_name ?? 'N/A' }}</div>
@@ -248,6 +325,17 @@
                                                 <i class="feather-alert-circle me-1"></i>Rejection: {{ $req->rejection_reason }}
                                             </div>
                                         @endif
+                                        @if(in_array($req->status, ['cancellation_requested', 'cancelled']) && !empty($req->cancellation_reason))
+                                             <div class="text-warning fs-11 mt-2">
+                                                 <span class="fw-semibold"><i class="feather-rotate-ccw me-1"></i>Cancellation:</span>
+                                                 <div class="wfh-cancel-reason-text mb-0" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; white-space: normal; line-height: 1.4; color: inherit;">
+                                                     {{ $req->cancellation_reason }}
+                                                 </div>
+                                                 @if($isLongCancelReason)
+                                                     <a href="#" class="wfh-toggle-cancel-reason-btn fs-10 text-primary fw-semibold d-inline-block mt-0.5" onclick="toggleWfhCancelReasonText(this); return false;">See more</a>
+                                                 @endif
+                                             </div>
+                                         @endif
                                     </div>
                                 </td>
                                 <td class="text-center">
@@ -259,45 +347,146 @@
                                         <span class="text-muted">—</span>
                                     @endif
                                 </td>
+                                {{-- Status column: plain badge only --}}
                                 <td class="text-end pe-3">
-                                    @if($isAdmin)
-                                        <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                            <button class="btn btn-sm {{ $statusBadge['cls'] }} rounded-pill px-3 py-1 fs-11 dropdown-toggle d-inline-flex align-items-center gap-1 border-0" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
-                                                <i class="{{ $statusBadge['icon'] }}"></i> {{ $statusBadge['lbl'] }}
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 130px; z-index: 1050; background: #ffffff;">
-                                                <li>
-                                                    <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}"
-                                                       href="#"
-                                                       onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'approved'); return false;">
-                                                        <span>Approved</span>
-                                                        @if($req->status === 'approved') <i class="feather-check text-primary"></i> @endif
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'rejected' ? 'bg-light text-danger fw-bold' : '' }}"
-                                                       href="#"
-                                                       data-action="{{ route('hrms.wfh.reject', $req->id) }}"
-                                                       onclick="openWfhRejectModal(this); return false;">
-                                                        <span>Rejected</span>
-                                                        @if($req->status === 'rejected') <i class="feather-check text-danger"></i> @endif
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'pending' ? 'bg-light text-warning fw-bold' : '' }}"
-                                                       href="#"
-                                                       onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'pending'); return false;">
-                                                        <span>Pending</span>
-                                                        @if($req->status === 'pending') <i class="feather-check text-warning"></i> @endif
-                                                    </a>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    @else
-                                        <span class="badge {{ $statusBadge['cls'] }} rounded-pill px-2.5 py-1 fs-11">
-                                            <i class="{{ $statusBadge['icon'] }} me-1"></i>{{ $statusBadge['lbl'] }}
-                                        </span>
-                                    @endif
+                                    <span class="badge {{ $statusBadge['cls'] }} rounded-pill px-2.5 py-1 fs-11">
+                                        <i class="{{ $statusBadge['icon'] }} me-1"></i>{{ $statusBadge['lbl'] }}
+                                    </span>
+                                </td>
+
+                                {{-- Actions column: solid styled dropdown + delete/withdraw button --}}
+                                <td class="text-end pe-3">
+                                    <div class="d-flex align-items-center justify-content-end gap-2">
+
+                                        @if($isAdmin)
+                                            @if($req->status === 'cancellation_requested')
+                                                {{-- Cancellation dropdown: Accept / Deny --}}
+                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                    <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
+                                                            type="button" 
+                                                            data-bs-toggle="dropdown" 
+                                                            data-bs-display="static"
+                                                            aria-expanded="false"
+                                                            style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
+                                                            title="Action">
+                                                        <span>Action</span>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
+                                                        <li>
+                                                            <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirm('Approve this WFH cancellation?')" class="m-0">
+                                                                @csrf
+                                                                <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-success">
+                                                                    <span>Accept</span>
+                                                                    <i class="feather-check text-success fs-12"></i>
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                        <li>
+                                                            <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirm('Deny this cancellation request?')" class="m-0">
+                                                                @csrf
+                                                                <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-danger">
+                                                                    <span>Deny</span>
+                                                                    <i class="feather-x text-danger fs-12"></i>
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+
+                                            @elseif(!in_array($req->status, ['cancelled']))
+                                                {{-- Normal status dropdown: Approved / Rejected / Pending --}}
+                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                    <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
+                                                            type="button" 
+                                                            data-bs-toggle="dropdown" 
+                                                            data-bs-display="static"
+                                                            aria-expanded="false"
+                                                            style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
+                                                            title="Change Status">
+                                                        <span>{{ $statusBadge['lbl'] }}</span>
+                                                    </button>
+                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
+                                                        <li>
+                                                            <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}"
+                                                               href="#"
+                                                               onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'approved'); return false;"
+                                                               style="{{ $req->status === 'approved' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                <span>Approved</span>
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}"
+                                                               href="#"
+                                                               data-action="{{ route('hrms.wfh.reject', $req->id) }}"
+                                                               onclick="openWfhRejectModal(this); return false;"
+                                                               style="{{ $req->status === 'rejected' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                <span>Rejected</span>
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'pending' ? 'bg-light text-primary fw-bold' : '' }}"
+                                                               href="#"
+                                                               onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'pending'); return false;"
+                                                               style="{{ $req->status === 'pending' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                <span>Pending</span>
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            @endif
+
+                                            {{-- Unified Withdraw / Cancellation Delete button --}}
+                                            @if($req->canWithdraw())
+                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this WFH application?')" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                            title="Withdraw Application"
+                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                        <i class="feather-trash-2 fs-14"></i>
+                                                    </button>
+                                                </form>
+                                            @elseif($req->canRequestCancellation())
+                                                <button type="button" class="btn btn-sm btn-soft-danger border" 
+                                                        title="Request Cancellation"
+                                                        onclick="openWfhCancellationModal({{ $req->id }}, '{{ route('hrms.wfh.request-cancellation', $req->id) }}')"
+                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                    <i class="feather-trash-2 fs-14"></i>
+                                                </button>
+                                            @else
+                                                <button type="button" class="btn btn-sm btn-light border disabled" 
+                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled>
+                                                    <i class="feather-trash-2 fs-14"></i>
+                                                </button>
+                                            @endif
+
+                                        @else
+                                            {{-- Non-admin actions --}}
+                                            {{-- Unified Withdraw / Cancellation Delete button --}}
+                                            @if($req->canWithdraw())
+                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this WFH application?')" class="d-inline">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                            title="Withdraw Application"
+                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                        <i class="feather-trash-2 fs-14"></i>
+                                                    </button>
+                                                </form>
+                                            @elseif($req->canRequestCancellation())
+                                                <button type="button" class="btn btn-sm btn-soft-danger border" 
+                                                        title="Request Cancellation"
+                                                        onclick="openWfhCancellationModal({{ $req->id }}, '{{ route('hrms.wfh.request-cancellation', $req->id) }}')"
+                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                    <i class="feather-trash-2 fs-14"></i>
+                                                </button>
+                                            @else
+                                                <button type="button" class="btn btn-sm btn-light border disabled" 
+                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled>
+                                                    <i class="feather-trash-2 fs-14"></i>
+                                                </button>
+                                            @endif
+                                        @endif
+
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -308,11 +497,57 @@
                                 </td>
                             </tr>
                         @endforelse
+                        <tr id="no_matching_wfh_row" class="d-none">
+                            <td colspan="10" class="text-center py-5 text-muted">
+                                <i class="feather-folder fs-3 d-block mb-3 text-secondary"></i>
+                                No matching applications found.
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
+            <div class="erp-pagination-container">
+                <ul class="erp-pagination mb-2" id="wfh_pagination_ul">
+                    <!-- Dynamically generated pagination links -->
+                </ul>
+                <div class="erp-pagination-info">
+                    Showing <span id="wfh_showing_start">0</span> to <span id="wfh_showing_end">0</span> of <span id="wfh_total_count">0</span> entries
+                </div>
+            </div>
         </div>
     </div>
+
+{{-- WFH Cancellation Request Modal --}}
+<div class="modal fade" id="wfhCancellationModal" tabindex="-1" aria-labelledby="wfhCancellationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom py-3">
+                <h5 class="modal-title fw-bold text-dark" id="wfhCancellationModalLabel">
+                    <i class="feather-x-circle text-warning me-2"></i>Request WFH Cancellation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="wfhCancellationForm" method="POST" action="">
+                @csrf
+                <div class="modal-body p-4">
+                    <p class="text-muted fs-13 mb-3">
+                        Please provide a reason for requesting cancellation of this approved WFH. The admin will review and approve or deny your request.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-dark fs-13">Cancellation Reason <span class="text-danger">*</span></label>
+                        <textarea name="cancellation_reason" id="wfh_cancellation_reason" class="form-control fs-13" rows="3" placeholder="Explain why you want to cancel this WFH..." required maxlength="1000"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-semibold">
+                        <i class="feather-send me-1"></i>Submit Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 {{-- Apply WFH Modal --}}
 <div class="modal fade" id="applyWfhModal" tabindex="-1" aria-labelledby="applyWfhModalLabel" aria-hidden="true">
@@ -436,16 +671,6 @@
 
 @push('scripts')
 <script>
-function setWfhSort(sortValue) {
-    var sortInput = document.getElementById('wfh_sort_input');
-    if (sortInput) {
-        sortInput.value = sortValue;
-    }
-    var form = document.getElementById('wfhFilterForm');
-    if (form) {
-        form.submit();
-    }
-}
 
 function submitWfhStatusDirect(url, action) {
     var form = document.createElement('form');
@@ -469,6 +694,19 @@ function submitWfhStatusDirect(url, action) {
 }
 
 function toggleWfhReasonText(btn) {
+    var textEl = btn.previousElementSibling;
+    if (textEl.style.display === 'block') {
+        textEl.style.display = '-webkit-box';
+        textEl.style.webkitLineClamp = '2';
+        btn.textContent = 'See more';
+    } else {
+        textEl.style.display = 'block';
+        textEl.style.webkitLineClamp = 'none';
+        btn.textContent = 'See less';
+    }
+}
+
+function toggleWfhCancelReasonText(btn) {
     var textEl = btn.previousElementSibling;
     if (textEl.style.display === 'block') {
         textEl.style.display = '-webkit-box';
@@ -525,8 +763,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        const start = new Date(startDateInput.value);
-        const end   = new Date(endDateInput.value);
+        const startParts = startDateInput.value.split('-');
+        const endParts = endDateInput.value.split('-');
+        const start = new Date(parseInt(startParts[0], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[2], 10));
+        const end   = new Date(parseInt(endParts[0], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[2], 10));
 
         if (end < start) {
             durationInput.value = '0.0';
@@ -537,24 +777,34 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
-        let days = 0;
+        let duration = 0;
         let current = new Date(start);
 
-        while (current <= end) {
-            // Exclude Sundays
-            if (current.getDay() !== 0) {
-                if (current.getTime() === start.getTime()) {
-                    days += (startTypeInput.value === 'full_day') ? 1.0 : 0.5;
-                } else if (current.getTime() === end.getTime()) {
-                    days += (endTypeInput.value === 'full_day') ? 1.0 : 0.5;
-                } else {
-                    days += 1.0;
-                }
+        if (start.getTime() === end.getTime()) {
+            // Single day
+            if (start.getDay() !== 0) { // Exclude Sunday (0)
+                duration = (startTypeInput.value === 'full_day') ? 1.0 : 0.5;
             }
-            current.setDate(current.getDate() + 1);
+        } else {
+            while (current <= end) {
+                // Exclude Sundays
+                if (current.getDay() !== 0) {
+                    var isStart = current.getTime() === start.getTime();
+                    var isEnd = current.getTime() === end.getTime();
+
+                    if (isStart) {
+                        duration += (startTypeInput.value === 'full_day') ? 1.0 : 0.5;
+                    } else if (isEnd) {
+                        duration += (endTypeInput.value === 'full_day') ? 1.0 : 0.5;
+                    } else {
+                        duration += 1.0;
+                    }
+                }
+                current.setDate(current.getDate() + 1);
+            }
         }
 
-        const formatted = days.toFixed(1);
+        const formatted = duration.toFixed(1);
         durationInput.value = formatted;
         const displayEl = document.getElementById('wfh_duration_val');
         if (displayEl) displayEl.textContent = formatted;
@@ -573,18 +823,193 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (startDateInput && endDateInput) {
         // Automatically sync End Date when Start Date changes (matching Leave Application form)
-        startDateInput.addEventListener('change', function () {
+        $('#wfh_start_date').on('change', function () {
             if (this.value) {
                 endDateInput.value = this.value;
             }
             calculateDuration();
         });
-        endDateInput.addEventListener('change', calculateDuration);
-        startTypeInput.addEventListener('change', calculateDuration);
-        endTypeInput.addEventListener('change', calculateDuration);
+        $('#wfh_end_date, #wfh_start_type, #wfh_end_type').on('change', calculateDuration);
         calculateDuration();
     }
+
+    // Append wfhCancellationModal to body to avoid z-index/backdrop issues
+    var wfhCancelEl = document.getElementById('wfhCancellationModal');
+    if (wfhCancelEl && wfhCancelEl.parentNode !== document.body) {
+        document.body.appendChild(wfhCancelEl);
+    }
+
+    // ── Client-side WFH search, sort, and filter ───────────────────────────────
+    var currentWfhPage = 1;
+    var wfhItemsPerPage = 10;
+
+    function updateWfhPagination() {
+        var searchVal = $('#wfh_search').val().toLowerCase().trim();
+        var empId = $('#filter_wfh_employee_id').val();
+        var status = $('#filter_wfh_status').val();
+
+        var $visibleRows = $('.wfh-row').filter(function() {
+            var $row = $(this);
+            var rowEmp = $row.attr('data-employee') || '';
+            var rowEmpId = $row.attr('data-employee-id') || '';
+            var rowStatus = $row.attr('data-status') || '';
+
+            var matchesSearch = !searchVal || rowEmp.indexOf(searchVal) !== -1;
+            var matchesEmp = !empId || rowEmpId === empId;
+            var matchesStatus = !status || rowStatus === status;
+
+            return matchesSearch && matchesEmp && matchesStatus;
+        });
+
+        var totalItems = $visibleRows.length;
+        var totalPages = Math.ceil(totalItems / wfhItemsPerPage) || 1;
+
+        if (currentWfhPage > totalPages) {
+            currentWfhPage = totalPages;
+        }
+        if (currentWfhPage < 1) {
+            currentWfhPage = 1;
+        }
+
+        var startIndex = (currentWfhPage - 1) * wfhItemsPerPage;
+        var endIndex = Math.min(startIndex + wfhItemsPerPage, totalItems);
+
+        $('.wfh-row').hide();
+        $visibleRows.slice(startIndex, endIndex).show();
+
+        if (totalPages > 1) {
+            $('.erp-pagination-container').show();
+        } else {
+            $('.erp-pagination-container').hide();
+        }
+
+        if (totalItems === 0) {
+            $('#no_matching_wfh_row').removeClass('d-none');
+        } else {
+            $('#no_matching_wfh_row').addClass('d-none');
+        }
+
+        $('#wfh_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
+        $('#wfh_showing_end').text(endIndex);
+        $('#wfh_total_count').text(totalItems);
+
+        var paginationHtml = '';
+
+        // Previous button
+        paginationHtml += `
+            <li class="page-item ${currentWfhPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${currentWfhPage - 1}" aria-label="Previous">
+                    <i class="feather-chevron-left"></i>
+                </a>
+            </li>
+        `;
+
+        // Page numbers
+        for (var i = 1; i <= totalPages; i++) {
+            paginationHtml += `
+                <li class="page-item ${currentWfhPage === i ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>
+            `;
+        }
+
+        // Next button
+        paginationHtml += `
+            <li class="page-item ${currentWfhPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${currentWfhPage + 1}" aria-label="Next">
+                    <i class="feather-chevron-right"></i>
+                </a>
+            </li>
+        `;
+
+        $('#wfh_pagination_ul').html(paginationHtml);
+    }
+
+    // Search trigger
+    $('#wfh_search').on('input', function() {
+        currentWfhPage = 1;
+        updateWfhPagination();
+    });
+
+    // Apply Filter trigger
+    $('#wfhFilterForm').on('submit', function(e) {
+        e.preventDefault();
+        currentWfhPage = 1;
+        updateWfhPagination();
+        $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
+    });
+
+    // Reset Filter trigger
+    $('#wfhFilterForm').find('.btn-light').on('click', function(e) {
+        e.preventDefault();
+        $('#wfh_search').val('');
+        $('#filter_wfh_employee_id').val('').trigger('change');
+        $('#filter_wfh_status').val('');
+        currentWfhPage = 1;
+        updateWfhPagination();
+        $(this).closest('.dropdown').find('[data-bs-toggle="dropdown"]').dropdown('toggle');
+    });
+
+    // Pagination click handler
+    $(document).on('click', '#wfh_pagination_ul .page-link', function(e) {
+        e.preventDefault();
+        var page = $(this).data('page');
+        if (page && !$(this).parent().hasClass('disabled')) {
+            currentWfhPage = parseInt(page);
+            updateWfhPagination();
+        }
+    });
+
+    // Sort function
+    window.setWfhSort = function(criteria, element) {
+        if (element) {
+            var menu = element.closest('.dropdown-menu');
+            if (menu) {
+                menu.querySelectorAll('.dropdown-item').forEach(function(el) {
+                    el.classList.remove('active');
+                });
+            }
+            element.classList.add('active');
+        }
+
+        var $tbody = $('#wfhTable tbody');
+        var $rows = $tbody.find('.wfh-row').get();
+
+        $rows.sort(function(a, b) {
+            var keyA, keyB;
+
+            if (criteria === 'newest' || criteria === 'oldest') {
+                keyA = parseInt($(a).attr('data-created-at') || 0);
+                keyB = parseInt($(b).attr('data-created-at') || 0);
+                return criteria === 'newest' ? keyB - keyA : keyA - keyB;
+            } else if (criteria === 'duration_high' || criteria === 'duration_low') {
+                keyA = parseFloat($(a).attr('data-duration') || 0);
+                keyB = parseFloat($(b).attr('data-duration') || 0);
+                return criteria === 'duration_high' ? keyB - keyA : keyA - keyB;
+            }
+            return 0;
+        });
+
+        $.each($rows, function(index, row) {
+            $tbody.append(row);
+        });
+        updateWfhPagination();
+    };
+
+    // Initial load
+    updateWfhPagination();
 });
+
+// ── WFH Cancellation Modal ─────────────────────────────────────────────────
+function openWfhCancellationModal(wfhId, actionUrl) {
+    var form = document.getElementById('wfhCancellationForm');
+    if (form) {
+        form.action = actionUrl;
+    }
+    document.getElementById('wfh_cancellation_reason').value = '';
+    var modal = new bootstrap.Modal(document.getElementById('wfhCancellationModal'));
+    modal.show();
+}
 </script>
 @endpush
 @endsection

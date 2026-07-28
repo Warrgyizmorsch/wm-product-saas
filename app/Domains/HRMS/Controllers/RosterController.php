@@ -2,9 +2,13 @@
 
 namespace App\Domains\HRMS\Controllers;
 
+use App\Domains\HRMS\Models\Employee;
+use App\Domains\HRMS\Models\ShiftRoster;
 use App\Domains\HRMS\Repositories\RosterRepositoryInterface;
 use App\Domains\Production\Models\ProductionShift;
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -30,19 +34,19 @@ class RosterController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $validated = $request->validate([
-            'company_id' => 'required|exists:companies,id',
-            'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:production_shifts,code',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i',
-            'grace_period_minutes' => 'nullable|integer|min:0',
-            'overtime_allowed' => 'nullable|boolean',
-            'active' => 'nullable|boolean',
-            'description' => 'nullable|string',
+            'company_id'            => 'required|exists:companies,id',
+            'name'                  => 'required|string|max:255',
+            'code'                  => 'required|string|max:50|unique:production_shifts,code',
+            'start_time'            => 'required|date_format:H:i',
+            'end_time'              => 'required|date_format:H:i',
+            'grace_period_minutes'  => 'nullable|integer|min:0',
+            'overtime_allowed'      => 'nullable|boolean',
+            'active'                => 'nullable|boolean',
+            'description'           => 'nullable|string',
         ]);
 
         $validated['overtime_allowed'] = $request->has('overtime_allowed');
-        $validated['active'] = $request->has('active');
+        $validated['active']           = $request->has('active');
 
         $this->rosterRepository->storeShift($validated);
 
@@ -55,19 +59,19 @@ class RosterController extends Controller
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $validated = $request->validate([
-            'company_id' => 'required|exists:companies,id',
-            'name' => 'required|string|max:255',
-            'code' => ['required', 'string', 'max:50', Rule::unique('production_shifts', 'code')->ignore($shift->id)],
-            'start_time' => 'required',
-            'end_time' => 'required',
+            'company_id'           => 'required|exists:companies,id',
+            'name'                 => 'required|string|max:255',
+            'code'                 => ['required', 'string', 'max:50', Rule::unique('production_shifts', 'code')->ignore($shift->id)],
+            'start_time'           => 'required',
+            'end_time'             => 'required',
             'grace_period_minutes' => 'nullable|integer|min:0',
-            'overtime_allowed' => 'nullable|boolean',
-            'active' => 'nullable|boolean',
-            'description' => 'nullable|string',
+            'overtime_allowed'     => 'nullable|boolean',
+            'active'               => 'nullable|boolean',
+            'description'          => 'nullable|string',
         ]);
 
         $validated['overtime_allowed'] = $request->has('overtime_allowed');
-        $validated['active'] = $request->has('active');
+        $validated['active']           = $request->has('active');
 
         $this->rosterRepository->updateShift($shift, $validated);
 
@@ -85,39 +89,225 @@ class RosterController extends Controller
             ->with('success', 'Shift deleted successfully.');
     }
 
-    public function assignShift(Request $request): RedirectResponse
+    // ─────────────────────────────────────────────────────────────────────────
+    // Roster Assignment
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function assign(Request $request): RedirectResponse
     {
         abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
 
         $validated = $request->validate([
-            'employee_ids' => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'shift_id' => 'required|exists:production_shifts,id',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'note' => 'nullable|string|max:255',
+            'employee_ids'             => 'nullable|array',
+            'employee_ids.*'           => 'exists:employees,id',
+            'bulk_company_ids'         => 'nullable|array',
+            'bulk_company_ids.*'       => 'exists:companies,id',
+            'bulk_business_unit_ids'   => 'nullable|array',
+            'bulk_business_unit_ids.*' => 'exists:business_units,id',
+            'bulk_branch_ids'          => 'nullable|array',
+            'bulk_branch_ids.*'        => 'exists:branches,id',
+            'bulk_department_ids'      => 'nullable|array',
+            'bulk_department_ids.*'    => 'exists:departments,id',
+            'bulk_designation_ids'     => 'nullable|array',
+            'bulk_designation_ids.*'   => 'exists:designations,id',
+            'shift_id'                 => 'nullable|exists:production_shifts,id',
+            'start_date'               => 'required|date',
+            'end_date'                 => 'required|date|after_or_equal:start_date',
+            'status'                   => 'required|string',
+            'notes'                    => 'nullable|string',
         ]);
 
-        $this->rosterRepository->assignShiftRoster($validated);
+        $employeeIds = $validated['employee_ids'] ?? [];
+        $shiftId     = $validated['shift_id'] ?? null;
+        $startDate   = Carbon::parse($validated['start_date']);
+        $endDate     = Carbon::parse($validated['end_date']);
+        $status      = $validated['status'] ?? 'scheduled';
+        $notes       = $validated['notes'] ?? null;
+
+        if (empty($employeeIds)) {
+            $query = Employee::query()->where('status', true);
+            if ($request->filled('bulk_company_ids'))       { $query->whereIn('company_id', $validated['bulk_company_ids']); }
+            if ($request->filled('bulk_business_unit_ids')) { $query->whereIn('business_unit_id', $validated['bulk_business_unit_ids']); }
+            if ($request->filled('bulk_branch_ids'))        { $query->whereIn('branch_id', $validated['bulk_branch_ids']); }
+            if ($request->filled('bulk_department_ids'))    { $query->whereIn('department_id', $validated['bulk_department_ids']); }
+            if ($request->filled('bulk_designation_ids'))   { $query->whereIn('designation_id', $validated['bulk_designation_ids']); }
+            $employeeIds = $query->pluck('id')->toArray();
+        }
+
+        if (empty($employeeIds)) {
+            return redirect()->back()->with('error', 'No matching active employees found for shift assignment.');
+        }
+
+        $period   = CarbonPeriod::create($startDate, $endDate);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        foreach ($employeeIds as $employeeId) {
+            foreach ($period as $date) {
+                ShiftRoster::updateOrCreate(
+                    ['tenant_id' => $tenantId, 'employee_id' => $employeeId, 'date' => $date->format('Y-m-d')],
+                    ['shift_id' => $shiftId, 'status' => $status, 'notes' => $notes]
+                );
+            }
+        }
 
         return redirect()->route('hrms.roster.index', ['tab' => 'roster', 'start_date' => $validated['start_date']])
-            ->with('success', 'Shift roster assigned successfully.');
+            ->with('success', 'Shifts assigned successfully.');
+    }
+
+    public function updateCell(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'date'        => 'required|date',
+            'shift_id'    => 'nullable',
+            'value'       => 'nullable|string',
+        ]);
+
+        $value = $validated['value'] ?? null;
+        if ($value === null) {
+            $value = isset($validated['shift_id']) ? (string)$validated['shift_id'] : 'default';
+        }
+
+        if ($value === 'default' || $value === '') {
+            ShiftRoster::where(['employee_id' => $validated['employee_id'], 'date' => $validated['date']])->delete();
+            return redirect()->back()->with('success', 'Shift roster cell reset to default.');
+        }
+
+        $shiftId  = $value === 'off' ? null : (int)$value;
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id();
+
+        ShiftRoster::updateOrCreate(
+            ['tenant_id' => $tenantId, 'employee_id' => $validated['employee_id'], 'date' => $validated['date']],
+            ['shift_id' => $shiftId, 'status' => 'scheduled']
+        );
+
+        return redirect()->back()->with('success', 'Shift roster cell updated.');
+    }
+
+    public function updateWeeklyPattern(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'day_of_week' => 'required|integer|between:0,6',
+            'value'       => 'nullable|string',
+        ]);
+
+        $employee  = Employee::findOrFail($validated['employee_id']);
+        $dayOfWeek = (int)$validated['day_of_week'];
+        $val       = $validated['value'] ?? null;
+        $pattern   = $employee->weekly_pattern ?: [];
+
+        if ($val === '' || $val === null || $val === 'default') {
+            unset($pattern[$dayOfWeek]);
+        } else {
+            $pattern[$dayOfWeek] = $val === 'off' ? 'off' : (int)$val;
+        }
+
+        ksort($pattern);
+        $employee->update(['weekly_pattern' => $pattern]);
+
+        return redirect()->back()->with('success', 'Weekly pattern updated.');
+    }
+
+    public function assignWeekly(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'employee_ids'   => 'required|array|min:1',
+            'employee_ids.*' => 'exists:employees,id',
+            'pattern'        => 'required|array',
+        ]);
+
+        foreach ($validated['employee_ids'] as $empId) {
+            $employee = Employee::find($empId);
+            if ($employee) {
+                $pattern = [];
+                foreach ($validated['pattern'] as $day => $shiftId) {
+                    $pattern[(int)$day] = $shiftId === 'off' ? 'off' : (int)$shiftId;
+                }
+                ksort($pattern);
+                $employee->update(['weekly_pattern' => $pattern]);
+            }
+        }
+
+        return redirect()->back()->with('success', 'Weekly shift pattern assigned successfully.');
+    }
+
+    public function clearWeekly(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'employee_ids'   => 'required|array|min:1',
+            'employee_ids.*' => 'exists:employees,id',
+        ]);
+
+        Employee::whereIn('id', $validated['employee_ids'])->update(['weekly_pattern' => null]);
+
+        return redirect()->back()->with('success', 'Weekly patterns cleared.');
+    }
+
+    public function clear(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'employee_ids'             => 'nullable|array',
+            'employee_ids.*'           => 'exists:employees,id',
+            'bulk_company_ids'         => 'nullable|array',
+            'bulk_company_ids.*'       => 'exists:companies,id',
+            'bulk_business_unit_ids'   => 'nullable|array',
+            'bulk_business_unit_ids.*' => 'exists:business_units,id',
+            'bulk_branch_ids'          => 'nullable|array',
+            'bulk_branch_ids.*'        => 'exists:branches,id',
+            'bulk_department_ids'      => 'nullable|array',
+            'bulk_department_ids.*'    => 'exists:departments,id',
+            'bulk_designation_ids'     => 'nullable|array',
+            'bulk_designation_ids.*'   => 'exists:designations,id',
+            'start_date'               => 'required|date',
+            'end_date'                 => 'required|date|after_or_equal:start_date',
+        ]);
+
+        $employeeIds = $validated['employee_ids'] ?? [];
+        $startDate   = $validated['start_date'];
+        $endDate     = $validated['end_date'];
+
+        if (empty($employeeIds)) {
+            $query = Employee::query()->where('status', true);
+            if ($request->filled('bulk_company_ids'))       { $query->whereIn('company_id', $validated['bulk_company_ids']); }
+            if ($request->filled('bulk_business_unit_ids')) { $query->whereIn('business_unit_id', $validated['bulk_business_unit_ids']); }
+            if ($request->filled('bulk_branch_ids'))        { $query->whereIn('branch_id', $validated['bulk_branch_ids']); }
+            if ($request->filled('bulk_department_ids'))    { $query->whereIn('department_id', $validated['bulk_department_ids']); }
+            if ($request->filled('bulk_designation_ids'))   { $query->whereIn('designation_id', $validated['bulk_designation_ids']); }
+            $employeeIds = $query->pluck('id')->toArray();
+        }
+
+        if (empty($employeeIds)) {
+            return redirect()->back()->with('error', 'No matching active employees found for roster clearance.');
+        }
+
+        ShiftRoster::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('date', [$startDate, $endDate])
+            ->delete();
+
+        return redirect()->route('hrms.roster.index', ['tab' => 'roster', 'start_date' => $startDate])
+            ->with('success', 'Roster entries cleared successfully.');
+    }
+
+    // Legacy aliases
+    public function assignShift(Request $request): RedirectResponse
+    {
+        return $this->assign($request);
     }
 
     public function clearRoster(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
-        $validated = $request->validate([
-            'employee_ids' => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
-        ]);
-
-        $this->rosterRepository->clearShiftRoster($validated);
-
-        return redirect()->route('hrms.roster.index', ['tab' => 'roster', 'start_date' => $validated['start_date']])
-            ->with('success', 'Shift roster cleared for selected period.');
+        return $this->clear($request);
     }
 }

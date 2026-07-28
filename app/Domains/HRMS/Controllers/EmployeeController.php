@@ -100,9 +100,10 @@ class EmployeeController extends Controller
 
         return $request->validate([
             'employee_id' => [
-                'required', 'string', 'max:255',
+                $employee ? 'required' : 'nullable', 'string', 'max:255',
                 Rule::unique('employees', 'employee_id')->ignore($employeeId),
             ],
+
             'title' => ['nullable', 'string', 'max:50'],
             'full_name' => ['required', 'string', 'max:255'],
             'first_name' => ['nullable', 'string', 'max:255'],
@@ -155,4 +156,221 @@ class EmployeeController extends Controller
         }
         return $validated;
     }
+
+    public function storeAdhocComponent(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'salary_component_id' => 'required|exists:salary_components,id',
+            'amount'              => 'required|numeric|min:0',
+            'payroll_month'       => 'required|regex:/^\d{4}-\d{2}$/',
+            'remarks'             => 'nullable|string|max:500',
+        ]);
+
+        $validated['employee_id'] = $employee->id;
+        $validated['status']      = 'pending';
+
+        \App\Domains\HRMS\Models\EmployeeAdhocComponent::create($validated);
+
+        return redirect()->back()->with('success', 'Ad-hoc salary component added successfully.');
+    }
+
+    public function destroyAdhocComponent(\App\Domains\HRMS\Models\EmployeeAdhocComponent $adhocComponent): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $adhocComponent->delete();
+
+        return redirect()->back()->with('success', 'Ad-hoc salary component deleted successfully.');
+    }
+
+    public function storePenalty(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'date'           => 'required|date',
+            'rule_type'      => 'required|string|max:255',
+            'penalty_amount' => 'required|numeric|min:0',
+            'payroll_month'  => 'required|regex:/^\d{4}-\d{2}$/',
+            'remarks'        => 'nullable|string|max:500',
+        ]);
+
+        $validated['employee_id'] = $employee->id;
+        $validated['status']      = 'pending';
+
+        \App\Domains\HRMS\Models\EmployeePenalty::create($validated);
+
+        return redirect()->back()->with('success', 'Attendance penalty instance logged successfully.');
+    }
+
+    public function destroyPenalty(\App\Domains\HRMS\Models\EmployeePenalty $penalty): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $penalty->delete();
+
+        return redirect()->back()->with('success', 'Attendance penalty instance deleted successfully.');
+    }
+
+    public function storeEmploymentHistory(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'company_name'    => 'required|string|max:255',
+            'designation'     => 'required|string|max:255',
+            'start_date'      => 'required|date',
+            'end_date'        => 'nullable|date|after_or_equal:start_date',
+            'job_description' => 'nullable|string|max:1000',
+        ]);
+
+        $employee->employmentHistories()->create($validated);
+
+        return redirect()->back()->with('success', 'Employment history record added successfully.');
+    }
+
+    public function destroyEmploymentHistory(Employee $employee, \App\Domains\HRMS\Models\EmployeeEmploymentHistory $history): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $history->delete();
+
+        return redirect()->back()->with('success', 'Employment history record deleted successfully.');
+    }
+
+    public function requestDocument(Request $request, Employee $employee): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'name'        => 'required|string|max:255',
+            'description' => 'nullable|string|max:500',
+            'has_expiry'  => 'nullable|boolean',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+
+        \App\Domains\HRMS\Models\Document::create([
+            'tenant_id'         => $tenantId,
+            'documentable_id'   => $employee->id,
+            'documentable_type' => Employee::class,
+            'name'              => $request->string('name')->value(),
+            'description'       => $request->input('description'),
+            'status'            => 'requested',
+            'has_expiry'        => $request->boolean('has_expiry'),
+            'requested_by_id'   => auth()->id(),
+        ]);
+
+        return redirect()->back()->with('success', 'Document request created successfully.');
+    }
+
+    public function uploadDocument(Request $request, Employee $employee): RedirectResponse
+    {
+        $isHR = auth()->user()->hasHrPermission('hr.settings.manage');
+        $isOwnProfile = auth()->id() === ($employee->user_id ?? null);
+        
+        abort_unless($isHR || $isOwnProfile, 403);
+
+        $request->validate([
+            'document_id' => 'nullable|exists:documents,id',
+            'name'        => 'nullable|required_without:document_id|string|max:255',
+            'file'        => 'required|file|max:10240', // Max 10MB
+            'expiry_date' => 'nullable|date',
+        ]);
+
+        $tenantId = auth()->user()->tenant_id;
+        $file = $request->file('file');
+
+        if ($request->filled('document_id')) {
+            $document = \App\Domains\HRMS\Models\Document::findOrFail($request->integer('document_id'));
+            
+            if ($document->has_expiry && !$request->filled('expiry_date')) {
+                return redirect()->back()->withErrors(['expiry_date' => 'Expiry date is required for this requested document.'])->withInput();
+            }
+
+            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+
+            $document->update([
+                'file_name'   => $file->getClientOriginalName(),
+                'file_path'   => $path,
+                'file_type'   => $file->getClientMimeType(),
+                'file_size'   => $file->getSize(),
+                'expiry_date' => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status'      => 'uploaded',
+            ]);
+        } else {
+            $path = $file->store("documents/tenant_{$tenantId}/employee_{$employee->id}", 'public');
+
+            \App\Domains\HRMS\Models\Document::create([
+                'tenant_id'         => $tenantId,
+                'documentable_id'   => $employee->id,
+                'documentable_type' => Employee::class,
+                'name'              => $request->string('name')->value(),
+                'file_name'         => $file->getClientOriginalName(),
+                'file_path'         => $path,
+                'file_type'         => $file->getClientMimeType(),
+                'file_size'         => $file->getSize(),
+                'expiry_date'       => $request->filled('expiry_date') ? $request->date('expiry_date') : null,
+                'status'            => 'uploaded',
+                'has_expiry'        => $request->filled('expiry_date'),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Document uploaded successfully.');
+    }
+
+    public function destroyDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
+        }
+
+        $document->delete();
+
+        return redirect()->back()->with('success', 'Document record deleted successfully.');
+    }
+
+    public function approveDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $document->update([
+            'status' => 'approved',
+        ]);
+
+        return redirect()->back()->with('success', 'Document approved successfully.');
+    }
+
+    public function rejectDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $document->update([
+            'status' => 'rejected',
+        ]);
+
+        return redirect()->back()->with('success', 'Document rejected successfully.');
+    }
+
+    public function updateDocumentStatus(Request $request, \App\Domains\HRMS\Models\Document $document): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'status' => 'required|in:approved,rejected',
+        ]);
+
+        $document->update([
+            'status' => $validated['status'],
+        ]);
+
+        $msg = $validated['status'] === 'approved' ? 'Document approved successfully.' : 'Document marked as rejected.';
+
+        return redirect()->back()->with('success', $msg);
+    }
 }
+

@@ -342,10 +342,38 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         $rules = $leaveType->rules ?? [];
         
         return [
-            'probation' => $rules['probation'] ?? ['probation_rule' => 'allow'],
-            'notice' => $rules['notice'] ?? ['notice_rule' => 'allow'],
-            'attachment' => $rules['attachment'] ?? ['require_attachment' => false],
-            'approval' => $rules['approval'] ?? ['workflow_level' => '1_level'],
+            'probation'  => $rules['probation']  ?? ['probation_rule' => 'allow'],
+            'notice'     => $rules['notice']      ?? ['notice_rule' => 'allow'],
+            'attachment' => $rules['attachment']  ?? ['require_attachment' => false],
+            'approval'   => $rules['approval']    ?? ['workflow_level' => '1_level'],
         ];
+    }
+
+    /**
+     * Cancel a leave request (admin approved the employee's cancellation request).
+     * Marks as 'cancelled' and restores the leave balance if the request was approved.
+     */
+    public function cancelLeaveRequest(LeaveRequest $leaveRequest): void
+    {
+        $wasApproved = in_array($leaveRequest->status, ['approved', 'cancellation_requested']);
+
+        $leaveRequest->update([
+            'status'         => 'cancelled',
+            'current_level'  => 'cancelled',
+        ]);
+
+        // Restore leave balance if the leave was previously approved
+        if ($wasApproved) {
+            $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
+                ->where('leave_type_id', $leaveRequest->leave_type_id)
+                ->first();
+
+            if ($balance) {
+                $restore = floatval($leaveRequest->duration);
+                // Ensure used doesn't go below 0
+                $newUsed = max(0, floatval($balance->used) - $restore);
+                $balance->update(['used' => $newUsed]);
+            }
+        }
     }
 }

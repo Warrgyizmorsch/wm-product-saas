@@ -170,4 +170,64 @@ class SalaryStructureController extends Controller
 
         return redirect($redirectUrl)->with('success', __('hrms.salary.component_deleted_success'));
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Pay Groups
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function storePayGroup(Request $request)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'name'        => 'required|max:255',
+            'company_id'  => 'nullable|integer|exists:companies,id',
+            'description' => 'nullable',
+            'status'      => 'required',
+        ]);
+
+        $status = in_array($request->status, ['success', '1', 'active', true], true);
+
+        PayGroup::create([
+            'company_id'  => $validated['company_id'] ?? null,
+            'name'        => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'status'      => $status,
+        ]);
+
+        return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group created successfully.');
+    }
+
+    public function updatePayGroup(Request $request, PayGroup $payGroup)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'name'        => 'required|max:255',
+            'company_id'  => 'nullable|integer|exists:companies,id',
+            'description' => 'nullable',
+            'status'      => 'required',
+        ]);
+
+        $status = in_array($request->status, ['success', '1', 'active', true], true);
+
+        $payGroup->update([
+            'company_id'  => $validated['company_id'] ?? $payGroup->company_id,
+            'name'        => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'status'      => $status,
+        ]);
+
+        return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group updated successfully.');
+    }
+
+    public function destroyPayGroup(PayGroup $payGroup)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $payGroup->delete();
+
+        return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group deleted successfully.');
+    }
 }
+

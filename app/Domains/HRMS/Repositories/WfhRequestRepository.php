@@ -166,4 +166,16 @@ class WfhRequestRepository implements WfhRequestRepositoryInterface
 
         return true;
     }
+
+    /**
+     * Cancel a WFH request (admin approved the employee's cancellation request).
+     * WFH has no leave balance — just mark as cancelled.
+     */
+    public function cancelWfhRequest(WfhRequest $wfhRequest): void
+    {
+        $wfhRequest->update([
+            'status'        => 'cancelled',
+            'current_level' => 'cancelled',
+        ]);
+    }
 }

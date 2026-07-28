@@ -389,7 +389,7 @@
 
         $(document).ready(function() {
             // Append modals to document.body to completely prevent blur/backdrop z-index issues
-            ['applyLeaveModal', 'rejectLeaveModal', 'applyEncashmentModal'].forEach(function(id) {
+            ['applyLeaveModal', 'rejectLeaveModal', 'applyEncashmentModal', 'leaveCancellationModal'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el && el.parentNode !== document.body) {
                     document.body.appendChild(el);
@@ -660,8 +660,10 @@
 
                 if (!startDateStr || !endDateStr) return 0;
 
-                var start = new Date(startDateStr);
-                var end = new Date(endDateStr);
+                var startParts = startDateStr.split('-');
+                var endParts = endDateStr.split('-');
+                var start = new Date(parseInt(startParts[0], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[2], 10));
+                var end = new Date(parseInt(endParts[0], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[2], 10));
 
                 if (end < start) {
                     $('#calculated_duration_display').text("{{ __('hrms.leave.app.date_validation_error') }}");
@@ -1048,9 +1050,7 @@
 
         // Client-side sort selection handler for leave applications
         function changeLeavesSort(criteria, element) {
-            $('.sort-check').addClass('d-none');
             if (element) {
-                $(element).find('.sort-check').removeClass('d-none');
                 var menu = element.closest('.dropdown-menu');
                 if (menu) {
                     menu.querySelectorAll('.dropdown-item').forEach(function(el) {
@@ -1168,6 +1168,14 @@
                 $('#lid-rejection-wrap').addClass('d-none');
             }
 
+            // Cancellation
+            if (d.cancellation) {
+                $('#lid-cancellation-wrap').removeClass('d-none');
+                $('#lid-cancellation').text(d.cancellation);
+            } else {
+                $('#lid-cancellation-wrap').addClass('d-none');
+            }
+
             // Attachment
             if (d.attachment) {
                 $('#lid-attach-wrap').removeClass('d-none');
@@ -1184,9 +1192,37 @@
                 $('#lid-notified-wrap').addClass('d-none');
             }
 
-            // Status form action
-            $('#lid-status-form').attr('action', d.updateUrl || '');
-            $('#lid-status-select').val(d.status).trigger('change');
+            // Status form action & data urls
+            var form = $('#lid-status-form');
+            form.data('update-url', d.updateUrl || '');
+            form.data('approve-cancel-url', d.approveCancelUrl || '');
+            form.data('deny-cancel-url', d.denyCancelUrl || '');
+
+            // Hide status change panel completely if status is cancelled
+            if (d.status === 'cancelled') {
+                $('#lid-status-change-wrap').addClass('d-none');
+                $('#lid-status-hr').addClass('d-none');
+            } else {
+                $('#lid-status-change-wrap').removeClass('d-none');
+                $('#lid-status-hr').removeClass('d-none');
+            }
+
+            // Dynamically populate options based on status
+            var $select = $('#lid-status-select');
+            $select.empty();
+
+            if (d.status === 'cancellation_requested') {
+                $select.append('<option value="approve_cancellation">Approve Cancellation</option>');
+                $select.append('<option value="deny_cancellation">Deny Cancellation</option>');
+                $select.val('approve_cancellation').trigger('change');
+            } else {
+                $select.append('<option value="approved">Approve</option>');
+                $select.append('<option value="rejected">Reject</option>');
+                $select.append('<option value="pending">Pending</option>');
+                $select.append('<option value="unauthorized">Unauthorized</option>');
+                $select.append('<option value="unpaid">Unpaid</option>');
+                $select.val(d.status).trigger('change');
+            }
 
             if (d.status === 'rejected') {
                 $('#lid-rejection-input-wrap').removeClass('d-none');
@@ -1198,12 +1234,50 @@
         });
 
         $(document).on('change', '#lid-status-select', function() {
-            if ($(this).val() === 'rejected') {
+            var selectedVal = $(this).val();
+            var form = $('#lid-status-form');
+            var baseUpdateUrl = form.data('update-url');
+            var approveCancelUrl = form.data('approve-cancel-url');
+            var denyCancelUrl = form.data('deny-cancel-url');
+
+            if (selectedVal === 'approve_cancellation') {
+                form.attr('action', approveCancelUrl);
+            } else if (selectedVal === 'deny_cancellation') {
+                form.attr('action', denyCancelUrl);
+            } else {
+                form.attr('action', baseUpdateUrl);
+            }
+
+            if (selectedVal === 'rejected') {
                 $('#lid-rejection-input-wrap').removeClass('d-none');
             } else {
                 $('#lid-rejection-input-wrap').addClass('d-none');
             }
         });
+
+        // ── Leave Cancellation Modal ───────────────────────────────────────────
+        function openLeaveCancellationModal(leaveId, actionUrl) {
+            var form = document.getElementById('leaveCancellationForm');
+            if (form) {
+                form.action = actionUrl;
+            }
+            document.getElementById('leave_cancellation_reason').value = '';
+            var modal = new bootstrap.Modal(document.getElementById('leaveCancellationModal'));
+            modal.show();
+        }
+
+        function toggleLeaveCancelReasonText(btn) {
+            var textEl = btn.previousElementSibling;
+            if (textEl.style.display === 'block') {
+                textEl.style.display = '-webkit-box';
+                textEl.style.webkitLineClamp = '2';
+                btn.textContent = 'See more';
+            } else {
+                textEl.style.display = 'block';
+                textEl.style.webkitLineClamp = 'none';
+                btn.textContent = 'See less';
+            }
+        }
     </script>
 @endpush
 
@@ -1344,19 +1418,15 @@
                                     <x-ui.sort-dropdown :label="__('hrms.common.sort')">
                                         <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="changeLeavesSort('date_desc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.app.sort_newest') }}</span>
-                                            <i class="feather-check text-dark ms-auto sort-check"></i>
                                         </a>
                                         <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('date_asc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.app.sort_oldest') }}</span>
-                                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
                                         </a>
                                         <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_desc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.app.sort_duration_high_low') }}</span>
-                                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
                                         </a>
                                         <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="changeLeavesSort('duration_asc', this); event.preventDefault();">
                                             <span>{{ __('hrms.leave.app.sort_duration_low_high') }}</span>
-                                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
                                         </a>
                                     </x-ui.sort-dropdown>
 
@@ -1407,12 +1477,12 @@
                                             @if($isAdmin)
                                                 <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="min-width:150px;">{{ __('hrms.employees.tbl_employee') ?? 'Employee' }}</th>
                                             @endif
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="min-width:130px;">{{ __('hrms.leave.leave_types') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="min-width:280px;">{{ __('hrms.leave.leave_types') }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:160px;">{{ __('hrms.leave.app.duration_timeline') }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:75px;">{{ __('hrms.leave.days') }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:95px;">{{ __('ui.status') ?? 'Status' }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:65px;">File</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width:70px;">Detail</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width:110px;">{{ __('hrms.common.action') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody id="leavesTableBody">
@@ -1436,12 +1506,14 @@
                                                 }
 
                                                 $statusBadge = match($req->status) {
-                                                    'approved'     => ['cls' => 'bg-soft-success text-success',    'icon' => 'feather-check-circle', 'lbl' => __('hrms.leave.app.status_approved')],
-                                                    'pending'      => ['cls' => 'bg-soft-warning text-warning',    'icon' => 'feather-clock',         'lbl' => __('hrms.leave.app.status_pending')],
-                                                    'rejected'     => ['cls' => 'bg-soft-danger text-danger',      'icon' => 'feather-x-circle',      'lbl' => __('hrms.leave.app.status_rejected')],
-                                                    'unauthorized' => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',         'lbl' => __('hrms.leave.app.status_unauthorized')],
-                                                    'unpaid'       => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-alert-circle',  'lbl' => __('hrms.leave.app.status_unpaid')],
-                                                    default        => ['cls' => 'bg-light text-secondary',         'icon' => 'feather-circle',        'lbl' => ucfirst($req->status)],
+                                                    'approved'                => ['cls' => 'bg-soft-success text-success',    'icon' => 'feather-check-circle',  'lbl' => __('hrms.leave.app.status_approved')],
+                                                    'pending'                 => ['cls' => 'bg-soft-warning text-warning',    'icon' => 'feather-clock',          'lbl' => __('hrms.leave.app.status_pending')],
+                                                    'rejected'                => ['cls' => 'bg-soft-danger text-danger',      'icon' => 'feather-x-circle',       'lbl' => __('hrms.leave.app.status_rejected')],
+                                                    'cancellation_requested'  => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-rotate-ccw',     'lbl' => 'Cancellation Requested'],
+                                                    'cancelled'               => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',          'lbl' => 'Cancelled'],
+                                                    'unauthorized'            => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',          'lbl' => __('hrms.leave.app.status_unauthorized')],
+                                                    'unpaid'                  => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-alert-circle',   'lbl' => __('hrms.leave.app.status_unpaid')],
+                                                    default                   => ['cls' => 'bg-light text-secondary',         'icon' => 'feather-circle',         'lbl' => ucfirst($req->status)],
                                                 };
 
                                                 $sessionInfo = '';
@@ -1451,6 +1523,7 @@
                                                         $sessionInfo .= ' → ' . ucwords(str_replace('_', ' ', $req->end_date_type));
                                                     }
                                                 }
+                                                $isLongCancelReason = (mb_strlen($req->cancellation_reason ?? '') > 70) || (substr_count($req->cancellation_reason ?? '', "\n") > 1);
                                             @endphp
                                             <tr class="leave-row"
                                                 data-employee="{{ strtolower($req->employee->full_name) }} {{ strtolower($req->employee->employee_id) }}"
@@ -1474,6 +1547,9 @@
                                                 data-rejection="{{ addslashes($req->rejection_reason ?? '') }}"
                                                 data-attachment="{{ $req->attachment_path ? asset('storage/'.$req->attachment_path) : '' }}"
                                                 data-update-url="{{ route('hrms.leaves.update-status', $req->id) }}"
+                                                data-approve-cancel-url="{{ route('hrms.leaves.approve-cancellation', $req->id) }}"
+                                                data-deny-cancel-url="{{ route('hrms.leaves.deny-cancellation', $req->id) }}"
+                                                data-cancellation="{{ addslashes($req->cancellation_reason ?? '') }}"
                                                 data-notified-names="{{ $notifiedNames }}"
                                                 data-employee-name="{{ $req->employee->full_name }}"
                                                 data-employee-code="{{ $req->employee->employee_id }}"
@@ -1492,6 +1568,17 @@
                                                             <div class="text-muted fs-11">Rem: {{ $rowRemaining }} / {{ $rowAllocated }} {{ __('hrms.leave.days') }}</div>
                                                         </div>
                                                     </div>
+                                                    @if(in_array($req->status, ['cancellation_requested', 'cancelled']) && !empty($req->cancellation_reason))
+                                                        <div class="text-warning fs-11 mt-2" style="max-width: 250px;">
+                                                            <span class="fw-semibold"><i class="feather-rotate-ccw me-1"></i>Cancellation:</span>
+                                                            <div class="leave-cancel-reason-text mb-0 text-muted fs-11" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; white-space: normal; line-height: 1.4; color: inherit;">
+                                                                {{ $req->cancellation_reason }}
+                                                            </div>
+                                                            @if($isLongCancelReason)
+                                                                <a href="#" class="leave-toggle-cancel-reason-btn fs-10 text-primary fw-semibold d-inline-block mt-0.5" onclick="toggleLeaveCancelReasonText(this); return false;">See more</a>
+                                                            @endif
+                                                        </div>
+                                                    @endif
                                                 </td>
                                                 <td>
                                                     <div class="fs-13 text-dark">{{ $dateRange }}</div>
@@ -1511,14 +1598,42 @@
                                                         <span class="text-muted">—</span>
                                                     @endif
                                                 </td>
-                                                <td class="text-end pe-3">
-                                                    <button type="button"
-                                                        class="btn btn-sm btn-light border open-leave-detail-idx px-2 py-1"
-                                                        title="View Details"
-                                                        data-bs-toggle="offcanvas"
-                                                        data-bs-target="#leaveDetailDrawerIdx">
-                                                        <i class="feather-eye fs-12 text-primary"></i>
-                                                    </button>
+                                                <td class="text-end pe-3" style="min-width:110px;">
+                                                     <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
+                                                         {{-- Eye / detail button --}}
+                                                         <button type="button"
+                                                             class="btn btn-sm btn-soft-primary open-leave-detail-idx"
+                                                             title="View Details"
+                                                             data-bs-toggle="offcanvas"
+                                                             data-bs-target="#leaveDetailDrawerIdx"
+                                                             style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                             <i class="feather-eye fs-14"></i>
+                                                         </button>
+
+                                                         {{-- Unified Withdraw / Cancellation Delete button --}}
+                                                         @if($req->canWithdraw())
+                                                             <form method="POST" action="{{ route('hrms.leaves.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this leave application?')" class="d-inline">
+                                                                 @csrf
+                                                                 <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                                         title="Withdraw Application"
+                                                                         style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                                     <i class="feather-trash-2 fs-14"></i>
+                                                                 </button>
+                                                             </form>
+                                                         @elseif($req->canRequestCancellation())
+                                                             <button type="button" class="btn btn-sm btn-soft-danger border" 
+                                                                     title="Request Cancellation"
+                                                                     onclick="openLeaveCancellationModal({{ $req->id }}, '{{ route('hrms.leaves.request-cancellation', $req->id) }}')"
+                                                                     style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                                 <i class="feather-trash-2 fs-14"></i>
+                                                             </button>
+                                                         @else
+                                                             <button type="button" class="btn btn-sm btn-light border disabled" 
+                                                                     style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled>
+                                                                 <i class="feather-trash-2 fs-14"></i>
+                                                             </button>
+                                                         @endif
+                                                     </div>
                                                 </td>
                                             </tr>
                                         @empty
@@ -1622,6 +1737,12 @@
                         <div class="alert alert-soft-danger py-2 px-3 fs-13 mb-0" id="lid-rejection"></div>
                     </div>
 
+                    {{-- Cancellation Reason --}}
+                    <div class="mb-3 d-none" id="lid-cancellation-wrap">
+                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Cancellation Reason</div>
+                        <div class="alert alert-soft-warning py-2 px-3 fs-13 mb-0" id="lid-cancellation" style="word-break: break-word !important; overflow-wrap: anywhere !important;"></div>
+                    </div>
+
                     {{-- Notified Members --}}
                     <div class="mb-3 d-none" id="lid-notified-wrap">
                         <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.notify_members') }}</div>
@@ -1630,8 +1751,8 @@
 
                     {{-- Status Change --}}
                     @if($isAdmin)
-                        <hr class="my-3">
-                        <div>
+                        <hr class="my-3" id="lid-status-hr">
+                        <div id="lid-status-change-wrap">
                             <div class="text-muted fs-11 text-uppercase fw-semibold mb-2" style="letter-spacing:.5px;">{{ __('hrms.employees.lbl_update_status') }}</div>
                             <form method="POST" id="lid-status-form" action="">
                                 @csrf
@@ -1794,14 +1915,14 @@
                                                 @if($isAdmin)
                                                     <td class="text-end pe-3" style="white-space: nowrap;">
                                                         <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                                            <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background-color: #8c4444 !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
+                                                            <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
                                                                 <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
                                                             </button>
                                                             <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0; background: #ffffff;">
                                                                 <li>
                                                                     <form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST">
                                                                         @csrf
-                                                                        <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'approved' ? 'color: #8c4444 !important;' : '' }}">
+                                                                        <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'approved' ? 'color: var(--bs-primary) !important;' : '' }}">
                                                                             <span>{{ __('hrms.leave.app.status_approved') }}</span>
                                                                         </button>
                                                                     </form>
@@ -1809,7 +1930,7 @@
                                                                 <li>
                                                                     <form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST">
                                                                         @csrf
-                                                                        <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'rejected' ? 'color: #8c4444 !important;' : '' }}">
+                                                                        <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'rejected' ? 'color: var(--bs-primary) !important;' : '' }}">
                                                                             <span>{{ __('hrms.leave.app.status_rejected') }}</span>
                                                                         </button>
                                                                     </form>
@@ -1851,6 +1972,38 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leave Cancellation Request Modal -->
+    <div class="modal fade" id="leaveCancellationModal" tabindex="-1" aria-labelledby="leaveCancellationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom py-3">
+                    <h5 class="modal-title fw-bold text-dark" id="leaveCancellationModalLabel">
+                        <i class="feather-x-circle text-warning me-2"></i>Request Leave Cancellation
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="leaveCancellationForm" method="POST" action="">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <p class="text-muted fs-13 mb-3">
+                            Please provide a reason for requesting cancellation of this approved leave. The admin will review and approve or deny your request.
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-dark fs-13">Cancellation Reason <span class="text-danger">*</span></label>
+                            <textarea name="cancellation_reason" id="leave_cancellation_reason" class="form-control fs-13" rows="3" placeholder="Explain why you want to cancel this leave..." required maxlength="1000"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning text-dark fw-semibold">
+                            <i class="feather-send me-1"></i>Submit Request
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

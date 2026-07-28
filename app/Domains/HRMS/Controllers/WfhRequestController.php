@@ -2,11 +2,12 @@
 
 namespace App\Domains\HRMS\Controllers;
 
+use App\Domains\HRMS\Helpers\SessionConflictChecker;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\WfhRequest;
-use App\Domains\HRMS\Models\LeaveRequest;
 use App\Domains\HRMS\Repositories\WfhRequestRepositoryInterface;
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -26,24 +27,23 @@ class WfhRequestController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $user = auth()->user();
+        $user    = auth()->user();
         $isAdmin = false;
         if ($user) {
-            $isAdmin = $user->hasHrPermission('hr.settings.manage') 
-                || $user->hasHrPermission('hr.leaves.manage') 
+            $isAdmin = $user->hasHrPermission('hr.settings.manage')
+                || $user->hasHrPermission('hr.leaves.manage')
                 || !empty($user->role_id);
         }
 
         $validated = $request->validate([
-            'employee_id'       => $isAdmin ? 'required|exists:employees,id' : 'nullable',
-            'start_date'        => 'required|date',
-            'end_date'          => 'required|date|after_or_equal:start_date',
-            'start_date_type'   => 'required|string|in:full_day,first_half,second_half',
-            'end_date_type'     => 'required|string|in:full_day,first_half,second_half',
-            'duration'          => 'required|numeric|min:0.5',
-            'reason'            => 'required|string|max:1000',
-            'attachment'        => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
-            'notified_contacts' => 'nullable|array',
+            'employee_id'         => $isAdmin ? 'required|exists:employees,id' : 'nullable',
+            'start_date'          => 'required|date',
+            'end_date'            => 'required|date|after_or_equal:start_date',
+            'start_date_type'     => 'required|string|in:full_day,first_half,second_half',
+            'end_date_type'       => 'required|string|in:full_day,first_half,second_half',
+            'reason'              => 'required|string|max:1000',
+            'attachment'          => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
+            'notified_contacts'   => 'nullable|array',
             'notified_contacts.*' => 'exists:employees,id',
         ]);
 
@@ -59,30 +59,44 @@ class WfhRequestController extends Controller
             return redirect()->back()->with('error', 'Employee profile not found.');
         }
 
-        // Check for duplicate / overlapping WFH requests for this employee
-        $wfhOverlap = WfhRequest::where('employee_id', $employee->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->where(function ($q) use ($validated) {
-                $q->where('start_date', '<=', $validated['end_date'])
-                  ->where('end_date', '>=', $validated['start_date']);
-            })
-            ->exists();
+        // Calculate duration server-side from dates + session types
+        $startDate = Carbon::parse($validated['start_date']);
+        $endDate   = Carbon::parse($validated['end_date']);
+        $startType = $validated['start_date_type'] ?? 'full_day';
+        $endType   = $validated['end_date_type']   ?? 'full_day';
+        $duration  = 0;
 
-        if ($wfhOverlap) {
-            return redirect()->back()->withInput()->with('error', 'A WFH application already exists for the selected employee within this date range.');
+        if ($startDate->isSameDay($endDate)) {
+            $duration = ($startType === 'full_day') ? 1.0 : 0.5;
+        } else {
+            $daysDiff = $startDate->diffInDays($endDate);
+            if ($daysDiff === 1) {
+                $duration  = ($startType === 'full_day') ? 1.0 : 0.5;
+                $duration += ($endType   === 'full_day') ? 1.0 : 0.5;
+            } else {
+                $duration  = ($startType === 'full_day') ? 1.0 : 0.5;
+                $duration += ($daysDiff - 1);
+                $duration += ($endType   === 'full_day') ? 1.0 : 0.5;
+            }
         }
 
-        // Check for duplicate / overlapping Leave requests for this employee
-        $leaveOverlap = LeaveRequest::where('employee_id', $employee->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->where(function ($q) use ($validated) {
-                $q->where('start_date', '<=', $validated['end_date'])
-                  ->where('end_date', '>=', $validated['start_date']);
-            })
-            ->exists();
+        if ($duration < 0.5) {
+            return redirect()->back()->withInput()->with('error', 'Duration cannot be less than 0.5 days.');
+        }
 
-        if ($leaveOverlap) {
-            return redirect()->back()->withInput()->with('error', 'A Leave application already exists for the selected employee within this date range.');
+        $validated['duration'] = $duration;
+
+        // Session-aware conflict check (covers both Leave & WFH, same employee)
+        $conflict = SessionConflictChecker::hasConflict(
+            employeeId:   $employee->id,
+            newStart:     $startDate,
+            newEnd:       $endDate,
+            newStartType: $startType,
+            newEndType:   $endType
+        );
+
+        if ($conflict) {
+            return redirect()->back()->withInput()->with('error', $conflict);
         }
 
         $validated['employee_id'] = $employee->id;
@@ -90,7 +104,7 @@ class WfhRequestController extends Controller
 
         $this->wfhRequestRepository->storeWfhRequest($validated, $request);
 
-        return redirect()->route('hrms.wfh.index')->with('success', 'WFH application submitted successfully.');
+        return redirect()->back()->with('success', 'WFH application submitted successfully.');
     }
 
     public function approve(Request $request, WfhRequest $wfhRequest): RedirectResponse
@@ -105,7 +119,7 @@ class WfhRequestController extends Controller
 
     public function updateStatus(Request $request, WfhRequest $wfhRequest, ?string $overrideAction = null): RedirectResponse
     {
-        $user = auth()->user();
+        $user    = auth()->user();
         $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
             || $user->hasHrPermission('hr.leaves.manage')
             || !empty($user->role_id));
@@ -114,10 +128,14 @@ class WfhRequestController extends Controller
             return redirect()->back()->with('error', 'Unauthorized action.');
         }
 
+        if ($wfhRequest->status === 'cancelled') {
+            return redirect()->back()->with('error', 'Cannot change the status of a cancelled WFH application.');
+        }
+
         $action = $overrideAction ?? $request->input('action');
         if (!$action) {
             $validated = $request->validate([
-                'action' => 'required|in:approved,rejected,pending',
+                'action'           => 'required|in:approved,rejected,pending',
                 'rejection_reason' => 'nullable|string|max:1000',
             ]);
             $action = $validated['action'];
@@ -127,7 +145,7 @@ class WfhRequestController extends Controller
         }
 
         $this->wfhRequestRepository->updateStatus($wfhRequest, [
-            'action' => $action,
+            'action'           => $action,
             'rejection_reason' => $reason,
         ], $request);
 
@@ -137,6 +155,120 @@ class WfhRequestController extends Controller
             default    => 'WFH request status updated to pending.',
         };
 
-        return redirect()->route('hrms.wfh.index')->with('success', $msg);
+        return redirect()->back()->with('success', $msg);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Employee: Withdraw (pending only)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function withdraw(Request $request, WfhRequest $wfhRequest): RedirectResponse
+    {
+        $user     = auth()->user();
+        $employee = Employee::where('personal_email', $user?->email)
+            ->orWhere('office_email', $user?->email)
+            ->first();
+
+        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
+            || !empty($user->role_id));
+
+        if (!$isAdmin && (!$employee || $employee->id !== $wfhRequest->employee_id)) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        if (!$wfhRequest->canWithdraw()) {
+            return redirect()->back()->with('error', 'Only pending applications can be withdrawn.');
+        }
+
+        $wfhRequest->delete();
+
+        return redirect()->back()->with('success', 'WFH application withdrawn successfully.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Employee: Request Cancellation (approved only)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function requestCancellation(Request $request, WfhRequest $wfhRequest): RedirectResponse
+    {
+        $user     = auth()->user();
+        $employee = Employee::where('personal_email', $user?->email)
+            ->orWhere('office_email', $user?->email)
+            ->first();
+
+        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
+            || !empty($user->role_id));
+
+        if (!$isAdmin && (!$employee || $employee->id !== $wfhRequest->employee_id)) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        if (!$wfhRequest->canRequestCancellation()) {
+            return redirect()->back()->with('error', 'Only approved applications can have a cancellation requested.');
+        }
+
+        $validated = $request->validate([
+            'cancellation_reason' => 'required|string|max:1000',
+        ]);
+
+        $wfhRequest->update([
+            'status'              => 'cancellation_requested',
+            'cancellation_reason' => $validated['cancellation_reason'],
+        ]);
+
+        return redirect()->back()->with('success', 'Cancellation request submitted. Awaiting admin approval.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Admin: Approve Cancellation
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function approveCancellation(WfhRequest $wfhRequest): RedirectResponse
+    {
+        $user    = auth()->user();
+        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
+            || !empty($user->role_id));
+
+        if (!$isAdmin) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        if ($wfhRequest->status !== 'cancellation_requested') {
+            return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
+        }
+
+        $this->wfhRequestRepository->cancelWfhRequest($wfhRequest);
+
+        return redirect()->back()->with('success', 'WFH cancellation approved.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Admin: Deny Cancellation (revert to approved)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function denyCancellation(WfhRequest $wfhRequest): RedirectResponse
+    {
+        $user    = auth()->user();
+        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
+            || !empty($user->role_id));
+
+        if (!$isAdmin) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        if ($wfhRequest->status !== 'cancellation_requested') {
+            return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
+        }
+
+        $wfhRequest->update([
+            'status'              => 'approved',
+            'cancellation_reason' => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Cancellation request denied. Application remains approved.');
     }
 }

@@ -267,4 +267,286 @@ class AssetController extends Controller
 
         return redirect()->route('hrms.assets.index')->with('success', __('hrms.assets.success_deleted'));
     }
+
+    public function storeItem(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'asset_category_id' => 'required|exists:asset_categories,id',
+            'name'              => 'required|string|max:255',
+            'description'       => 'nullable|string|max:500',
+        ]);
+
+        $this->assetRepository->storeAssetItem($validated);
+
+        return redirect()->back()->with('success', 'Asset item created successfully.');
+    }
+
+    public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        return $this->assetRepository->export();
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
+        ]);
+
+        $result = $this->assetRepository->import($request->file('file'));
+
+        return redirect()->back()->with('success', $result['message'] ?? 'Assets imported successfully.');
+    }
+
+    public function downloadTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        return $this->assetRepository->downloadTemplate();
+    }
+
+    public function exportCategories(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        return $this->assetRepository->exportCategories();
+    }
+
+    public function importCategories(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
+        ]);
+
+        $result = $this->assetRepository->importCategories($request->file('file'));
+
+        return redirect()->back()->with('success', $result['message'] ?? 'Categories imported successfully.');
+    }
+
+    public function downloadCategoriesTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+        return $this->assetRepository->downloadCategoriesTemplate();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Asset Requests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function storeRequest(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'employee_id'              => 'required|exists:employees,id',
+            'reason'                   => 'required|string|max:1000',
+            'items'                    => 'required|array|min:1',
+            'items.*.asset_item_id'    => 'required|exists:asset_items,id',
+            'items.*.quantity'         => 'required|integer|min:1',
+        ]);
+
+        $employee    = \App\Domains\HRMS\Models\Employee::findOrFail($validated['employee_id']);
+        $companyId   = $employee->company_id;
+        $requestDate = date('Y-m-d');
+        $reason      = $validated['reason'];
+
+        foreach ($validated['items'] as $item) {
+            $assetItem = \App\Domains\HRMS\Models\AssetItem::find($item['asset_item_id']);
+            if (!$assetItem) {
+                continue;
+            }
+
+            AssetRequest::create([
+                'company_id'        => $companyId,
+                'employee_id'       => $employee->id,
+                'asset_category_id' => $assetItem->asset_category_id,
+                'asset_item_id'     => $assetItem->id,
+                'quantity'          => $item['quantity'],
+                'reason'            => $reason,
+                'request_date'      => $requestDate,
+                'status'            => 'pending',
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Asset request(s) submitted successfully.');
+    }
+
+
+    public function rejectRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'admin_notes' => 'required|string|max:1000',
+        ]);
+
+        $assetRequest->update([
+            'status'      => 'rejected',
+            'admin_notes' => $validated['admin_notes'],
+        ]);
+
+        return redirect()->back()->with('success', 'Asset request rejected successfully.');
+    }
+
+    public function allocateDirect(AssetRequest $assetRequest): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        if ($assetRequest->status !== 'pending') {
+            return redirect()->back()->with('error', 'Only pending asset requests can be allocated.');
+        }
+
+        $asset = null;
+        if ($assetRequest->requested_asset_id) {
+            $asset = Asset::find($assetRequest->requested_asset_id);
+            if (!$asset || $asset->status !== 'available') {
+                return redirect()->back()->with('error', 'The specifically requested asset is not currently available.');
+            }
+        } else {
+            $asset = Asset::query()
+                ->where('asset_category_id', $assetRequest->asset_category_id)
+                ->where('company_id', $assetRequest->company_id)
+                ->where('status', 'available')
+                ->first();
+
+            if (!$asset) {
+                return redirect()->back()->with('error', 'No available asset found in this category for allocation.');
+            }
+        }
+
+        $asset->update([
+            'status'               => 'allocated',
+            'assigned_employee_id' => $assetRequest->employee_id,
+            'allocated_at'         => date('Y-m-d'),
+            'expected_return_date' => null,
+        ]);
+
+        $asset->allocations()->create([
+            'employee_id'          => $assetRequest->employee_id,
+            'allocated_at'         => date('Y-m-d'),
+            'allocation_condition' => $asset->condition,
+            'notes'                => $asset->notes,
+        ]);
+
+        $assetRequest->update([
+            'status'             => 'allocated',
+            'allocated_asset_id' => $asset->id,
+            'admin_notes'        => "Allocated asset {$asset->asset_code} ({$asset->name}) directly on " . date('d M, Y'),
+        ]);
+
+        return redirect()->back()->with('success', 'Asset allocated directly for request.');
+    }
+
+    public function allocateRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'asset_id'             => 'required|exists:assets,id',
+            'allocated_at'         => 'required|date',
+            'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
+        ]);
+
+        $asset = Asset::findOrFail($validated['asset_id']);
+
+        if ($asset->status !== 'available') {
+            return redirect()->back()->with('error', 'The selected asset is not currently available.');
+        }
+
+        $asset->update([
+            'status'               => 'allocated',
+            'assigned_employee_id' => $assetRequest->employee_id,
+            'allocated_at'         => $validated['allocated_at'],
+            'expected_return_date' => $validated['expected_return_date'] ?? null,
+        ]);
+
+        $asset->allocations()->create([
+            'employee_id'          => $assetRequest->employee_id,
+            'allocated_at'         => $validated['allocated_at'],
+            'allocation_condition' => $asset->condition,
+            'notes'                => $asset->notes,
+        ]);
+
+        $assetRequest->update([
+            'status'             => 'allocated',
+            'allocated_asset_id' => $asset->id,
+            'admin_notes'        => "Allocated asset {$asset->asset_code} ({$asset->name}) on " . date('d M, Y'),
+        ]);
+
+        return redirect()->back()->with('success', 'Asset request allocated successfully.');
+    }
+
+    public function bulkAllocate(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'allocations'          => 'required|array',
+            'allocations.*'        => 'nullable|exists:assets,id',
+            'allocated_at'         => 'required|date',
+            'expected_return_date' => 'nullable|date|after_or_equal:allocated_at',
+        ]);
+
+        $allocatedAt        = $validated['allocated_at'];
+        $expectedReturnDate = $validated['expected_return_date'] ?? null;
+        $allocatedCount     = 0;
+
+        foreach ($validated['allocations'] as $requestId => $assetId) {
+            if (empty($assetId)) {
+                continue;
+            }
+
+            $assetRequest = AssetRequest::find($requestId);
+            $asset        = Asset::find($assetId);
+
+            if ($assetRequest && $asset && $asset->status === 'available') {
+                $asset->update([
+                    'status'               => 'allocated',
+                    'assigned_employee_id' => $assetRequest->employee_id,
+                    'allocated_at'         => $allocatedAt,
+                    'expected_return_date' => $expectedReturnDate,
+                ]);
+
+                $asset->allocations()->create([
+                    'employee_id'          => $assetRequest->employee_id,
+                    'allocated_at'         => $allocatedAt,
+                    'allocation_condition' => $asset->condition,
+                    'notes'                => $asset->notes,
+                ]);
+
+                $assetRequest->update([
+                    'status'             => 'allocated',
+                    'allocated_asset_id' => $asset->id,
+                    'admin_notes'        => "Bulk allocated asset {$asset->asset_code} ({$asset->name}) on " . date('d M, Y'),
+                ]);
+
+                $allocatedCount++;
+            }
+        }
+
+        return redirect()->back()->with('success', "Successfully allocated {$allocatedCount} asset request(s).");
+    }
+
+    public function bulkReject(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'request_ids'   => 'required|array',
+            'request_ids.*' => 'exists:asset_requests,id',
+            'admin_notes'   => 'nullable|string|max:1000',
+        ]);
+
+        AssetRequest::whereIn('id', $validated['request_ids'])
+            ->where('status', 'pending')
+            ->update([
+                'status'      => 'rejected',
+                'admin_notes' => $validated['admin_notes'] ?? 'Bulk rejected.',
+            ]);
+
+        return redirect()->back()->with('success', 'Selected asset requests have been rejected.');
+    }
 }
+

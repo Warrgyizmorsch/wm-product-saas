@@ -137,7 +137,14 @@ Route::prefix('hrms')
             Route::post('/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leaves.approve');
             Route::post('/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leaves.reject');
             Route::post('/{leaveRequest}/update-status', [LeaveRequestController::class, 'updateStatus'])->name('leaves.update-status');
-            
+
+            // Employee cancellation flow
+            Route::post('/{leaveRequest}/withdraw', [LeaveRequestController::class, 'withdraw'])->name('leaves.withdraw');
+            Route::post('/{leaveRequest}/request-cancellation', [LeaveRequestController::class, 'requestCancellation'])->name('leaves.request-cancellation');
+            // Admin cancellation decision
+            Route::post('/{leaveRequest}/approve-cancellation', [LeaveRequestController::class, 'approveCancellation'])->name('leaves.approve-cancellation');
+            Route::post('/{leaveRequest}/deny-cancellation', [LeaveRequestController::class, 'denyCancellation'])->name('leaves.deny-cancellation');
+
             // Leave Encashments
             Route::post('/encashment/store', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'store'])->name('leaves.encashment.store');
             Route::post('/encashment/{leaveEncashment}/approve', [\App\Domains\HRMS\Controllers\LeaveEncashmentController::class, 'approve'])->name('leaves.encashment.approve');
@@ -152,6 +159,13 @@ Route::prefix('hrms')
             Route::post('/{wfhRequest}/approve', [WfhRequestController::class, 'approve'])->name('wfh.approve');
             Route::post('/{wfhRequest}/reject', [WfhRequestController::class, 'reject'])->name('wfh.reject');
             Route::post('/{wfhRequest}/update-status', [WfhRequestController::class, 'updateStatus'])->name('wfh.update-status');
+
+            // Employee cancellation flow
+            Route::post('/{wfhRequest}/withdraw', [WfhRequestController::class, 'withdraw'])->name('wfh.withdraw');
+            Route::post('/{wfhRequest}/request-cancellation', [WfhRequestController::class, 'requestCancellation'])->name('wfh.request-cancellation');
+            // Admin cancellation decision
+            Route::post('/{wfhRequest}/approve-cancellation', [WfhRequestController::class, 'approveCancellation'])->name('wfh.approve-cancellation');
+            Route::post('/{wfhRequest}/deny-cancellation', [WfhRequestController::class, 'denyCancellation'])->name('wfh.deny-cancellation');
         });
 
         // Asset Management

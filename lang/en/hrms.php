@@ -203,6 +203,7 @@ return [
         'download_template' => 'Download Template',
         'import' => 'Import',
         'detail' => 'Detail',
+        'action' => 'Action',
         'all_types' => 'All Types',
         'close_panel' => 'Close Panel',
         'save_changes' => 'Save Changes',

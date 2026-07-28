@@ -294,4 +294,106 @@ class OrgController extends Controller
 
         return redirect()->route('hrms.org.index', ['tab' => 'designations'])->with('success', __('hrms.org.desig_deleted'));
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Route aliases: web.php maps store/update/destroy → storeCompany etc.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function create()
+    {
+        return redirect()->route('hrms.org.index');
+    }
+
+    public function store(\Illuminate\Http\Request $request)
+    {
+        return $this->storeCompany($request);
+    }
+
+    public function update(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\Company $company)
+    {
+        return $this->updateCompany($request, $company);
+    }
+
+    public function destroy(\App\Domains\HRMS\Models\Company $company)
+    {
+        return $this->destroyCompany($company);
+    }
+
+    public function createBusinessUnit()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'business-units']);
+    }
+
+    public function createBranch()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'branches']);
+    }
+
+    public function createDepartment()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'departments']);
+    }
+
+    public function createDesignation()
+    {
+        return redirect()->route('hrms.org.index', ['tab' => 'designations']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Salary Component (delegated to SalaryStructureController)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function storeSalaryComponent(\Illuminate\Http\Request $request)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'pay_group_id' => 'nullable|exists:pay_groups,id',
+            'name'         => 'required|string|max:255',
+            'code'         => 'required|string|max:50',
+            'type'         => 'required|in:earning,deduction',
+            'is_adhoc'     => 'required|boolean',
+            'status'       => 'required|boolean',
+            'description'  => 'nullable|string',
+        ]);
+
+        if (!empty($validated['pay_group_id'])) {
+            $payGroup = \App\Domains\HRMS\Models\PayGroup::find($validated['pay_group_id']);
+            if ($payGroup) {
+                $validated['company_id'] = $payGroup->company_id;
+            }
+        }
+
+        \App\Domains\HRMS\Models\SalaryComponent::create($validated);
+
+        return redirect()->route('hrms.org.index')->with('success', 'Salary component created successfully.');
+    }
+
+    public function updateSalaryComponent(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'code'        => 'required|string|max:50',
+            'type'        => 'required|in:earning,deduction',
+            'is_adhoc'    => 'required|boolean',
+            'status'      => 'required|boolean',
+            'description' => 'nullable|string',
+        ]);
+
+        $salaryComponent->update($validated);
+
+        return redirect()->route('hrms.org.index')->with('success', 'Salary component updated successfully.');
+    }
+
+    public function destroySalaryComponent(\App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
+    {
+        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
+
+        $salaryComponent->delete();
+
+        return redirect()->route('hrms.org.index')->with('success', 'Salary component deleted successfully.');
+    }
 }
+

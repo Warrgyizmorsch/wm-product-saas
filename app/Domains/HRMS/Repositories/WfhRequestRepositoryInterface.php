@@ -12,4 +12,6 @@ interface WfhRequestRepositoryInterface
     public function storeWfhRequest(array $validated, Request $request): WfhRequest;
 
     public function updateStatus(WfhRequest $wfhRequest, array $validated, Request $request): bool;
+
+    public function cancelWfhRequest(WfhRequest $wfhRequest): void;
 }

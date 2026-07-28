@@ -2,9 +2,9 @@
 
 namespace App\Domains\HRMS\Controllers;
 
+use App\Domains\HRMS\Helpers\SessionConflictChecker;
 use App\Domains\HRMS\Models\Employee;
 use App\Domains\HRMS\Models\LeaveRequest;
-use App\Domains\HRMS\Models\WfhRequest;
 use App\Domains\HRMS\Repositories\LeaveRequestRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
@@ -41,11 +41,11 @@ class LeaveRequestController extends Controller
         ]);
 
         // Calculate duration server-side from dates + session types
-        $startDate    = Carbon::parse($validated['start_date']);
-        $endDate      = Carbon::parse($validated['end_date']);
-        $startType    = $validated['start_date_type'] ?? 'full_day';
-        $endType      = $validated['end_date_type']   ?? 'full_day';
-        $duration     = 0;
+        $startDate = Carbon::parse($validated['start_date']);
+        $endDate   = Carbon::parse($validated['end_date']);
+        $startType = $validated['start_date_type'] ?? 'full_day';
+        $endType   = $validated['end_date_type']   ?? 'full_day';
+        $duration  = 0;
 
         if ($startDate->isSameDay($endDate)) {
             $duration = ($startType === 'full_day') ? 1.0 : 0.5;
@@ -69,69 +69,182 @@ class LeaveRequestController extends Controller
 
         $employee = Employee::findOrFail($validated['employee_id']);
 
-        // Check for duplicate / overlapping Leave requests for this employee
-        $leaveOverlap = LeaveRequest::where('employee_id', $employee->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->where(function ($q) use ($validated) {
-                $q->where('start_date', '<=', $validated['end_date'])
-                  ->where('end_date', '>=', $validated['start_date']);
-            })
-            ->exists();
+        // Session-aware conflict check (covers both Leave & WFH, same employee)
+        $conflict = SessionConflictChecker::hasConflict(
+            employeeId:   $employee->id,
+            newStart:     $startDate,
+            newEnd:       $endDate,
+            newStartType: $startType,
+            newEndType:   $endType
+        );
 
-        if ($leaveOverlap) {
-            return redirect()->back()->withInput()->with('error', 'A Leave application already exists for the selected employee within this date range.');
-        }
-
-        // Check for duplicate / overlapping WFH requests for this employee
-        $wfhOverlap = WfhRequest::where('employee_id', $employee->id)
-            ->whereIn('status', ['pending', 'approved'])
-            ->where(function ($q) use ($validated) {
-                $q->where('start_date', '<=', $validated['end_date'])
-                  ->where('end_date', '>=', $validated['start_date']);
-            })
-            ->exists();
-
-        if ($wfhOverlap) {
-            return redirect()->back()->withInput()->with('error', 'A WFH application already exists for the selected employee within this date range.');
+        if ($conflict) {
+            return redirect()->back()->withInput()->with('error', $conflict);
         }
 
         $validated['company_id'] = $employee->company_id;
 
         $this->leaveRequestRepository->storeLeaveRequest($validated, $request);
 
-        return redirect()->route('hrms.leaves.index')->with('success', __('hrms.leave.app.submitted_successfully'));
+        return redirect()->back()->with('success', __('hrms.leave.app.submitted_successfully'));
     }
 
     public function updateStatus(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
         $user = auth()->user();
-        $isAdmin = $user->hasHrPermission('hr.settings.manage') 
-            || $user->hasHrPermission('hr.leaves.manage') 
+        $isAdmin = $user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
             || !empty($user->role_id);
 
         if (!$isAdmin) {
             return redirect()->back()->with('error', 'Unauthorized action.');
         }
 
+        if ($leaveRequest->status === 'cancelled') {
+            return redirect()->back()->with('error', 'Cannot change the status of a cancelled leave application.');
+        }
+
+        if (!$request->has('action') && $request->has('status')) {
+            $request->merge(['action' => $request->input('status')]);
+        }
+
         $validated = $request->validate([
-            'action' => 'required|in:approved,rejected',
+            'action'           => 'required|in:approved,rejected,pending,unauthorized,unpaid',
             'rejection_reason' => 'nullable|string|max:1000',
         ]);
 
         $this->leaveRequestRepository->updateStatus($leaveRequest, $validated, $request);
 
-        $msg = $validated['action'] === 'approved' ? __('hrms.leave.app.approved_successfully') : __('hrms.leave.app.rejected_successfully');
+        $msg = $validated['action'] === 'approved'
+            ? __('hrms.leave.app.approved_successfully')
+            : __('hrms.leave.app.rejected_successfully');
 
-        return redirect()->route('hrms.leaves.index')->with('success', $msg);
+        return redirect()->back()->with('success', $msg);
     }
 
     public function getRules(Request $request): JsonResponse
     {
-        $employeeId = $request->integer('employee_id');
+        $employeeId  = $request->integer('employee_id');
         $leaveTypeId = $request->integer('leave_type_id');
 
         $rules = $this->leaveRequestRepository->getPolicyRules($employeeId, $leaveTypeId);
 
         return response()->json($rules);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Employee: Withdraw (pending only)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function withdraw(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $user      = auth()->user();
+        $employee  = Employee::where('personal_email', $user?->email)
+            ->orWhere('office_email', $user?->email)
+            ->first();
+
+        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
+            || !empty($user->role_id));
+
+        // Only the owning employee (or admin) can withdraw
+        if (!$isAdmin && (!$employee || $employee->id !== $leaveRequest->employee_id)) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        if (!$leaveRequest->canWithdraw()) {
+            return redirect()->back()->with('error', 'Only pending applications can be withdrawn.');
+        }
+
+        $leaveRequest->delete();
+
+        return redirect()->back()->with('success', 'Leave application withdrawn successfully.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Employee: Request Cancellation (approved only)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function requestCancellation(Request $request, LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $user     = auth()->user();
+        $employee = Employee::where('personal_email', $user?->email)
+            ->orWhere('office_email', $user?->email)
+            ->first();
+
+        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
+            || !empty($user->role_id));
+
+        if (!$isAdmin && (!$employee || $employee->id !== $leaveRequest->employee_id)) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        if (!$leaveRequest->canRequestCancellation()) {
+            return redirect()->back()->with('error', 'Only approved applications can have a cancellation requested.');
+        }
+
+        $validated = $request->validate([
+            'cancellation_reason' => 'required|string|max:1000',
+        ]);
+
+        $leaveRequest->update([
+            'status'              => 'cancellation_requested',
+            'cancellation_reason' => $validated['cancellation_reason'],
+        ]);
+
+        return redirect()->back()->with('success', 'Cancellation request submitted. Awaiting admin approval.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Admin: Approve Cancellation
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function approveCancellation(LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $user    = auth()->user();
+        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
+            || !empty($user->role_id));
+
+        if (!$isAdmin) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        if ($leaveRequest->status !== 'cancellation_requested') {
+            return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
+        }
+
+        // Cancel and restore the leave balance
+        $this->leaveRequestRepository->cancelLeaveRequest($leaveRequest);
+
+        return redirect()->back()->with('success', 'Leave cancellation approved. Balance has been restored.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Admin: Deny Cancellation (revert to approved)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function denyCancellation(LeaveRequest $leaveRequest): RedirectResponse
+    {
+        $user    = auth()->user();
+        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
+            || $user->hasHrPermission('hr.leaves.manage')
+            || !empty($user->role_id));
+
+        if (!$isAdmin) {
+            return redirect()->back()->with('error', 'Unauthorized action.');
+        }
+
+        if ($leaveRequest->status !== 'cancellation_requested') {
+            return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
+        }
+
+        $leaveRequest->update([
+            'status'              => 'approved',
+            'cancellation_reason' => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Cancellation request denied. Application remains approved.');
     }
 }
