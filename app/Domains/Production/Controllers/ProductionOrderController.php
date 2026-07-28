@@ -52,6 +52,10 @@ class ProductionOrderController extends Controller
             $query->where('status', $request->input('status'));
         }
 
+        if ($request->filled('production_mode')) {
+            $query->where('production_mode', $request->input('production_mode'));
+        }
+
         if ($request->filled('start_date')) {
             $query->where('start_date', '>=', $request->input('start_date'));
         }

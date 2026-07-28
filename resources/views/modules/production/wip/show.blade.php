@@ -64,29 +64,29 @@
             <div class="col-md-7">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-transparent border-bottom pt-4 pb-3">
-                        <h5 class="fw-bold mb-0"><i class="feather-info text-primary me-2"></i> WIP Specification</h5>
+                        <h5 class="fw-bold mb-0"><i class="feather-info text-primary me-2"></i> {{ __('production.wip_specification') }}</h5>
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-6">
-                                <span class="text-muted d-block fs-11 uppercase font-semibold">Production Order</span>
+                                <span class="text-muted d-block fs-11 uppercase font-semibold">{{ __('production.production_order') }}</span>
                                 <a href="{{ route('production.orders.show', $wip->production_order_id) }}"
                                     class="fw-bold text-primary">
                                     {{ $wip->order->order_number ?? 'Order #' . $wip->production_order_id }}
                                 </a>
                             </div>
                             <div class="col-6">
-                                <span class="text-muted d-block fs-11 uppercase font-semibold">Batch / Lot Reference</span>
+                                <span class="text-muted d-block fs-11 uppercase font-semibold">{{ __('production.batch_lot_reference') }}</span>
                                 <span
                                     class="fw-semibold text-dark">{{ $wip->batch ? $wip->batch->batch_number : 'Direct Order Lot' }}</span>
                             </div>
                             <div class="col-12 pt-2 border-top">
-                                <span class="text-muted d-block fs-11 uppercase font-semibold">Product Definition</span>
+                                <span class="text-muted d-block fs-11 uppercase font-semibold">{{ __('production.product_definition') }}</span>
                                 <span class="fw-bold text-dark">{{ $wip->product->name }}</span>
                                 <small class="text-muted font-monospace d-block fs-10">{{ $wip->product->sku }}</small>
                             </div>
                             <div class="col-6 pt-2 border-top">
-                                <span class="text-muted d-block fs-11 uppercase font-semibold">Current Process Stage</span>
+                                <span class="text-muted d-block fs-11 uppercase font-semibold">{{ __('production.current_process_stage') }}</span>
                                 <span class="badge bg-soft-primary text-primary px-3 py-1 font-monospace mt-1">
                                     @if($wip->status === 'completed')
                                         Finished Goods (Ready)
@@ -96,7 +96,7 @@
                                 </span>
                             </div>
                             <div class="col-6 pt-2 border-top">
-                                <span class="text-muted d-block fs-11 uppercase font-semibold">Current Work Center</span>
+                                <span class="text-muted d-block fs-11 uppercase font-semibold">{{ __('production.current_work_center') }}</span>
                                 <span class="fw-semibold text-dark">
                                     @if($wip->status === 'completed')
                                         Warehouse Inflow / Stock

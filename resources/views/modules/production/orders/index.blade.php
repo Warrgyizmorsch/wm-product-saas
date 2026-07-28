@@ -261,6 +261,17 @@
                         </div>
 
                         <div class="mb-3">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.production_mode') ?? 'Production Mode' }}</label>
+                            <x-ui.odoo-form-ui type="select" name="production_mode">
+                                <option value="">{{ __('production.all_production_modes') ?? 'All Production Modes' }}</option>
+                                <option value="standard" {{ request('production_mode') === 'standard' ? 'selected' : '' }}>{{ __('production.standard') }}</option>
+                                <option value="batch" {{ request('production_mode') === 'batch' ? 'selected' : '' }}>{{ __('production.batch') }}</option>
+                                <option value="serial" {{ request('production_mode') === 'serial' ? 'selected' : '' }}>{{ __('production.serial') }}</option>
+                                <option value="batch_serial" {{ request('production_mode') === 'batch_serial' ? 'selected' : '' }}>{{ __('production.batch_and_serial') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.scheduled_dates') }}</label>
                             <div class="d-flex gap-2">
                                 <x-ui.odoo-form-ui type="input" name="start_date" value="{{ request('start_date') }}" />

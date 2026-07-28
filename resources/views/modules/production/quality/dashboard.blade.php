@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'Quality Management & Yield | SaaS ERP')
-@section('page-title', 'Quality Management Dashboard')
-@section('breadcrumb', 'Quality Dashboard')
+@section('title', __('production.quality_management_dashboard') . ' | SaaS ERP')
+@section('page-title', __('production.quality_management_dashboard'))
+@section('breadcrumb', __('production.quality_dashboard'))
 
 @section('content')
     <div class="erp-single-panel bg-white p-4 rounded shadow-sm">
@@ -11,36 +11,36 @@
             <div class="col-md-3">
                 <div class="card border border-light shadow-sm text-center">
                     <div class="card-body">
-                        <div class="fs-12 text-muted text-uppercase fw-bold">Total Inspections</div>
+                        <div class="fs-12 text-muted text-uppercase fw-bold">{{ __('production.total_inspections') }}</div>
                         <h2 class="fw-bold text-dark mt-2">{{ number_format($totalInspections) }}</h2>
-                        <span class="badge bg-soft-primary text-primary fs-10 mt-1">All Recorded</span>
+                        <span class="badge bg-soft-primary text-primary fs-10 mt-1">{{ __('production.all_recorded') }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card border border-light shadow-sm text-center">
                     <div class="card-body">
-                        <div class="fs-12 text-muted text-uppercase fw-bold">Pending Inspections</div>
+                        <div class="fs-12 text-muted text-uppercase fw-bold">{{ __('production.pending_inspections') }}</div>
                         <h2 class="fw-bold text-warning mt-2">{{ number_format($pendingInspections) }}</h2>
-                        <span class="badge bg-soft-warning text-warning fs-10 mt-1">Awaiting Audit</span>
+                        <span class="badge bg-soft-warning text-warning fs-10 mt-1">{{ __('production.awaiting_audit') }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card border border-light shadow-sm text-center">
                     <div class="card-body">
-                        <div class="fs-12 text-muted text-uppercase fw-bold">Passed Inspections</div>
+                        <div class="fs-12 text-muted text-uppercase fw-bold">{{ __('production.passed_inspections') }}</div>
                         <h2 class="fw-bold text-success mt-2">{{ number_format($passedInspections) }}</h2>
-                        <span class="badge bg-soft-success text-success fs-10 mt-1">Met Acceptance</span>
+                        <span class="badge bg-soft-success text-success fs-10 mt-1">{{ __('production.met_acceptance') }}</span>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card border border-light shadow-sm text-center">
                     <div class="card-body">
-                        <div class="fs-12 text-muted text-uppercase fw-bold">Failed Inspections</div>
+                        <div class="fs-12 text-muted text-uppercase fw-bold">{{ __('production.failed_inspections') }}</div>
                         <h2 class="fw-bold text-danger mt-2">{{ number_format($failedInspections) }}</h2>
-                        <span class="badge bg-soft-danger text-danger fs-10 mt-1">Defects Found</span>
+                        <span class="badge bg-soft-danger text-danger fs-10 mt-1">{{ __('production.defects_found') }}</span>
                     </div>
                 </div>
             </div>
