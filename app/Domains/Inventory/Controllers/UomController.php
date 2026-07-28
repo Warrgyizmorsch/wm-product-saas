@@ -4,15 +4,19 @@ namespace App\Domains\Inventory\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\Inventory\Models\Uom;
+use App\Domains\Inventory\Repositories\UomRepository;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class UomController extends Controller
 {
+    public function __construct(
+        protected UomRepository $uomRepo
+    ) {}
+
     public function quickCreate(Request $request): JsonResponse
     {
         $this->authorize('create', Uom::class);
-
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $validated = $request->validate([
@@ -29,7 +33,7 @@ class UomController extends Controller
             ],
         ]);
 
-        $uom = Uom::create([
+        $uom = $this->uomRepo->create([
             'tenant_id' => $tenantId,
             'name' => $validated['name'],
             'code' => $validated['code'],

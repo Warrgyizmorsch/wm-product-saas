@@ -5,6 +5,9 @@ use App\Domains\Purchase\Controllers\PurchaseRequisitionController;
 use App\Domains\Purchase\Controllers\PurchaseRfqController;
 use App\Domains\Purchase\Controllers\PurchaseOrderController;
 use App\Domains\Purchase\Controllers\GoodsReceiptNoteController;
+use App\Domains\Purchase\Controllers\PurchaseAdvancePaymentController;
+use App\Domains\Purchase\Controllers\VendorBillController;
+use App\Domains\Purchase\Controllers\VendorPaymentController;
 
 Route::prefix('purchase')
     ->as('purchase.')
@@ -35,7 +38,7 @@ Route::prefix('purchase')
         Route::get('orders/{order}/download', [PurchaseOrderController::class, 'downloadPdf'])->name('orders.download');
         Route::get('orders/{order}/po-detail-partial', [PurchaseOrderController::class, 'poDetailPartial'])->name('orders.po-detail-partial');
         Route::get('po-approvals', [PurchaseOrderController::class, 'poApprovals'])->name('po-approvals.index');
-        Route::post('orders/advance-payments', [\App\Domains\Purchase\Controllers\PurchaseAdvancePaymentController::class, 'store'])->name('orders.advance-payments.store');
+        Route::post('orders/advance-payments', [PurchaseAdvancePaymentController::class, 'store'])->name('orders.advance-payments.store');
         Route::match(['get', 'post'], 'orders/create', [PurchaseOrderController::class, 'create'])->name('orders.create');
         Route::resource('orders', PurchaseOrderController::class);
 
@@ -45,7 +48,9 @@ Route::prefix('purchase')
         Route::get('grns/{grn}/download', [GoodsReceiptNoteController::class, 'downloadPdf'])->name('grns.download');
         Route::resource('grns', GoodsReceiptNoteController::class);
 
-        Route::resource('bills', \App\Domains\Purchase\Controllers\VendorBillController::class);
-        Route::resource('payments', \App\Domains\Purchase\Controllers\VendorPaymentController::class);
+        Route::post('bills/{bill}/apply-advance', [VendorBillController::class, 'applyAdvance'])->name('bills.apply-advance');
+        Route::resource('bills', VendorBillController::class);
+        Route::resource('payments', VendorPaymentController::class);
+        Route::resource('advances', PurchaseAdvancePaymentController::class);
+        Route::resource('advance-payments', PurchaseAdvancePaymentController::class);
     });
-

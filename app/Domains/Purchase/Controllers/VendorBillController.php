@@ -3,197 +3,163 @@
 namespace App\Domains\Purchase\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Domains\Purchase\Models\VendorBill;
-use App\Domains\Purchase\Models\VendorBillItem;
+use App\Domains\Purchase\Repositories\VendorBillRepository;
+use App\Domains\Purchase\Services\VendorBillService;
 use App\Domains\Purchase\Models\GoodsReceiptNote;
+use App\Domains\Purchase\Models\PurchaseOrder;
 use App\Domains\Inventory\Models\Vendor;
-use App\Domains\Accounting\Services\JournalService;
-use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
+use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class VendorBillController extends Controller
 {
     public function __construct(
-        private readonly JournalService $journals,
-        private readonly ChartOfAccountRepositoryInterface $accounts,
-    ) {
-    }
+        protected VendorBillRepository $billRepo,
+        protected VendorBillService $billService
+    ) {}
 
-    /**
-     * List all Vendor Bills
-     */
     public function index(Request $request)
     {
-        $tenantId = require_tenant_id();
-
-        $query = VendorBill::where('tenant_id', $tenantId)
-            ->with(['vendor', 'goodsReceiptNote', 'purchaseOrder']);
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('bill_number', 'like', "%{$search}%")
-                  ->orWhere('vendor_invoice_number', 'like', "%{$search}%")
-                  ->orWhereHas('vendor', function ($vq) use ($search) {
-                      $vq->where('name', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        $bills = $query->latest()->paginate(15);
-
+        $bills = $this->billRepo->getPaginatedBills($request->all(), 10);
         return view('modules.purchase.bills.index', compact('bills'));
     }
 
-    /**
-     * Create Bill Screen - Strictly Requires an Approved Goods Receipt Note (GRN)
-     */
     public function create(Request $request)
     {
         $tenantId = require_tenant_id();
 
-        if (!$request->filled('grn_id')) {
-            return redirect()->route('purchase.grns.index')->with('error', 'Vendor Bill can ONLY be generated from an Approved Goods Receipt Note (GRN). Please select an Approved GRN.');
+        $grnId = $request->query('grn_id');
+        $poId = $request->query('purchase_order_id');
+
+        $selectedGrn = null;
+        if ($grnId) {
+            $selectedGrn = GoodsReceiptNote::where('tenant_id', $tenantId)
+                ->with(['purchaseOrder', 'vendor', 'items.product', 'items.purchaseOrderItem'])
+                ->find($grnId);
         }
 
-        $selectedGrn = GoodsReceiptNote::where('tenant_id', $tenantId)
-            ->where('status', 'Approved')
-            ->with(['items.product', 'vendor', 'purchaseOrder'])
-            ->findOrFail($request->grn_id);
+        if (!$selectedGrn && $poId) {
+            $selectedGrn = GoodsReceiptNote::where('tenant_id', $tenantId)
+                ->where('purchase_order_id', $poId)
+                ->whereIn('status', ['Approved', 'Completed'])
+                ->with(['purchaseOrder', 'vendor', 'items.product', 'items.purchaseOrderItem'])
+                ->latest()
+                ->first();
+        }
 
-        $vendors = Vendor::where('tenant_id', $tenantId)->get();
+        if (!$selectedGrn) {
+            $selectedGrn = GoodsReceiptNote::where('tenant_id', $tenantId)
+                ->whereIn('status', ['Approved', 'Completed'])
+                ->with(['purchaseOrder', 'vendor', 'items.product', 'items.purchaseOrderItem'])
+                ->latest()
+                ->first();
+        }
 
-        return view('modules.purchase.bills.create', compact('vendors', 'selectedGrn'));
+        if (!$selectedGrn) {
+            return redirect()->route('purchase.grns.index')
+                ->with('error', 'No Approved Goods Receipt Note found to create a bill.');
+        }
+
+        $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
+        $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
+        $availableAdvance = $selectedGrn ? $this->billService->getAvailableVendorAdvance($selectedGrn->vendor_id, $tenantId) : 0.0;
+
+        return view('modules.purchase.bills.create', compact('selectedGrn', 'vendors', 'warehouses', 'availableAdvance'));
     }
 
-    /**
-     * Store Vendor Bill generated from Approved GRN and post Journal Entry
-     */
     public function store(Request $request)
     {
         $tenantId = require_tenant_id();
 
-        $request->validate([
-            'goods_receipt_note_id' => 'required|exists:goods_receipt_notes,id',
-            'vendor_id' => 'required|exists:vendors,id',
+        $validated = $request->validate([
             'bill_date' => 'required|date',
-            'due_date' => 'nullable|date',
-            'vendor_invoice_number' => 'nullable|string|max:100',
+            'due_date' => 'required|date|after_or_equal:bill_date',
+            'purchase_order_id' => 'nullable|integer',
+            'goods_receipt_note_id' => 'nullable|integer',
+            'vendor_id' => 'required|integer|exists:vendors,id',
+            'vendor_bill_number' => 'nullable|string|max:255',
+            'vendor_invoice_number' => 'nullable|string|max:255',
+            'use_vendor_advance' => 'nullable|boolean',
+            'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'nullable|exists:products,id',
-            'items.*.quantity' => 'required|numeric|min:0.001',
-            'items.*.unit_rate' => 'required|numeric|min:0',
+            'items.*.product_id' => 'nullable|integer',
+            'items.*.purchase_order_item_id' => 'nullable|integer',
+            'items.*.quantity' => 'required|numeric|min:0.0001',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.unit_rate' => 'nullable|numeric|min:0',
+            'items.*.tax_rate' => 'nullable|numeric|min:0',
         ]);
 
-        $grn = GoodsReceiptNote::where('tenant_id', $tenantId)
-            ->where('status', 'Approved')
-            ->findOrFail($request->goods_receipt_note_id);
+        if (empty($validated['vendor_bill_number']) && !empty($validated['vendor_invoice_number'])) {
+            $validated['vendor_bill_number'] = $validated['vendor_invoice_number'];
+        }
 
-        $count = VendorBill::where('tenant_id', $tenantId)->count() + 1;
-        $billNumber = 'BILL-' . date('Y') . '-' . str_pad($count, 6, '0', STR_PAD_LEFT);
+        $bill = $this->billService->storeBill($validated, $tenantId);
 
-        DB::transaction(function () use ($tenantId, $request, $grn, $billNumber, &$bill) {
-            $subtotal = 0;
-            foreach ($request->items as $itemData) {
-                $qty = (float) $itemData['quantity'];
-                $rate = (float) $itemData['unit_rate'];
-                $subtotal += ($qty * $rate);
-            }
-
-            $taxAmount = (float) ($request->tax_amount ?? 0);
-            $grandTotal = $subtotal + $taxAmount;
-
-            $bill = VendorBill::create([
-                'tenant_id' => $tenantId,
-                'bill_number' => $billNumber,
-                'vendor_invoice_number' => $request->vendor_invoice_number,
-                'goods_receipt_note_id' => $grn->id,
-                'purchase_order_id' => $grn->purchase_order_id,
-                'vendor_id' => $request->vendor_id,
-                'bill_date' => $request->bill_date,
-                'due_date' => $request->due_date ?: date('Y-m-d', strtotime('+30 days')),
-                'status' => 'Posted',
-                'subtotal' => $subtotal,
-                'tax_amount' => $taxAmount,
-                'grand_total' => $grandTotal,
-                'paid_amount' => 0,
-                'due_amount' => $grandTotal,
-                'notes' => $request->notes,
-                'created_by' => auth()->id(),
-            ]);
-
-            foreach ($request->items as $itemData) {
-                $qty = (float) $itemData['quantity'];
-                $rate = (float) $itemData['unit_rate'];
-                $lineTotal = $qty * $rate;
-
-                VendorBillItem::create([
-                    'tenant_id' => $tenantId,
-                    'vendor_bill_id' => $bill->id,
-                    'product_id' => $itemData['product_id'] ?? null,
-                    'goods_receipt_note_item_id' => $itemData['goods_receipt_note_item_id'] ?? null,
-                    'quantity' => $qty,
-                    'unit_rate' => $rate,
-                    'total_amount' => $lineTotal,
-                ]);
-            }
-
-            // Post directly to global Accounting JournalService (Dr: GRNI 2100, Cr: Accounts Payable 2000)
-            try {
-                $grniAccount = $this->accounts->findByCode('2100', $tenantId) 
-                            ?? $this->accounts->findByCode('1400', $tenantId);
-
-                $payableAccount = $this->accounts->findByCode('2000', $tenantId) 
-                               ?? $this->accounts->findByCode('2100', $tenantId);
-
-                if ($grniAccount && $payableAccount) {
-                    $grnNo = $grn->grn_number;
-                    $invNo = $bill->vendor_invoice_number ?: $bill->bill_number;
-
-                    $this->journals->post([
-                        [
-                            'chart_of_account_id' => $grniAccount->id,
-                            'debit' => $grandTotal,
-                            'description' => "Clear GRNI liability for Bill {$bill->bill_number} (GRN: {$grnNo})",
-                        ],
-                        [
-                            'chart_of_account_id' => $payableAccount->id,
-                            'credit' => $grandTotal,
-                            'description' => "Accounts Payable Vendor Invoice {$invNo}",
-                        ],
-                    ], [
-                        'tenant_id' => $tenantId,
-                        'source' => 'purchase',
-                        'reference_type' => VendorBill::class,
-                        'reference_id' => $bill->id,
-                        'memo' => "Vendor Bill {$bill->bill_number} against GRN {$grnNo}",
-                    ]);
-                }
-            } catch (\Throwable $e) {
-                Log::error('Accounting Journal Posting Exception on Vendor Bill: ' . $e->getMessage());
-            }
-        });
-
-        return redirect()->route('purchase.bills.show', $bill->id)->with('success', "Vendor Bill {$bill->bill_number} posted from GRN {$grn->grn_number} successfully!");
+        return redirect()->route('purchase.bills.show', $bill->id)
+            ->with('success', "Vendor Bill {$bill->bill_number} created successfully.");
     }
 
-    /**
-     * Show Vendor Bill Details & Allocations
-     */
-    public function show($id)
+    public function show(int $id)
     {
         $tenantId = require_tenant_id();
+        $bill = $this->billRepo->findWithDetails($id);
+        $availableAdvance = $bill ? $this->billService->getAvailableVendorAdvance($bill->vendor_id, $tenantId) : 0.0;
+        return view('modules.purchase.bills.show', compact('bill', 'availableAdvance'));
+    }
 
-        $bill = VendorBill::where('tenant_id', $tenantId)
-            ->with(['vendor', 'goodsReceiptNote', 'purchaseOrder', 'items.product', 'allocations.payment', 'creator'])
-            ->findOrFail($id);
+    public function applyAdvance(int $id)
+    {
+        $tenantId = require_tenant_id();
+        $bill = $this->billRepo->find($id);
+        if (!$bill) abort(404);
 
-        return view('modules.purchase.bills.show', compact('bill'));
+        $res = $this->billService->applyAdvanceCredit($bill, $tenantId);
+        if ($res) {
+            return redirect()->route('purchase.bills.show', $id)
+                ->with('success', 'Vendor Advance Credit applied successfully!');
+        }
+
+        return redirect()->route('purchase.bills.show', $id)
+            ->with('error', 'No available vendor advance credit found to apply.');
+    }
+
+    public function edit(int $id)
+    {
+        $bill = $this->billRepo->findWithDetails($id);
+        return view('modules.purchase.bills.edit', compact('bill'));
+    }
+
+    public function update(Request $request, int $id)
+    {
+        $bill = $this->billRepo->find($id);
+        if (!$bill) abort(404);
+
+        $validated = $request->validate([
+            'due_date' => 'required|date',
+            'notes' => 'nullable|string',
+        ]);
+
+        $this->billRepo->update($bill, $validated);
+
+        return redirect()->route('purchase.bills.show', $id)
+            ->with('success', 'Vendor bill updated successfully.');
+    }
+
+    public function destroy(int $id)
+    {
+        $bill = $this->billRepo->find($id);
+        if (!$bill) abort(404);
+
+        $bill->delete();
+
+        return redirect()->route('purchase.bills.index')
+            ->with('success', 'Vendor bill deleted successfully.');
+    }
+
+    public function detailPartial(int $id)
+    {
+        $bill = $this->billRepo->findWithDetails($id);
+        return view('modules.purchase.bills.detail-partial', compact('bill'));
     }
 }

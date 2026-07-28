@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Concerns\BelongsToTenant;
+use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\Warehouse;
 
 class SalesOrderItem extends Model
 {
@@ -43,12 +45,12 @@ class SalesOrderItem extends Model
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'product_id');
+        return $this->belongsTo(Product::class, 'product_id');
     }
 
     public function warehouse(): BelongsTo
     {
-        return $this->belongsTo(\App\Domains\Inventory\Models\Warehouse::class, 'warehouse_id');
+        return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 
     protected static function booted(): void

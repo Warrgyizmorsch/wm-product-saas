@@ -89,6 +89,7 @@ return [
     'item_name' => 'Item Name',
     'sku' => 'SKU',
     'unit' => 'Unit',
+    'select_unit' => 'Select Unit...',
     'material_type' => 'Material Type',
     'finished_good_std' => 'Finished Good (Standard Sales/Assembly)',
     'semi_finished_comp' => 'Semi-Finished Good (Assembly Components)',

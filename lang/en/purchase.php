@@ -44,6 +44,7 @@ return [
     'warehouse' => 'Warehouse',
     'status_draft' => 'Draft',
     'status_approved' => 'Approved',
+    'status_completed' => 'Approved',
     'status_cancelled' => 'Cancelled',
     'status_pending' => 'Pending',
     'status_rejected' => 'Rejected',

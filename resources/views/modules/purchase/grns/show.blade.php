@@ -222,38 +222,33 @@
                     <div class="d-flex align-items-center py-2">
                         <h5 class="fw-bold text-dark mb-0 me-3 fs-16">{{ $grn->grn_number }}</h5>
                         @php
+                            $statusLabel = match($grn->status) {
+                                'Draft' => 'Draft',
+                                'Approved', 'Completed' => 'Approved',
+                                'Cancelled' => 'Cancelled',
+                                default => $grn->status,
+                            };
                             $badgeClass = match($grn->status) {
                                 'Draft' => 'bg-soft-warning text-warning',
-                                'Approved' => 'bg-soft-success text-success',
+                                'Approved', 'Completed' => 'bg-soft-success text-success',
                                 'Cancelled' => 'bg-soft-danger text-danger',
                                 default => 'bg-soft-secondary text-secondary',
                             };
                         @endphp
-                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ __('purchase.status_' . strtolower($grn->status)) }}</span>
+                        <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $statusLabel }}</span>
                     </div>
 
                     <!-- Chevron Status Pipeline -->
                     <div class="so-status-pipeline my-2 d-print-none">
                         @php
-                            $statuses = ['Draft' => 'Draft', 'Approved' => 'Received'];
+                            $statuses = ['Approved' => 'Approved'];
                             if ($grn->status === 'Cancelled') {
                                 $statuses['Cancelled'] = 'Cancelled';
                             }
-                            $keys = array_keys($statuses);
-                            $currentIndex = array_search($grn->status, $keys);
                         @endphp
                         @foreach($statuses as $key => $label)
-                            @php
-                                $stepIndex = array_search($key, $keys);
-                                $stepClass = '';
-                                if ($grn->status === $key) {
-                                    $stepClass = 'active';
-                                } elseif ($currentIndex !== false && $stepIndex < $currentIndex) {
-                                    $stepClass = 'completed';
-                                }
-                            @endphp
-                            <span class="pipeline-step {{ $stepClass }}">
-                                {{ __('purchase.status_' . strtolower(str_replace(' ', '_', $key))) }}
+                            <span class="pipeline-step active">
+                                {{ $label }}
                             </span>
                         @endforeach
                     </div>
@@ -311,24 +306,32 @@
                                 </thead>
                                 <tbody>
                                     @php
-                                        $totRec = 0; $totRej = 0; $totAcc = 0; $totAmt = 0;
-                                        $groupedItems = $grn->items->groupBy('product_id')->map(function($items) {
-                                            $first = $items->first();
-                                            return (object) [
-                                                'id' => $first->id,
-                                                'product' => $first->product,
-                                                'product_id' => $first->product_id,
-                                                'ordered_qty' => $items->sum('ordered_qty'),
-                                                'previous_received_qty' => $items->sum('previous_received_qty'),
-                                                'received_qty' => $items->sum('received_qty'),
-                                                'rejected_qty' => $items->sum('rejected_qty'),
-                                                'accepted_qty' => $items->sum('accepted_qty'),
-                                                'unit_rate' => $first->unit_rate,
-                                                'total_amount' => $items->sum('total_amount'),
-                                                'remarks' => $items->pluck('remarks')->filter()->implode(', '),
-                                            ];
-                                        })->values();
-                                    @endphp
+                                         $totRec = 0; $totRej = 0; $totAcc = 0; $totAmt = 0;
+                                         $groupedItems = $grn->items->groupBy('product_id')->map(function($items) {
+                                             $first = $items->first();
+                                             $poQty = (float)($first->purchaseOrderItem?->quantity ?? 0);
+                                             $poPrevRec = (float)($first->purchaseOrderItem?->received_qty ?? 0) - $items->sum('received_qty');
+                                             $ordQty = $items->sum('ordered_qty') > 0 ? $items->sum('ordered_qty') : $poQty;
+                                             $prevRecQty = $items->sum('previous_received_qty') > 0 ? $items->sum('previous_received_qty') : max(0, $poPrevRec);
+                                             $rate = (float)($first->unit_rate ?: ($first->purchaseOrderItem?->rate ?? 0));
+                                             $accQty = $items->sum('accepted_qty');
+                                             $tot = $items->sum('total_amount') > 0 ? $items->sum('total_amount') : round($accQty * $rate, 2);
+
+                                             return (object) [
+                                                 'id' => $first->id,
+                                                 'product' => $first->product,
+                                                 'product_id' => $first->product_id,
+                                                 'ordered_qty' => $ordQty,
+                                                 'previous_received_qty' => $prevRecQty,
+                                                 'received_qty' => $items->sum('received_qty'),
+                                                 'rejected_qty' => $items->sum('rejected_qty'),
+                                                 'accepted_qty' => $accQty,
+                                                 'unit_rate' => $rate,
+                                                 'total_amount' => $tot,
+                                                 'remarks' => $items->pluck('remarks')->filter()->implode(', '),
+                                             ];
+                                         })->values();
+                                     @endphp
                                     @foreach($groupedItems as $idx => $item)
                                         @php
                                             $totRec += (float)$item->received_qty;

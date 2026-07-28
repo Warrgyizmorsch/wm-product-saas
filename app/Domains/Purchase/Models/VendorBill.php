@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VendorBill extends BaseModel
@@ -19,6 +20,7 @@ class VendorBill extends BaseModel
         'tenant_id',
         'bill_number',
         'vendor_invoice_number',
+        'vendor_bill_number',
         'goods_receipt_note_id',
         'purchase_order_id',
         'vendor_id',
@@ -28,6 +30,7 @@ class VendorBill extends BaseModel
         'subtotal',
         'tax_amount',
         'grand_total',
+        'total_amount',
         'paid_amount',
         'due_amount',
         'notes',
@@ -40,6 +43,7 @@ class VendorBill extends BaseModel
         'subtotal' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'grand_total' => 'decimal:2',
+        'total_amount' => 'decimal:2',
         'paid_amount' => 'decimal:2',
         'due_amount' => 'decimal:2',
     ];
@@ -47,6 +51,13 @@ class VendorBill extends BaseModel
     public function items(): HasMany
     {
         return $this->hasMany(VendorBillItem::class, 'vendor_bill_id');
+    }
+
+    public function payments(): BelongsToMany
+    {
+        return $this->belongsToMany(VendorPayment::class, 'vendor_payment_allocations', 'vendor_bill_id', 'vendor_payment_id')
+            ->withPivot('allocated_amount')
+            ->withTimestamps();
     }
 
     public function allocations(): HasMany
@@ -72,5 +83,10 @@ class VendorBill extends BaseModel
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function getTotalAmountAttribute(): float
+    {
+        return (float)($this->attributes['grand_total'] ?? $this->attributes['total_amount'] ?? 0);
     }
 }

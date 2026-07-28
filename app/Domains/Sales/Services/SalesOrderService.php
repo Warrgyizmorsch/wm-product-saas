@@ -4,6 +4,9 @@ namespace App\Domains\Sales\Services;
 
 use App\Domains\Sales\Models\SalesOrder;
 use App\Domains\Sales\Repositories\SalesOrderRepository;
+use App\Domains\Inventory\Models\Product;
+use App\Domains\CRM\Models\Quotation;
+use App\Domains\CRM\Models\Lead;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -71,7 +74,7 @@ class SalesOrderService
 
                 $itemName = $item['item_name'] ?? 'Product/Service';
                 if ($productId) {
-                    $product = \App\Domains\Inventory\Models\Product::find($productId);
+                    $product = Product::find($productId);
                     if ($product) {
                         $itemName = $product->name;
                     }
@@ -103,11 +106,11 @@ class SalesOrderService
             $salesOrder->items()->createMany($itemsData);
 
             if (!empty($data['quotation_id'])) {
-                $quotation = \App\Domains\CRM\Models\Quotation::find($data['quotation_id']);
+                $quotation = Quotation::find($data['quotation_id']);
                 if ($quotation) {
                     $quotation->update(['status' => 'Converted']);
                     if ($quotation->lead_id) {
-                        $lead = \App\Domains\CRM\Models\Lead::find($quotation->lead_id);
+                        $lead = Lead::find($quotation->lead_id);
                         if ($lead) {
                             $lead->update([
                                 'status' => 'Converted',
@@ -145,7 +148,7 @@ class SalesOrderService
 
                 $itemName = $item['item_name'] ?? 'Product/Service';
                 if ($productId) {
-                    $product = \App\Domains\Inventory\Models\Product::find($productId);
+                    $product = Product::find($productId);
                     if ($product) {
                         $itemName = $product->name;
                     }

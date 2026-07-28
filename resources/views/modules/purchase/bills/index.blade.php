@@ -95,10 +95,22 @@
                 <tbody>
                     @forelse($bills as $bill)
                         @php
-                            $badgeClass = 'warning';
-                            if ($bill->status === 'Paid') $badgeClass = 'success';
-                            elseif ($bill->status === 'Partially Paid') $badgeClass = 'info';
-                            elseif ($bill->status === 'Posted') $badgeClass = 'primary';
+                            $statusText = match($bill->status) {
+                                'Paid' => 'Paid',
+                                'Partially Paid' => 'Partially Paid',
+                                'Unpaid' => 'Unpaid',
+                                'Posted' => 'Posted',
+                                'Cancelled' => 'Cancelled',
+                                default => $bill->status,
+                            };
+                            $badgeClass = match($bill->status) {
+                                'Paid' => 'success',
+                                'Partially Paid' => 'info',
+                                'Unpaid' => 'danger',
+                                'Posted', 'Draft' => 'warning',
+                                'Cancelled' => 'secondary',
+                                default => 'secondary',
+                            };
                         @endphp
                         <tr>
                             <td>
@@ -115,7 +127,7 @@
                             <td>{{ $bill->due_date ? $bill->due_date->format('d-M-Y') : '—' }}</td>
                             <td class="text-center">
                                 <span class="badge bg-soft-{{ $badgeClass }} text-{{ $badgeClass }} px-2.5 py-1 fs-11 fw-bold">
-                                    {{ __('purchase.status_' . strtolower(str_replace(' ', '_', $bill->status))) }}
+                                    {{ $statusText }}
                                 </span>
                             </td>
                             <td class="text-end font-monospace fw-bold text-dark">₹{{ number_format($bill->grand_total, 2) }}</td>

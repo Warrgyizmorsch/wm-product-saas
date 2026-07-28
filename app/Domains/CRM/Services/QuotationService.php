@@ -3,18 +3,20 @@
 namespace App\Domains\CRM\Services;
 
 use App\Domains\CRM\Models\Quotation;
+use App\Domains\CRM\Models\Lead;
+use App\Domains\CRM\Models\Customer;
+use App\Domains\CRM\Models\LeadHistory;
 use App\Domains\CRM\Repositories\QuotationRepository;
+use App\Domains\Inventory\Models\Product;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Collection;
-use App\Domains\Inventory\Models\Product;
 
 class QuotationService
 {
     public function __construct(
         private readonly QuotationRepository $quotations,
-    ) {
-    }
+    ) {}
 
     public function latest(): Collection
     {
@@ -50,12 +52,10 @@ class QuotationService
     public function create(array $data, array $items): Quotation
     {
         return DB::transaction(function () use ($data, $items) {
-            // Check if quotation number is provided or fallback
             if (empty($data['quotation_number'])) {
                 $data['quotation_number'] = $this->getNextQuotationNumber();
             }
 
-            // Calculate totals
             $subtotal = 0;
             $tax = 0;
             $itemsData = [];
@@ -100,10 +100,7 @@ class QuotationService
             $data['is_current'] = true;
             $data['revision_number'] = 0;
 
-            // Save Quotation
             $quotation = $this->quotations->create($data);
-
-            // Save Items
             $quotation->items()->createMany($itemsData);
 
             return $quotation;
@@ -115,7 +112,6 @@ class QuotationService
         return DB::transaction(function () use ($quotation, $data, $items) {
             $rootParentId = $quotation->parent_id ?: $quotation->id;
 
-            // Get max revision number for this group
             $latestRevision = Quotation::query()
                 ->where(function ($query) use ($rootParentId) {
                     $query->where('parent_id', $rootParentId)
@@ -124,13 +120,10 @@ class QuotationService
                 ->max('revision_number') ?? 0;
 
             $newRevisionNumber = $latestRevision + 1;
-
-            // Extract base number
             $rawNum = $quotation->getRawOriginal('quotation_number');
             $baseNum = explode('-R', $rawNum)[0];
             $newQuotationNumber = $baseNum . '-R' . $newRevisionNumber;
 
-            // Calculate totals
             $subtotal = 0;
             $tax = 0;
             $itemsData = [];
@@ -169,7 +162,6 @@ class QuotationService
             $discount = floatval($data['discount'] ?? 0);
             $totalAmount = $subtotal + $tax - $discount;
 
-            // Prepare active revision data
             $revData = [
                 'tenant_id' => $quotation->tenant_id,
                 'lead_id' => $data['lead_id'] ?? $quotation->lead_id,
@@ -189,7 +181,6 @@ class QuotationService
                 'is_current' => true,
             ];
 
-            // Mark all older revisions as inactive
             Quotation::query()
                 ->where(function ($query) use ($rootParentId) {
                     $query->where('parent_id', $rootParentId)
@@ -197,18 +188,55 @@ class QuotationService
                 })
                 ->update(['is_current' => false]);
 
-            // Save new active Quotation revision
             $newQuotation = $this->quotations->create($revData);
-
-            // Save new items
             $newQuotation->items()->createMany($itemsData);
 
             return $newQuotation;
         });
     }
 
+    public function handleQuotationStatusChange(Quotation $quotation, string $status, ?int $leadId = null): void
+    {
+        if ($status === 'Accepted') {
+            $customer = $quotation->customer;
+            
+            if (!$customer) {
+                $lead = null;
+                if ($leadId) {
+                    $lead = Lead::find($leadId);
+                }
+                if (!$lead && $quotation->lead_id) {
+                    $lead = Lead::find($quotation->lead_id);
+                }
+
+                if ($lead) {
+                    if ($lead->email) {
+                        $customer = Customer::where('email', $lead->email)->first();
+                    }
+                    if (!$customer && $lead->phone) {
+                        $customer = Customer::where('phone', $lead->phone)->first();
+                    }
+
+                    if (!$customer) {
+                        Customer::create([
+                            'tenant_id' => $lead->tenant_id,
+                            'name' => $lead->company_name ?: ($lead->contact_person ?: 'Converted Lead'),
+                            'email' => $lead->email,
+                            'phone' => $lead->phone,
+                            'status' => 'active',
+                        ]);
+                    } else {
+                        $customer->update(['status' => 'active']);
+                    }
+                }
+            } else {
+                $customer->update(['status' => 'active']);
+            }
+        }
+    }
+
     public function delete(Quotation $quotation): bool
     {
-        return $quotation->delete();
+        return $this->quotations->delete($quotation);
     }
 }

@@ -123,10 +123,11 @@
                             $recQty = (float)$grn->items->sum('received_qty');
                             $badgeClass = match($grn->status) {
                                 'Draft' => 'bg-soft-warning text-warning',
-                                'Approved' => 'bg-soft-success text-success',
+                                'Approved', 'Completed' => 'bg-soft-success text-success',
                                 'Cancelled' => 'bg-soft-danger text-danger',
                                 default => 'bg-soft-secondary text-secondary',
                             };
+                            $displayStatus = in_array($grn->status, ['Approved', 'Completed']) ? 'Approved' : $grn->status;
                         @endphp
                         <tr>
                             <td class="ps-4 fw-bold font-monospace">
@@ -150,7 +151,7 @@
                             <td>{{ $grn->received_date ? $grn->received_date->format('d-M-Y') : '—' }}</td>
                             <td class="text-center font-monospace fw-bold text-primary">{{ number_format($recQty, 2) }}</td>
                             <td class="text-center">
-                                <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ __('purchase.status_' . strtolower($grn->status)) }}</span>
+                                <span class="badge {{ $badgeClass }} px-2.5 py-1 fw-bold fs-11">{{ $displayStatus }}</span>
                             </td>
                             <td>
                                 <div class="fs-12 fw-semibold text-dark">{{ $grn->creator?->name ?? __('purchase.system') }}</div>

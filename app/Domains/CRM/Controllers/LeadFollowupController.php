@@ -4,15 +4,16 @@ namespace App\Domains\CRM\Controllers;
 
 use App\Domains\CRM\Models\Lead;
 use App\Domains\CRM\Models\LeadFollowup;
+use App\Domains\CRM\Services\LeadFollowupService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 class LeadFollowupController extends Controller
 {
-    /**
-     * Store a newly created lead follow-up.
-     */
+    public function __construct(
+        private readonly LeadFollowupService $followupService
+    ) {}
+
     public function store(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
@@ -24,48 +25,11 @@ class LeadFollowupController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        // Parse Followup Date & Time
-        try {
-            $followupDateTime = Carbon::parse($validated['followup_date']);
-        } catch (\Exception $e) {
-            $followupDateTime = Carbon::now();
-        }
+        $this->followupService->storeFollowup($lead, $validated);
 
-        // Create the followup (BelongsToTenant will auto-inject tenant_id)
-        // Create the followup (BelongsToTenant will auto-inject tenant_id)
-        $followup = LeadFollowup::create([
-            'lead_id' => $lead->id,
-            'followup_date' => $followupDateTime,
-            'type' => $validated['type'],
-            'status' => $validated['status'],
-            'notes' => $validated['notes'],
-        ]);
-
-        // Log history event
-        $eventType = $followup->status === 'Pending' ? 'activity_scheduled' : 'activity_completed';
-        $description = $followup->status === 'Pending' 
-            ? "Scheduled a {$followup->type} activity on " . $followup->followup_date->format('d/m/Y h:i A')
-            : "Logged a {$followup->type} interaction: " . ($followup->notes ?: 'No details');
-
-        \App\Domains\CRM\Models\LeadHistory::logEvent(
-            $lead,
-            $eventType,
-            null,
-            $followup->type,
-            $description
-        );
-
-        // Sync Parent Lead status and next meetup date
-        $this->syncLeadStatusAndFollowupDate($lead);
-
-        return redirect()
-            ->route('crm.leads.show', $lead->id)
-            ->with('success', 'Follow-up successfully scheduled/logged!');
+        return redirect()->route('crm.leads.show', $lead->id)->with('success', 'Follow-up successfully scheduled/logged!');
     }
 
-    /**
-     * Update the specified lead follow-up.
-     */
     public function update(Request $request, LeadFollowup $followup)
     {
         $this->authorize('update', $followup->lead);
@@ -78,138 +42,18 @@ class LeadFollowupController extends Controller
             'is_reschedule' => 'nullable|boolean',
         ]);
 
-        // Check if this is a Reschedule action
-        $isReschedule = !empty($validated['followup_date']) && ($request->boolean('is_reschedule') || $followup->status === 'Pending');
+        $msg = $this->followupService->updateOrReschedule($followup, $validated, $request->boolean('is_reschedule'));
 
-        if ($isReschedule && !empty($validated['followup_date'])) {
-            try {
-                $newFollowupDateTime = Carbon::parse($validated['followup_date']);
-
-                // 1. Mark original followup status as 'Rescheduled'
-                $oldStatus = $followup->status;
-                $followup->update([
-                    'status' => 'Rescheduled',
-                ]);
-
-                // 2. Create NEW followup row with Pending status
-                $newFollowup = LeadFollowup::create([
-                    'lead_id' => $followup->lead_id,
-                    'type' => $validated['type'] ?? $followup->type,
-                    'followup_date' => $newFollowupDateTime,
-                    'status' => 'Pending',
-                    'notes' => $validated['notes'] ?? $followup->notes,
-                    'rescheduled_from_id' => $followup->id,
-                    'original_followup_date' => $followup->original_followup_date ?: $followup->followup_date,
-                ]);
-
-                // 3. Log History Event
-                \App\Domains\CRM\Models\LeadHistory::logEvent(
-                    $followup->lead,
-                    'activity_rescheduled',
-                    $oldStatus,
-                    'Rescheduled',
-                    "Rescheduled {$followup->type} activity from " . $followup->followup_date->format('d/m/Y h:i A') . " to " . $newFollowupDateTime->format('d/m/Y h:i A')
-                );
-
-                $lead = $followup->lead;
-                $this->syncLeadStatusAndFollowupDate($lead);
-
-                return redirect()
-                    ->route('crm.leads.show', $lead->id)
-                    ->with('success', 'Activity successfully rescheduled!');
-            } catch (\Exception $e) {
-                // Fall back to standard update on date parse failure
-            }
-        }
-
-        // Standard update (Completed, Cancelled, etc.)
-        $updateData = [];
-        if (isset($validated['status'])) {
-            $updateData['status'] = $validated['status'];
-        }
-        if (isset($validated['notes'])) {
-            $updateData['notes'] = $validated['notes'];
-        }
-        if (isset($validated['type'])) {
-            $updateData['type'] = $validated['type'];
-        }
-        if (isset($validated['followup_date'])) {
-            try {
-                $updateData['followup_date'] = Carbon::parse($validated['followup_date']);
-            } catch (\Exception $e) {
-                // Ignore invalid date format
-            }
-        }
-
-        $oldStatus = $followup->status;
-        $followup->update($updateData);
-
-        if ($oldStatus !== $followup->status && $followup->status === 'Completed') {
-            \App\Domains\CRM\Models\LeadHistory::logEvent(
-                $followup->lead,
-                'activity_completed',
-                $oldStatus,
-                'Completed',
-                "Marked scheduled {$followup->type} activity (scheduled for " . $followup->followup_date->format('d/m/Y h:i A') . ") as Completed"
-            );
-        }
-
-        // Sync Parent Lead status and next meetup date
-        $lead = $followup->lead;
-        $this->syncLeadStatusAndFollowupDate($lead);
-
-        return redirect()
-            ->route('crm.leads.show', $lead->id)
-            ->with('success', 'Follow-up successfully updated!');
+        return redirect()->route('crm.leads.show', $followup->lead_id)->with('success', $msg);
     }
 
-    /**
-     * Remove the specified lead follow-up.
-     */
     public function destroy(LeadFollowup $followup)
     {
         $this->authorize('update', $followup->lead);
+        $leadId = $followup->lead_id;
 
-        $lead = $followup->lead;
+        $this->followupService->deleteFollowup($followup);
 
-        \App\Domains\CRM\Models\LeadHistory::logEvent(
-            $lead,
-            'activity_deleted',
-            $followup->type,
-            null,
-            "Deleted {$followup->type} activity (scheduled/logged for " . $followup->followup_date->format('d/m/Y h:i A') . ")"
-        );
-
-        $followup->delete();
-
-        // Sync Parent Lead status and next meetup date
-        $this->syncLeadStatusAndFollowupDate($lead);
-
-        return redirect()
-            ->route('crm.leads.show', $lead->id)
-            ->with('success', 'Follow-up successfully deleted!');
-    }
-
-    /**
-     * Recalculate and update the parent lead's status and next meetup date.
-     */
-    protected function syncLeadStatusAndFollowupDate(Lead $lead): void
-    {
-        // Refresh relation to get latest DB state
-        $lead->unsetRelation('followups');
-
-        // Find the next nearest pending followup
-        $nextPending = $lead->followups()
-            ->where('status', 'Pending')
-            ->orderBy('followup_date', 'asc')
-            ->first();
-
-        if ($nextPending) {
-            $lead->next_followup_date = $nextPending->followup_date;
-        } else {
-            $lead->next_followup_date = null;
-        }
-        
-        $lead->save();
+        return redirect()->route('crm.leads.show', $leadId)->with('success', 'Follow-up successfully deleted!');
     }
 }

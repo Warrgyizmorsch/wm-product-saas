@@ -145,17 +145,45 @@
                 color: #212529 !important;
             }
             
-            /* Borderless Select2 theme custom override for Odoo Look in Tables */
-            .odoo-table td .select2-container--bootstrap-5 .select2-selection {
-                border: none !important;
-                border-bottom: 1px solid #ced4da !important;
-                border-radius: 0 !important;
-                background-color: transparent !important;
-                padding-left: 2px !important;
+            /* Prevent OptGroup section header container (e.g. Finished Goods) from turning dark grey */
+            body .select2-results__option[role=group],
+            body .select2-results__option[role=group].select2-results__option--highlighted,
+            body .select2-results__option[role=group]:hover {
+                background-color: #ffffff !important;
+                background: #ffffff !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
-            .odoo-table td .select2-container--bootstrap-5 .select2-selection:hover,
-            .odoo-table td .select2-container--bootstrap-5.select2-container--focus .select2-selection {
-                border-bottom-color: var(--bs-primary) !important;
+
+            /* OptGroup Header label styling - Clean Full Width Header matching Image 2 */
+            body .select2-results__group {
+                display: block !important;
+                width: 100% !important;
+                background-color: #f8fafc !important;
+                background: #f8fafc !important;
+                color: #334155 !important;
+                font-weight: 700 !important;
+                font-size: 12px !important;
+                padding: 8px 14px !important;
+                border-bottom: 1px solid #e2e8f0 !important;
+                cursor: default !important;
+                margin: 0 !important;
+            }
+
+            /* Individual selectable items default style */
+            body .select2-results__option:not([role=group]) {
+                background-color: #ffffff !important;
+                background: #ffffff !important;
+                color: #1e293b !important;
+                padding: 8px 12px !important;
+                font-size: 13px !important;
+            }
+
+            /* ONLY the specific individual item gets dark highlight when mouse hovers over it */
+            body .select2-results__option:not([role=group]).select2-results__option--highlighted {
+                background-color: #333a4d !important;
+                background: #333a4d !important;
+                color: #ffffff !important;
             }
             
             /* Odoo style Table */
@@ -374,6 +402,32 @@
                                 theme: "bootstrap-5",
                                 width: "100%"
                             });
+                        }
+                    });
+
+                    // Dedicated Top Search Box for Multiselect Dropdowns (Matches Image 2 style)
+                    $(document).off('select2:open.multiSearch').on('select2:open.multiSearch', 'select[multiple]', function() {
+                        var $dropdown = $('.select2-dropdown');
+                        if ($dropdown.find('.custom-s2-search').length === 0) {
+                            var $searchBox = $('<div class="custom-s2-search p-2 border-bottom bg-white"><input class="form-control form-control-sm bg-white" type="search" style="border-radius:4px; font-size:13px; border: 1px solid #ced4da; box-shadow:none;"></div>');
+                            $dropdown.prepend($searchBox);
+                            var $input = $searchBox.find('input');
+                            
+                            $input.on('keyup input search', function() {
+                                var val = $(this).val().toLowerCase().trim();
+                                $dropdown.find('.select2-results__option').each(function() {
+                                    var txt = $(this).text().toLowerCase();
+                                    if (txt.indexOf(val) > -1 || val === '') {
+                                        $(this).removeClass('d-none').show();
+                                    } else {
+                                        $(this).addClass('d-none').hide();
+                                    }
+                                });
+                            });
+
+                            setTimeout(function() {
+                                $input.focus();
+                            }, 60);
                         }
                     });
                 }

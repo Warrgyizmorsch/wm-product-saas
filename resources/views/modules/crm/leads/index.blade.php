@@ -33,7 +33,15 @@
         @endif
         <!-- Toolbar: Sort, Filters -->
         <div class="d-flex align-items-center mb-3">
-            <h5 class="fw-bold text-dark mb-0">{{ __('crm.leads_listing') }}</h5>
+            <div class="d-flex align-items-center gap-2">
+                <h5 class="fw-bold text-dark mb-0 me-2">{{ __('crm.leads_listing') }}</h5>
+                <a href="{{ request()->fullUrlWithQuery(['duplicates_only' => null]) }}" class="btn btn-xs {{ !request('duplicates_only') ? 'btn-primary' : 'btn-light border' }}">
+                    All Leads
+                </a>
+                <a href="{{ request()->fullUrlWithQuery(['duplicates_only' => '1']) }}" class="btn btn-xs {{ request('duplicates_only') === '1' ? 'btn-danger text-white' : 'btn-soft-danger text-danger' }}">
+                    <i class="feather-copy me-1"></i>Duplicates View
+                </a>
+            </div>
             <div class="d-flex gap-2 ms-auto">
                 <!-- Custom Sort Component -->
                 <x-ui.sort-dropdown :label="__('crm.sort')">
@@ -51,6 +59,9 @@
                         <span>{{ __('crm.sort_company_name_za') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
+                    <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'duplicates', 'sort_order' => 'asc']) }}" class="dropdown-item {{ $sortBy === 'duplicates' ? 'active' : '' }}">
+                        <span class="text-danger fw-semibold"><i class="feather-copy me-1"></i>Group Side-by-Side Duplicates</span>
+                    </a>
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'expected_amount', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'expected_amount' && $sortOrder === 'desc' ? 'active' : '' }}">
                         <span>{{ __('crm.sort_expected_amount_desc') }}</span>
                     </a>
@@ -166,7 +177,7 @@
                 </thead>
                 <tbody>
                     @forelse ($leads as $lead)
-                        <tr>
+                        <tr class="{{ !empty($lead->is_duplicate) ? 'table-warning bg-soft-warning' : '' }}">
                             <td class="text-center">
                                 <input type="checkbox" class="form-check-input">
                             </td>
@@ -182,7 +193,14 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="fw-bold text-dark d-block mb-1">{{ $lead->company_name }}</span>
+                                <div class="d-flex align-items-center flex-wrap gap-1">
+                                    <span class="fw-bold text-dark d-block mb-1">{{ $lead->company_name }}</span>
+                                    @if(!empty($lead->is_duplicate))
+                                        <span class="badge bg-soft-danger text-danger border border-danger ms-1" style="font-size: 10px;" title="Same {{ $lead->duplicate_reason }} as Lead #{{ $lead->duplicate_of_id }}">
+                                            <i class="feather-copy me-1"></i>Duplicate of #{{ $lead->duplicate_of_id }} ({{ $lead->duplicate_reason }})
+                                        </span>
+                                    @endif
+                                </div>
                                 <span class="text-muted fs-11"><i class="feather-user me-1 fs-10 text-primary"></i>{{ $lead->contact_person ?: 'N/A' }}</span>
                             </td>
                             <td>
@@ -264,15 +282,15 @@
                                                     </option>
                                                 @endforeach
                                             </select>
-                                        </form>
-                                        @if (($lead->status ?: 'New') === 'Qualified' && $lead->getQuotations()->isEmpty())
-                                            <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
-                                                @csrf
-                                                <button type="submit" class="btn btn-xs btn-primary mt-1 w-100 fw-bold py-1 px-1 fs-10">
-                                                    <i class="feather-file-plus me-1"></i>{{ __('crm.convert_to_quotation') }}
-                                                </button>
-                                            </form>
-                                        @endif
+                                         </form>
+                                         @if (($lead->status ?: 'New') === 'Qualified' && $lead->getQuotations()->isEmpty())
+                                             <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
+                                                 @csrf
+                                                 <button type="submit" class="btn btn-xs btn-primary px-2 py-0.5 mt-1 fs-10 fw-semibold text-nowrap" style="border-radius: 4px;" title="Convert to Quotation">
+                                                     <i class="feather-file-plus me-1"></i>Convert Quotation
+                                                 </button>
+                                             </form>
+                                         @endif
                                     </div>
                                 @endif
                             </td>
@@ -286,20 +304,33 @@
                                        </a>
                                    </li>
                            
-                                   {{-- Delete --}}
-                                   <li><hr class="dropdown-divider"></li>
-                                   <li>
-                                       <form action="{{ route('crm.leads.destroy', $lead->id) }}"
-                                             method="POST"
-                                             onsubmit="return confirm('{{ __('crm.confirm_delete_lead') }}');">
-                                           @csrf
-                                           @method('DELETE')
-                           
-                                           <button type="submit" class="dropdown-item text-danger">
-                                               <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('crm.delete_lead') }}
-                                           </button>
-                                       </form>
-                                   </li>
+                                   {{-- Qualify Lead --}}
+                                   @if(($lead->status ?: 'New') !== 'Qualified' && ($lead->status ?: 'New') !== 'Converted')
+                                        <li>
+                                            <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="dropdown-item text-success fw-semibold">
+                                                    <i class="feather-check-circle me-2 text-success fs-12"></i>Qualify (Genuine Lead)
+                                                </button>
+                                            </form>
+                                        </li>
+                                    @endif
+
+                                    {{-- Delete / Reject --}}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form action="{{ route('crm.leads.destroy', $lead->id) }}"
+                                              method="POST"
+                                              onsubmit="return confirm('Reject & delete lead #{{ $lead->id }} ({{ $lead->company_name }}) permanently?');">
+                                            @csrf
+                                            @method('DELETE')
+
+                                            <button type="submit" class="dropdown-item text-danger fw-semibold">
+                                                <i class="feather-x-circle me-2 text-danger fs-12"></i>Reject & Delete Lead
+                                            </button>
+                                        </form>
+                                    </li>
                            
                                </x-ui.action-dropdown>
                             </td>

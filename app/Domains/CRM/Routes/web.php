@@ -21,6 +21,10 @@ Route::prefix('crm')
             ->name('leads.import');
         Route::get('leads/export', [LeadController::class, 'export'])
             ->name('leads.export');
+        Route::post('leads/check-duplicate', [LeadController::class, 'checkDuplicate'])
+            ->name('leads.checkDuplicate');
+        Route::patch('leads/{lead}/qualify', [LeadController::class, 'qualify'])
+            ->name('leads.qualify');
         Route::get('leads/{lead}', [LeadController::class, 'show'])
             ->name('leads.show');
         Route::post('leads', [LeadController::class, 'store'])

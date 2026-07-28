@@ -1,7 +1,7 @@
 @extends('layouts.duralux')
 
-@section('title', __('inventory.create_inventory_item') . ' | SaaS ERP')
-@section('page-title', __('inventory.add_new_item'))
+@section('title', __('inventory.new_inventory_item') . ' | SaaS ERP')
+@section('page-title', __('inventory.new_item'))
 @section('breadcrumb', __('inventory.inventory_items_create'))
 
 @push('styles')
@@ -56,26 +56,26 @@
             cursor: pointer;
             font-weight: bold;
         }
+        .tag-badge .remove-tag:hover {
+            color: #ffc107;
+        }
         .tag-input-container {
             border: 1px solid #ced4da;
-            padding: 4px;
-            background-color: #fff;
-            min-height: 38px;
-            border-radius: 0;
+            background: white;
+            padding: 5px;
+            border-radius: 4px;
             display: flex;
             flex-wrap: wrap;
             align-items: center;
+            min-height: 38px;
         }
-        .tag-input-container input {
+        .tag-input {
             border: none;
             outline: none;
             flex-grow: 1;
             padding: 4px;
             font-size: 13px;
-        }
-        .variants-table-container {
-            max-height: 400px;
-            overflow-y: auto;
+            min-width: 120px;
         }
     </style>
 @endpush
@@ -89,6 +89,23 @@
 @section('content')
     <div class="row">
         <div class="col-12">
+            <!-- Toast Notifications -->
+            @if (session('success'))
+                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
+            @endif
+            @if (session('error'))
+                <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
+            @endif
+            @if ($errors->any())
+                <div class="alert alert-danger mb-3">
+                    <ul class="mb-0">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <!-- Zoho / Odoo Style Flat Form Sheet -->
             <div class="card border-0 shadow-sm p-4 p-md-5 bg-white">
                 <form action="{{ route('inventory.products.store') }}" method="POST" id="productForm" class="odoo-sheet">
@@ -105,22 +122,22 @@
                     <!-- Radio Type Selector in Zoho style -->
                     <div class="custom-radio-group mb-3">
                         <span class="custom-radio-label">{{ __('inventory.item_type') }} <span class="text-danger">*</span></span>
-                        <x-ui.radio name="item_type" value="Goods" :label="__('inventory.goods_physical_product')" :checked="true" />
-                        <x-ui.radio name="item_type" value="Service" :label="__('inventory.service_labor')" />
+                        <x-ui.radio name="item_type" value="Goods" :label="__('inventory.goods_physical_product')" :checked="old('item_type', 'Goods') === 'Goods'" />
+                        <x-ui.radio name="item_type" value="Service" :label="__('inventory.service_labor')" :checked="old('item_type') === 'Service'" />
                     </div>
 
-                    <!-- Radio variation selector (Single vs Variant) -->
-                    <div class="custom-radio-group mb-4" id="variationTypeWrapper">
+                    <!-- Variation type in Zoho style -->
+                    <div class="custom-radio-group mb-4">
                         <span class="custom-radio-label">{{ __('inventory.variation') }} <span class="text-danger">*</span></span>
-                        <x-ui.radio name="variation_type" value="Single" :label="__('inventory.single_item')" :checked="true" />
-                        <x-ui.radio name="variation_type" value="Variant" :label="__('inventory.contains_variants')" />
+                        <x-ui.radio name="variation_type" value="Single" :label="__('inventory.single_item')" :checked="old('variation_type', 'Single') === 'Single'" />
+                        <x-ui.radio name="variation_type" value="Variant" :label="__('inventory.contains_variants')" :checked="old('variation_type') === 'Variant'" />
                     </div>
 
-                    <!-- Supplier Method Selector -->
+                    <!-- Supplier Method Selector in Zoho style -->
                     <div class="custom-radio-group mb-4">
                         <span class="custom-radio-label">{{ __('inventory.supplier_method') }} <span class="text-danger">*</span></span>
-                        <x-ui.radio name="supplier_method" value="buy" :label="__('inventory.buy')" :checked="true" />
-                        <x-ui.radio name="supplier_method" value="manufacture" :label="__('inventory.manufacture')" />
+                        <x-ui.radio name="supplier_method" value="buy" :label="__('inventory.buy')" :checked="old('supplier_method', 'buy') === 'buy'" />
+                        <x-ui.radio name="supplier_method" value="manufacture" :label="__('inventory.manufacture')" :checked="old('supplier_method') === 'manufacture'" />
                     </div>
 
                     <div class="row g-4 mb-4 fs-13 text-dark">
@@ -135,6 +152,7 @@
                             </div>
 
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.unit')" name="uom_id" required="true">
+                                <option value="" selected disabled>{{ __('inventory.select_unit') }}</option>
                                 @foreach($uoms as $uom)
                                     <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
                                 @endforeach
@@ -148,18 +166,20 @@
                                 <option value="service" {{ old('type') === 'service' ? 'selected' : '' }} style="display:none;">{{ __('inventory.service') }}</option>
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.brand')" name="brand" placeholder="e.g. Apple, Nike" />
-                            
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.manufacturer')" name="manufacturer" placeholder="Manufacturer Name" />
-                            
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.mpn')" name="mpn" placeholder="Manufacturer Part Number" />
+                            <div class="physical-goods-only">
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.brand')" name="brand" placeholder="e.g. Apple, Nike" />
+                                
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.manufacturer')" name="manufacturer" placeholder="Manufacturer Name" />
+                                
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.mpn')" name="mpn" placeholder="Manufacturer Part Number" />
 
-                            <div class="border-top pt-3 mt-3">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>{{ __('inventory.identifiers') }}</h6>
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.barcode')" name="barcode" placeholder="Barcode (EAN/UPC)" />
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.upc')" name="upc" placeholder="Universal Product Code" />
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.ean')" name="ean" placeholder="European Article Number" />
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.isbn')" name="isbn" placeholder="International Standard Book Number" />
+                                <div class="border-top pt-3 mt-3">
+                                    <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>{{ __('inventory.identifiers') }}</h6>
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.barcode')" name="barcode" placeholder="Barcode (EAN/UPC)" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.upc')" name="upc" placeholder="Universal Product Code" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.ean')" name="ean" placeholder="European Article Number" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.isbn')" name="isbn" placeholder="International Standard Book Number" />
+                                </div>
                             </div>
                         </div>
 
@@ -213,7 +233,7 @@
                                 </x-ui.odoo-form-ui>
                             </div>
 
-                            <div class="border-top pt-3 mt-3">
+                            <div class="border-top pt-3 mt-3 physical-goods-only">
                                 <h6 class="fw-bold text-primary mb-3"><i class="feather-maximize me-2"></i>Dimensions & Weight</h6>
                                 <div class="odoo-form-group">
                                     <label class="odoo-form-label">Dimensions</label>
@@ -409,14 +429,12 @@
     <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
     <script>
         $(document).ready(function() {
-            let attributeIndex = 1; // Start counter for additional attributes
+            let attributeIndex = 1;
 
-            // Toggle Inventory Section based on Goods/Service
             $('input[name="item_type"]').on('change', function() {
                 toggleSections();
             });
 
-            // Toggle Variants Section based on Variation Type
             $('input[name="variation_type"]').on('change', function() {
                 toggleSections();
             });
@@ -425,252 +443,51 @@
                 const itemType = $('input[name="item_type"]:checked').val();
                 const variationType = $('input[name="variation_type"]:checked').val();
 
-                // HSN vs SAC label change dynamically
                 const hsnLabel = $('input[name="hsn_sac"]').closest('.odoo-form-group').find('.odoo-form-label');
                 if (itemType === 'Service') {
                     hsnLabel.html('SAC Code');
                     $('input[name="hsn_sac"]').attr('placeholder', 'e.g. 9983 (SAC)');
-                    // Hide preferred vendor and dimensions for services
-                    $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').slideUp();
-                    $('input[name="length"]').closest('.border-top').slideUp();
-                    // Hide Material Type and set default to service for services
-                    $('select[name="type"]').val('service').trigger('change').closest('.odoo-form-group').slideUp();
-                } else {
-                    hsnLabel.html('HSN Code');
-                    $('input[name="hsn_sac"]').attr('placeholder', 'e.g. 8471 (HSN)');
-                    // Show preferred vendor and dimensions for goods
-                    $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').slideDown();
-                    $('input[name="length"]').closest('.border-top').slideDown();
-                    // Show Material Type for goods
-                    $('select[name="type"]').closest('.odoo-form-group').slideDown();
-                }
-
-                if (itemType === 'Service') {
-                    // Hide inventory sections for Services
-                    $('#inventorySection').slideUp();
-                    $('#warehouseStocksSection').slideUp();
+                    $('.physical-goods-only').hide();
+                    $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').hide();
+                    $('select[name="type"]').val('service').trigger('change').closest('.odoo-form-group').hide();
+                    $('#inventorySection').hide();
+                    $('#warehouseStocksSection').hide();
                     $('select[name="inventory_account"]').prop('required', false);
                     $('.variant-stock-col').hide();
                 } else {
+                    hsnLabel.html('HSN Code');
+                    $('input[name="hsn_sac"]').attr('placeholder', 'e.g. 8471 (HSN)');
+                    $('.physical-goods-only').show();
+                    $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').show();
+                    $('select[name="type"]').closest('.odoo-form-group').show();
                     $('.variant-stock-col').show();
+
                     if (variationType === 'Single') {
-                        $('#inventorySection').slideDown();
-                        $('#warehouseStocksSection').slideDown();
+                        $('#inventorySection').show();
+                        $('#warehouseStocksSection').show();
                         $('select[name="inventory_account"]').prop('required', true);
                     } else {
-                        $('#inventorySection').slideUp();
-                        $('#warehouseStocksSection').slideUp();
+                        $('#inventorySection').hide();
+                        $('#warehouseStocksSection').hide();
                         $('select[name="inventory_account"]').prop('required', false);
                     }
                 }
 
                 if (variationType === 'Variant') {
-                    $('.single-item-only').slideUp();
+                    $('.single-item-only').hide();
                     $('input[name="sku"]').prop('required', false);
-                    $('#variantsSection').slideDown();
+                    $('#variantsSection').show();
                     generateMatrix();
                 } else {
-                    $('.single-item-only').slideDown();
-                    $('input[name="sku"]').prop('required', true);
-                    $('#variantsSection').slideUp();
-                }
-            }
-
-            // Setup custom attribute type display
-            $(document).on('change', '.attribute-name-select', function() {
-                const isCustom = $(this).val() === 'Custom';
-                const inputCustom = $(this).siblings('.attribute-custom-name');
-                inputCustom.toggle(isCustom).prop('required', isCustom);
-                
-                const cardIndex = $(this).closest('.attribute-card').attr('data-index');
-                if (isCustom) {
-                    $(this).removeAttr('name');
-                    inputCustom.attr('name', `attributes[${cardIndex}][name]`);
-                } else {
-                    $(this).attr('name', `attributes[${cardIndex}][name]`);
-                    inputCustom.removeAttr('name');
-                }
-                generateMatrix();
-            });
-
-            $(document).on('input', '.attribute-custom-name', function() {
-                generateMatrix();
-            });
-
-            // Handle tag badges additions in inputs
-            $(document).on('keydown', '.tag-input', function(e) {
-                if (e.key === 'Enter' || e.key === ',') {
-                    e.preventDefault();
-                    const val = $(this).val().trim().replace(/,/g, '');
-                    if (val) {
-                        const wrapper = $(this).siblings('.tags-wrapper');
-                        const cardIndex = $(this).closest('.attribute-card').attr('data-index');
-                        
-                        // Prevent duplicates
-                        let exists = false;
-                        wrapper.find('.tag-badge').each(function() {
-                            if ($(this).attr('data-val').toLowerCase() === val.toLowerCase()) {
-                                exists = true;
-                            }
-                        });
-
-                        if (!exists) {
-                            wrapper.append(`
-                                <span class="tag-badge" data-val="${val}">
-                                    ${val} <span class="remove-tag">&times;</span>
-                                    <input type="hidden" name="attributes[${cardIndex}][options][]" value="${val}">
-                                </span>
-                            `);
-                            generateMatrix();
-                        }
-                        $(this).val('');
-                    }
-                }
-            });
-
-            // Handle removing tags
-            $(document).on('click', '.remove-tag', function() {
-                $(this).closest('.tag-badge').remove();
-                generateMatrix();
-            });
-
-            // Handle Add Attribute row
-            $('#addAttributeBtn').on('click', function() {
-                const html = `
-                    <div class="attribute-card" data-index="${attributeIndex}">
-                        <div class="row align-items-center">
-                            <div class="col-md-3">
-                                <label class="fs-12 fw-bold text-dark mb-1">Attribute Name</label>
-                                <select name="attributes[${attributeIndex}][name]" class="form-select form-select-sm attribute-name-select" style="border-radius: 0;">
-                                    <option value="Size">Size</option>
-                                    <option value="Color">Color</option>
-                                    <option value="Material">Material</option>
-                                    <option value="Style">Style</option>
-                                    <option value="Custom">Custom...</option>
-                                </select>
-                                <input type="text" class="form-control form-control-sm attribute-custom-name mt-1" placeholder="Custom Attribute Name" style="display: none; border-radius: 0;">
-                            </div>
-                            <div class="col-md-8">
-                                <label class="fs-12 fw-bold text-dark mb-1">Options (Type option value and press Enter or Comma)</label>
-                                <div class="tag-input-container">
-                                    <span class="tags-wrapper"></span>
-                                    <input type="text" class="tag-input" placeholder="e.g. Small, Medium, Large">
-                                </div>
-                            </div>
-                            <div class="col-md-1 text-center mt-3 mt-md-0">
-                                <button type="button" class="btn btn-sm btn-soft-danger remove-attribute-btn"><i class="feather-trash-2"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                $('#attributesContainer').append(html);
-                attributeIndex++;
-                generateMatrix();
-            });
-
-            // Remove Attribute row
-            $(document).on('click', '.remove-attribute-btn', function() {
-                $(this).closest('.attribute-card').remove();
-                generateMatrix();
-            });
-
-            // Dynamic Combinations Matrix Generator (Cartesian Product)
-            function generateMatrix() {
-                const attributes = [];
-                $('#attributesContainer .attribute-card').each(function() {
-                    const selectVal = $(this).find('.attribute-name-select').val();
-                    const name = selectVal === 'Custom' ? $(this).find('.attribute-custom-name').val().trim() : selectVal;
-                    const options = [];
-                    
-                    $(this).find('.tag-badge').each(function() {
-                        options.push($(this).attr('data-val'));
-                    });
-
-                    if (name && options.length > 0) {
-                        attributes.push({ name: name, options: options });
-                    }
-                });
-
-                if (attributes.length === 0) {
-                    $('#variantsMatrixContainer').hide();
-                    return;
-                }
-
-                // Cartesian Product calculation helper
-                const cartesian = (sets) => {
-                    return sets.reduce((acc, set) => {
-                        return acc.flatMap(x => set.map(y => [...x, y]));
-                    }, [[]]);
-                };
-
-                const optionSets = attributes.map(a => a.options);
-                const combinations = cartesian(optionSets);
-
-                const parentName = $('input[name="name"]').val().trim() || 'Product';
-                const parentSku = $('input[name="sku"]').val().trim() || 'SKU';
-                const sellingPrice = $('input[name="selling_price"]').val().trim() || '';
-                const costPrice = $('input[name="cost_price"]').val().trim() || '';
-                const itemType = $('input[name="item_type"]:checked').val();
-
-                const tbody = $('#variantsMatrixBody');
-                tbody.empty();
-
-                combinations.forEach((combo, index) => {
-                    // Create human readable variant tag, e.g. "Color: Red, Size: S"
-                    const detailsStr = combo.map((val, idx) => `${attributes[idx].name}: ${val}`).join(', ');
-                    // Auto-generated helper SKU code, e.g. SKU-RED-S
-                    const skuCodeSuffix = combo.map(val => val.toString().toUpperCase().replace(/\s+/g, '')).join('-');
-                    const autoSku = parentSku ? `${parentSku}-${skuCodeSuffix}` : skuCodeSuffix;
-
-                    let stockInputsHtml = '';
                     if (itemType !== 'Service') {
-                        stockInputsHtml = `
-                            <td>
-                                <input type="number" name="variants[${index}][opening_stock]" class="form-control form-control-sm py-1" placeholder="0" style="border-radius: 0; min-width: 80px;">
-                            </td>
-                            <td>
-                                <input type="number" name="variants[${index}][reorder_point]" class="form-control form-control-sm py-1" placeholder="0" style="border-radius: 0; min-width: 80px;">
-                            </td>
-                        `;
+                        $('.single-item-only').show();
                     }
-
-                    const rowHtml = `
-                        <tr>
-                            <td class="fw-semibold text-dark">
-                                <span class="badge bg-soft-primary text-primary me-2">Variant #${index + 1}</span>
-                                <span>${parentName} (${detailsStr})</span>
-                                <input type="hidden" name="variants[${index}][attributes]" value="${detailsStr}">
-                            </td>
-                            <td>
-                                <input type="text" name="variants[${index}][sku]" class="form-control form-control-sm py-1" value="${autoSku}" required style="border-radius: 0; min-width: 140px;">
-                            </td>
-                            <td>
-                                <input type="number" name="variants[${index}][selling_price]" class="form-control form-control-sm py-1" value="${sellingPrice}" step="0.01" style="border-radius: 0; min-width: 100px;">
-                            </td>
-                            <td>
-                                <input type="number" name="variants[${index}][cost_price]" class="form-control form-control-sm py-1" value="${costPrice}" step="0.01" style="border-radius: 0; min-width: 100px;">
-                            </td>
-                            ${stockInputsHtml}
-                        </tr>
-                    `;
-                    tbody.append(rowHtml);
-                });
-
-                if (combinations.length > 0 && combinations[0].length > 0) {
-                    $('#variantsMatrixContainer').show();
-                } else {
-                    $('#variantsMatrixContainer').hide();
+                    $('input[name="sku"]').prop('required', true);
+                    $('#variantsSection').hide();
                 }
             }
 
-            // Sync matrix helper fields when parent details are typed
-            $('input[name="name"], input[name="sku"], input[name="selling_price"], input[name="cost_price"]').on('input', function() {
-                if ($('input[name="variation_type"]:checked').val() === 'Variant') {
-                    generateMatrix();
-                }
-            });
-
-            // Initial toggle check
+            // Execute on initial page load
             toggleSections();
         });
     </script>

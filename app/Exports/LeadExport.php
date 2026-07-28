@@ -14,7 +14,7 @@ class LeadExport implements FromCollection, WithHeadings, WithMapping
      */
     public function collection()
     {
-        return Lead::with(['owner', 'product'])->orderBy('id', 'desc')->get();
+        return Lead::with(['owner'])->orderBy('id', 'desc')->get();
     }
 
     /**
@@ -61,7 +61,7 @@ class LeadExport implements FromCollection, WithHeadings, WithMapping
             $lead->email,
             $lead->phone,
             $lead->owner?->name ?? 'N/A',
-            $lead->product?->name ?? 'N/A',
+            $lead->product_names ?? 'N/A',
             $lead->expected_amount,
             $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : null,
             $lead->requirement,

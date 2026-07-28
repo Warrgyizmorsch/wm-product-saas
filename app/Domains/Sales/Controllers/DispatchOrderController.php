@@ -5,6 +5,7 @@ namespace App\Domains\Sales\Controllers;
 use App\Domains\Sales\Models\MaterialRequirement;
 use App\Domains\Sales\Models\DispatchOrder;
 use App\Domains\Sales\Models\DispatchOrderItem;
+use App\Domains\Sales\Repositories\DispatchOrderRepository;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,10 @@ use Illuminate\View\View;
 
 class DispatchOrderController extends Controller
 {
+    public function __construct(
+        private readonly DispatchOrderRepository $dispatchRepo
+    ) {}
+
     public function index(): View
     {
         $this->authorize('viewAny', DispatchOrder::class);
@@ -24,7 +29,6 @@ class DispatchOrderController extends Controller
             ->latest()
             ->get();
 
-        // Recent material requirements without a dispatch (for sidebar quick view)
         $pendingDOs = MaterialRequirement::with('salesOrder.customer')
             ->whereNotIn('id', DispatchOrder::pluck('material_requirement_id'))
             ->whereNotIn('status', ['Cancelled', 'Delivered'])
@@ -41,7 +45,6 @@ class DispatchOrderController extends Controller
 
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();
 
-        // Material requirements without a dispatch order yet
         $pendingDOs = MaterialRequirement::with('salesOrder.customer')
             ->whereNotIn('status', ['Cancelled'])
             ->latest()
@@ -50,176 +53,114 @@ class DispatchOrderController extends Controller
         return view('modules.sales.dispatches.create', compact('warehouses', 'pendingDOs'));
     }
 
-    /**
-     * AJAX: Return delivery orders available for dispatch.
-     * Includes already-dispatched qty per item so the UI can cap new dispatch qty.
-     */
     public function pendingMaterialRequirements(Request $request): JsonResponse
     {
         $this->authorize('create', DispatchOrder::class);
 
-        $dos = MaterialRequirement::with(['salesOrder.customer', 'items.product', 'items.dispatchItems'])
-            ->whereNotIn('status', ['Cancelled', 'Delivered'])
-            ->latest()
-            ->get()
-            ->map(function ($do) {
-                $items = $do->items->map(function ($item) {
-                    $orderedQty     = (float)($item->quantity_ordered > 0 ? $item->quantity_ordered : $item->quantity);
-                    $reservedQty    = (float)$item->quantity_reserved;
+        $materialRequirements = MaterialRequirement::with([
+            'salesOrder.customer',
+            'items.product',
+            'items.warehouse',
+        ])
+        ->whereNotIn('status', ['Cancelled'])
+        ->latest()
+        ->get();
 
-                    // Sum all previously dispatched qty across all dispatch orders for this line
-                    $alreadyDispatched = (float)$item->dispatchItems->sum('quantity_dispatched');
-                    $remainingQty      = max(0, $orderedQty - $alreadyDispatched);
+        $result = $materialRequirements->map(function ($requirement) {
+            $itemsData = $requirement->items->map(function ($item) {
+                $alreadyDispatched = DispatchOrderItem::whereHas('dispatchOrder', function ($q) {
+                    $q->where('status', '!=', 'Cancelled');
+                })
+                ->where('material_requirement_item_id', $item->id)
+                ->sum('quantity');
 
-                    // Suggested dispatch qty = min(reserved, remaining)
-                    $suggestedQty = min($reservedQty > 0 ? $reservedQty : $orderedQty, $remainingQty);
-
-                    return [
-                        'id'                 => $item->id,
-                        'product_id'         => $item->product_id,
-                        'warehouse_id'       => $item->warehouse_id,
-                        'product_name'       => $item->product?->name,
-                        'product_sku'        => $item->product?->sku,
-                        'quantity_ordered'   => (int)$orderedQty,
-                        'quantity_reserved'  => (int)$reservedQty,
-                        'already_dispatched' => (int)$alreadyDispatched,
-                        'remaining_qty'      => (int)$remainingQty,
-                        'dispatch_qty'       => (int)max(0, $suggestedQty),
-                        'fully_dispatched'   => $remainingQty <= 0,
-                    ];
-                });
-
-                // Only return the DO if at least one item still has remaining qty
-                $hasRemaining = $items->contains(fn($i) => !$i['fully_dispatched']);
+                $remainingQty = max(0, (float) $item->quantity - (float) $alreadyDispatched);
 
                 return [
-                    'id'              => $do->id,
-                    'requirement_number' => $do->requirement_number,
-                    'sales_order'     => $do->salesOrder->sales_order_number,
-                    'customer'        => $do->salesOrder->customer?->name,
-                    'status'          => $do->status,
-                    'has_remaining'   => $hasRemaining,
-                    'items'           => $items,
+                    'id' => $item->id,
+                    'product_id' => $item->product_id,
+                    'product_name' => $item->product?->name ?? 'Unknown',
+                    'sku' => $item->product?->sku ?? '',
+                    'warehouse_id' => $item->warehouse_id,
+                    'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
+                    'ordered_qty' => (float) $item->quantity,
+                    'dispatched_qty' => (float) $alreadyDispatched,
+                    'remaining_qty' => $remainingQty,
                 ];
-            })
-            ->values();
+            })->filter(fn ($i) => $i['remaining_qty'] > 0)->values();
 
-        return response()->json($dos);
-    }
+            return [
+                'id' => $requirement->id,
+                'requirement_number' => $requirement->requirement_number,
+                'sales_order_number' => $requirement->salesOrder?->sales_order_number ?? 'N/A',
+                'customer_name' => $requirement->salesOrder?->customer?->name ?? 'N/A',
+                'items' => $itemsData,
+            ];
+        })->filter(fn ($do) => count($do['items']) > 0)->values();
 
-    /**
-     * AJAX: Get warehouse address by warehouse ID.
-     */
-    public function warehouseAddress(int $warehouseId): JsonResponse
-    {
-        $this->authorize('create', DispatchOrder::class);
-
-        $warehouse = Warehouse::findOrFail($warehouseId);
-        return response()->json([
-            'address' => $warehouse->address ?? '',
-            'name'    => $warehouse->name,
-        ]);
+        return response()->json(['data' => $result]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', DispatchOrder::class);
 
-        $request->validate([
-            'material_requirement_id' => 'required|exists:material_requirements,id',
-            'carrier'                 => 'nullable|string|max:255',
-            'tracking_number'         => 'nullable|string|max:255',
-            'vehicle_number'          => 'nullable|string|max:100',
-            'driver_name'             => 'nullable|string|max:150',
-            'driver_phone'            => 'nullable|string|max:20',
-            'dispatch_date'           => 'required|date',
-            'notes'                   => 'nullable|string',
-            'items'                   => 'required|array|min:1',
-            'items.*.material_requirement_item_id' => 'required|integer',
-            'items.*.product_id'                   => 'required|integer',
-            'items.*.warehouse_id'                 => 'nullable|integer',
-            'items.*.quantity_ordered'             => 'required|numeric|min:0',
-            'items.*.quantity_dispatched'          => 'required|numeric|min:1',
+        $validated = $request->validate([
+            'material_requirement_id' => ['required', 'exists:material_requirements,id'],
+            'vehicle_number'          => ['nullable', 'string', 'max:100'],
+            'driver_name'             => ['nullable', 'string', 'max:100'],
+            'driver_phone'            => ['nullable', 'string', 'max:50'],
+            'shipping_agent'          => ['nullable', 'string', 'max:100'],
+            'dispatch_date'           => ['required', 'date'],
+            'notes'                   => ['nullable', 'string'],
+            'items'                   => ['required', 'array', 'min:1'],
+            'items.*.material_requirement_item_id' => ['required', 'exists:material_requirement_items,id'],
+            'items.*.product_id'      => ['required', 'exists:products,id'],
+            'items.*.warehouse_id'    => ['required', 'exists:warehouses,id'],
+            'items.*.quantity'        => ['required', 'numeric', 'min:0.0001'],
         ]);
 
-        $delivery = MaterialRequirement::findOrFail($request->material_requirement_id);
+        $req = MaterialRequirement::findOrFail($validated['material_requirement_id']);
 
-        // Validate each item's dispatch qty does not exceed remaining (ordered - already dispatched)
-        foreach ($request->items as $index => $line) {
-            $alreadyDispatched = DispatchOrderItem::where('material_requirement_item_id', $line['material_requirement_item_id'])
-                ->sum('quantity_dispatched');
-            $orderedQty    = (float)$line['quantity_ordered'];
-            $remainingQty  = max(0, $orderedQty - (float)$alreadyDispatched);
-            if ((float)$line['quantity_dispatched'] > $remainingQty) {
-                return back()->withErrors([
-                    "items.{$index}.quantity_dispatched" =>
-                        "Dispatch quantity exceeds remaining quantity ({$remainingQty}) for one or more items.",
-                ])->withInput();
-            }
-        }
+        $count = DispatchOrder::whereYear('created_at', now()->year)->count() + 1;
+        $dispatchNumber = 'DISP-' . now()->format('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
-        $dispatchOrder = DB::transaction(function () use ($request, $delivery) {
-            // Auto-generate dispatch number
-            $year = now()->format('Y');
-            $prefix = "DSP-{$year}-";
-
-            $latest = DispatchOrder::where('tenant_id', $delivery->tenant_id)
-                ->where('dispatch_number', 'like', "{$prefix}%")
-                ->orderByDesc('id')
-                ->first();
-
-            $nextNum = 1;
-            if ($latest) {
-                $lastNumStr = str_replace($prefix, '', $latest->dispatch_number);
-                $nextNum = intval($lastNumStr) + 1;
-            }
-            $dispatchNumber = $prefix . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
-
-            $dispatchOrder = DispatchOrder::create([
-                'tenant_id'               => $delivery->tenant_id,
-                'material_requirement_id' => $delivery->id,
-                'sales_order_id'          => $delivery->sales_order_id,
-                'dispatch_number'         => $dispatchNumber,
-                'dispatch_date'           => $request->dispatch_date,
-                'carrier'                 => $request->carrier,
-                'tracking_number'         => $request->tracking_number,
-                'vehicle_number'          => $request->vehicle_number,
-                'driver_name'             => $request->driver_name,
-                'driver_phone'            => $request->driver_phone,
-                'status'                  => 'Pending',
-                'notes'                   => $request->notes,
+        DB::transaction(function () use ($validated, $req, $dispatchNumber) {
+            $dispatch = DispatchOrder::create([
+                'tenant_id' => $req->tenant_id,
+                'material_requirement_id' => $req->id,
+                'sales_order_id' => $req->sales_order_id,
+                'customer_id' => $req->salesOrder?->customer_id,
+                'dispatch_number' => $dispatchNumber,
+                'dispatch_date' => $validated['dispatch_date'],
+                'status' => 'Pending',
+                'vehicle_number' => $validated['vehicle_number'] ?? null,
+                'driver_name' => $validated['driver_name'] ?? null,
+                'driver_phone' => $validated['driver_phone'] ?? null,
+                'shipping_agent' => $validated['shipping_agent'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => Auth::id(),
             ]);
 
-            foreach ($request->items as $line) {
-                if ((float)$line['quantity_dispatched'] <= 0) continue;
-
+            foreach ($validated['items'] as $item) {
                 DispatchOrderItem::create([
-                    'dispatch_order_id'            => $dispatchOrder->id,
-                    'material_requirement_item_id' => $line['material_requirement_item_id'],
-                    'product_id'                   => $line['product_id'],
-                    'warehouse_id'                 => $line['warehouse_id'] ?? null,
-                    'quantity_ordered'             => $line['quantity_ordered'],
-                    'quantity_dispatched'          => $line['quantity_dispatched'],
+                    'dispatch_order_id' => $dispatch->id,
+                    'material_requirement_item_id' => $item['material_requirement_item_id'],
+                    'product_id' => $item['product_id'],
+                    'warehouse_id' => $item['warehouse_id'],
+                    'quantity' => $item['quantity'],
+                    'status' => 'Pending',
                 ]);
             }
-
-            return $dispatchOrder;
         });
 
-        return redirect()
-            ->route('sales.dispatches.show', $dispatchOrder->id)
-            ->with('success', "Dispatch Order {$dispatchOrder->dispatch_number} created successfully!");
+        return redirect()->route('sales.dispatches.index')->with('success', "Dispatch Order {$dispatchNumber} created successfully.");
     }
 
     public function show(int $id): View
     {
-        $dispatch = DispatchOrder::with([
-            'salesOrder.customer',
-            'materialRequirement',
-            'items.product',
-            'items.warehouse',
-        ])->findOrFail($id);
-
+        $dispatch = $this->dispatchRepo->find($id);
+        if (!$dispatch) abort(404);
         $this->authorize('view', $dispatch);
 
         return view('modules.sales.dispatches.show', compact('dispatch'));

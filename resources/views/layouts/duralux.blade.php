@@ -206,10 +206,19 @@
             }
         });
 
-        // Generic Quick Create Master Dropdown handler
+        // Generic Quick Create Master Dropdown handler (Supports Single & Multiselect)
         $(document).on('change', '.erp-premium-select, select[data-master]', function () {
             var select = $(this);
-            if (select.val() === '__ADD_NEW__') {
+            var val = select.val();
+            var isAddNew = false;
+
+            if (Array.isArray(val)) {
+                isAddNew = val.includes('__ADD_NEW__');
+            } else {
+                isAddNew = (val === '__ADD_NEW__');
+            }
+
+            if (isAddNew) {
                 var master = select.attr('data-master');
                 var modalId = 'quickCreateModal_' + master;
                 var modalEl = document.getElementById(modalId);
@@ -218,7 +227,13 @@
                     modal.show();
                     $(modalEl).data('trigger-select', select);
                 }
-                select.val('').trigger('change.select2'); // Reset selection
+                
+                if (Array.isArray(val)) {
+                    var newVal = val.filter(function(v) { return v !== '__ADD_NEW__'; });
+                    select.val(newVal).trigger('change.select2');
+                } else {
+                    select.val('').trigger('change.select2');
+                }
             }
         });
 
@@ -290,15 +305,36 @@
                         });
 
                         if (triggerSelect) {
+                            var isMultiple = $(triggerSelect).prop('multiple');
+                            var displayText = response.name + (response.sku ? ' (' + response.sku + ')' : '');
+
                             var optionEl = $('<option>', {
                                 value: response.id,
-                                text: response.name,
+                                text: displayText,
                                 selected: true
                             });
                             if (response.type) {
                                 optionEl.attr('data-type', response.type);
                             }
-                            $(triggerSelect).append(optionEl).trigger('change');
+
+                            // Append new DB product option to dropdown
+                            $(triggerSelect).append(optionEl);
+
+                            if (isMultiple) {
+                                var currentVals = $(triggerSelect).val() || [];
+                                if (!Array.isArray(currentVals)) {
+                                    currentVals = [currentVals];
+                                }
+                                // Filter out dummy __ADD_NEW__ value
+                                currentVals = currentVals.filter(function(v) { return v !== '__ADD_NEW__' && v !== ''; });
+                                var strId = String(response.id);
+                                if (!currentVals.includes(strId) && !currentVals.includes(Number(response.id))) {
+                                    currentVals.push(strId);
+                                }
+                                $(triggerSelect).val(currentVals).trigger('change').trigger('change.select2');
+                            } else {
+                                $(triggerSelect).val(response.id).trigger('change').trigger('change.select2');
+                            }
                         }
                     }
                 },

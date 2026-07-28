@@ -163,18 +163,20 @@
                                 <option value="inactive" {{ $product->status === 'inactive' ? 'selected' : '' }}>Inactive</option>
                             </x-ui.odoo-form-ui>
 
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.brand')" name="brand" value="{{ $product->brand }}" placeholder="e.g. Apple, Nike" />
-                            
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.manufacturer')" name="manufacturer" value="{{ $product->manufacturer }}" placeholder="Manufacturer Name" />
-                            
-                            <x-ui.odoo-form-ui type="input" :label="__('inventory.mpn')" name="mpn" value="{{ $product->mpn }}" placeholder="Manufacturer Part Number" />
+                            <div class="physical-goods-only">
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.brand')" name="brand" value="{{ $product->brand }}" placeholder="e.g. Apple, Nike" />
+                                
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.manufacturer')" name="manufacturer" value="{{ $product->manufacturer }}" placeholder="Manufacturer Name" />
+                                
+                                <x-ui.odoo-form-ui type="input" :label="__('inventory.mpn')" name="mpn" value="{{ $product->mpn }}" placeholder="Manufacturer Part Number" />
 
-                            <div class="border-top pt-3 mt-3">
-                                <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>{{ __('inventory.identifiers') }}</h6>
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.barcode')" name="barcode" value="{{ $product->barcode }}" placeholder="Barcode (EAN/UPC)" />
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.upc')" name="upc" value="{{ $product->upc }}" placeholder="Universal Product Code" />
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.ean')" name="ean" value="{{ $product->ean }}" placeholder="European Article Number" />
-                                <x-ui.odoo-form-ui type="input" :label="__('inventory.isbn')" name="isbn" value="{{ $product->isbn }}" placeholder="International Standard Book Number" />
+                                <div class="border-top pt-3 mt-3">
+                                    <h6 class="fw-bold text-primary mb-3"><i class="feather-hash me-2"></i>{{ __('inventory.identifiers') }}</h6>
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.barcode')" name="barcode" value="{{ $product->barcode }}" placeholder="Barcode (EAN/UPC)" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.upc')" name="upc" value="{{ $product->upc }}" placeholder="Universal Product Code" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.ean')" name="ean" value="{{ $product->ean }}" placeholder="European Article Number" />
+                                    <x-ui.odoo-form-ui type="input" :label="__('inventory.isbn')" name="isbn" value="{{ $product->isbn }}" placeholder="International Standard Book Number" />
+                                </div>
                             </div>
                         </div>
 
@@ -232,7 +234,7 @@
                                 </x-ui.odoo-form-ui>
                             </div>
 
-                            <div class="border-top pt-3 mt-3">
+                            <div class="border-top pt-3 mt-3 physical-goods-only">
                                 <h6 class="fw-bold text-primary mb-3"><i class="feather-maximize me-2"></i>Dimensions & Weight</h6>
                                 <div class="odoo-form-group">
                                     <label class="odoo-form-label">Dimensions</label>
@@ -671,4 +673,20 @@
         });
     </script>
     @endif
+    <script>
+        $(document).ready(function() {
+            const itemType = '{{ $product->item_type }}';
+            if (itemType === 'Service') {
+                $('.physical-goods-only').hide();
+                $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').hide();
+                $('select[name="type"]').prop('required', false).closest('.odoo-form-group').hide();
+                $('#inventorySection').hide();
+                $('#warehouseStocksSection').hide();
+                $('select[name="inventory_account"]').prop('required', false);
+                $('select[name="inventory_valuation_method"]').prop('required', false);
+                const hsnLabel = $('input[name="hsn_sac"]').closest('.odoo-form-group').find('.odoo-form-label');
+                hsnLabel.html('SAC Code');
+            }
+        });
+    </script>
 @endpush
