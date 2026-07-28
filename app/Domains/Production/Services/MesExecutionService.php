@@ -296,7 +296,7 @@ class MesExecutionService
 
             $schedOp->update([
                 'status' => ProductionScheduleOperation::STATUS_RUNNING,
-                'accumulated_paused_seconds' => $schedOp->accumulated_paused_seconds + $pausedSeconds,
+                'accumulated_paused_seconds' => ($schedOp->accumulated_paused_seconds ?? 0) + $pausedSeconds,
                 'last_paused_at' => null,
             ]);
 
@@ -388,7 +388,7 @@ class MesExecutionService
             $schedOp->update([
                 'status' => ProductionScheduleOperation::STATUS_COMPLETED,
                 'actual_finish' => $now,
-                'accumulated_paused_seconds' => $schedOp->accumulated_paused_seconds + $pausedSeconds,
+                'accumulated_paused_seconds' => ($schedOp->accumulated_paused_seconds ?? 0) + $pausedSeconds,
                 'last_paused_at' => null,
             ]);
 

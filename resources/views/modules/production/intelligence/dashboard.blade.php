@@ -1,18 +1,18 @@
 @extends('layouts.duralux')
 
-@section('title', 'Executive Manufacturing Intelligence | SaaS ERP')
-@section('page-title', 'Executive Manufacturing Intelligence')
-@section('breadcrumb', 'Manufacturing Intelligence')
+@section('title', __('production.manufacturing_intelligence') . ' | SaaS ERP')
+@section('page-title', __('production.manufacturing_intelligence'))
+@section('breadcrumb', __('production.manufacturing_intelligence'))
 
 @section('page-actions')
     <form method="GET" action="{{ route('production.intelligence.dashboard') }}" class="d-inline me-2">
-        <x-ui.filter label="Filter" offset="0, 5">
-            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+        <x-ui.filter label="{{ __('production.filter') ?? 'Filter' }}" offset="0, 5">
+            <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('production.filter_options') }}</h6>
             
             <div class="mb-3">
-                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Work Center</label>
+                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.col_work_center') }}</label>
                 <x-ui.odoo-form-ui type="select" name="work_center_id">
-                    <option value="">All Work Centers</option>
+                    <option value="">{{ __('production.all_work_centers') ?? 'All Work Centers' }}</option>
                     @foreach($workCenters as $wc)
                         <option value="{{ $wc->id }}" {{ request('work_center_id') == $wc->id ? 'selected' : '' }}>{{ $wc->name }}</option>
                     @endforeach
@@ -20,26 +20,26 @@
             </div>
 
             <div class="mb-3">
-                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Start Date</label>
+                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.start_date') }}</label>
                 <x-ui.odoo-form-ui type="input" inputType="date" name="date_start" value="{{ request('date_start', today()->toDateString()) }}" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">End Date</label>
+                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('production.end_date') }}</label>
                 <x-ui.odoo-form-ui type="input" inputType="date" name="date_end" value="{{ request('date_end', today()->toDateString()) }}" />
             </div>
 
             <div class="d-flex gap-2 justify-content-end mt-4">
-                <a href="{{ route('production.intelligence.dashboard') }}" class="btn btn-sm btn-light border">Reset</a>
-                <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                <a href="{{ route('production.intelligence.dashboard') }}" class="btn btn-sm btn-light border">{{ __('production.reset') }}</a>
+                <button type="submit" class="btn btn-sm btn-primary">{{ __('production.apply_filters') }}</button>
             </div>
         </x-ui.filter>
     </form>
     <button type="button" class="btn btn-primary me-2" onclick="saveDashboardPrefs()">
-        <i class="feather-save me-2"></i>Save Layout Preferences
+        <i class="feather-save me-2"></i>{{ __('production.save_layout_preferences') }}
     </button>
     <a href="{{ route('production.intelligence.dashboard') }}" class="btn btn-secondary">
-        <i class="feather-rotate-cw me-2"></i>Refresh
+        <i class="feather-rotate-cw me-2"></i>{{ __('production.reset') }}
     </a>
 @endsection
 

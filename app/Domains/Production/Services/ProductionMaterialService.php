@@ -53,6 +53,20 @@ class ProductionMaterialService
     }
 
     /**
+     * Override component-level warehouse for a reservation.
+     */
+    public function updateReservationWarehouse(int $reservationId, int $warehouseId): ProductionOrderReservation
+    {
+        $res = ProductionOrderReservation::findOrFail($reservationId);
+        $this->assertWarehouseActive($warehouseId, $res->tenant_id);
+
+        $res->warehouse_id = $warehouseId;
+        $res->save();
+
+        return $res;
+    }
+
+    /**
      * Issue material quantities against a reservation snapshot.
      *
      * Validations enforced:
