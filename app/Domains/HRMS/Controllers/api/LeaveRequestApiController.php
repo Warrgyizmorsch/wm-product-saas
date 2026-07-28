@@ -165,7 +165,9 @@ class LeaveRequestApiController extends Controller
             return $authError;
         }
 
-        $leaveRequest = LeaveRequest::with(['employee', 'leaveType', 'approvedByEmployee'])->find($id);
+        $leaveRequest = LeaveRequest::with(['employee', 'leaveType', 'approvedByEmployee'])
+            ->where('tenant_id', tenant_id())
+            ->find($id);
 
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
@@ -375,7 +377,7 @@ class LeaveRequestApiController extends Controller
             return $this->sendError('Unauthorized access. Only HR administrators can approve leave requests.', 403);
         }
 
-        $leaveRequest = LeaveRequest::find($id);
+        $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
         }
@@ -429,7 +431,7 @@ class LeaveRequestApiController extends Controller
             return $this->sendError('Unauthorized access. Only HR administrators can reject leave requests.', 403);
         }
 
-        $leaveRequest = LeaveRequest::find($id);
+        $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
         }
@@ -460,7 +462,7 @@ class LeaveRequestApiController extends Controller
             return $this->sendError('Unauthorized access. Only HR administrators can update leave request statuses.', 403);
         }
 
-        $leaveRequest = LeaveRequest::find($id);
+        $leaveRequest = LeaveRequest::where('tenant_id', tenant_id())->find($id);
         if (!$leaveRequest) {
             return $this->sendError("Leave request with ID '{$id}' not found.", 404);
         }

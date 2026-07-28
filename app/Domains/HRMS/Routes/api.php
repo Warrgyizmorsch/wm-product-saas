@@ -22,7 +22,7 @@ use App\Domains\HRMS\Controllers\Api\WfhRequestApiController;
 // 1. ORGANIZATION STRUCTURE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/org')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.org.')
     ->group(function () {
 
@@ -69,7 +69,7 @@ Route::prefix('api/hrms/org')
 // 2. SALARY STRUCTURE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/salary-structure')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.salary-structure.')
     ->group(function () {
 
@@ -102,7 +102,7 @@ Route::prefix('api/hrms/salary-structure')
 // 3. LEAVE STRUCTURE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/leave-structure')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.leave-structure.')
     ->group(function () {
 
@@ -133,7 +133,7 @@ Route::prefix('api/hrms/leave-structure')
 // 4. PENALIZATION POLICY API ROUTES
 // ==========================================
 Route::prefix('api/hrms/penalization-policy')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.penalization-policy.')
     ->group(function () {
 
@@ -154,7 +154,7 @@ Route::prefix('api/hrms/penalization-policy')
 // 5. WORK ROSTER & SHIFT SCHEDULING API ROUTES
 // ==========================================
 Route::prefix('api/hrms/roster')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.roster.')
     ->group(function () {
 
@@ -180,7 +180,7 @@ Route::prefix('api/hrms/roster')
 // 6. ASSET MANAGEMENT API ROUTES
 // ==========================================
 Route::prefix('api/hrms/assets')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.assets.')
     ->group(function () {
 
@@ -215,7 +215,7 @@ Route::prefix('api/hrms/assets')
 // 7. EMPLOYEE DIRECTORY & PROFILE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/employees')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.employees.')
     ->group(function () {
 
@@ -258,7 +258,7 @@ Route::prefix('api/hrms/employees')
 // 8. LEAVE REQUESTS & APPLICATIONS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/leave-requests')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.leave-requests.')
     ->group(function () {
 
@@ -279,7 +279,7 @@ Route::prefix('api/hrms/leave-requests')
 // 8B. WFH REQUESTS & APPLICATIONS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/wfh-requests')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.wfh-requests.')
     ->group(function () {
         Route::get('/summary', [WfhRequestApiController::class, 'summary'])->name('summary');
@@ -295,7 +295,7 @@ Route::prefix('api/hrms/wfh-requests')
 // 9. LEAVE ENCASHMENTS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/leave-encashments')
-    ->middleware(['web'])
+    ->middleware(['throttle:60,1'])
     ->name('api.hrms.leave-encashments.')
     ->group(function () {
 

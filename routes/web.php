@@ -39,5 +39,9 @@ Route::middleware(['tenant'])->group(function (): void {
         foreach (glob(app_path('Domains/*/Routes/web.php')) as $moduleRoutes) {
             require $moduleRoutes;
         }
+
+        foreach (glob(app_path('Domains/*/Routes/api.php')) as $moduleApiRoutes) {
+            require $moduleApiRoutes;
+        }
     });
 });

@@ -56,8 +56,7 @@ class WfhRequestApiController extends Controller
     {
         return auth()->check() && (
             auth()->user()->hasHrPermission('hr.settings.manage') ||
-            auth()->user()->hasHrPermission('hr.leaves.manage') ||
-            !empty(auth()->user()->role_id)
+            auth()->user()->hasHrPermission('hr.leaves.manage')
         );
     }
 
