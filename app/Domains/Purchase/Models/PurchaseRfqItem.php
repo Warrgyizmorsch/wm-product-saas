@@ -5,7 +5,9 @@ namespace App\Domains\Purchase\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Models\Warehouse;
 use App\Models\Concerns\BelongsToTenant;
 
@@ -39,9 +41,9 @@ class PurchaseRfqItem extends Model
         return $this->belongsTo(Product::class, 'product_id');
     }
 
-    public function vendors(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function vendors(): BelongsToMany
     {
-        return $this->belongsToMany(\App\Domains\Inventory\Models\Vendor::class, 'purchase_rfq_item_vendors', 'purchase_rfq_item_id', 'vendor_id')
+        return $this->belongsToMany(Vendor::class, 'purchase_rfq_item_vendors', 'purchase_rfq_item_id', 'vendor_id')
             ->withTimestamps();
     }
 

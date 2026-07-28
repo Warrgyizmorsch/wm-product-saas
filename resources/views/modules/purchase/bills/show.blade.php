@@ -13,6 +13,17 @@
         </a>
 
         @if($bill->due_amount > 0)
+            @php
+                $availAdvAction = max($availableAdvance ?? 0, $bill->goodsReceiptNote?->purchaseOrder?->total_advance_paid ?? 0);
+            @endphp
+            @if($availAdvAction > 0)
+                <form action="{{ route('purchase.bills.apply-advance', $bill->id) }}" method="POST" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-primary text-white fs-12 fw-bold shadow-sm me-1" style="background-color: #714B67; border-color: #714B67;">
+                        <i class="feather-check-circle me-1.5"></i>Apply Vendor Advance Credit
+                    </button>
+                </form>
+            @endif
             <a href="{{ route('purchase.payments.create', ['bill_id' => $bill->id]) }}" class="btn btn-success text-white fs-12 fw-bold shadow-sm">
                 <i class="feather-credit-card me-2"></i>{{ __('purchase.register_vendor_payment') }}
             </a>
@@ -45,30 +56,52 @@
 
             <div class="d-flex align-items-center gap-2">
                 @php
-                    $badgeClass = 'warning';
-                    if ($bill->status === 'Paid') $badgeClass = 'success';
-                    elseif ($bill->status === 'Partially Paid') $badgeClass = 'info';
-                    elseif ($bill->status === 'Posted') $badgeClass = 'primary';
+                    $statusText = match($bill->status) {
+                        'Paid' => 'PAID',
+                        'Partially Paid' => 'PARTIALLY PAID',
+                        'Unpaid' => 'UNPAID',
+                        'Posted' => 'POSTED',
+                        'Cancelled' => 'CANCELLED',
+                        default => strtoupper($bill->status),
+                    };
+                    $badgeClass = match($bill->status) {
+                        'Paid' => 'success',
+                        'Partially Paid' => 'info',
+                        'Unpaid' => 'danger',
+                        'Posted', 'Draft' => 'warning',
+                        'Cancelled' => 'secondary',
+                        default => 'secondary',
+                    };
                 @endphp
                 <span class="badge bg-soft-{{ $badgeClass }} text-{{ $badgeClass }} px-3 py-1.5 fs-13 fw-bold">
-                    {{ strtoupper(__('purchase.status_' . strtolower(str_replace(' ', '_', $bill->status)))) }}
+                    {{ $statusText }}
                 </span>
             </div>
         </div>
 
         @php
-            $poAdvancePaid = $bill->goodsReceiptNote?->purchaseOrder?->total_advance_paid ?? 0;
+            $availAdv = max($availableAdvance ?? 0, $bill->goodsReceiptNote?->purchaseOrder?->total_advance_paid ?? 0);
         @endphp
 
-        @if($poAdvancePaid > 0)
+        @if($availAdv > 0)
             <div class="alert alert-info border-info p-3 mb-4 rounded shadow-sm">
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <div>
-                        <strong class="text-dark fs-13"><i class="feather-info text-info me-1.5"></i>{{ __('purchase.vendor_advance_available') }}:</strong>
-                        <span class="text-success fw-bold font-monospace fs-14">₹{{ number_format($poAdvancePaid, 2) }}</span>
-                        <small class="text-muted d-block fs-11 mt-0.5">{{ __('purchase.apply_advance_credit_help') }}</small>
+                        <strong class="text-dark fs-13"><i class="feather-info text-info me-1.5"></i>Vendor Advance Credit Available:</strong>
+                        <span class="text-success fw-bold font-monospace fs-14 ms-1">₹{{ number_format($availAdv, 2) }}</span>
+                        <small class="text-muted d-block fs-11 mt-0.5">This supplier has available advance credit that can be applied to settle this bill.</small>
                     </div>
-                    <span class="badge bg-primary text-white p-2 fs-12">{{ __('purchase.net_payable_from_bank') }}: ₹{{ number_format(max(0, $bill->due_amount - $poAdvancePaid), 2) }}</span>
+                    <div class="d-flex align-items-center gap-2">
+                        @if($bill->due_amount > 0)
+                            <form action="{{ route('purchase.bills.apply-advance', $bill->id) }}" method="POST" class="d-inline">
+                                @csrf
+                                <button type="submit" class="btn btn-primary btn-sm fw-bold shadow-sm" style="background-color: #714B67; border-color: #714B67;">
+                                    <i class="feather-check-circle me-1"></i>Apply Vendor Advance Credit
+                                </button>
+                            </form>
+                        @endif
+                        <span class="badge bg-primary text-white p-2 fs-12">{{ __('purchase.net_payable_from_bank') }}: ₹{{ number_format(max(0, $bill->due_amount - $availAdv), 2) }}</span>
+                    </div>
                 </div>
             </div>
         @endif

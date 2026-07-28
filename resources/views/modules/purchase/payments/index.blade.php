@@ -92,10 +92,10 @@
                             <td class="fw-semibold text-dark">{{ $pay->vendor?->name ?: '—' }}</td>
                             <td>{{ $pay->payment_date ? $pay->payment_date->format('d-M-Y') : '—' }}</td>
                             <td class="text-center">
-                                <span class="badge bg-soft-primary text-primary px-2.5 py-1 fs-11 fw-semibold">{{ __('purchase.pay_type_' . strtolower(str_replace(' ', '_', $pay->payment_type))) }}</span>
+                                <span class="badge bg-soft-primary text-primary px-2.5 py-1 fs-11 fw-semibold">{{ $pay->payment_type ?: 'Bill Payment' }}</span>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-soft-info text-info px-2.5 py-1 fs-11 fw-semibold">{{ __('purchase.pay_method_' . strtolower(str_replace(' ', '_', $pay->payment_method))) }}</span>
+                                <span class="badge bg-soft-info text-info px-2.5 py-1 fs-11 fw-semibold">{{ $pay->payment_method ?: 'Bank Transfer' }}</span>
                             </td>
                             <td class="font-monospace fs-12 text-secondary">{{ $pay->reference_number ?: 'N/A' }}</td>
                             <td class="text-end font-monospace fw-bold text-success">₹{{ number_format($pay->amount, 2) }}</td>

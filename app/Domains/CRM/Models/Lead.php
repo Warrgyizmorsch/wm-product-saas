@@ -4,9 +4,13 @@ namespace App\Domains\CRM\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\User;
+use App\Domains\Inventory\Models\Product;
 use Illuminate\Database\Eloquent\Model;
 
 class Lead extends Model
@@ -32,7 +36,8 @@ class Lead extends Model
         'state',
         'city',
         'address',
-        'product_id',
+        'product_ids',
+        'product_items',
         'status',
         'next_followup_date',
         'is_customer',
@@ -45,30 +50,47 @@ class Lead extends Model
         'expected_amount' => 'decimal:2',
         'next_followup_date' => 'datetime',
         'is_customer' => 'boolean',
-        'product_id' => 'integer',
+        'product_ids' => 'array',
+        'product_items' => 'array',
         'documents' => 'array',
     ];
 
     /**
-     * Get the product interested.
+     * Get all interested products models.
      */
-    public function product(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function getProductsAttribute()
     {
-        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'product_id');
+        $ids = $this->product_ids ?: [];
+        if (empty($ids) || !is_array($ids)) {
+            return collect();
+        }
+        return Product::whereIn('id', $ids)->get();
+    }
+
+    /**
+     * Helper to get comma separated product names.
+     */
+    public function getProductNamesAttribute()
+    {
+        $products = $this->products;
+        if ($products->isEmpty()) {
+            return '—';
+        }
+        return $products->pluck('name')->implode(', ');
     }
 
     /**
      * Get the owner (user) of the lead.
      */
-    public function owner(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function owner(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'lead_owner_id');
+        return $this->belongsTo(User::class, 'lead_owner_id');
     }
 
     /**
      * Get the follow-ups for the lead.
      */
-    public function followups(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function followups(): HasMany
     {
         return $this->hasMany(LeadFollowup::class)->orderBy('followup_date', 'desc');
     }

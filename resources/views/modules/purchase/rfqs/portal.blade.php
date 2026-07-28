@@ -97,6 +97,16 @@
                         </div>
                     </div>
                 @endif
+                @if($errors->any())
+                    <div class="alert alert-danger border-0 shadow-sm mb-4 py-3" role="alert">
+                        <div class="fw-bold mb-1"><i data-feather="alert-circle" class="me-2 text-danger"></i>Please correct the errors below:</div>
+                        <ul class="mb-0 ps-4">
+                            @foreach($errors->all() as $err)
+                                <li>{{ $err }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
 
                 <!-- Portal Box -->
                 <div class="card portal-card">

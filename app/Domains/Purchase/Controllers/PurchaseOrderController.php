@@ -4,91 +4,34 @@ namespace App\Domains\Purchase\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\Purchase\Models\PurchaseOrder;
-use App\Domains\Purchase\Models\PurchaseOrderItem;
 use App\Domains\Purchase\Models\PurchaseRequisition;
-use App\Domains\Purchase\Models\PurchaseRequisitionItem;
+use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
+use App\Domains\Purchase\Services\PurchaseOrderService;
 use App\Domains\Inventory\Models\Product;
-use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Models\Vendor;
+use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 class PurchaseOrderController extends Controller
 {
+    public function __construct(
+        protected PurchaseOrderRepository $orderRepo,
+        protected PurchaseOrderService $orderService
+    ) {}
+
     public function index(Request $request)
     {
-        $tenantId = require_tenant_id();
-        $query = PurchaseOrder::where('tenant_id', $tenantId)
-            ->with(['vendor', 'requisition', 'creator']);
-
-        if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
-            $query->where(function ($q) use ($search) {
-                $q->where('purchase_order_number', 'like', $search)
-                  ->orWhere('reference', 'like', $search)
-                  ->orWhereHas('vendor', function ($v) use ($search) {
-                      $v->where('name', 'like', $search);
-                  });
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        $sortBy = $request->input('sort_by', 'id');
-        $sortOrder = $request->input('sort_order', 'desc');
-        $allowedSorts = ['id', 'purchase_order_number', 'date', 'grand_total', 'status'];
-
-        if (in_array($sortBy, $allowedSorts)) {
-            $query->orderBy($sortBy, $sortOrder);
-        } else {
-            $query->orderBy('id', 'desc');
-        }
-
-        $orders = $query->paginate(10)->withQueryString();
-
+        $orders = $this->orderRepo->getPaginatedOrders($request->all(), 10);
         return view('modules.purchase.orders.index', compact('orders'));
     }
 
-    /**
-     * PO Approvals — only Draft orders pending approval.
-     */
     public function poApprovals(Request $request)
     {
-        $tenantId = require_tenant_id();
-
-        $query = PurchaseOrder::where('tenant_id', $tenantId)
-            ->where('status', 'Draft')
-            ->with(['vendor', 'requisition', 'creator']);
-
-        if ($request->filled('search')) {
-            $search = '%' . $request->input('search') . '%';
-            $query->where(function ($q) use ($search) {
-                $q->where('purchase_order_number', 'like', $search)
-                  ->orWhereHas('vendor', fn($v) => $v->where('name', 'like', $search));
-            });
-        }
-
-        $sortBy    = $request->input('sort_by', 'id');
-        $sortOrder = $request->input('sort_order', 'desc');
-        $allowedSorts = ['id', 'purchase_order_number', 'date', 'grand_total'];
-
-        if (in_array($sortBy, $allowedSorts)) {
-            $query->orderBy($sortBy, $sortOrder);
-        } else {
-            $query->orderBy('id', 'desc');
-        }
-
-        $orders = $query->paginate(15)->withQueryString();
-
+        $orders = $this->orderRepo->getPaginatedOrders(array_merge($request->all(), ['status' => 'Draft']), 15);
         return view('modules.purchase.approvals.po-index', compact('orders'));
     }
 
-    /**
-     * Return HTML partial for PO offcanvas drawer.
-     */
     public function poDetailPartial(PurchaseOrder $order)
     {
         $order->load(['vendor', 'requisition', 'items.product']);
@@ -98,110 +41,85 @@ class PurchaseOrderController extends Controller
     public function create(Request $request)
     {
         $tenantId = require_tenant_id();
+
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
+        $products = Product::where('tenant_id', $tenantId)->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
-        $products = Product::sellable()->where('tenant_id', $tenantId)->get();
-
-        $allRequisitions = PurchaseRequisition::where('tenant_id', $tenantId)
-            ->where('status', 'Approved')
-            ->with('items')
-            ->get();
-
-        $requisitions = $allRequisitions->filter(function ($pr) use ($tenantId) {
-            $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
-                ->where('purchase_requisition_id', $pr->id)
-                ->where('status', '!=', 'Cancelled')
-                ->with('items')
-                ->get();
-
-            foreach ($pr->items as $item) {
-                $alreadyOrderedQty = 0.0;
-                foreach ($existingPos as $po) {
-                    $alreadyOrderedQty += (float) $po->items->where('product_id', $item->product_id)->sum('quantity');
-                }
-                $pendingQty = (float) $item->quantity - $alreadyOrderedQty;
-                if ($pendingQty > 0.0001) {
-                    return true;
-                }
-            }
-            return false;
-        });
+        $requisitions = PurchaseRequisition::where('tenant_id', $tenantId)->where('status', 'Approved')->get();
 
         $selectedRequisitionId = $request->input('requisition_id');
-        $requisitionItemIds = $request->input('requisition_item_ids', []);
+        $requisitionItemIds = (array) $request->input('requisition_item_ids', []);
         $prefilledItems = [];
 
-        if ($selectedRequisitionId) {
-            $requisition = PurchaseRequisition::where('tenant_id', $tenantId)
-                ->with(['items.product', 'items.warehouse'])
-                ->find($selectedRequisitionId);
-            
-            if ($requisition) {
-                $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
-                    ->where('purchase_requisition_id', $selectedRequisitionId)
-                    ->where('status', '!=', 'Cancelled')
-                    ->with('items')
-                    ->get();
-
-                foreach ($requisition->items as $item) {
-                    $alreadyOrderedQty = 0.0;
-                    foreach ($existingPos as $po) {
-                        $alreadyOrderedQty += (float) $po->items->where('product_id', $item->product_id)->sum('quantity');
-                    }
-                    $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
-
-                    if ($pendingQty > 0.0001) {
-                        $prefilledItems[] = [
-                            'product_id' => $item->product_id,
-                            'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
-                            'quantity' => $pendingQty,
-                            'warehouse_id' => $item->warehouse_id,
-                            'warehouse_name' => $item->warehouse->name ?? '—',
-                            'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
-                            'estimated_cost' => (float)$item->estimated_cost,
-                        ];
-                    }
-                }
-            }
-        } elseif (!empty($requisitionItemIds)) {
-            $items = PurchaseRequisitionItem::whereIn('id', $requisitionItemIds)
+        // If specific PR item IDs were passed (e.g. from Pending PR page or Convert to PO button)
+        if (!empty($requisitionItemIds)) {
+            $prItems = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('tenant_id', $tenantId)
+                ->whereIn('id', $requisitionItemIds)
                 ->with(['product', 'warehouse', 'requisition'])
                 ->get();
 
-            if ($items->isNotEmpty()) {
-                $requisitionIds = $items->pluck('purchase_requisition_id')->unique()->toArray();
-                
-                // If items are selected from different PRs, do not select any PR (leave it blank)
-                $selectedRequisitionId = count($requisitionIds) === 1 ? $requisitionIds[0] : null;
-
-                $groupedPrefilled = [];
-                foreach ($items as $item) {
-                    $alreadyOrderedQty = (float) $item->ordered_qty;
-
-                    $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
-
-                    if ($pendingQty > 0.0001) {
-                        $prodId = $item->product_id;
-                        if (isset($groupedPrefilled[$prodId])) {
-                            $groupedPrefilled[$prodId]['quantity'] += $pendingQty;
-                        } else {
-                            $groupedPrefilled[$prodId] = [
-                                'product_id' => $item->product_id,
-                                'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
-                                'quantity' => $pendingQty,
-                                'warehouse_id' => $item->warehouse_id,
-                                'warehouse_name' => $item->warehouse->name ?? '—',
-                                'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
-                                'estimated_cost' => (float)$item->estimated_cost,
-                            ];
-                        }
-                    }
+            foreach ($prItems as $prItem) {
+                if (!$selectedRequisitionId && $prItem->purchase_requisition_id) {
+                    $selectedRequisitionId = $prItem->purchase_requisition_id;
                 }
-                $prefilledItems = array_values($groupedPrefilled);
+
+                $alreadyOrderedQty = (float) $prItem->ordered_qty;
+                $pendingQty = max(0.0, (float) $prItem->quantity - $alreadyOrderedQty);
+                if ($pendingQty <= 0) {
+                    $pendingQty = (float) $prItem->quantity;
+                }
+
+                $product = $prItem->product;
+                $costRate = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
+
+                $prefilledItems[] = [
+                    'requisition_item_id' => $prItem->id,
+                    'product_id' => $prItem->product_id,
+                    'product_name' => $product?->name ?? 'Product #' . $prItem->product_id,
+                    'quantity' => $pendingQty,
+                    'rate' => $costRate,
+                    'warehouse_id' => $prItem->warehouse_id,
+                ];
+            }
+        } elseif ($selectedRequisitionId) {
+            // If whole requisition_id was passed
+            $prItems = \App\Domains\Purchase\Models\PurchaseRequisitionItem::where('tenant_id', $tenantId)
+                ->where('purchase_requisition_id', $selectedRequisitionId)
+                ->with(['product', 'warehouse'])
+                ->get();
+
+            foreach ($prItems as $prItem) {
+                $alreadyOrderedQty = (float) $prItem->ordered_qty;
+                $pendingQty = max(0.0, (float) $prItem->quantity - $alreadyOrderedQty);
+                if ($pendingQty <= 0) {
+                    $pendingQty = (float) $prItem->quantity;
+                }
+
+                $product = $prItem->product;
+                $costRate = (float) ($prItem->estimated_cost ?: ($product?->cost_price ?: ($product?->unit_cost ?: 0.00)));
+
+                $prefilledItems[] = [
+                    'requisition_item_id' => $prItem->id,
+                    'product_id' => $prItem->product_id,
+                    'product_name' => $product?->name ?? 'Product #' . $prItem->product_id,
+                    'quantity' => $pendingQty,
+                    'rate' => $costRate,
+                    'warehouse_id' => $prItem->warehouse_id,
+                ];
+
+                $requisitionItemIds[] = $prItem->id;
             }
         }
 
-        return view('modules.purchase.orders.create', compact('vendors', 'warehouses', 'products', 'requisitions', 'selectedRequisitionId', 'prefilledItems', 'requisitionItemIds'));
+        return view('modules.purchase.orders.create', compact(
+            'vendors',
+            'products',
+            'warehouses',
+            'requisitions',
+            'selectedRequisitionId',
+            'requisitionItemIds',
+            'prefilledItems'
+        ));
     }
 
     public function store(Request $request)
@@ -209,175 +127,47 @@ class PurchaseOrderController extends Controller
         $tenantId = require_tenant_id();
 
         $validated = $request->validate([
-            'source_type' => 'nullable|string|in:direct,requisition,rfq',
+            'date' => 'nullable|date',
+            'po_date' => 'nullable|date',
+            'delivery_date' => 'nullable|date',
+            'expected_delivery_date' => 'nullable|date',
             'vendor_id' => 'required|integer|exists:vendors,id',
-            'date' => 'required|date',
-            'delivery_date' => 'nullable|date|after_or_equal:date',
-            'purchase_requisition_id' => 'nullable|integer|exists:purchase_requisitions,id',
-            'location' => 'nullable|string|max:255',
-            'reference' => 'nullable|string|max:255',
-            'supplier_quotation_number' => 'nullable|string|max:255',
-            'discount_type' => 'required|string|in:without_discount,item_wise,order_wise',
-            'tax_type' => 'required|string|in:without_tax,item_wise_tax,order_wise_tax',
-            'gst_type' => 'required|string|in:cgst_sgst,igst',
-            'subtotal' => 'required|numeric|min:0',
-            'discount_amount' => 'required|numeric|min:0',
-            'cgst_amount' => 'required|numeric|min:0',
-            'sgst_amount' => 'required|numeric|min:0',
-            'igst_amount' => 'required|numeric|min:0',
-            'tax_amount' => 'required|numeric|min:0',
-            'grand_total' => 'required|numeric|min:0',
+            'payment_terms' => 'nullable|string|max:255',
+            'discount_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
+            'terms_conditions' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.warehouse_id' => 'nullable|integer|exists:warehouses,id',
             'items.*.quantity' => 'required|numeric|min:0.0001',
-            'items.*.rate' => 'required|numeric|min:0',
-            'items.*.amount' => 'required|numeric|min:0',
-            'items.*.discount_percent' => 'nullable|numeric|min:0|max:100',
-            'items.*.discount_amount' => 'nullable|numeric|min:0',
-            'items.*.tax_percent' => 'nullable|numeric|min:0',
-            'items.*.cgst_percent' => 'nullable|numeric|min:0',
-            'items.*.sgst_percent' => 'nullable|numeric|min:0',
-            'items.*.igst_percent' => 'nullable|numeric|min:0',
-            'items.*.cgst_amount' => 'nullable|numeric|min:0',
-            'items.*.sgst_amount' => 'nullable|numeric|min:0',
-            'items.*.igst_amount' => 'nullable|numeric|min:0',
-            'items.*.tax_amount' => 'nullable|numeric|min:0',
-            'items.*.total_amount' => 'nullable|numeric|min:0',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.rate' => 'nullable|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0',
+            'items.*.tax_rate' => 'nullable|numeric|min:0',
         ]);
 
-        return DB::transaction(function () use ($validated, $tenantId, $request) {
-            // Generate sequence number YYYY-000001
-            $year = now()->format('Y');
-            $prefix = "PO-{$year}-";
-            $latest = PurchaseOrder::where('tenant_id', $tenantId)
-                ->where('purchase_order_number', 'like', "{$prefix}%")
-                ->orderBy('id', 'desc')
-                ->first();
-            $nextNum = 1;
-            if ($latest) {
-                $lastNumStr = str_replace($prefix, '', $latest->purchase_order_number);
-                $nextNum = ((int) $lastNumStr) + 1;
-            }
-            $poNumber = $prefix . str_pad($nextNum, 6, '0', STR_PAD_LEFT);
+        $po = $this->orderService->storeOrder($validated, $tenantId);
 
-            $requisitionItemIds = $request->input('requisition_item_ids', []);
-            $prItems = collect();
-            if (!empty($requisitionItemIds)) {
-                $prItems = PurchaseRequisitionItem::whereIn('id', $requisitionItemIds)->get();
-            }
-
-            // Determine if the selected items are from a single PR or multiple
-            $prIds = $prItems->pluck('purchase_requisition_id')->unique();
-            $headerPrId = $prIds->count() === 1 ? $prIds->first() : null;
-
-            $po = PurchaseOrder::create([
-                'tenant_id' => $tenantId,
-                'purchase_order_number' => $poNumber,
-                'purchase_requisition_id' => $headerPrId ?: ($validated['purchase_requisition_id'] ?? null),
-                'source_type' => $validated['source_type'] ?? (!empty($headerPrId) || !empty($validated['purchase_requisition_id']) ? 'requisition' : 'direct'),
-                'vendor_id' => $validated['vendor_id'],
-                'location' => $validated['location'] ?? null,
-                'reference' => $validated['reference'] ?? null,
-                'supplier_quotation_number' => $validated['supplier_quotation_number'] ?? null,
-                'date' => $validated['date'],
-                'delivery_date' => $validated['delivery_date'] ?? null,
-                'discount_type' => $validated['discount_type'],
-                'tax_type' => $validated['tax_type'],
-                'gst_type' => $validated['gst_type'],
-                'subtotal' => $validated['subtotal'],
-                'discount_amount' => $validated['discount_amount'],
-                'cgst_amount' => $validated['cgst_amount'],
-                'sgst_amount' => $validated['sgst_amount'],
-                'igst_amount' => $validated['igst_amount'],
-                'tax_amount' => $validated['tax_amount'],
-                'grand_total' => $validated['grand_total'],
-                'status' => 'Draft',
-                'notes' => $validated['notes'] ?? null,
-                'created_by' => auth()->id() ?: 1,
-            ]);
-
-            foreach ($validated['items'] as $item) {
-                $productId = $item['product_id'];
-                $totalQty = (float)$item['quantity'];
-
-                // Find matching PR items for this product
-                $matchingPrItems = $prItems->where('product_id', $productId)->sortBy('id');
-
-                $allocations = [];
-                if ($matchingPrItems->isNotEmpty()) {
-                    $remainingQty = $totalQty;
-
-                    foreach ($matchingPrItems as $prItem) {
-                        if ($remainingQty <= 0) break;
-
-                        // Calculate pending quantity for this specific PR item
-                        $alreadyOrdered = (float)$prItem->ordered_qty;
-                        $pending = max(0.0, (float)$prItem->quantity - $alreadyOrdered);
-
-                        if ($pending > 0.0001) {
-                            $qtyToAlloc = min($remainingQty, $pending);
-                            $remainingQty -= $qtyToAlloc;
-
-                            // Add to allocations JSON
-                            $allocations[] = [
-                                'pr_item_id' => $prItem->id,
-                                'quantity' => $qtyToAlloc,
-                            ];
-                        }
-                    }
-
-                    // Save any remaining/excess quantity without incrementing any PR (direct excess)
-                    if ($remainingQty > 0.0001) {
-                        $allocations[] = [
-                            'pr_item_id' => null,
-                            'quantity' => $remainingQty,
-                        ];
-                    }
-                }
-
-                PurchaseOrderItem::create([
-                    'purchase_order_id' => $po->id,
-                    'product_id' => $productId,
-                    'requisition_item_allocations' => empty($allocations) ? null : $allocations,
-                    'quantity' => $totalQty,
-                    'rate' => $item['rate'],
-                    'amount' => $item['amount'],
-                    'discount_percent' => $item['discount_percent'] ?? 0.00,
-                    'discount_amount' => $item['discount_amount'] ?? 0.00,
-                    'tax_percent' => $item['tax_percent'] ?? 0.00,
-                    'cgst_percent' => $item['cgst_percent'] ?? 0.00,
-                    'sgst_percent' => $item['sgst_percent'] ?? 0.00,
-                    'igst_percent' => $item['igst_percent'] ?? 0.00,
-                    'cgst_amount' => $item['cgst_amount'] ?? 0.00,
-                    'sgst_amount' => $item['sgst_amount'] ?? 0.00,
-                    'igst_amount' => $item['igst_amount'] ?? 0.00,
-                    'tax_amount' => $item['tax_amount'] ?? 0.00,
-                    'total_amount' => $item['total_amount'] ?? $item['amount'],
-                ]);
-            }
-
-            return redirect()->route('purchase.orders.show', $po->id)
-                ->with('success', "Purchase Order {$poNumber} created successfully.");
-        });
+        return redirect()->route('purchase.orders.show', $po->id)
+            ->with('success', "Purchase Order {$po->po_number} created successfully.");
     }
 
     public function show(int $id)
     {
-        $tenantId = require_tenant_id();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)
-            ->with(['vendor', 'requisition', 'creator', 'items.product', 'warehouse'])
-            ->findOrFail($id);
-
+        $order = $this->orderRepo->findWithDetails($id);
         return view('modules.purchase.orders.show', compact('order'));
+    }
+
+    public function detailPartial(int $id)
+    {
+        $order = $this->orderRepo->findWithDetails($id);
+        return view('modules.purchase.orders.detail-partial', compact('order'));
     }
 
     public function edit(int $id)
     {
         $tenantId = require_tenant_id();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)
-            ->with('items')
-            ->findOrFail($id);
+        $order = $this->orderRepo->findWithDetails($id);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
@@ -385,44 +175,17 @@ class PurchaseOrderController extends Controller
         }
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
+        $products = Product::where('tenant_id', $tenantId)->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
-        $products = Product::sellable()->where('tenant_id', $tenantId)->get();
-        $allRequisitions = PurchaseRequisition::where('tenant_id', $tenantId)
-            ->where('status', 'Approved')
-            ->with('items')
-            ->get();
+        $requisitions = PurchaseRequisition::where('tenant_id', $tenantId)->where('status', 'Approved')->get();
 
-        $requisitions = $allRequisitions->filter(function ($pr) use ($tenantId, $order) {
-            if ($order->purchase_requisition_id == $pr->id) {
-                return true;
-            }
-
-            $existingPos = PurchaseOrder::where('tenant_id', $tenantId)
-                ->where('purchase_requisition_id', $pr->id)
-                ->where('status', '!=', 'Cancelled')
-                ->with('items')
-                ->get();
-
-            foreach ($pr->items as $item) {
-                $alreadyOrderedQty = 0.0;
-                foreach ($existingPos as $po) {
-                    $alreadyOrderedQty += (float) $po->items->where('product_id', $item->product_id)->sum('quantity');
-                }
-                $pendingQty = (float) $item->quantity - $alreadyOrderedQty;
-                if ($pendingQty > 0.0001) {
-                    return true;
-                }
-            }
-            return false;
-        });
-
-        return view('modules.purchase.orders.edit', compact('order', 'vendors', 'warehouses', 'products', 'requisitions'));
+        return view('modules.purchase.orders.edit', compact('order', 'vendors', 'products', 'warehouses', 'requisitions'));
     }
 
     public function update(Request $request, int $id)
     {
-        $tenantId = require_tenant_id();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order = $this->orderRepo->find($id);
+        if (!$order) abort(404);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
@@ -431,216 +194,84 @@ class PurchaseOrderController extends Controller
 
         $validated = $request->validate([
             'vendor_id' => 'required|integer|exists:vendors,id',
-            'date' => 'required|date',
-            'delivery_date' => 'nullable|date|after_or_equal:date',
-            'purchase_requisition_id' => 'nullable|integer|exists:purchase_requisitions,id',
-            'location' => 'nullable|string|max:255',
-            'reference' => 'nullable|string|max:255',
-            'supplier_quotation_number' => 'nullable|string|max:255',
-            'discount_type' => 'required|string|in:without_discount,item_wise,order_wise',
-            'tax_type' => 'required|string|in:without_tax,item_wise_tax,order_wise_tax',
-            'gst_type' => 'required|string|in:cgst_sgst,igst',
-            'subtotal' => 'required|numeric|min:0',
-            'discount_amount' => 'required|numeric|min:0',
-            'cgst_amount' => 'required|numeric|min:0',
-            'sgst_amount' => 'required|numeric|min:0',
-            'igst_amount' => 'required|numeric|min:0',
-            'tax_amount' => 'required|numeric|min:0',
-            'grand_total' => 'required|numeric|min:0',
+            'po_date' => 'nullable|date',
+            'date' => 'nullable|date',
+            'expected_delivery_date' => 'nullable|date',
+            'payment_terms' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
-            'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|integer|exists:products,id',
-            'items.*.quantity' => 'required|numeric|min:0.0001',
-            'items.*.rate' => 'required|numeric|min:0',
-            'items.*.amount' => 'required|numeric|min:0',
-            'items.*.discount_percent' => 'nullable|numeric|min:0|max:100',
-            'items.*.discount_amount' => 'nullable|numeric|min:0',
-            'items.*.tax_percent' => 'nullable|numeric|min:0',
-            'items.*.cgst_percent' => 'nullable|numeric|min:0',
-            'items.*.sgst_percent' => 'nullable|numeric|min:0',
-            'items.*.igst_percent' => 'nullable|numeric|min:0',
-            'items.*.cgst_amount' => 'nullable|numeric|min:0',
-            'items.*.sgst_amount' => 'nullable|numeric|min:0',
-            'items.*.igst_amount' => 'nullable|numeric|min:0',
-            'items.*.tax_amount' => 'nullable|numeric|min:0',
-            'items.*.total_amount' => 'nullable|numeric|min:0',
         ]);
 
-        return DB::transaction(function () use ($validated, $order) {
-            $order->update([
-                'purchase_requisition_id' => $validated['purchase_requisition_id'] ?? null,
-                'vendor_id' => $validated['vendor_id'],
-                'location' => $validated['location'] ?? null,
-                'reference' => $validated['reference'] ?? null,
-                'supplier_quotation_number' => $validated['supplier_quotation_number'] ?? null,
-                'date' => $validated['date'],
-                'delivery_date' => $validated['delivery_date'] ?? null,
-                'discount_type' => $validated['discount_type'],
-                'tax_type' => $validated['tax_type'],
-                'gst_type' => $validated['gst_type'],
-                'subtotal' => $validated['subtotal'],
-                'discount_amount' => $validated['discount_amount'],
-                'cgst_amount' => $validated['cgst_amount'],
-                'sgst_amount' => $validated['sgst_amount'],
-                'igst_amount' => $validated['igst_amount'],
-                'tax_amount' => $validated['tax_amount'],
-                'grand_total' => $validated['grand_total'],
-                'notes' => $validated['notes'] ?? null,
-            ]);
+        $this->orderRepo->update($order, $validated);
 
-            // Keep a copy of old allocations to re-allocate if items are updated
-            $oldAllocationsByProduct = [];
-            foreach ($order->items as $oldItem) {
-                if (!empty($oldItem->requisition_item_allocations)) {
-                    $oldAllocationsByProduct[$oldItem->product_id] = $oldItem->requisition_item_allocations;
-                }
-            }
+        return redirect()->route('purchase.orders.show', $id)
+            ->with('success', 'Purchase Order updated successfully.');
+    }
 
-            // Re-create items
-            $order->items()->delete();
+    public function confirm(int $id)
+    {
+        $order = $this->orderRepo->find($id);
+        if (!$order) abort(404);
 
-            foreach ($validated['items'] as $item) {
-                $productId = $item['product_id'];
-                $totalQty = (float)$item['quantity'];
+        if ($order->status !== 'Draft') {
+            return redirect()->back()->with('error', 'Only Draft Purchase Orders can be confirmed.');
+        }
 
-                // Reconstruct allocations based on previous ones, or check header link
-                $prItemIds = [];
-                if (isset($oldAllocationsByProduct[$productId])) {
-                    $prItemIds = collect($oldAllocationsByProduct[$productId])->pluck('pr_item_id')->filter()->toArray();
-                }
+        $this->orderService->confirmOrder($order);
 
-                $prItems = collect();
-                if (!empty($prItemIds)) {
-                    $prItems = PurchaseRequisitionItem::whereIn('id', $prItemIds)->get();
-                } elseif (!empty($validated['purchase_requisition_id'])) {
-                    $prItems = PurchaseRequisitionItem::where('purchase_requisition_id', $validated['purchase_requisition_id'])
-                        ->where('product_id', $productId)
-                        ->get();
-                }
+        return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} has been approved successfully.");
+    }
 
-                $allocations = [];
-                if ($prItems->isNotEmpty()) {
-                    $remainingQty = $totalQty;
+    public function approve(int $id)
+    {
+        return $this->confirm($id);
+    }
 
-                    foreach ($prItems as $prItem) {
-                        if ($remainingQty <= 0) break;
+    public function reject(int $id)
+    {
+        return $this->cancel($id);
+    }
 
-                        $alreadyOrdered = (float)$prItem->fresh()->ordered_qty;
-                        $pending = max(0.0, (float)$prItem->quantity - $alreadyOrdered);
+    public function cancel(int $id)
+    {
+        $order = $this->orderRepo->find($id);
+        if (!$order) abort(404);
 
-                        if ($pending > 0.0001) {
-                            $qtyToAlloc = min($remainingQty, $pending);
-                            $remainingQty -= $qtyToAlloc;
+        if (in_array($order->status, ['Completed', 'Cancelled'])) {
+            return redirect()->back()->with('error', 'This Purchase Order cannot be cancelled.');
+        }
 
-                            $allocations[] = [
-                                'pr_item_id' => $prItem->id,
-                                'quantity' => $qtyToAlloc,
-                            ];
-                        }
-                    }
+        $this->orderService->cancelOrder($order);
 
-                    if ($remainingQty > 0.0001) {
-                        $allocations[] = [
-                            'pr_item_id' => null,
-                            'quantity' => $remainingQty,
-                        ];
-                    }
-                }
+        return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} cancelled.");
+    }
 
-                PurchaseOrderItem::create([
-                    'purchase_order_id' => $order->id,
-                    'product_id' => $productId,
-                    'requisition_item_allocations' => empty($allocations) ? null : $allocations,
-                    'quantity' => $totalQty,
-                    'rate' => $item['rate'],
-                    'amount' => $item['amount'],
-                    'discount_percent' => $item['discount_percent'] ?? 0.00,
-                    'discount_amount' => $item['discount_amount'] ?? 0.00,
-                    'tax_percent' => $item['tax_percent'] ?? 0.00,
-                    'cgst_percent' => $item['cgst_percent'] ?? 0.00,
-                    'sgst_percent' => $item['sgst_percent'] ?? 0.00,
-                    'igst_percent' => $item['igst_percent'] ?? 0.00,
-                    'cgst_amount' => $item['cgst_amount'] ?? 0.00,
-                    'sgst_amount' => $item['sgst_amount'] ?? 0.00,
-                    'igst_amount' => $item['igst_amount'] ?? 0.00,
-                    'tax_amount' => $item['tax_amount'] ?? 0.00,
-                    'total_amount' => $item['total_amount'] ?? $item['amount'],
-                ]);
-            }
-
-            return redirect()->route('purchase.orders.show', $order->id)
-                ->with('success', "Purchase Order updated successfully.");
-        });
+    public function downloadPdf(int $id)
+    {
+        $order = $this->orderRepo->findWithDetails($id);
+        $pdf = Pdf::loadView('modules.purchase.orders.pdf', compact('order'));
+        return $pdf->download("PO_{$order->po_number}.pdf");
     }
 
     public function destroy(int $id)
     {
-        $tenantId = require_tenant_id();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
+        $order = $this->orderRepo->find($id);
+        if (!$order) abort(404);
 
         if ($order->status !== 'Draft') {
             return redirect()->route('purchase.orders.show', $id)
                 ->with('error', 'Only Draft Purchase Orders can be deleted.');
         }
 
-        $order->delete();
+        $this->orderRepo->delete($order);
 
         return redirect()->route('purchase.orders.index')
             ->with('success', 'Purchase Order deleted successfully.');
-    }
-
-    public function approve(int $id)
-    {
-        $tenantId = require_tenant_id();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
-
-        if ($order->status === 'Draft') {
-            DB::transaction(function () use ($order) {
-                // Increment ordered_qty on allocated PR items
-                foreach ($order->items as $item) {
-                    if (!empty($item->requisition_item_allocations)) {
-                        foreach ($item->requisition_item_allocations as $alloc) {
-                            if (!empty($alloc['pr_item_id'])) {
-                                DB::table('purchase_requisition_items')
-                                    ->where('id', $alloc['pr_item_id'])
-                                    ->increment('ordered_qty', (float)$alloc['quantity']);
-                            }
-                        }
-                    }
-                }
-                $order->update(['status' => 'Approved']);
-            });
-
-            return redirect()->route('purchase.orders.show', $id)
-                ->with('success', 'Purchase Order approved successfully.');
-        }
-
-        return redirect()->route('purchase.orders.show', $id)
-            ->with('error', 'Only Draft Purchase Orders can be approved.');
-    }
-
-    public function reject(int $id)
-    {
-        $tenantId = require_tenant_id();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($id);
-
-        if ($order->status === 'Draft') {
-            $order->update(['status' => 'Cancelled']);
-
-            return redirect()->route('purchase.orders.show', $id)
-                ->with('success', 'Purchase Order rejected successfully.');
-        }
-
-        return redirect()->route('purchase.orders.show', $id)
-            ->with('error', 'Only Draft Purchase Orders can be rejected.');
     }
 
     public function getRequisitionItems(Request $request)
     {
         $tenantId = require_tenant_id();
         $requisitionId = (int) $request->query('requisition_id');
-        $excludePoId = $request->query('exclude_po_id');
-
         $requisition = PurchaseRequisition::where('tenant_id', $tenantId)
             ->with(['items.product', 'items.warehouse'])
             ->find($requisitionId);
@@ -650,53 +281,18 @@ class PurchaseOrderController extends Controller
         }
 
         $items = [];
-        $existingPoQuery = PurchaseOrder::where('tenant_id', $tenantId)
-            ->where('purchase_requisition_id', $requisitionId)
-            ->where('status', '!=', 'Cancelled');
-
-        if ($excludePoId) {
-            $existingPoQuery->where('id', '!=', (int)$excludePoId);
-        }
-
-        $existingPos = $existingPoQuery->with('items')->get();
-
         foreach ($requisition->items as $item) {
-            $alreadyOrderedQty = 0.0;
-            foreach ($existingPos as $po) {
-                $alreadyOrderedQty += (float) $po->items->where('product_id', $item->product_id)->sum('quantity');
-            }
-            $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
-
-            if ($pendingQty > 0.0001) {
-                $items[] = [
-                    'product_id' => $item->product_id,
-                    'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
-                    'quantity' => $pendingQty,
-                    'warehouse_id' => $item->warehouse_id,
-                    'warehouse_name' => $item->warehouse->name ?? '—',
-                    'rate' => (float)($item->product->unit_cost ?? $item->estimated_cost ?? 0.00),
-                    'estimated_cost' => (float)$item->estimated_cost,
-                ];
-            }
+            $items[] = [
+                'product_id' => $item->product_id,
+                'product_name' => $item->product->name . ($item->product->sku ? ' (' . $item->product->sku . ')' : ''),
+                'quantity' => (float)$item->quantity,
+                'estimated_cost' => (float)$item->estimated_cost,
+            ];
         }
 
         return response()->json([
             'success' => true,
             'items' => $items,
         ]);
-    }
-
-    public function downloadPdf(int $id)
-    {
-        $tenantId = require_tenant_id();
-        $order = PurchaseOrder::where('tenant_id', $tenantId)
-            ->with(['vendor', 'requisition', 'creator', 'items.product', 'warehouse'])
-            ->findOrFail($id);
-
-        $pdf = Pdf::loadView('modules.purchase.orders.pdf', [
-            'order' => $order,
-        ]);
-
-        return $pdf->download("PurchaseOrder_{$order->purchase_order_number}.pdf");
     }
 }

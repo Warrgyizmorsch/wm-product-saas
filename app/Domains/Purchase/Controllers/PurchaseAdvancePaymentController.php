@@ -3,104 +3,88 @@
 namespace App\Domains\Purchase\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Domains\Purchase\Models\PurchaseOrder;
-use App\Domains\Purchase\Models\PurchaseAdvancePayment;
-use App\Domains\Accounting\Services\JournalService;
-use App\Domains\Accounting\Repositories\ChartOfAccountRepositoryInterface;
+use App\Domains\Purchase\Repositories\PurchaseAdvancePaymentRepository;
+use App\Domains\Purchase\Repositories\PurchaseOrderRepository;
+use App\Domains\Purchase\Services\PurchaseAdvancePaymentService;
+use App\Domains\Inventory\Models\Vendor;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class PurchaseAdvancePaymentController extends Controller
 {
     public function __construct(
-        private readonly JournalService $journals,
-        private readonly ChartOfAccountRepositoryInterface $accounts,
-    ) {
+        protected PurchaseAdvancePaymentRepository $advanceRepo,
+        protected PurchaseOrderRepository $orderRepo,
+        protected PurchaseAdvancePaymentService $advanceService
+    ) {}
+
+    public function index(Request $request)
+    {
+        $advances = $this->advanceRepo->getPaginatedAdvances($request->all(), 10);
+        return view('modules.purchase.advances.index', compact('advances'));
     }
 
-    /**
-     * Store PO Advance Payment and invoke global Accounting Journal Service
-     */
+    public function create(Request $request)
+    {
+        $tenantId = require_tenant_id();
+
+        $poId = $request->query('purchase_order_id');
+        $prefillPo = null;
+        if ($poId) {
+            $prefillPo = $this->orderRepo->find($poId);
+        }
+
+        $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
+        $purchaseOrders = $this->orderRepo->getPaginatedOrders([], 100);
+
+        return view('modules.purchase.advances.create', compact('vendors', 'purchaseOrders', 'prefillPo'));
+    }
+
     public function store(Request $request)
     {
         $tenantId = require_tenant_id();
 
-        $request->validate([
-            'purchase_order_id' => 'required|exists:purchase_orders,id',
-            'vendor_id' => 'required|exists:vendors,id',
-            'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'required|string|in:Bank Transfer,Cheque,Cash,UPI',
+        $validated = $request->validate([
             'payment_date' => 'required|date',
-            'reference_number' => 'nullable|string|max:100',
-            'notes' => 'nullable|string|max:500',
+            'vendor_id' => 'required|integer|exists:vendors,id',
+            'purchase_order_id' => 'nullable|integer|exists:purchase_orders,id',
+            'amount' => 'required|numeric|min:0.01',
+            'payment_method' => 'required|string|in:Bank Transfer,Cash,Cheque,UPI,Credit Card',
+            'reference_number' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
         ]);
 
-        $po = PurchaseOrder::where('tenant_id', $tenantId)->findOrFail($request->purchase_order_id);
+        $advance = $this->advanceService->recordAdvancePayment($validated, $tenantId);
 
-        $currentAdvance = (float)$po->total_advance_paid;
-        $newAdvance = (float)$request->amount;
-        $maxAllowed = (float)$po->grand_total;
-
-        if (($currentAdvance + $newAdvance) > $maxAllowed) {
-            $rem = max(0, $maxAllowed - $currentAdvance);
-            return redirect()->back()->withInput()->with('error', "Advance payment cannot exceed remaining balance (Max allowed: ₹" . number_format($rem, 2) . ").");
+        if ($advance->purchase_order_id) {
+            return redirect()->route('purchase.orders.show', $advance->purchase_order_id)
+                ->with('success', "Advance Payment {$advance->advance_number} recorded successfully.");
         }
 
-        $count = PurchaseAdvancePayment::where('tenant_id', $tenantId)->count() + 1;
-        $paymentNumber = 'VPAY-ADV-' . date('Y') . '-' . str_pad($count, 6, '0', STR_PAD_LEFT);
+        return redirect()->route('purchase.advances.index')
+            ->with('success', "Advance Payment {$advance->advance_number} recorded successfully.");
+    }
 
-        DB::transaction(function () use ($tenantId, $request, $po, $paymentNumber) {
-            $payment = PurchaseAdvancePayment::create([
-                'tenant_id' => $tenantId,
-                'purchase_order_id' => $po->id,
-                'vendor_id' => $request->vendor_id,
-                'payment_number' => $paymentNumber,
-                'payment_date' => $request->payment_date,
-                'amount' => $request->amount,
-                'payment_method' => $request->payment_method,
-                'reference_number' => $request->reference_number,
-                'status' => 'Posted',
-                'notes' => $request->notes,
-                'created_by' => auth()->id(),
-            ]);
+    public function show(int $id)
+    {
+        $advance = $this->advanceRepo->find($id);
+        if (!$advance) abort(404);
 
-            // Direct call to global Accounting JournalService (Dr: Advance to Vendor 1200, Cr: Bank 1010)
-            try {
-                $advanceAccount = $this->accounts->findByCode('1200', $tenantId) 
-                               ?? $this->accounts->findByCode('1300', $tenantId);
+        $advance->load(['vendor', 'purchaseOrder']);
+        return view('modules.purchase.advances.show', compact('advance'));
+    }
 
-                $bankAccount = $this->accounts->findByCode('1010', $tenantId) 
-                            ?? $this->accounts->findByCode('1020', $tenantId);
+    public function edit(int $id)
+    {
+        return $this->show($id);
+    }
 
-                if ($advanceAccount && $bankAccount) {
-                    $amt = (float)$payment->amount;
-                    $vendorName = $payment->vendor?->name ?? 'Vendor';
-                    
-                    $this->journals->post([
-                        [
-                            'chart_of_account_id' => $advanceAccount->id,
-                            'debit' => $amt,
-                            'description' => "Advance to Vendor for PO {$po->purchase_order_number}",
-                        ],
-                        [
-                            'chart_of_account_id' => $bankAccount->id,
-                            'credit' => $amt,
-                            'description' => "Bank Payment for Vendor Advance {$paymentNumber}",
-                        ],
-                    ], [
-                        'tenant_id' => $tenantId,
-                        'source' => 'purchase',
-                        'reference_type' => PurchaseAdvancePayment::class,
-                        'reference_id' => $payment->id,
-                        'memo' => "Advance Payment {$paymentNumber} to Vendor {$vendorName}",
-                    ]);
-                }
-            } catch (\Throwable $e) {
-                Log::error('Accounting Journal Posting Exception on PO Advance: ' . $e->getMessage());
-            }
-        });
+    public function update(Request $request, int $id)
+    {
+        return redirect()->route('purchase.advances.index');
+    }
 
-        return redirect()->back()->with('success', "Advance Payment of ₹" . number_format($request->amount, 2) . " registered successfully for PO {$po->purchase_order_number}!");
+    public function destroy(int $id)
+    {
+        return redirect()->route('purchase.advances.index');
     }
 }

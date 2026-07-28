@@ -50,6 +50,25 @@ class VendorPayment extends BaseModel
         return $this->hasMany(VendorPaymentAllocation::class, 'vendor_payment_id');
     }
 
+    public function bills(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(VendorBill::class, 'vendor_payment_allocations', 'vendor_payment_id', 'vendor_bill_id')
+            ->withPivot('allocated_amount')
+            ->withTimestamps();
+    }
+
+    public function vendorBill(): \Illuminate\Database\Eloquent\Relations\HasOneThrough
+    {
+        return $this->hasOneThrough(
+            VendorBill::class,
+            VendorPaymentAllocation::class,
+            'vendor_payment_id',
+            'id',
+            'id',
+            'vendor_bill_id'
+        );
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

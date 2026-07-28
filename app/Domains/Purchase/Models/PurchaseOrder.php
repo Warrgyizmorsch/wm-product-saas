@@ -5,6 +5,7 @@ namespace App\Domains\Purchase\Models;
 use App\Core\Database\BaseModel;
 use App\Models\User;
 use App\Domains\Inventory\Models\Vendor;
+use App\Domains\Inventory\Models\Warehouse;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -67,9 +68,19 @@ class PurchaseOrder extends BaseModel
         return $this->hasMany(GoodsReceiptNote::class, 'purchase_order_id');
     }
 
+    public function vendorBills(): HasMany
+    {
+        return $this->hasMany(VendorBill::class, 'purchase_order_id');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(VendorPayment::class, 'purchase_order_id');
+    }
+
     public function advancePayments(): HasMany
     {
-        return $this->hasMany(PurchaseAdvancePayment::class, 'purchase_order_id')->where('status', 'Posted');
+        return $this->hasMany(PurchaseAdvancePayment::class, 'purchase_order_id');
     }
 
     public function getTotalAdvancePaidAttribute(): float
@@ -114,7 +125,22 @@ class PurchaseOrder extends BaseModel
 
     public function warehouse(): BelongsTo
     {
-        return $this->belongsTo(\App\Domains\Inventory\Models\Warehouse::class, 'location', 'name');
+        return $this->belongsTo(Warehouse::class, 'location', 'name');
+    }
+
+    public function getPoNumberAttribute(): string
+    {
+        return $this->attributes['purchase_order_number'] ?? $this->attributes['po_number'] ?? '';
+    }
+
+    public function getPoDateAttribute(): string
+    {
+        return $this->attributes['date'] ?? $this->attributes['po_date'] ?? '';
+    }
+
+    public function getTotalAmountAttribute(): float
+    {
+        return (float)($this->attributes['grand_total'] ?? $this->attributes['total_amount'] ?? 0);
     }
 
     public function getSupplierQuotationNumberAttribute(): ?string

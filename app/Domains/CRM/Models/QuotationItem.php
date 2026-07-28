@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Models\Concerns\BelongsToTenant;
+use App\Domains\Inventory\Models\Product;
 
 class QuotationItem extends Model
 {
@@ -37,7 +38,7 @@ class QuotationItem extends Model
 
     public function product(): BelongsTo
     {
-        return $this->belongsTo(\App\Domains\Inventory\Models\Product::class, 'product_id');
+        return $this->belongsTo(Product::class, 'product_id');
     }
 
     protected static function booted(): void

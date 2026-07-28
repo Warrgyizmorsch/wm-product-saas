@@ -28,15 +28,24 @@
                 </div>
             </div>
 
-            @if($selectedGrn->purchaseOrder && $selectedGrn->purchaseOrder->total_advance_paid > 0)
+            @php
+                $availAdv = max($availableAdvance ?? 0, $selectedGrn->purchaseOrder?->total_advance_paid ?? 0);
+            @endphp
+
+            @if($availAdv > 0)
                 <div class="alert alert-info border-info p-3 mb-4 rounded shadow-sm">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                         <div>
-                            <strong class="text-dark fs-13"><i class="feather-info text-info me-1.5"></i>{{ __('purchase.vendor_advance_paid_po') }}:</strong>
-                            <span class="text-success fw-bold font-monospace fs-14">₹{{ number_format($selectedGrn->purchaseOrder->total_advance_paid, 2) }}</span>
-                            <small class="text-muted d-block fs-11 mt-0.5">{{ __('purchase.bill_posted_full_value_help') }}</small>
+                            <strong class="text-dark fs-13"><i class="feather-info text-info me-1.5"></i>Vendor Advance Credit Available:</strong>
+                            <span class="text-success fw-bold font-monospace fs-14 ms-1">₹{{ number_format($availAdv, 2) }}</span>
+                            <small class="text-muted d-block fs-11 mt-0.5">Check the toggle option to automatically apply and deduct advance credit on this bill.</small>
                         </div>
-                        <span class="badge bg-primary text-white p-2 fs-12">{{ __('purchase.net_payment_to_vendor') }}: ₹{{ number_format(max(0, $selectedGrn->items->sum('total_amount') - $selectedGrn->purchaseOrder->total_advance_paid), 2) }}</span>
+                        <div class="form-check form-switch fs-14 bg-white p-2 px-3 rounded border shadow-sm">
+                            <input class="form-check-input ms-0 me-2" type="checkbox" name="use_vendor_advance" value="1" id="useVendorAdvance" checked style="cursor: pointer;">
+                            <label class="form-check-label fw-bold text-dark" for="useVendorAdvance" style="cursor: pointer;">
+                                Deduct Advance Credit (₹{{ number_format($availAdv, 2) }})
+                            </label>
+                        </div>
                     </div>
                 </div>
             @endif
@@ -91,7 +100,7 @@
                                     <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center font-monospace" value="{{ (float)$item->accepted_qty }}" step="0.001" min="0.001" required readonly style="background-color: #f8fafc;">
                                 </td>
                                 <td class="text-end">
-                                    <input type="number" name="items[{{ $idx }}][unit_rate]" class="form-control form-control-sm text-end font-monospace" value="{{ (float)$item->unit_rate }}" step="0.01" min="0" required>
+                                    <input type="number" name="items[{{ $idx }}][unit_price]" class="form-control form-control-sm text-end font-monospace" value="{{ (float)$item->unit_rate }}" step="0.01" min="0" required>
                                 </td>
                                 <td class="text-end pe-3 font-monospace fw-bold text-success">
                                     ₹{{ number_format($item->accepted_qty * $item->unit_rate, 2) }}

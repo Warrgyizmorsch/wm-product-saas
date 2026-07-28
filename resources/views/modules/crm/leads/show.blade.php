@@ -194,6 +194,7 @@
                                         </div>
 
                                         <div class="row g-4 fs-13 text-dark">
+                                            <!-- Left Column: Contact Info, Products, Pricing, Requirements -->
                                             <div class="col-md-6 border-end">
                                                 <h6 class="fw-bold text-primary mb-3">{{ __('crm.company_contact_info') }}</h6>
                                                 
@@ -213,8 +214,195 @@
                                                         <option value="{{ $user->id }}" @selected(old('lead_owner_id', $lead->lead_owner_id) == $user->id)>{{ $user->name }}</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
-                                                
-                                                <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.location_details') }}</h6>
+
+                                                <!-- Ultra Compact Product & Quantity Repeater Table Style -->
+                                                <style>
+                                                    #editProductItemsTable {
+                                                        table-layout: fixed !important;
+                                                        width: 100% !important;
+                                                    }
+                                                    #editProductItemsTable .select2-container {
+                                                        width: 100% !important;
+                                                        max-width: 100% !important;
+                                                    }
+                                                    #editProductItemsTable .select2-container .select2-selection--single {
+                                                        height: 32px !important;
+                                                        padding: 2px 8px !important;
+                                                        font-size: 12px !important;
+                                                        border-color: #dee2e6 !important;
+                                                    }
+                                                    #editProductItemsTable .select2-container .select2-selection--single .select2-selection__rendered {
+                                                        line-height: 26px !important;
+                                                        white-space: nowrap !important;
+                                                        overflow: hidden !important;
+                                                        text-overflow: ellipsis !important;
+                                                        padding-left: 0 !important;
+                                                        padding-right: 15px !important;
+                                                    }
+                                                    #editProductItemsTable .select2-container--bootstrap-5 .select2-selection--single .select2-selection__arrow {
+                                                        height: 30px !important;
+                                                    }
+                                                    #editProductItemsTable .qty-row-input {
+                                                        height: 32px !important;
+                                                        font-size: 13px !important;
+                                                        font-weight: 600 !important;
+                                                        border-color: #dee2e6 !important;
+                                                        background-color: #ffffff !important;
+                                                        padding: 2px 4px !important;
+                                                    }
+                                                </style>
+
+                                                <div class="mb-3 mt-4" id="editProductItemsContainer">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <label class="form-label fw-bold text-dark fs-12 mb-0">
+                                                            <i class="feather-package me-1 text-primary"></i>{{ __('crm.product') }} & Quantity
+                                                        </label>
+                                                        <button type="button" class="btn btn-xs btn-outline-primary fw-semibold px-2 py-1 fs-11" id="editAddProductRowBtn" style="border-radius: 6px;">
+                                                            <i class="feather-plus me-1"></i>Add Product
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    <div class="border rounded-3 bg-white p-2 shadow-sm" style="max-height: 270px; overflow-x: hidden; overflow-y: auto;">
+                                                        <table class="table table-sm table-borderless align-middle mb-0" id="editProductItemsTable">
+                                                            <thead>
+                                                                <tr class="border-bottom text-muted fs-11" style="background-color: #f8fafc;">
+                                                                    <th style="width: 58%; font-weight: 600;" class="py-1 ps-2">Product</th>
+                                                                    <th style="width: 28%; font-weight: 600;" class="py-1 text-center">Qty</th>
+                                                                    <th style="width: 14%; font-weight: 600;" class="py-1 text-center"></th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody id="editProductItemsBody">
+                                                                @php
+                                                                    $savedItems = old('items', $lead->product_items ?? []);
+                                                                    if (empty($savedItems) && !empty($lead->product_ids)) {
+                                                                        foreach ($lead->product_ids as $pid) {
+                                                                            $savedItems[] = ['product_id' => $pid, 'quantity' => 1];
+                                                                        }
+                                                                    }
+                                                                    if (empty($savedItems)) {
+                                                                        $savedItems = [['product_id' => '', 'quantity' => 1]];
+                                                                    }
+                                                                    $finished = $products->filter(fn($p) => $p->type === 'finished_good');
+                                                                    $semiFinished = $products->filter(fn($p) => $p->type === 'semi_finished');
+                                                                    $services = $products->filter(fn($p) => $p->item_type === 'Service' || $p->type === 'service');
+                                                                    $others = $products->filter(fn($p) => !in_array($p->type, ['finished_good', 'semi_finished', 'service']) && $p->item_type !== 'Service');
+                                                                @endphp
+
+                                                                @foreach($savedItems as $idx => $item)
+                                                                    <tr class="lead-item-row border-bottom">
+                                                                        <td class="py-1 ps-1 pe-1 align-top">
+                                                                            <select name="items[{{ $idx }}][product_id]" class="form-select form-select-sm odoo-select2 product-row-select" searchable="true" data-master="product">
+                                                                                <option value="">Select Product...</option>
+                                                                                <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>
+                                                                                
+                                                                                @if($finished->count())
+                                                                                    <optgroup label="📦 Finished Goods">
+                                                                                        @foreach($finished as $p)
+                                                                                            <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                                                {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                                                                            </option>
+                                                                                        @endforeach
+                                                                                    </optgroup>
+                                                                                @endif
+
+                                                                                @if($semiFinished->count())
+                                                                                    <optgroup label="⚙️ Semi-Finished Goods">
+                                                                                        @foreach($semiFinished as $p)
+                                                                                            <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                                                {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                                                                            </option>
+                                                                                        @endforeach
+                                                                                    </optgroup>
+                                                                                @endif
+
+                                                                                @if($services->count())
+                                                                                    <optgroup label="🛠️ Services">
+                                                                                        @foreach($services as $p)
+                                                                                            <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                                                {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                                                                            </option>
+                                                                                        @endforeach
+                                                                                    </optgroup>
+                                                                                @endif
+
+                                                                                @if($others->count())
+                                                                                    <optgroup label="🧱 Raw Materials & Components">
+                                                                                        @foreach($others as $p)
+                                                                                            <option value="{{ $p->id }}" @selected(($item['product_id'] ?? '') == $p->id)>
+                                                                                                {{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif
+                                                                                            </option>
+                                                                                        @endforeach
+                                                                                    </optgroup>
+                                                                                @endif
+                                                                            </select>
+                                                                        </td>
+                                                                        <td class="py-1 px-1 align-top">
+                                                                            <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input @error('items.'.$idx.'.quantity') is-invalid @enderror" value="{{ $item['quantity'] ?? 1 }}" min="1" step="1" required>
+                                                                            @error('items.'.$idx.'.quantity')
+                                                                                <div class="text-danger fs-11 mt-1 fw-semibold text-center qty-error-msg">{{ $message }}</div>
+                                                                            @enderror
+                                                                        </td>
+                                                                        <td class="py-1 text-center align-top pt-2">
+                                                                            <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="Remove Product">
+                                                                                <i class="feather-trash-2 fs-13"></i>
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                @endforeach
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+
+                                                <template id="editProductRowSelectTemplate">
+                                                    <select class="form-select form-select-sm product-row-select" searchable="true" data-master="product">
+                                                        <option value="">Select Product...</option>
+                                                        <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>
+                                                        
+                                                        @if($finished->count())
+                                                            <optgroup label="📦 Finished Goods">
+                                                                @foreach($finished as $p)
+                                                                    <option value="{{ $p->id }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
+                                                                @endforeach
+                                                            </optgroup>
+                                                        @endif
+
+                                                        @if($semiFinished->count())
+                                                            <optgroup label="⚙️ Semi-Finished Goods">
+                                                                @foreach($semiFinished as $p)
+                                                                    <option value="{{ $p->id }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
+                                                                @endforeach
+                                                            </optgroup>
+                                                        @endif
+
+                                                        @if($services->count())
+                                                            <optgroup label="🛠️ Services">
+                                                                @foreach($services as $p)
+                                                                    <option value="{{ $p->id }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
+                                                                @endforeach
+                                                            </optgroup>
+                                                        @endif
+
+                                                        @if($others->count())
+                                                            <optgroup label="🧱 Raw Materials & Components">
+                                                                @foreach($others as $p)
+                                                                    <option value="{{ $p->id }}">{{ $p->name }} @if($p->sku) ({{ $p->sku }}) @endif</option>
+                                                                @endforeach
+                                                            </optgroup>
+                                                        @endif
+                                                    </select>
+                                                </template>
+
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.expected_revenue_label')" name="expected_amount" inputType="number" :value="old('expected_amount', $lead->expected_amount)" min="0" step="0.01" :placeholder="__('crm.expected_revenue_label')" :errorText="$errors->first('expected_amount')" />
+
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.expected_sale_date')" name="expected_sale_date" inputType="date" :value="old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '')" :errorText="$errors->first('expected_sale_date')" />
+
+                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.requirements')" name="requirement" rows="3" :placeholder="__('crm.requirements_placeholder')" :errorText="$errors->first('requirement')">{{ old('requirement', $lead->requirement) }}</x-ui.odoo-form-ui>
+                                            </div>
+
+                                            <!-- Right Column: Location Details (Top Right) & Classification -->
+                                            <div class="col-md-6">
+                                                <h6 class="fw-bold text-primary mb-3">{{ __('crm.location_details') }}</h6>
 
                                                 <x-ui.odoo-form-ui type="textarea" :label="__('crm.street_address')" name="address" rows="3" :placeholder="__('crm.street_address_placeholder')" :errorText="$errors->first('address')">{{ old('address', $lead->address) }}</x-ui.odoo-form-ui>
 
@@ -223,28 +411,10 @@
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.state')" name="state" :value="old('state', $lead->state)" :placeholder="__('crm.state')" :errorText="$errors->first('state')" />
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.city')" name="city" :value="old('city', $lead->city)" :placeholder="__('crm.city')" :errorText="$errors->first('city')" />
-                                            </div>
 
-                                            <div class="col-md-6">
-                                                <h6 class="fw-bold text-primary mb-3">{{ __('crm.requirements_pricing') }}</h6>
+                                                <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.lead_classification') }}</h6>
 
-                                                <x-ui.odoo-form-ui type="select" :label="__('crm.product_interest')" name="product_id" searchable="true" class="erp-premium-select" data-master="product" :errorText="$errors->first('product_id')">
-                                                    <option value="">{{ __('crm.select_product') }}</option>
-                                                    <option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">{{ __('crm.add_new_product') }}</option>
-                                                    @foreach($products as $prod)
-                                                        <option value="{{ $prod->id }}" @selected(old('product_id', $lead->product_id) == $prod->id)>
-                                                            {{ $prod->name }} @if($prod->sku) ({{ $prod->sku }}) @endif
-                                                        </option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.expected_revenue_label')" name="expected_amount" inputType="number" :value="old('expected_amount', $lead->expected_amount)" min="0" step="0.01" :placeholder="__('crm.expected_revenue_label')" :errorText="$errors->first('expected_amount')" />
-
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.expected_sale_date')" name="expected_sale_date" inputType="date" :value="old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '')" :errorText="$errors->first('expected_sale_date')" />
-
-                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.requirements')" name="requirement" rows="4" :placeholder="__('crm.requirements_placeholder')" :errorText="$errors->first('requirement')">{{ old('requirement', $lead->requirement) }}</x-ui.odoo-form-ui>
-
-                                                <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.segmentation_sources') }}</h6>
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.industry_type')" name="industry_type" :value="old('industry_type', $lead->industry_type)" :placeholder="__('crm.industry_type')" :errorText="$errors->first('industry_type')" />
 
                                                 <x-ui.odoo-form-ui type="select" :label="__('crm.lead_source')" name="source" :errorText="$errors->first('source')">
                                                     <option value="">{{ __('crm.select_an_option') }}</option>
@@ -266,8 +436,6 @@
                                                         <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ __('crm.segments.' . $segOption) ?? $segOption }}</option>
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
-
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.industry_type')" name="industry_type" :value="old('industry_type', $lead->industry_type)" :placeholder="__('crm.industry_type')" :errorText="$errors->first('industry_type')" />
                                             </div>
                                         </div>
                                     </form>
@@ -332,9 +500,38 @@
                                                         <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ ($lead->source && $lead->source !== 'Select an Option') ? __('crm.sources.' . $lead->source) : '—' }}</span>
                                                     </div>
                                                 </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.product_interest') }}</div>
-                                                    <div class="zoho-field-value text-dark">{{ $lead->product?->name ?: '—' }}</div>
+                                                <div class="zoho-field-row align-items-start">
+                                                    <div class="zoho-field-label mt-1">{{ __('crm.product_interest') }}</div>
+                                                    <div class="zoho-field-value text-dark">
+                                                        @php
+                                                            $pItems = $lead->product_items ?: [];
+                                                        @endphp
+                                                        @if(!empty($pItems))
+                                                            <div class="d-flex flex-column gap-1">
+                                                                @foreach($pItems as $pi)
+                                                                    @php
+                                                                        $prod = $products->firstWhere('id', $pi['product_id']);
+                                                                    @endphp
+                                                                    @if($prod)
+                                                                        <div class="d-flex align-items-center justify-content-between bg-soft-primary border border-primary-subtle rounded px-2 py-1" style="font-size: 11px; max-width: 280px;">
+                                                                            <span class="text-primary fw-medium text-truncate me-2" title="{{ $prod->name }}">{{ $prod->name }}</span>
+                                                                            <span class="badge bg-primary text-white font-mono px-1.5 py-0.5">x{{ $pi['quantity'] ?? 1 }}</span>
+                                                                        </div>
+                                                                    @endif
+                                                                @endforeach
+                                                            </div>
+                                                        @elseif($lead->products->count())
+                                                            <div class="d-flex flex-column gap-1">
+                                                                @foreach($lead->products as $p)
+                                                                    <div class="bg-soft-primary border border-primary-subtle rounded px-2 py-1 text-primary fw-medium" style="font-size: 11px; max-width: 280px;">
+                                                                        {{ $p->name }}
+                                                                    </div>
+                                                                @endforeach
+                                                            </div>
+                                                        @else
+                                                            —
+                                                        @endif
+                                                    </div>
                                                 </div>
                                                 <div class="zoho-field-row">
                                                     <div class="zoho-field-label">{{ __('crm.segment') }}</div>
@@ -2166,7 +2363,8 @@
             const hasCreateQ = @json(request()->has('create_quotation') || old('form_type') === 'quotation_create');
             const hasEditQ = @json(request()->has('edit_quotation') || old('form_type') === 'quotation_edit');
             const existingItems = @json(old('items') ?: (isset($activeQuotation) ? $activeQuotation->items : []));
-            const prefillProductId = @json($lead->product_id);
+            const prefillProductItems = @json($lead->product_items ?: []);
+            const prefillProductIds = @json($lead->product_ids ?: []);
             const prefillAmount = @json($lead->expected_amount);
 
             if (hasCreateQ || hasEditQ) {
@@ -2174,14 +2372,36 @@
                     existingItems.forEach(function(item) {
                         addRow(item);
                     });
-                } else if (hasCreateQ && (prefillProductId || prefillAmount)) {
-                    addRow({
-                        product_id: prefillProductId || '',
-                        description: '',
-                        quantity: 1,
-                        unit_price: parseFloat(prefillAmount) || 0.00,
-                        tax_rate: 18.00
-                    });
+                } else if (hasCreateQ && (prefillProductItems.length > 0 || prefillProductIds.length > 0 || prefillAmount)) {
+                    if (prefillProductItems.length > 0) {
+                        prefillProductItems.forEach(function(pItem) {
+                            addRow({
+                                product_id: pItem.product_id || '',
+                                description: '',
+                                quantity: parseFloat(pItem.quantity) || 1,
+                                unit_price: parseFloat(prefillAmount) || 0.00,
+                                tax_rate: 18.00
+                            });
+                        });
+                    } else if (prefillProductIds.length > 0) {
+                        prefillProductIds.forEach(function(pid) {
+                            addRow({
+                                product_id: pid || '',
+                                description: '',
+                                quantity: 1,
+                                unit_price: parseFloat(prefillAmount) || 0.00,
+                                tax_rate: 18.00
+                            });
+                        });
+                    } else {
+                        addRow({
+                            product_id: '',
+                            description: '',
+                            quantity: 1,
+                            unit_price: parseFloat(prefillAmount) || 0.00,
+                            tax_rate: 18.00
+                        });
+                    }
                 } else {
                     addRow();
                 }
@@ -2314,6 +2534,59 @@
                 $('#calcTax').text('₹' + taxTotal.toFixed(2));
                 $('#calcTotal').text('₹' + Math.max(0, grandTotal).toFixed(2));
             }
+
+            // Edit Lead Form Product Rows JavaScript
+            function updateEditRemoveButtonsState() {
+                const rows = $('#editProductItemsBody tr');
+                if (rows.length <= 1) {
+                    rows.find('.remove-product-row-btn').attr('disabled', true).addClass('opacity-50');
+                } else {
+                    rows.find('.remove-product-row-btn').removeAttr('disabled').removeClass('opacity-50');
+                }
+            }
+
+            updateEditRemoveButtonsState();
+
+            let editItemRowIndex = $('#editProductItemsBody tr').length;
+
+            $('#editAddProductRowBtn').on('click', function () {
+                let templateHtml = $('#editProductRowSelectTemplate').html();
+                let newSelect = $(templateHtml);
+                newSelect.attr('name', 'items[' + editItemRowIndex + '][product_id]');
+
+                let newRow = $(`
+                    <tr class="lead-item-row border-bottom">
+                        <td class="py-1 ps-1 pe-1 align-top"></td>
+                        <td class="py-1 px-1 align-top">
+                            <input type="number" name="items[${editItemRowIndex}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="1" min="1" step="1" required>
+                        </td>
+                        <td class="py-1 text-center align-top pt-2">
+                            <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="Remove Product">
+                                <i class="feather-trash-2 fs-13"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+
+                newRow.find('td:first-child').append(newSelect);
+                $('#editProductItemsBody').append(newRow);
+
+                newSelect.select2({
+                    theme: "bootstrap-5",
+                    width: "100%"
+                });
+
+                editItemRowIndex++;
+                updateEditRemoveButtonsState();
+            });
+
+            $(document).on('click', '#editProductItemsBody .remove-product-row-btn', function (e) {
+                e.preventDefault();
+                if ($('#editProductItemsBody tr').length > 1) {
+                    $(this).closest('tr').remove();
+                    updateEditRemoveButtonsState();
+                }
+            });
         });
     </script>
 

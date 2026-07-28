@@ -4,8 +4,11 @@ namespace App\Domains\Sales\Models;
 
 use App\Core\Database\BaseModel;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\User;
 use App\Domains\CRM\Models\Customer;
 use App\Domains\CRM\Models\Quotation;
+use App\Domains\Production\Models\ProductionOrder;
+use App\Domains\Purchase\Models\PurchaseRequisition;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -71,7 +74,7 @@ class SalesOrder extends BaseModel
 
     public function salesPerson(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'sales_person_id');
+        return $this->belongsTo(User::class, 'sales_person_id');
     }
 
     public function items(): HasMany
@@ -101,12 +104,12 @@ class SalesOrder extends BaseModel
 
     public function productionOrders(): HasMany
     {
-        return $this->hasMany(\App\Domains\Production\Models\ProductionOrder::class, 'sales_order_id');
+        return $this->hasMany(ProductionOrder::class, 'sales_order_id');
     }
 
     public function purchaseRequisitions(): HasMany
     {
-        return $this->hasMany(\App\Domains\Purchase\Models\PurchaseRequisition::class, 'sales_order_id');
+        return $this->hasMany(PurchaseRequisition::class, 'sales_order_id');
     }
 
 }

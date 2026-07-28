@@ -4,10 +4,13 @@ namespace App\Domains\CRM\Models;
 
 use App\Core\Database\BaseModel;
 use App\Models\Concerns\BelongsToTenant;
+use App\Models\User;
+use App\Domains\Sales\Models\SalesOrder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Quotation extends BaseModel
@@ -75,7 +78,7 @@ class Quotation extends BaseModel
 
     public function salesPerson(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'sales_person_id');
+        return $this->belongsTo(User::class, 'sales_person_id');
     }
 
     /**
@@ -96,9 +99,9 @@ class Quotation extends BaseModel
         return $this->belongsTo(Quotation::class, 'parent_id');
     }
 
-    public function salesOrder(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function salesOrder(): HasOne
     {
-        return $this->hasOne(\App\Domains\Sales\Models\SalesOrder::class);
+        return $this->hasOne(SalesOrder::class);
     }
 
     public function revisions(): HasMany

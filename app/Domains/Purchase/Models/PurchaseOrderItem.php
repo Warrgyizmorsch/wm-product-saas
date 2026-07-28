@@ -72,6 +72,13 @@ class PurchaseOrderItem extends Model
         return $this->belongsTo(Product::class, 'product_id');
     }
 
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id')->withDefault(function () {
+            return $this->order?->warehouse;
+        });
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $item) {

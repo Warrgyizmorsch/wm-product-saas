@@ -2,12 +2,12 @@
 
 namespace App\Domains\Sales\Controllers;
 
-use App\Domains\Sales\Models\SalesOrder;
-use App\Domains\Sales\Models\MaterialRequirement;
-use App\Domains\Sales\Models\Invoice;
 use App\Domains\Sales\Models\SalesReturn;
 use App\Domains\Sales\Models\SalesReturnItem;
-use App\Domains\Inventory\Services\StockService;
+use App\Domains\Sales\Models\SalesOrder;
+use App\Domains\Sales\Repositories\SalesReturnRepository;
+use App\Domains\CRM\Models\Customer;
+use App\Domains\Inventory\Models\Warehouse;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,39 +16,37 @@ use Illuminate\Support\Facades\DB;
 
 class SalesReturnController extends Controller
 {
-    public function index(): View
+    public function __construct(
+        private readonly SalesReturnRepository $returnRepo
+    ) {}
+
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', SalesReturn::class);
+        $returns = $this->returnRepo->getPaginated($request->all(), 15);
 
-        $returns = SalesReturn::with(['salesOrder.customer', 'materialRequirement', 'invoice'])->latest()->get();
-
-        return view('modules.sales.returns.index', [
-            'returns' => $returns,
-        ]);
+        return view('modules.sales.returns.index', compact('returns'));
     }
 
     public function create(Request $request): View
     {
         $this->authorize('create', SalesReturn::class);
 
-        $salesOrders = SalesOrder::with('customer')->orderBy('sales_order_number')->get();
-        $deliveries = MaterialRequirement::orderBy('requirement_number')->get();
-        $invoices = Invoice::orderBy('invoice_number')->get();
+        $salesOrderId = $request->input('sales_order_id');
+        $salesOrder = null;
+        if ($salesOrderId) {
+            $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId);
+        }
 
-        // Calculate next return number
+        $customers = Customer::query()->orderBy('name')->get();
+        $salesOrders = SalesOrder::whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped'])->latest()->get();
+        $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();
+
         $latest = SalesReturn::latest('id')->first();
         $nextSeq = $latest ? intval(str_replace('RET-', '', $latest->return_number)) + 1 : 1;
         $nextReturnNumber = 'RET-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
 
-        return view('modules.sales.returns.create', [
-            'salesOrders' => $salesOrders,
-            'deliveries' => $deliveries,
-            'invoices' => $invoices,
-            'nextReturnNumber' => $nextReturnNumber,
-            'prefillSalesOrderId' => $request->input('sales_order_id'),
-            'prefillDeliveryOrderId' => $request->input('material_requirement_id'),
-            'prefillInvoiceId' => $request->input('invoice_id'),
-        ]);
+        return view('modules.sales.returns.create', compact('customers', 'salesOrders', 'salesOrder', 'warehouses', 'nextReturnNumber'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -56,92 +54,58 @@ class SalesReturnController extends Controller
         $this->authorize('create', SalesReturn::class);
 
         $validated = $request->validate([
-            'return_number' => 'required|string',
-            'return_date' => 'required|date',
-            'sales_order_id' => 'nullable|exists:sales_orders,id',
-            'material_requirement_id' => 'nullable|exists:material_requirements,id',
-            'invoice_id' => 'nullable|exists:invoices,id',
-            'reason' => 'nullable|string',
-            'items' => 'required|array',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.warehouse_id' => 'required|exists:warehouses,id',
-            'items.*.quantity' => 'required|numeric|min:0.0001',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            'customer_id'    => ['required', 'exists:customers,id'],
+            'sales_order_id' => ['nullable', 'exists:sales_orders,id'],
+            'return_number'  => ['required', 'string', 'max:255', 'unique:sales_returns,return_number'],
+            'return_date'    => ['required', 'date'],
+            'reason'         => ['nullable', 'string'],
+            'items'          => ['required', 'array', 'min:1'],
+            'items.*.product_id'   => ['required', 'exists:products,id'],
+            'items.*.warehouse_id' => ['required', 'exists:warehouses,id'],
+            'items.*.quantity'     => ['required', 'numeric', 'min:0.0001'],
+            'items.*.unit_price'   => ['required', 'numeric', 'min:0'],
         ]);
 
-        $return = DB::transaction(function () use ($validated) {
-            $totalRefundAmount = 0;
-            foreach ($validated['items'] as $itemData) {
-                $totalRefundAmount += floatval($itemData['quantity']) * floatval($itemData['unit_price']);
+        $returnOrder = DB::transaction(function () use ($validated) {
+            $totalAmount = 0;
+            foreach ($validated['items'] as $item) {
+                $totalAmount += floatval($item['quantity']) * floatval($item['unit_price']);
             }
 
-            $return = SalesReturn::create([
+            $salesReturn = SalesReturn::create([
+                'tenant_id'      => tenant_id() ?? 1,
+                'customer_id'    => $validated['customer_id'],
                 'sales_order_id' => $validated['sales_order_id'] ?? null,
-                'material_requirement_id' => $validated['material_requirement_id'] ?? null,
-                'invoice_id' => $validated['invoice_id'] ?? null,
-                'return_number' => $validated['return_number'],
-                'return_date' => $validated['return_date'],
-                'status' => 'Draft',
-                'total_refund_amount' => $totalRefundAmount,
-                'reason' => $validated['reason'] ?? null,
+                'return_number'  => $validated['return_number'],
+                'return_date'    => $validated['return_date'],
+                'status'         => 'Pending',
+                'reason'         => $validated['reason'] ?? null,
+                'total_amount'   => $totalAmount,
             ]);
 
-            foreach ($validated['items'] as $itemData) {
+            foreach ($validated['items'] as $item) {
                 SalesReturnItem::create([
-                    'sales_return_id' => $return->id,
-                    'product_id' => $itemData['product_id'],
-                    'warehouse_id' => $itemData['warehouse_id'],
-                    'quantity' => floatval($itemData['quantity']),
-                    'unit_price' => floatval($itemData['unit_price']),
+                    'sales_return_id' => $salesReturn->id,
+                    'product_id'      => $item['product_id'],
+                    'warehouse_id'    => $item['warehouse_id'],
+                    'quantity'        => $item['quantity'],
+                    'unit_price'      => $item['unit_price'],
+                    'total_amount'    => floatval($item['quantity']) * floatval($item['unit_price']),
                 ]);
             }
 
-            return $return;
+            return $salesReturn;
         });
 
-        return redirect()
-            ->route('sales.returns.show', $return->id)
-            ->with('success', 'Sales Return created in Draft status.');
+        return redirect()->route('sales.returns.show', $returnOrder->id)->with('success', "Sales Return {$returnOrder->return_number} recorded successfully.");
     }
 
     public function show(int $id): View
     {
-        $return = SalesReturn::with(['salesOrder.customer', 'materialRequirement', 'invoice', 'items.product', 'items.warehouse'])->findOrFail($id);
-
+        $return = $this->returnRepo->find($id);
+        if (!$return) abort(404);
         $this->authorize('view', $return);
 
-        return view('modules.sales.returns.show', [
-            'return' => $return,
-        ]);
-    }
-
-    public function complete(int $id): RedirectResponse
-    {
-        $return = SalesReturn::with('items.product')->findOrFail($id);
-
-        $this->authorize('complete', $return);
-
-        if ($return->status !== 'Draft') {
-            return back()->withErrors(['status' => 'Only Draft Returns can be completed.']);
-        }
-
-        DB::transaction(function () use ($return) {
-            $return->update(['status' => 'Completed']);
-
-            foreach ($return->items as $item) {
-                // Restock inventory using StockService::recordInflow
-                StockService::recordInflow(
-                    $return->tenant_id,
-                    $item->product_id,
-                    $item->warehouse_id,
-                    $item->quantity,
-                    $item->unit_price, // returned cost rate
-                    'SalesReturn',
-                    $return->id
-                );
-            }
-        });
-
-        return back()->with('success', 'Sales Return completed! Inventory has been returned and restocked in the warehouse.');
+        return view('modules.sales.returns.show', compact('return'));
     }
 }

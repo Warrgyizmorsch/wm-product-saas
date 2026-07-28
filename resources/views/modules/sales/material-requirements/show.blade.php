@@ -135,6 +135,7 @@
                                         $lineBadge = 'secondary';
                                         if (in_array($item->status, ['Reserved', 'Ready']))  $lineBadge = 'success';
                                         elseif ($item->status === 'Waiting Purchase')         $lineBadge = 'warning';
+                                        elseif ($item->status === 'Partially PR Raised')      $lineBadge = 'info';
                                         elseif ($item->status === 'Waiting Production')       $lineBadge = 'danger';
                                         elseif ($item->status === 'Partially Reserved')       $lineBadge = 'info';
                                         elseif ($item->status === 'Picked')                   $lineBadge = 'primary';
@@ -222,10 +223,25 @@
                                                         @endif
 
                                                         @if ($method === 'buy')
-                                                            @if ($item->status === 'Waiting Purchase')
-                                                                <span class="badge bg-warning-soft text-warning px-2 py-1 fs-12 w-100 text-center">
-                                                                    <i class="feather-clock me-1"></i>PR Raised
+                                                            @php
+                                                                $prRaised = (float)($item->quantity_pr_raised ?? 0);
+                                                                $remainingPrQty = max(0, $pendingQty - $prRaised);
+                                                            @endphp
+
+                                                            @if ($item->status === 'Waiting Purchase' || ($prRaised > 0 && $remainingPrQty <= 0))
+                                                                <span class="badge bg-warning-soft text-warning px-2 py-1 fs-11 w-100 text-center">
+                                                                    <i class="feather-check-circle me-1"></i>PR Raised ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
                                                                 </span>
+                                                            @elseif ($prRaised > 0 && $remainingPrQty > 0)
+                                                                <span class="badge bg-info-soft text-info px-2 py-1 fs-11 w-100 text-center mb-1">
+                                                                    <i class="feather-clock me-1"></i>Partially PR Raised ({{ (int)$prRaised }}/{{ (int)$pendingQty }})
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    class="btn btn-sm btn-soft-warning px-2 py-1 fs-11 fw-semibold w-100"
+                                                                    data-bs-toggle="modal"
+                                                                    data-bs-target="#indentModal-{{ $item->id }}"
+                                                                ><i class="feather-plus-circle me-1"></i>Create Indent (+{{ (int)$remainingPrQty }})</button>
                                                             @else
                                                                 <button
                                                                     type="button"
@@ -374,81 +390,92 @@
                 </div>
             </x-ui.modal>
 
-            {{-- ─── Create Indent Modal ─── --}}
-            <x-ui.modal
-                id="indentModal-{{ $item->id }}"
-                title="Create Purchase Indent — {{ $item->product?->name }}"
-                submitText="Submit Indent Request"
-                formAction="{{ route('sales.material-requirements.mock-indent', $item->id) }}"
-                :centered="true"
-                :showFooter="true"
-            >
-                <div class="fs-13 text-dark">
-                    <div class="d-flex align-items-center gap-3 p-3 bg-light rounded border mb-4">
-                        <div class="avatar-text avatar-md bg-soft-warning text-warning">
-                            <i class="feather-file-text"></i>
-                        </div>
-                        <div>
-                            <h6 class="fw-bold text-dark mb-0">{{ $item->product?->name }}</h6>
-                            <small class="text-muted font-monospace">SKU: {{ $item->product?->sku ?? '—' }}</small>
-                        </div>
-                    </div>
+            @php
+                $prRaised = (float)($item->quantity_pr_raised ?? 0);
+                $remainingPrQty = max(0, $pendingQty - $prRaised);
+            @endphp
 
-                    <x-ui.alert variant="warning" icon="feather-info" class="border-0 fs-12 py-2 mb-3">
-                        This will raise a <strong>Purchase Indent</strong> to procure the shortage quantity.
-                    </x-ui.alert>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-4">
-                            <div class="bg-light rounded p-2 text-center border">
-                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Order Qty</span>
-                                <span class="fs-16 fw-bold text-dark">{{ (int)$orderedQty }}</span>
+            @if ($method === 'buy' && $item->status !== 'Waiting Purchase' && $remainingPrQty > 0)
+                {{-- ─── Create Indent Modal ─── --}}
+                <x-ui.modal
+                    id="indentModal-{{ $item->id }}"
+                    title="Create Purchase Indent — {{ $item->product?->name }}"
+                    submitText="Submit Indent Request"
+                    formAction="{{ route('sales.material-requirements.mock-indent', $item->id) }}"
+                    :centered="true"
+                    :showFooter="true"
+                >
+                    <div class="fs-13 text-dark">
+                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded border mb-4">
+                            <div class="avatar-text avatar-md bg-soft-warning text-warning">
+                                <i class="feather-file-text"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0">{{ $item->product?->name }}</h6>
+                                <small class="text-muted font-monospace">SKU: {{ $item->product?->sku ?? '—' }}</small>
                             </div>
                         </div>
-                        <div class="col-4">
-                            <div class="bg-light rounded p-2 text-center border">
-                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Reserved</span>
-                                <span class="fs-16 fw-bold text-success">{{ (int)$reservedQty }}</span>
+
+                        <x-ui.alert variant="warning" icon="feather-info" class="border-0 fs-12 py-2 mb-3">
+                            This will raise a <strong>Purchase Indent</strong> for the required procurement quantity.
+                        </x-ui.alert>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-3">
+                                <div class="bg-light rounded p-2 text-center border">
+                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Order Qty</span>
+                                    <span class="fs-15 fw-bold text-dark">{{ (int)$orderedQty }}</span>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="bg-light rounded p-2 text-center border">
+                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Reserved</span>
+                                    <span class="fs-15 fw-bold text-success">{{ (int)$reservedQty }}</span>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="bg-light rounded p-2 text-center border">
+                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">PR Raised</span>
+                                    <span class="fs-15 fw-bold text-info">{{ (int)$prRaised }}</span>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="bg-light rounded p-2 text-center border">
+                                    <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Remaining</span>
+                                    <span class="fs-15 fw-bold text-danger">{{ (int)$remainingPrQty }}</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-4">
-                            <div class="bg-light rounded p-2 text-center border">
-                                <span class="fs-10 text-muted d-block fw-semibold text-uppercase mb-1">Shortage</span>
-                                <span class="fs-16 fw-bold text-danger">{{ (int)($shortageQty ?: $pendingQty) }}</span>
+
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label">Qty to Indent <span class="text-danger">*</span></label>
+                            <div class="flex-grow-1">
+                                <input type="number" class="odoo-form-control" name="quantity_request" min="1" max="{{ (int)$remainingPrQty }}" value="{{ (int)$remainingPrQty }}" required>
+                                <div class="text-muted fs-11 mt-1">Pre-filled with remaining un-indented quantity ({{ (int)$remainingPrQty }} unit(s)). You can adjust.</div>
+                            </div>
+                        </div>
+
+                        <div class="odoo-form-group">
+                            <label class="odoo-form-label">Destination Warehouse <span class="text-danger">*</span></label>
+                            <div class="flex-grow-1">
+                                <select class="odoo-form-control" name="warehouse_id" required>
+                                    @foreach($warehouses as $w)
+                                        <option value="{{ $w->id }}" @selected($w->id == $item->warehouse_id)>{{ $w->name }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="text-muted fs-11 mt-1">Select the target warehouse for procurement.</div>
+                            </div>
+                        </div>
+
+                        <div class="odoo-form-group mb-0">
+                            <label class="odoo-form-label">Notes</label>
+                            <div class="flex-grow-1">
+                                <textarea class="odoo-form-control" name="notes" rows="2" placeholder="Reason, urgency, etc…"></textarea>
                             </div>
                         </div>
                     </div>
-
-                    <div class="odoo-form-group">
-                        <label class="odoo-form-label">Qty to Indent <span class="text-danger">*</span></label>
-                        <div class="flex-grow-1">
-                            <input type="number" class="odoo-form-control" name="quantity_request" min="1" value="{{ (int)($shortageQty ?: $pendingQty) }}">
-                            <div class="text-muted fs-11 mt-1">Pre-filled with shortage. You can adjust.</div>
-                        </div>
-                    </div>
-
-                    <div class="odoo-form-group">
-                        <label class="odoo-form-label">Destination Warehouse <span class="text-danger">*</span></label>
-                        <div class="flex-grow-1">
-                            <select class="odoo-form-control" name="warehouse_id" required>
-                                @foreach($warehouses as $w)
-                                    <option value="{{ $w->id }}" @selected($w->id == $item->warehouse_id)>{{ $w->name }}</option>
-                                @endforeach
-                            </select>
-                            <div class="text-muted fs-11 mt-1">Select the target warehouse for procurement.</div>
-                        </div>
-                    </div>
-
-                    <div class="odoo-form-group mb-0">
-                        <label class="odoo-form-label">Notes</label>
-                        <div class="flex-grow-1">
-                            <textarea class="odoo-form-control" name="notes" rows="2" placeholder="Reason, urgency, etc…"></textarea>
-                        </div>
-                    </div>
-                </div>
-            </x-ui.modal>
-
-        @endif
+                </x-ui.modal>
+            @endif
 
         @if ($method === 'manufacture' && $item->status !== 'Waiting Production')
 
@@ -507,6 +534,8 @@
             </x-ui.modal>
 
         @endif
+
+    @endif
 
     @endforeach
 

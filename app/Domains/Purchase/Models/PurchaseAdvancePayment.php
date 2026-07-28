@@ -33,6 +33,11 @@ class PurchaseAdvancePayment extends BaseModel
         'amount' => 'decimal:2',
     ];
 
+    public function getAdvanceNumberAttribute(): string
+    {
+        return $this->attributes['payment_number'] ?? $this->attributes['advance_number'] ?? '';
+    }
+
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class, 'purchase_order_id');
