@@ -103,7 +103,7 @@ class ProductionExecutionService
             // 4. Update Active Production Batches actual_quantity for this order
             if ($produced > 0) {
                 $activeBatches = ProductionBatch::where('production_order_id', $order->id)
-                    ->whereIn('status', [ProductionBatch::STATUS_PLANNED, ProductionBatch::STATUS_IN_PRODUCTION])
+                    ->whereIn('status', [ProductionBatch::STATUS_PLANNED, ProductionBatch::STATUS_IN_PROGRESS])
                     ->orderBy('id', 'asc')
                     ->get();
 
@@ -119,10 +119,28 @@ class ProductionExecutionService
                         if ($b->actual_quantity >= $b->planned_quantity) {
                             $b->status = ProductionBatch::STATUS_COMPLETED;
                         } else {
-                            $b->status = ProductionBatch::STATUS_IN_PRODUCTION;
+                            $b->status = ProductionBatch::STATUS_IN_PROGRESS;
                         }
                         $b->save();
                     }
+                }
+
+                // If over-production occurs ($rem > 0 after filling active planned batches),
+                // automatically create a surplus batch for the remaining items so they appear in MES batch tracking!
+                if ($rem > 0) {
+                    $batchService = app(BatchProductionService::class);
+                    $surplusBatch = $batchService->createBatch(
+                        $order->tenant_id,
+                        $order->id,
+                        $order->product_id,
+                        $rem,
+                        ProductionBatch::STATUS_COMPLETED,
+                        null,
+                        "Auto-created surplus batch for over-production of {$rem} units."
+                    );
+                    $surplusBatch->actual_quantity = $rem;
+                    $surplusBatch->status = ProductionBatch::STATUS_COMPLETED;
+                    $surplusBatch->save();
                 }
             }
 
@@ -260,7 +278,8 @@ class ProductionExecutionService
                     $setupMinutes,
                     $runMinutes,
                     $remarks,
-                    $userId
+                    $userId,
+                    $op->status === ProductionOrderOperation::STATUS_COMPLETED
                 );
 
                 if ($completeOperation && isset($nextOp) && $nextOp && $produced > 0 && $op->routing_operation_id && $nextOp->routing_operation_id) {

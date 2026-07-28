@@ -15,9 +15,10 @@ class ProductionBatch extends BaseModel
 
     protected $table = 'production_batches';
 
-    public const STATUS_PLANNED     = 'planned';
-    public const STATUS_IN_PROGRESS = 'in_progress';
-    public const STATUS_COMPLETED   = 'completed';
+    public const STATUS_PLANNED       = 'planned';
+    public const STATUS_IN_PROGRESS   = 'in_progress';
+    public const STATUS_IN_PRODUCTION = self::STATUS_IN_PROGRESS;
+    public const STATUS_COMPLETED     = 'completed';
     public const STATUS_CANCELLED   = 'cancelled';
     public const STATUS_CONSUMED    = 'consumed';
     public const STATUS_BLOCKED     = 'blocked';

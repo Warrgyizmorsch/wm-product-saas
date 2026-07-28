@@ -49,7 +49,7 @@ class ProductionPriority2VerificationTest extends TestCase
         parent::setUp();
 
         // Setup Tenant A
-        $this->tenantA = Tenant::create([
+        $this->tenantA = Tenant::firstOrCreate(['id' => 1], [
             'name' => 'P2 Tenant A',
             'slug' => 'p2-tenant-a',
             'status' => 'active',
