@@ -846,7 +846,8 @@
                                                          @foreach($dates as $date)
                                                             @php
                                                                 $dateStr = $date->format('Y-m-d');
-                                                                $roster = $rosterMap[$employee->id][$dateStr] ?? null;
+                                                                $rosterVal = $rosters[$employee->id . '_' . $dateStr] ?? null;
+                                                                $roster = $rosterVal ? (is_iterable($rosterVal) ? $rosterVal->first() : $rosterVal) : null;
                                                                 $assignedShiftId = $roster ? $roster->shift_id : null;
                                                                 $dayOfWeek = $date->dayOfWeek;
                                                                 $weeklyPatternShiftId = (isset($employee->weekly_pattern) && isset($employee->weekly_pattern[$dayOfWeek])) ? $employee->weekly_pattern[$dayOfWeek] : null;

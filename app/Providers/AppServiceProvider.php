@@ -93,6 +93,16 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\HRMS\Repositories\WfhRequestRepository::class
         );
 
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\ShiftChangeRequestRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\ShiftChangeRequestRepository::class
+        );
+
+        $this->app->bind(
+            \App\Domains\HRMS\Repositories\OvertimeRequestRepositoryInterface::class,
+            \App\Domains\HRMS\Repositories\OvertimeRequestRepository::class
+        );
+
         // ── Projects: Project ─────────────────────────────────────────────────
         $this->app->bind(
             \App\Domains\Projects\Repositories\ProjectRepositoryInterface::class,

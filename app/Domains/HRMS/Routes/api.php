@@ -11,6 +11,8 @@ use App\Domains\HRMS\Controllers\Api\EmployeeApiController;
 use App\Domains\HRMS\Controllers\Api\LeaveRequestApiController;
 use App\Domains\HRMS\Controllers\Api\LeaveEncashmentApiController;
 use App\Domains\HRMS\Controllers\Api\WfhRequestApiController;
+use App\Domains\HRMS\Controllers\Api\ShiftChangeRequestApiController;
+use App\Domains\HRMS\Controllers\Api\OvertimeRequestApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -290,6 +292,37 @@ Route::prefix('api/hrms/wfh-requests')
         Route::post('/{wfhRequest}/reject', [WfhRequestApiController::class, 'rejectRequest'])->name('reject');
         Route::put('/{wfhRequest}/status', [WfhRequestApiController::class, 'updateStatus'])->name('status.update');
     });
+
+// ==========================================
+// 8C. SHIFT CHANGE REQUESTS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/shift-change-requests')
+    ->middleware(['web'])
+    ->name('api.hrms.shift-change-requests.')
+    ->group(function () {
+        Route::get('/summary', [ShiftChangeRequestApiController::class, 'summary'])->name('summary');
+        Route::get('/', [ShiftChangeRequestApiController::class, 'indexRequests'])->name('index');
+        Route::post('/', [ShiftChangeRequestApiController::class, 'storeRequest'])->name('store');
+        Route::get('/{shiftChangeRequest}', [ShiftChangeRequestApiController::class, 'showRequest'])->name('show');
+        Route::post('/{shiftChangeRequest}/approve', [ShiftChangeRequestApiController::class, 'approveRequest'])->name('approve');
+        Route::post('/{shiftChangeRequest}/reject', [ShiftChangeRequestApiController::class, 'rejectRequest'])->name('reject');
+    });
+
+// ==========================================
+// 8D. OVERTIME REQUESTS API ROUTES
+// ==========================================
+Route::prefix('api/hrms/overtime-requests')
+    ->middleware(['web'])
+    ->name('api.hrms.overtime-requests.')
+    ->group(function () {
+        Route::get('/summary', [OvertimeRequestApiController::class, 'summary'])->name('summary');
+        Route::get('/', [OvertimeRequestApiController::class, 'indexRequests'])->name('index');
+        Route::post('/', [OvertimeRequestApiController::class, 'storeRequest'])->name('store');
+        Route::get('/{overtimeRequest}', [OvertimeRequestApiController::class, 'showRequest'])->name('show');
+        Route::post('/{overtimeRequest}/approve', [OvertimeRequestApiController::class, 'approveRequest'])->name('approve');
+        Route::post('/{overtimeRequest}/reject', [OvertimeRequestApiController::class, 'rejectRequest'])->name('reject');
+    });
+
 
 // ==========================================
 // 9. LEAVE ENCASHMENTS API ROUTES

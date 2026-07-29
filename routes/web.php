@@ -44,4 +44,9 @@ Route::middleware(['tenant'])->group(function (): void {
             require $moduleApiRoutes;
         }
     });
+
+    foreach (glob(app_path('Domains/*/Routes/api.php')) as $moduleApiRoutes) {
+        require $moduleApiRoutes;
+    }
+    
 });
