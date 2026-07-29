@@ -5,85 +5,69 @@
 @section('breadcrumb', 'Sales / Sales Orders / ' . $order->sales_order_number)
 
 @section('page-actions')
-    <div class="d-flex gap-2">
-        <a href="{{ route('sales.orders.index') }}" class="btn d-print-none d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0;" data-bs-toggle="tooltip" title="Back to List">
-            <i class="feather-arrow-left text-dark fs-16"></i>
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ route('sales.orders.index') }}" class="action-dropdown-btn" title="Back to Sales Orders" data-bs-toggle="tooltip">
+            <i class="feather feather-arrow-left"></i>
         </a>
-        
+
+        <a href="javascript:void(0)" onclick="window.print()" class="btn btn-sm btn-outline-secondary fw-bold px-3 d-print-none me-1">
+            <i class="feather-printer me-1.5"></i>Print
+        </a>
+
+        @php
+            $totalOrderedQty  = $order->items->sum('quantity');
+            $totalInvoicedQty = \App\Domains\Sales\Models\InvoiceItem::whereHas('invoice', function($q) use ($order) {
+                $q->where('sales_order_id', $order->id)->where('status', '!=', 'Cancelled');
+            })->sum('quantity');
+            $hasUnbilledQty = ($totalOrderedQty - $totalInvoicedQty) > 0.0001;
+        @endphp
+
         @if ($order->status === 'Draft')
             <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST" class="d-inline d-print-none" id="confirmSoForm">
                 @csrf
-                <button type="button" class="btn btn-success" onclick="confirmAction({ title: 'Confirm Sales Order', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: 'Confirm' }, function() { document.getElementById('confirmSoForm').submit(); })">
-                    <i class="feather-check-circle me-2"></i>Confirm Order
-                </button>
+                <x-ui.button type="button" variant="success" size="sm" class="fw-bold px-3" onclick="confirmAction({ title: 'Confirm Sales Order', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: 'Confirm' }, function() { document.getElementById('confirmSoForm').submit(); })">
+                    <i class="feather-check-circle me-1.5"></i>Confirm Order
+                </x-ui.button>
             </form>
         @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped']))
-            <a href="{{ route('sales.dispatches.create') }}" class="btn btn-info text-white fw-bold px-3 d-print-none">
-                <i class="feather-truck me-1.5"></i> Dispatch Order
-            </a>
-            <a href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" class="btn btn-primary fw-bold px-3 d-print-none">
-                <i class="feather-file-text me-1.5"></i> Create Invoice
-            </a>
+            <x-ui.button href="{{ route('sales.dispatches.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" class="fw-bold px-3 d-print-none">
+                <i class="feather-truck me-1.5"></i>Dispatch Order
+            </x-ui.button>
+
+            @if ($hasUnbilledQty)
+                <x-ui.button href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" variant="soft-primary" size="sm" class="fw-bold px-3 d-print-none">
+                    <i class="feather-file-text me-1.5"></i>Create Invoice
+                </x-ui.button>
+            @endif
         @endif
 
         @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
+            <x-ui.button href="{{ route('sales.orders.edit', $order->id) }}" variant="outline-secondary" size="sm" class="fw-bold px-3 d-print-none">
+                <i class="feather-edit-2 me-1.5"></i>Edit
+            </x-ui.button>
+
             <form action="{{ route('sales.orders.cancel', $order->id) }}" method="POST" class="d-inline d-print-none" onsubmit="return confirm('Are you sure you want to cancel this sales order?');">
                 @csrf
-                <button type="submit" class="btn btn-soft-danger">
-                    <i class="feather-x-circle me-2"></i>Cancel Order
+                <button type="submit" class="btn btn-sm btn-soft-danger fw-bold px-3">
+                    <i class="feather-x-circle me-1"></i>Cancel
                 </button>
             </form>
-            
-            <a href="{{ route('sales.orders.edit', $order->id) }}" class="btn d-print-none d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0;" data-bs-toggle="tooltip" title="Edit Sales Order">
-                <i class="feather-edit-2 text-dark fs-16"></i>
-            </a>
         @endif
-
-        <a href="{{ route('sales.orders.download', $order->id) }}" class="btn d-print-none d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0;" data-bs-toggle="tooltip" title="Print / Download PDF">
-            <i class="feather-printer text-dark fs-16"></i>
-        </a>
     </div>
 @endsection
 
 @section('content')
     @if (session('success'))
-        <div class="alert alert-success alert-dismissible fade show border-0 shadow-sm mb-4 d-print-none" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-success text-white me-3">
-                    <i class="feather-check-circle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Success!</h6>
-                    <p class="fs-12 mb-0">{{ session('success') }}</p>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
     @endif
 
     @if ($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4 d-print-none" role="alert">
-            <div class="d-flex align-items-center">
-                <div class="avatar-text avatar-md bg-danger text-white me-3">
-                    <i class="feather-alert-triangle"></i>
-                </div>
-                <div>
-                    <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                    <ul class="fs-12 mb-0 ps-3">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <x-ui.toast :auto="true" type="error" title="{{ $errors->first() }}" />
     @endif
 
     @php
         $soTabs = [
             ['id' => 'tab-order', 'label' => 'Sales Order Details', 'active' => true, 'icon' => 'feather-shopping-cart'],
-            ['id' => 'tab-deliveries', 'label' => 'Material Requirements (' . $order->materialRequirements->count() . ')', 'active' => false, 'icon' => 'feather-clipboard'],
             ['id' => 'tab-invoices', 'label' => 'Invoices (' . $order->invoices->count() . ')', 'active' => false, 'icon' => 'feather-file-text'],
             ['id' => 'tab-payments', 'label' => 'Payments (' . $order->allocations->count() . ')', 'active' => false, 'icon' => 'feather-dollar-sign'],
             ['id' => 'tab-returns', 'label' => 'Returns (' . $order->returns->count() . ')', 'active' => false, 'icon' => 'feather-rotate-ccw'],
@@ -93,40 +77,31 @@
 @once
     @push('styles')
         <style>
+            /* ── Odoo/Zoho Form Header & Pipeline ─────────────────── */
             .so-status-pipeline {
                 display: inline-flex;
                 align-items: center;
-                border-radius: 4px;
+                border-radius: 6px;
                 overflow: hidden;
                 border: 1px solid #cbd5e1;
-                background-color: #f1f5f9;
+                background-color: #f8fafc;
             }
             .so-status-pipeline .pipeline-step {
                 position: relative;
-                padding: 6px 14px 6px 24px;
-                background-color: #f1f5f9;
+                padding: 6px 16px 6px 24px;
+                background-color: #f8fafc;
                 color: #64748b;
-                font-size: 10px;
+                font-size: 10.5px;
                 font-weight: 700;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                border: none;
-                outline: none;
-                transition: all 0.2s ease;
                 display: inline-flex;
                 align-items: center;
+                transition: all 0.2s ease;
             }
             .so-status-pipeline .pipeline-step:first-child {
-                padding-left: 14px;
-                border-top-left-radius: 3px;
-                border-bottom-left-radius: 3px;
+                padding-left: 16px;
             }
-            .so-status-pipeline .pipeline-step:last-child {
-                padding-right: 14px;
-                border-top-right-radius: 3px;
-                border-bottom-right-radius: 3px;
-            }
-            /* Right pointing arrowhead */
             .so-status-pipeline .pipeline-step::after {
                 content: "";
                 position: absolute;
@@ -136,11 +111,10 @@
                 height: 0;
                 border-top: 14px solid transparent;
                 border-bottom: 14px solid transparent;
-                border-left: 10px solid #f1f5f9;
+                border-left: 10px solid #f8fafc;
                 z-index: 10;
                 transition: all 0.2s ease;
             }
-            /* Left cutout */
             .so-status-pipeline .pipeline-step::before {
                 content: "";
                 position: absolute;
@@ -156,47 +130,54 @@
             .so-status-pipeline .pipeline-step:first-child::before {
                 display: none;
             }
-            /* Active stage */
             .so-status-pipeline .pipeline-step.active {
-                background-color: #3454d1;
+                background-color: #1e40af;
                 color: #ffffff;
             }
             .so-status-pipeline .pipeline-step.active::after {
-                border-left-color: #3454d1;
+                border-left-color: #1e40af;
             }
-            /* Completed/previous stage */
             .so-status-pipeline .pipeline-step.completed {
-                background-color: #cbd5e1;
-                color: #475569;
+                background-color: #e2e8f0;
+                color: #334155;
             }
             .so-status-pipeline .pipeline-step.completed::after {
-                border-left-color: #cbd5e1;
+                border-left-color: #e2e8f0;
             }
-            /* Scrollable tabs overrides */
-            #salesOrderTabs {
-                flex-wrap: nowrap !important;
-                overflow-x: auto !important;
-                scrollbar-width: none; /* Firefox */
-                -ms-overflow-style: none; /* IE 10+ */
+
+            /* Tabs styling */
+            .so-tab-header-strip {
+                background: #ffffff;
+                border-bottom: 1px solid #e2e8f0;
+                padding: 0 24px;
             }
-            #salesOrderTabs::-webkit-scrollbar {
-                display: none; /* Safari and Chrome */
+            #salesOrderTabs .nav-link {
+                padding: 12px 18px !important;
+                font-weight: 600 !important;
+                font-size: 13px !important;
+                color: #64748b !important;
+                border-bottom: 2px solid transparent !important;
+                border-radius: 0 !important;
             }
-            #salesOrderTabs .nav-item {
-                flex-shrink: 0 !important;
+            #salesOrderTabs .nav-link.active {
+                color: #1e40af !important;
+                border-bottom-color: #1e40af !important;
+                background: transparent !important;
             }
         </style>
     @endpush
 @endonce
 
-    <div class="card border-0 shadow-sm print-area">
-        <div class="card-header bg-white border-bottom py-0 px-4 d-print-none d-flex justify-content-between align-items-center flex-wrap gap-2" style="min-height: 48px;">
-            <div class="d-flex align-items-center" style="max-width: 100%; overflow: hidden;">
-                <x-ui.horizontal-tabs id="salesOrderTabs" :tabs="$soTabs" class="border-0 mb-0" />
+    <div class="erp-single-panel print-area p-0">
+        <!-- Top Status Bar (Chevron Pipeline + Actions) -->
+        <div class="d-flex justify-content-between align-items-center bg-white border-bottom px-4 py-2 d-print-none" style="min-height: 52px;">
+            <div class="d-flex align-items-center gap-2">
+                <span class="fs-12 fw-bold text-dark text-uppercase tracking-wider">Status:</span>
+                <span class="badge bg-soft-primary text-primary fs-11 px-2.5 py-1 fw-bold">{{ $order->status }}</span>
             </div>
-            
+
             <!-- Custom Chevron Status Pipeline -->
-            <div class="so-status-pipeline my-2 d-print-none" style="margin-left: auto;">
+            <div class="so-status-pipeline d-print-none">
                 @php
                     $statuses = ['Draft', 'Confirmed', 'Shipped'];
                     if ($order->status === 'Partially Shipped') {
@@ -221,6 +202,11 @@
                     </span>
                 @endforeach
             </div>
+        </div>
+
+        <!-- Navigation Tabs Bar -->
+        <div class="so-tab-header-strip d-print-none">
+            <x-ui.horizontal-tabs id="salesOrderTabs" :tabs="$soTabs" class="border-0 mb-0" />
         </div>
         
         <div class="card-body p-0">
@@ -433,118 +419,32 @@
                         <div class="col-6 text-start">
                             <p class="fs-10 text-muted mb-0">For queries regarding fulfillment, please refer to the sales department.</p>
                         </div>
-                        <div class="col-6 text-end">
-                            <div class="d-inline-block text-center" style="width: 180px;">
-                                <hr class="mb-1 mt-3">
-                                <span class="fs-10 text-muted text-uppercase fw-semibold" style="letter-spacing: 0.5px;">Authorized Signature</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
-                <!-- TAB 2: Material Requirements -->
-                <div class="tab-pane fade" id="tab-deliveries">
-                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
-                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-clipboard me-2 text-primary"></i>Fulfillment History (Material Requirements)</h5>
-                        @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                            <x-ui.button href="{{ route('sales.material-requirements.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
-                                Create Material Requirement
-                            </x-ui.button>
-                        @endif
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
-                                <tr>
-                                    <th class="ps-4">Requirement Number</th>
-                                    <th>Date</th>
-                                    <th>Carrier</th>
-                                    <th>Tracking Number</th>
-                                    <th>Status</th>
-                                    <th class="text-end pe-4">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="fs-13 text-dark">
-                                @forelse ($order->materialRequirements as $do)
-                                    @php
-                                        $doBadge = 'bg-soft-secondary text-secondary';
-                                        if ($do->status === 'Shipped') $doBadge = 'bg-soft-success text-success';
-                                        elseif ($do->status === 'Cancelled') $doBadge = 'bg-soft-danger text-danger';
-
-                                        // Check if this specific shipment has already been invoiced
-                                        $invoiced = $order->invoices->where('material_requirement_id', $do->id)->first();
-                                    @endphp
-                                    <tr>
-                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.material-requirements.show', $do->id) }}" class="text-primary">{{ $do->requirement_number }}</a></td>
-                                        <td>{{ $do->requirement_date->format('d/m/Y') }}</td>
-                                        <td>{{ $do->carrier ?: '—' }}</td>
-                                        <td>{{ $do->tracking_number ?: '—' }}</td>
-                                        <td><span class="badge {{ $doBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $do->status }}</span></td>
-                                        <td class="text-end pe-4">
-                                            @if ($do->status === 'Shipped' && $invoiced)
-                                                <div class="d-flex justify-content-end align-items-center gap-2">
-                                                    <span class="fs-12 text-muted me-2">
-                                                        Invoiced: <a href="{{ route('sales.invoices.show', $invoiced->id) }}" class="text-success fw-bold">{{ $invoiced->invoice_number }}</a>
-                                                    </span>
-                                                    <x-ui.action-dropdown :viewUrl="route('sales.material-requirements.show', $do->id)">
-                                                        <x-ui.dropdown-item href="{{ route('sales.material-requirements.show', $do->id) }}" icon="feather-eye">
-                                                            View Details
-                                                        </x-ui.dropdown-item>
-                                                    </x-ui.action-dropdown>
-                                                </div>
-                                            @else
-                                                <x-ui.action-dropdown :viewUrl="route('sales.material-requirements.show', $do->id)">
-                                                    <x-ui.dropdown-item href="{{ route('sales.material-requirements.show', $do->id) }}" icon="feather-eye">
-                                                        View Details
-                                                    </x-ui.dropdown-item>
-                                                    @php
-                                                        $invoicePolicy = config('sales.invoice_policy', 'On Dispatch');
-                                                        $canInvoice = ($invoicePolicy === 'On Dispatch') 
-                                                            ? in_array($do->status, ['Dispatched', 'Delivered', 'Shipped']) 
-                                                            : ($do->status === 'Delivered');
-                                                    @endphp
-                                                    @if ($canInvoice && !$invoiced)
-                                                        <x-ui.dropdown-item href="{{ route('sales.invoices.create', ['material_requirement_id' => $do->id]) }}" icon="feather-file-text">
-                                                            Create Invoice
-                                                        </x-ui.dropdown-item>
-                                                    @endif
-                                                </x-ui.action-dropdown>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="6" class="text-center py-5 text-muted">
-                                            <i class="feather-truck fs-1 mb-2 d-block text-gray-300"></i>
-                                            No delivery orders created for this Sales Order yet.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- TAB 3: Invoices -->
+                <!-- TAB 2: Invoices -->
                 <div class="tab-pane fade" id="tab-invoices">
-                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
-                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-file-text me-2 text-primary"></i>Sales Invoices</h5>
-                        @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped' || $order->status === 'Shipped')
-                            <x-ui.button href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
+                    <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light bg-opacity-20">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="feather-file-text fs-16 text-primary"></i>
+                            <h6 class="mb-0 fw-bold text-dark fs-14">Sales Invoices</h6>
+                        </div>
+                        @if (($order->status === 'Confirmed' || $order->status === 'Partially Shipped' || $order->status === 'Shipped') && ($hasUnbilledQty ?? true))
+                            <x-ui.button href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
                                 Create Invoice
                             </x-ui.button>
                         @endif
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                        <x-ui.odoo-form-ui type="table" id="soInvoicesTable">
+                            <thead>
                                 <tr>
-                                    <th class="ps-4">Invoice Number</th>
-                                    <th>Date</th>
-                                    <th>Source Shipment</th>
-                                    <th class="text-end">Grand Total</th>
-                                    <th>Status</th>
-                                    <th class="text-end pe-4">Actions</th>
+                                    <th class="ps-4" style="width: 25%;">Invoice Number</th>
+                                    <th style="width: 18%;">Date</th>
+                                    <th style="width: 25%;">Source Shipment</th>
+                                    <th class="text-end" style="width: 17%;">Grand Total</th>
+                                    <th style="width: 15%;">Status</th>
+                                    <th class="text-end pe-4" style="width: 15%;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -557,23 +457,35 @@
                                         elseif ($inv->status === 'Cancelled') $invBadge = 'bg-soft-danger text-danger';
                                     @endphp
                                     <tr>
-                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.invoices.show', $inv->id) }}" class="text-primary">{{ $inv->invoice_number }}</a></td>
-                                        <td>{{ date('d/m/Y', strtotime($inv->invoice_date)) }}</td>
+                                        <td class="ps-4 fw-bold">
+                                            <a href="{{ route('sales.invoices.show', $inv->id) }}" class="text-primary">{{ $inv->invoice_number }}</a>
+                                        </td>
+                                        <td class="text-muted">{{ date('d/m/Y', strtotime($inv->invoice_date)) }}</td>
                                         <td>
                                             @if ($inv->materialRequirement)
                                                 <a href="{{ route('sales.material-requirements.show', $inv->material_requirement_id) }}" class="text-muted fw-semibold">
                                                     {{ $inv->materialRequirement->requirement_number }}
                                                 </a>
                                             @else
-                                                <span class="text-muted">Full Order Billing</span>
+                                                <span class="text-muted fs-12">Full Order Billing</span>
                                             @endif
                                         </td>
-                                        <td class="text-end fw-bold">₹{{ number_format($inv->grand_total, 2) }}</td>
-                                        <td><span class="badge {{ $invBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $inv->status }}</span></td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($inv->grand_total, 2) }}</td>
+                                        <td>
+                                            <span class="badge {{ $invBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $inv->status }}</span>
+                                        </td>
                                         <td class="text-end pe-4">
-                                            <x-ui.button href="{{ route('sales.invoices.show', $inv->id) }}" variant="outline-primary" size="sm" class="fw-bold">
-                                                View Invoice
-                                            </x-ui.button>
+                                            <x-ui.action-dropdown :viewUrl="route('sales.invoices.show', $inv->id)" id="invAction-{{ $inv->id }}">
+                                                <x-ui.dropdown-item href="{{ route('sales.invoices.show', $inv->id) }}" icon="feather-eye me-2">
+                                                    View Invoice
+                                                </x-ui.dropdown-item>
+
+                                                @if(in_array($inv->status, ['Sent', 'Partially Paid', 'Posted', 'Draft']))
+                                                    <x-ui.dropdown-item href="{{ route('sales.payments.create', ['invoice_id' => $inv->id, 'customer_id' => $order->customer_id]) }}" icon="feather-dollar-sign me-2" class="text-success fw-semibold">
+                                                        Register Payment
+                                                    </x-ui.dropdown-item>
+                                                @endif
+                                            </x-ui.action-dropdown>
                                         </td>
                                     </tr>
                                 @empty
@@ -585,72 +497,88 @@
                                     </tr>
                                 @endforelse
                             </tbody>
-                        </table>
+                        </x-ui.odoo-form-ui>
                     </div>
                 </div>
 
-                <!-- TAB 4: Payments & Advance Allocations -->
+                <!-- TAB 3: Payments & Advance Allocations -->
                 <div class="tab-pane fade" id="tab-payments">
-                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
-                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-dollar-sign me-2 text-primary"></i>Payments & Advance Allocations</h5>
+                    <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light bg-opacity-20">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="feather-dollar-sign fs-16 text-primary"></i>
+                            <h6 class="mb-0 fw-bold text-dark fs-14">Payments & Advance Allocations</h6>
+                        </div>
                         @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                            <x-ui.button href="{{ route('sales.payments.create', ['sales_order_id' => $order->id, 'customer_id' => $order->customer_id, 'allocate_to' => 'sales_order']) }}" variant="primary" size="sm" icon="feather-plus">
+                            <x-ui.button href="{{ route('sales.payments.create', ['sales_order_id' => $order->id, 'customer_id' => $order->customer_id, 'allocate_to' => 'sales_order']) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
                                 Record Receipt / Advance
                             </x-ui.button>
                         @endif
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                        <x-ui.odoo-form-ui type="table" id="soPaymentsTable">
+                            <thead>
                                 <tr>
-                                    <th class="ps-4">Payment Number</th>
-                                    <th>Date</th>
-                                    <th>Method</th>
-                                    <th>Reference No</th>
-                                    <th class="text-end pe-4">Allocated Amount</th>
+                                    <th class="ps-4" style="width: 25%;">Payment Number</th>
+                                    <th style="width: 20%;">Date</th>
+                                    <th style="width: 20%;">Method</th>
+                                    <th style="width: 20%;">Reference No</th>
+                                    <th class="text-end" style="width: 20%;">Allocated Amount</th>
+                                    <th class="text-end pe-4" style="width: 15%;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
                                 @forelse ($order->allocations as $alloc)
                                     <tr>
-                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.payments.show', $alloc->payment->id) }}" class="text-primary">{{ $alloc->payment->payment_number }}</a></td>
-                                        <td>{{ date('d/m/Y', strtotime($alloc->payment->payment_date)) }}</td>
-                                        <td>{{ $alloc->payment->payment_method }}</td>
+                                        <td class="ps-4 fw-bold">
+                                            <a href="{{ route('sales.payments.show', $alloc->payment->id) }}" class="text-primary">{{ $alloc->payment->payment_number }}</a>
+                                        </td>
+                                        <td class="text-muted">{{ date('d/m/Y', strtotime($alloc->payment->payment_date)) }}</td>
+                                        <td><span class="fw-semibold text-dark">{{ $alloc->payment->payment_method }}</span></td>
                                         <td class="text-muted">{{ $alloc->payment->reference_no ?: '—' }}</td>
-                                        <td class="text-end pe-4 fw-bold text-dark">₹{{ number_format($alloc->allocated_amount, 2) }}</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($alloc->allocated_amount, 2) }}</td>
+                                        <td class="text-end pe-4">
+                                            <x-ui.action-dropdown :viewUrl="route('sales.payments.show', $alloc->payment->id)" id="payAction-{{ $alloc->payment->id }}">
+                                                <x-ui.dropdown-item href="{{ route('sales.payments.show', $alloc->payment->id) }}" icon="feather-eye me-2">
+                                                    View Receipt
+                                                </x-ui.dropdown-item>
+                                            </x-ui.action-dropdown>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center py-5 text-muted">
+                                        <td colspan="6" class="text-center py-5 text-muted">
                                             <i class="feather-dollar-sign fs-1 mb-2 d-block text-gray-300"></i>
                                             No payment receipts or advances adjusted for this Sales Order yet.
                                         </td>
                                     </tr>
                                 @endforelse
                             </tbody>
-                        </table>
+                        </x-ui.odoo-form-ui>
                     </div>
                 </div>
 
-                <!-- TAB 5: Returns -->
+                <!-- TAB 4: Returns -->
                 <div class="tab-pane fade" id="tab-returns">
-                    <div class="d-flex justify-content-between align-items-center py-3 px-4 border-bottom bg-light bg-opacity-10">
-                        <h5 class="mb-0 fw-bold text-dark fs-14"><i class="feather-rotate-ccw me-2 text-primary"></i>Sales Returns</h5>
+                    <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-light bg-opacity-20">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="feather-rotate-ccw fs-16 text-primary"></i>
+                            <h6 class="mb-0 fw-bold text-dark fs-14">Sales Returns</h6>
+                        </div>
                         @if ($order->status === 'Partially Shipped' || $order->status === 'Shipped')
-                            <x-ui.button href="{{ route('sales.returns.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus">
+                            <x-ui.button href="{{ route('sales.returns.create', ['sales_order_id' => $order->id]) }}" variant="primary" size="sm" icon="feather-plus" class="fw-bold">
                                 Create Sales Return
                             </x-ui.button>
                         @endif
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
+                        <x-ui.odoo-form-ui type="table" id="soReturnsTable">
+                            <thead>
                                 <tr>
-                                    <th class="ps-4">Return Number</th>
-                                    <th>Date</th>
-                                    <th class="text-end">Refund Amount</th>
-                                    <th>Status</th>
-                                    <th class="text-end pe-4">Actions</th>
+                                    <th class="ps-4" style="width: 25%;">Return Number</th>
+                                    <th style="width: 20%;">Date</th>
+                                    <th class="text-end" style="width: 20%;">Refund Amount</th>
+                                    <th style="width: 20%;">Status</th>
+                                    <th class="text-end pe-4" style="width: 15%;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="fs-13 text-dark">
@@ -661,29 +589,32 @@
                                         elseif ($ret->status === 'Cancelled') $retBadge = 'bg-soft-danger text-danger';
                                     @endphp
                                     <tr>
-                                        <td class="ps-4 fw-bold"><a href="{{ route('sales.returns.show', $ret->id) }}" class="text-primary">{{ $ret->return_number }}</a></td>
-                                        <td>{{ date('d/m/Y', strtotime($ret->return_date)) }}</td>
-                                        <td class="text-end fw-bold">₹{{ number_format($ret->total_refund_amount, 2) }}</td>
+                                        <td class="ps-4 fw-bold">
+                                            <a href="{{ route('sales.returns.show', $ret->id) }}" class="text-primary">{{ $ret->return_number }}</a>
+                                        </td>
+                                        <td class="text-muted">{{ date('d/m/Y', strtotime($ret->return_date)) }}</td>
+                                        <td class="text-end fw-bold text-dark">₹{{ number_format($ret->total_refund_amount, 2) }}</td>
                                         <td><span class="badge {{ $retBadge }} px-2 py-0.5 fs-11 fw-semibold">{{ $ret->status }}</span></td>
                                         <td class="text-end pe-4">
-                                            <x-ui.button href="{{ route('sales.returns.show', $ret->id) }}" variant="outline-primary" size="sm" class="fw-bold">
-                                                View Return
-                                            </x-ui.button>
+                                            <x-ui.action-dropdown :viewUrl="route('sales.returns.show', $ret->id)" id="retAction-{{ $ret->id }}">
+                                                <x-ui.dropdown-item href="{{ route('sales.returns.show', $ret->id) }}" icon="feather-eye me-2">
+                                                    View Return
+                                                </x-ui.dropdown-item>
+                                            </x-ui.action-dropdown>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
                                         <td colspan="5" class="text-center py-5 text-muted">
                                             <i class="feather-rotate-ccw fs-1 mb-2 d-block text-gray-300"></i>
-                                            No returns processed for this Sales Order yet.
+                                            No sales returns created for this Sales Order yet.
                                         </td>
                                     </tr>
                                 @endforelse
                             </tbody>
-                        </table>
+                        </x-ui.odoo-form-ui>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>

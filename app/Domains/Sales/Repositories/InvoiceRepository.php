@@ -9,7 +9,7 @@ class InvoiceRepository
 {
     public function getPaginated(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Invoice::query()->with(['customer', 'salesOrder']);
+        $query = Invoice::query()->with(['customer', 'salesOrder.customer']);
 
         if (!empty($filters['search'])) {
             $search = trim($filters['search']);
@@ -17,6 +17,9 @@ class InvoiceRepository
                 $q->where('invoice_number', 'like', "%{$search}%")
                   ->orWhereHas('customer', function ($cq) use ($search) {
                       $cq->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('salesOrder', function ($sq) use ($search) {
+                      $sq->where('sales_order_number', 'like', "%{$search}%");
                   });
             });
         }
@@ -25,7 +28,16 @@ class InvoiceRepository
             $query->where('status', $filters['status']);
         }
 
-        return $query->latest()->paginate($perPage)->withQueryString();
+        $sortBy    = $filters['sort_by'] ?? 'created_at';
+        $sortOrder = $filters['sort_order'] ?? 'desc';
+
+        if (in_array($sortBy, ['invoice_number', 'invoice_date', 'total_amount', 'status', 'created_at'])) {
+            $query->orderBy($sortBy, strtolower($sortOrder) === 'asc' ? 'asc' : 'desc');
+        } else {
+            $query->latest();
+        }
+
+        return $query->paginate($perPage)->withQueryString();
     }
 
     public function find(int $id): ?Invoice

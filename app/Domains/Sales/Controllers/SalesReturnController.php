@@ -46,12 +46,47 @@ class SalesReturnController extends Controller
         $nextSeq = $latest ? intval(str_replace('RET-', '', $latest->return_number)) + 1 : 1;
         $nextReturnNumber = 'RET-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
 
-        return view('modules.sales.returns.create', compact('customers', 'salesOrders', 'salesOrder', 'warehouses', 'nextReturnNumber'));
+        $prefillSalesOrderId = $salesOrderId;
+        $prefillCustomerId   = $salesOrder?->customer_id;
+
+        return view('modules.sales.returns.create', compact(
+            'customers', 'salesOrders', 'salesOrder', 'warehouses', 'nextReturnNumber',
+            'prefillSalesOrderId', 'prefillCustomerId'
+        ));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('create', SalesReturn::class);
+
+        // Auto-fill customer_id from SalesOrder if missing in request
+        if (!$request->filled('customer_id') && $request->filled('sales_order_id')) {
+            $so = SalesOrder::find($request->input('sales_order_id'));
+            if ($so) {
+                $request->merge(['customer_id' => $so->customer_id]);
+            }
+        }
+
+        // Auto-fill warehouse_id for return items if missing/invalid
+        if ($request->has('items') && is_array($request->input('items'))) {
+            $defaultWhId = Warehouse::query()->orderByDesc('is_default')->orderBy('name')->first()?->id;
+            if (!$defaultWhId) {
+                $defaultWhId = Warehouse::create([
+                    'tenant_id' => tenant_id() ?? 1,
+                    'name'      => 'Main Warehouse',
+                    'code'      => 'WH-MAIN',
+                    'is_default'=> true
+                ])->id;
+            }
+
+            $items = $request->input('items');
+            foreach ($items as &$it) {
+                if (empty($it['warehouse_id']) || !Warehouse::where('id', $it['warehouse_id'])->exists()) {
+                    $it['warehouse_id'] = $defaultWhId;
+                }
+            }
+            $request->merge(['items' => $items]);
+        }
 
         $validated = $request->validate([
             'customer_id'    => ['required', 'exists:customers,id'],
@@ -73,14 +108,15 @@ class SalesReturnController extends Controller
             }
 
             $salesReturn = SalesReturn::create([
-                'tenant_id'      => tenant_id() ?? 1,
-                'customer_id'    => $validated['customer_id'],
-                'sales_order_id' => $validated['sales_order_id'] ?? null,
-                'return_number'  => $validated['return_number'],
-                'return_date'    => $validated['return_date'],
-                'status'         => 'Pending',
-                'reason'         => $validated['reason'] ?? null,
-                'total_amount'   => $totalAmount,
+                'tenant_id'           => tenant_id() ?? 1,
+                'customer_id'         => $validated['customer_id'],
+                'sales_order_id'      => $validated['sales_order_id'] ?? null,
+                'return_number'       => $validated['return_number'],
+                'return_date'         => $validated['return_date'],
+                'status'              => 'Pending',
+                'reason'              => $validated['reason'] ?? null,
+                'total_amount'        => $totalAmount,
+                'total_refund_amount' => $totalAmount,
             ]);
 
             foreach ($validated['items'] as $item) {
@@ -115,8 +151,8 @@ class SalesReturnController extends Controller
         if (!$returnOrder) abort(404);
         $this->authorize('update', $returnOrder);
 
-        if ($returnOrder->status !== 'Pending') {
-            return redirect()->back()->with('error', 'Only Pending Sales Returns can be approved.');
+        if (!in_array($returnOrder->status, ['Pending', 'Draft'])) {
+            return redirect()->back()->with('error', 'Only Pending or Draft Sales Returns can be approved.');
         }
 
         DB::transaction(function () use ($returnOrder) {
@@ -136,6 +172,8 @@ class SalesReturnController extends Controller
 
             $returnOrder->update(['status' => 'Completed']);
         });
+
+        event(new \App\Domains\Sales\Events\SalesReturnApproved($returnOrder));
 
         return redirect()->route('sales.returns.show', $returnOrder->id)->with('success', "Sales Return {$returnOrder->return_number} approved and stock restored to inventory successfully.");
     }

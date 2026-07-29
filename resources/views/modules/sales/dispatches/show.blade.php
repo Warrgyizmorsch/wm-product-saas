@@ -69,17 +69,17 @@
         </div>
     </div>
 
-    <div class="row g-4">
+    <div class="row g-4 align-items-stretch">
         {{-- Items Table --}}
-        <div class="col-lg-8">
-            <div class="card border-0 shadow-sm">
+        <div class="col-lg-8 d-flex flex-column">
+            <div class="card border-0 shadow-sm flex-grow-1 d-flex flex-column h-100">
                 <div class="card-header bg-transparent border-bottom py-3">
                     <h6 class="card-title mb-0 fw-bold text-dark">
                         <i class="feather-list me-2 text-primary"></i>Dispatched Items
                     </h6>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
+                <div class="card-body p-0 flex-grow-1 position-relative" style="min-height: 0;">
+                    <div class="table-responsive h-100" style="overflow-y: auto;">
                         <table class="table align-middle fs-13 mb-0">
                             <thead class="table-light fs-11 text-uppercase fw-semibold text-muted">
                                 <tr>

@@ -49,7 +49,7 @@
                             @endforeach
                         </x-ui.odoo-form-ui>
 
-                        <x-ui.odoo-form-ui type="input" inputType="number" label="Amount (₹)" name="amount" id="amountInput" :value="old('amount')" :required="true" step="0.01" placeholder="0.00" style="font-weight: bold; color: #1e40af;" />
+                        <x-ui.odoo-form-ui type="input" inputType="number" label="Amount (₹)" name="amount" id="amountInput" :value="old('amount', $prefillAmount)" :required="true" step="0.01" placeholder="0.00" style="font-weight: bold; color: #1e40af;" />
 
                         <x-ui.odoo-form-ui type="select" label="Payment Method" name="payment_method" :required="true">
                             <option value="Bank Transfer" @selected(old('payment_method') == 'Bank Transfer')>Bank Transfer / Wire</option>
@@ -91,8 +91,8 @@
                             <x-ui.odoo-form-ui type="select" label="Link to Invoice" name="invoice_id" id="invoiceSelect">
                                 <option value="">Select Invoice...</option>
                                 @foreach ($invoices as $inv)
-                                    <option value="{{ $inv->id }}" data-customer="{{ $inv->salesOrder->customer_id }}" @selected(old('invoice_id', $prefillInvoiceId) == $inv->id)>
-                                        {{ $inv->invoice_number }} (Grand Total: ₹{{ number_format($inv->grand_total, 2) }})
+                                    <option value="{{ $inv->id }}" data-customer="{{ $inv->customer_id ?? $inv->salesOrder?->customer_id }}" data-balance="{{ $inv->balance_due }}" @selected(old('invoice_id', $prefillInvoiceId) == $inv->id)>
+                                        {{ $inv->invoice_number }} (Balance: ₹{{ number_format($inv->balance_due, 2) }})
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
@@ -163,9 +163,52 @@
             $('#allocateToSelect').on('change', toggleAllocationGroups);
             $('#customerSelect').on('change', filterAllocationsByCustomer);
 
-            // Initial Triggers
+            // Initial Triggers — run toggle first so invoice/SO group is visible
             toggleAllocationGroups();
             filterAllocationsByCustomer();
+
+            // Auto-fill amount from selected invoice's balance_due
+            function syncAmountFromInvoice() {
+                const selected = $('#invoiceSelect option:selected');
+                const balance  = selected.data('balance');
+                if (balance !== undefined && balance > 0) {
+                    $('#amountInput').val(parseFloat(balance).toFixed(2));
+                }
+            }
+
+            // Auto-select customer when invoice is chosen
+            function syncCustomerFromInvoice() {
+                const selected    = $('#invoiceSelect option:selected');
+                const customerId  = selected.data('customer');
+                if (customerId) {
+                    $('#customerSelect').val(customerId).trigger('change');
+                }
+            }
+
+            // Auto-select customer when sales order is chosen
+            function syncCustomerFromSalesOrder() {
+                const selected   = $('#salesOrderSelect option:selected');
+                const customerId = selected.data('customer');
+                if (customerId) {
+                    $('#customerSelect').val(customerId).trigger('change');
+                }
+            }
+
+            $('#invoiceSelect').on('change', function () {
+                syncAmountFromInvoice();
+                syncCustomerFromInvoice();
+            });
+
+            $('#salesOrderSelect').on('change', syncCustomerFromSalesOrder);
+
+            // On page load if invoice/SO is pre-selected, sync customer & amount
+            if ($('#invoiceSelect').val()) {
+                syncCustomerFromInvoice();
+                syncAmountFromInvoice();
+            }
+            if ($('#salesOrderSelect').val()) {
+                syncCustomerFromSalesOrder();
+            }
         });
     </script>
 @endpush
