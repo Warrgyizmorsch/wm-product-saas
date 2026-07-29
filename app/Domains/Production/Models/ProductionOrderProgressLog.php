@@ -12,6 +12,7 @@ class ProductionOrderProgressLog extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'idempotency_key',
         'production_order_id',
         'operation_id',
         'quantity_produced',

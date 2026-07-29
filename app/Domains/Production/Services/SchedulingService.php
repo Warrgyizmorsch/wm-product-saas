@@ -5,6 +5,7 @@ namespace App\Domains\Production\Services;
 use App\Domains\Production\Models\Machine;
 use App\Domains\Production\Models\ProductionCalendar;
 use App\Domains\Production\Models\ProductionCalendarHoliday;
+use App\Domains\Production\Models\ProductionMachineDowntime;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
 use App\Domains\Production\Models\ProductionSchedule;
@@ -201,19 +202,14 @@ class SchedulingService
                 $duration = $times['total_minutes'];
 
                 // Calculate earliest start based on predecessors
-                $predecessors = collect($scheduledData)->filter(function ($prev) use ($op) {
-                    if ($prev['sequence'] >= $op->sequence) {
-                        return false;
-                    }
-                    if ($op->is_parallel && $op->parallel_group !== null && $prev['parallel_group'] === $op->parallel_group) {
-                        return false;
-                    }
-                    return true;
-                });
-
-                $earliestStart = $predecessors->isEmpty()
-                    ? $startDate->copy()
-                    : $predecessors->max('planned_finish')->copy();
+                $earliestStart = $this->calculateEarliestStartFromPredecessors(
+                    $scheduledData,
+                    $op->sequence,
+                    $op->parallel_group,
+                    (bool) $op->is_parallel,
+                    $startDate,
+                    (float) $order->quantity_ordered
+                );
 
                 // Collect parallel-group sibling schedule-op IDs to exclude from bookings
                 $excludeScheduleOpIds = [];
@@ -225,12 +221,22 @@ class SchedulingService
                 if ($op->routing_operation_id) {
                     $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $earliestStart, $duration, $tenantId, true, $excludeScheduleOpIds);
                 } else {
-                    $slot = $this->calculateAvailableSlot($op->work_center_id, null, $earliestStart, $duration, true, $excludeScheduleOpIds);
+                    $slot = $this->calculateAvailableSlot($op->work_center_id, $op->machine_id, $earliestStart, $duration, true, $excludeScheduleOpIds);
+                    $warnings = $slot['warnings'];
+                    if ($op->machine_id) {
+                        $m = Machine::withoutGlobalScopes()->find($op->machine_id);
+                        if ($m) {
+                            $mCheck = $this->validateMachineForScheduling($m, $op->work_center_id, $tenantId);
+                            if (!$mCheck['valid'] && !empty($mCheck['warning'])) {
+                                $warnings[] = $mCheck['warning'];
+                            }
+                        }
+                    }
                     $alloc = [
-                        'machine_id' => null,
+                        'machine_id' => $op->machine_id,
                         'start' => $slot['start'],
                         'finish' => $slot['finish'],
-                        'warnings' => $slot['warnings'],
+                        'warnings' => $warnings,
                         'priority' => 1,
                     ];
                 }
@@ -273,6 +279,9 @@ class SchedulingService
                     'is_parallel' => $op->is_parallel,
                     'planned_start' => $plannedStart,
                     'planned_finish' => $plannedFinish,
+                    'work_center_id' => $op->work_center_id,
+                    'machine_id' => $machineId,
+                    'order_op' => $op,
                 ];
             }
 
@@ -368,19 +377,15 @@ class SchedulingService
                 $duration = $times['total_minutes'];
 
                 // Calculate latest finish cursor based on successors
-                $successors = collect($scheduledData)->filter(function ($succ) use ($op) {
-                    if ($succ['sequence'] <= $op->sequence) {
-                        return false;
-                    }
-                    if ($op->is_parallel && $op->parallel_group !== null && $succ['parallel_group'] === $op->parallel_group) {
-                        return false;
-                    }
-                    return true;
-                });
-
-                $latestFinish = $successors->isEmpty()
-                    ? $dueDate->copy()
-                    : $successors->min('planned_start')->copy();
+                $latestFinish = $this->calculateLatestFinishFromSuccessors(
+                    $scheduledData,
+                    $op->sequence,
+                    $op->parallel_group,
+                    (bool) $op->is_parallel,
+                    $dueDate,
+                    (float) $order->quantity_ordered,
+                    $op
+                );
 
                 // Collect parallel-group sibling schedule-op IDs to exclude from bookings
                 $excludeScheduleOpIds = [];
@@ -392,12 +397,22 @@ class SchedulingService
                 if ($op->routing_operation_id) {
                     $alloc = $this->findNextAvailableMachine($op->routing_operation_id, $latestFinish, $duration, $tenantId, false, $excludeScheduleOpIds);
                 } else {
-                    $slot = $this->calculateAvailableSlot($op->work_center_id, null, $latestFinish, $duration, false, $excludeScheduleOpIds);
+                    $slot = $this->calculateAvailableSlot($op->work_center_id, $op->machine_id, $latestFinish, $duration, false, $excludeScheduleOpIds);
+                    $warnings = $slot['warnings'];
+                    if ($op->machine_id) {
+                        $m = Machine::withoutGlobalScopes()->find($op->machine_id);
+                        if ($m) {
+                            $mCheck = $this->validateMachineForScheduling($m, $op->work_center_id, $tenantId);
+                            if (!$mCheck['valid'] && !empty($mCheck['warning'])) {
+                                $warnings[] = $mCheck['warning'];
+                            }
+                        }
+                    }
                     $alloc = [
-                        'machine_id' => null,
+                        'machine_id' => $op->machine_id,
                         'start' => $slot['start'],
                         'finish' => $slot['finish'],
-                        'warnings' => $slot['warnings'],
+                        'warnings' => $warnings,
                         'priority' => 1,
                     ];
                 }
@@ -435,6 +450,9 @@ class SchedulingService
                     'is_parallel' => $op->is_parallel,
                     'planned_start' => $plannedStart,
                     'planned_finish' => $plannedFinish,
+                    'work_center_id' => $op->work_center_id,
+                    'machine_id' => $machineId,
+                    'order_op' => $op,
                 ];
             }
 
@@ -516,19 +534,14 @@ class SchedulingService
                 }
 
                 // Calculate earliest start based on predecessors in scheduledData
-                $predecessors = collect($scheduledData)->filter(function ($prev) use ($op, $isParallel, $parallelGroup) {
-                    if ($prev['sequence'] >= $op->sequence) {
-                        return false;
-                    }
-                    if ($isParallel && $parallelGroup !== null && $prev['parallel_group'] === $parallelGroup) {
-                        return false;
-                    }
-                    return true;
-                });
-
-                $earliestStart = $predecessors->isEmpty()
-                    ? $newStartDate->copy()
-                    : $predecessors->max('planned_finish')->copy();
+                $earliestStart = $this->calculateEarliestStartFromPredecessors(
+                    $scheduledData,
+                    $op->sequence,
+                    $parallelGroup,
+                    (bool) $isParallel,
+                    $newStartDate,
+                    (float) ($schedule->order?->quantity_ordered ?? 1)
+                );
 
                 $routingOpId = $orderOp ? $orderOp->routing_operation_id : 0;
                 $alloc = $this->findNextAvailableMachine($routingOpId, $earliestStart, $op->planned_duration_minutes, $schedule->tenant_id, true);
@@ -562,6 +575,9 @@ class SchedulingService
                     'is_parallel' => $isParallel,
                     'planned_start' => $plannedStart,
                     'planned_finish' => $plannedFinish,
+                    'work_center_id' => $op->work_center_id,
+                    'machine_id' => $targetMachine,
+                    'order_op' => $orderOp,
                 ];
             }
 
@@ -647,6 +663,20 @@ class SchedulingService
         }
 
         $bookings = $bookingsQuery->get();
+
+        if ($machineId) {
+            $downtimes = ProductionMachineDowntime::withoutGlobalScopes()
+                ->where('machine_id', $machineId)
+                ->whereNotIn('status', ['closed', 'resolved', 'cancelled'])
+                ->get();
+
+            foreach ($downtimes as $dt) {
+                $bookings->push((object)[
+                    'planned_start' => Carbon::parse($dt->start_time),
+                    'planned_finish' => Carbon::parse($dt->end_time),
+                ]);
+            }
+        }
 
         // Exclude parallel-group siblings so they may share the same slot
         if (!empty($excludeScheduleOpIds)) {
@@ -739,6 +769,10 @@ class SchedulingService
                     $maxPlannedDuration = $freeDuration * $efficiencyFactor;
 
                     if ($forward) {
+                        if (($slot['bounded_at_finish'] ?? false) && $remainingMinutes > $maxPlannedDuration && $durationMinutes > $maxPlannedDuration) {
+                            continue;
+                        }
+
                         if ($plannedStart === null) {
                             $plannedStart = $freeStart->copy();
                         }
@@ -754,6 +788,10 @@ class SchedulingService
                         }
                     } else {
                         // Backward scheduling
+                        if (($slot['bounded_at_start'] ?? false) && $remainingMinutes > $maxPlannedDuration && $durationMinutes > $maxPlannedDuration) {
+                            continue;
+                        }
+
                         if ($plannedFinish === null) {
                             $plannedFinish = $freeEnd->copy();
                         }
@@ -818,6 +856,8 @@ class SchedulingService
                 $freeSlots[] = [
                     'start' => $currentStart->copy(),
                     'finish' => $bStart->copy(),
+                    'bounded_at_finish' => true,
+                    'bounded_at_start' => ($currentStart->gt($wStart)),
                 ];
             }
             $currentStart = $currentStart->max($bEnd);
@@ -827,6 +867,8 @@ class SchedulingService
             $freeSlots[] = [
                 'start' => $currentStart->copy(),
                 'finish' => $wEnd->copy(),
+                'bounded_at_finish' => false,
+                'bounded_at_start' => ($currentStart->gt($wStart)),
             ];
         }
 
@@ -1123,6 +1165,303 @@ class SchedulingService
             'processing_minutes' => $proc,
             'total_minutes' => $setup + $proc,
         ];
+    }
+
+    /**
+     * Add working minutes to a timestamp respecting work center shifts, working days, and holidays.
+     */
+    public function addWorkingMinutes(int $workCenterId, Carbon $from, float $minutes): Carbon
+    {
+        if ($minutes <= 0) {
+            return $from->copy();
+        }
+
+        $wc = $this->getCachedWorkCenter($workCenterId);
+        if (!$wc) {
+            return $from->copy()->addMinutes((int) ceil($minutes));
+        }
+
+        $tenantId = $wc->tenant_id;
+        $calendar = $this->getCachedCalendar($wc, $tenantId);
+        $shifts = $this->getCachedShifts($wc);
+        if ($shifts->isEmpty()) {
+            $shifts = collect([
+                new ProductionShift([
+                    'name' => 'Standard Shift',
+                    'code' => 'STD',
+                    'start_time' => '08:00:00',
+                    'end_time' => '16:00:00',
+                    'break_minutes' => 0,
+                ])
+            ]);
+        }
+
+        $searchDate = $from->copy();
+        $remaining = $minutes;
+
+        for ($day = 0; $day < 365; $day++) {
+            if (!$this->isWorkingDay($calendar, $searchDate, $tenantId)) {
+                $searchDate->addDay()->startOfDay();
+                continue;
+            }
+
+            foreach ($shifts as $shift) {
+                $startStr = $searchDate->toDateString() . ' ' . $shift->start_time;
+                $endStr = $searchDate->toDateString() . ' ' . $shift->end_time;
+                $start = Carbon::parse($startStr);
+                $end = Carbon::parse($endStr);
+                if ($end->lt($start)) {
+                    $end->addDay();
+                }
+                if ($shift->break_minutes > 0) {
+                    $end->subMinutes($shift->break_minutes);
+                }
+
+                $searchStart = $start->max($searchDate);
+                if ($searchStart->gte($end)) {
+                    continue;
+                }
+
+                $avail = $searchStart->diffInMinutes($end);
+                if ($remaining <= $avail) {
+                    return $searchStart->copy()->addMinutes((int) ceil($remaining));
+                }
+
+                $remaining -= $avail;
+                $searchDate = $end->copy();
+            }
+
+            $searchDate->addDay()->startOfDay();
+        }
+
+        return $from->copy()->addMinutes((int) ceil($minutes));
+    }
+
+    /**
+     * Subtract working minutes from a timestamp respecting work center shifts, working days, and holidays.
+     */
+    public function subtractWorkingMinutes(int $workCenterId, Carbon $from, float $minutes): Carbon
+    {
+        if ($minutes <= 0) {
+            return $from->copy();
+        }
+
+        $wc = $this->getCachedWorkCenter($workCenterId);
+        if (!$wc) {
+            return $from->copy()->subMinutes((int) ceil($minutes));
+        }
+
+        $tenantId = $wc->tenant_id;
+        $calendar = $this->getCachedCalendar($wc, $tenantId);
+        $shifts = $this->getCachedShifts($wc);
+        if ($shifts->isEmpty()) {
+            $shifts = collect([
+                new ProductionShift([
+                    'name' => 'Standard Shift',
+                    'code' => 'STD',
+                    'start_time' => '08:00:00',
+                    'end_time' => '16:00:00',
+                    'break_minutes' => 0,
+                ])
+            ]);
+        }
+
+        $searchDate = $from->copy();
+        $remaining = $minutes;
+
+        for ($day = 0; $day < 365; $day++) {
+            if (!$this->isWorkingDay($calendar, $searchDate, $tenantId)) {
+                $searchDate->subDay()->endOfDay();
+                continue;
+            }
+
+            $reversedShifts = $shifts->reverse();
+
+            foreach ($reversedShifts as $shift) {
+                $startStr = $searchDate->toDateString() . ' ' . $shift->start_time;
+                $endStr = $searchDate->toDateString() . ' ' . $shift->end_time;
+                $start = Carbon::parse($startStr);
+                $end = Carbon::parse($endStr);
+                if ($end->lt($start)) {
+                    $end->addDay();
+                }
+                if ($shift->break_minutes > 0) {
+                    $end->subMinutes($shift->break_minutes);
+                }
+
+                $searchFinish = $end->min($searchDate);
+                if ($searchFinish->lte($start)) {
+                    continue;
+                }
+
+                $avail = $start->diffInMinutes($searchFinish);
+                if ($remaining <= $avail) {
+                    return $searchFinish->copy()->subMinutes((int) ceil($remaining));
+                }
+
+                $remaining -= $avail;
+                $searchDate = $start->copy();
+            }
+
+            $searchDate->subDay()->endOfDay();
+        }
+
+        return $from->copy()->subMinutes((int) ceil($minutes));
+    }
+
+    /**
+     * Calculate transfer-ready timestamp for an operation given its planned start time.
+     */
+    public function calculateTransferReadyAt(
+        ProductionOrderOperation $orderOp,
+        Carbon $plannedStart,
+        float $orderQuantity
+    ): Carbon {
+        if (!(bool) $orderOp->overlap_enabled) {
+            $times = $this->calculateOperationTimes($orderOp, $orderQuantity);
+            return $this->addWorkingMinutes($orderOp->work_center_id, $plannedStart, $times['total_minutes']);
+        }
+
+        $setupMinutes = (float) ($orderOp->setup_time_planned ?? 0);
+        $batchQty = (float) ($orderOp->transfer_batch_quantity ?? 0);
+        $lagMinutes = (float) ($orderOp->transfer_lag_minutes ?? 0);
+        $effectiveTransferQty = min($batchQty, $orderQuantity);
+
+        $firstBatchTimes = $this->calculateOperationTimes($orderOp, $effectiveTransferQty);
+        $firstBatchRunDuration = (float) ($firstBatchTimes['processing_minutes'] ?? 0);
+        $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+
+        return $this->addWorkingMinutes(
+            $orderOp->work_center_id,
+            $plannedStart,
+            $totalOffsetMinutes
+        );
+    }
+
+    /**
+     * Calculate the latest allowable finish timestamp for an operation based on its scheduled successors.
+     * Respects overlap_enabled, transfer_batch_quantity, and transfer_lag_minutes for backward overlapping scheduling.
+     */
+    public function calculateLatestFinishFromSuccessors(
+        array $scheduledData,
+        int $opSequence,
+        ?string $parallelGroup,
+        bool $isParallel,
+        Carbon $defaultDueDate,
+        float $orderQuantity,
+        ProductionOrderOperation $currentOp
+    ): Carbon {
+        $successors = collect($scheduledData)->filter(function ($succ) use ($opSequence, $parallelGroup, $isParallel) {
+            if ($succ['sequence'] <= $opSequence) {
+                return false;
+            }
+            if ($isParallel && $parallelGroup !== null && ($succ['parallel_group'] ?? null) === $parallelGroup) {
+                return false;
+            }
+            return true;
+        });
+
+        if ($successors->isEmpty()) {
+            return $defaultDueDate->copy();
+        }
+
+        $latestFinishTimestamps = $successors->map(function ($succ) use ($orderQuantity, $currentOp) {
+            $succStart = $succ['planned_start']->copy();
+
+            if ((bool) $currentOp->overlap_enabled) {
+                // Same machine cannot overlap with itself: enforce Finish-to-Start on same machine
+                if ($currentOp->machine_id && ($succ['machine_id'] ?? null) === $currentOp->machine_id) {
+                    return $succStart;
+                }
+
+                $setupMinutes = (float) ($currentOp->setup_time_planned ?? 0);
+                $batchQty = (float) ($currentOp->transfer_batch_quantity ?? 0);
+                $lagMinutes = (float) ($currentOp->transfer_lag_minutes ?? 0);
+                $effectiveTransferQty = min($batchQty, $orderQuantity);
+
+                $firstBatchTimes = $this->calculateOperationTimes($currentOp, $effectiveTransferQty);
+                $firstBatchRunDuration = (float) ($firstBatchTimes['processing_minutes'] ?? 0);
+                $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+
+                // Latest allowable start time for currentOp to meet successor start
+                $maxStart = $this->subtractWorkingMinutes(
+                    $currentOp->work_center_id,
+                    $succStart,
+                    $totalOffsetMinutes
+                );
+
+                // Latest allowable finish time for currentOp
+                $totalTimes = $this->calculateOperationTimes($currentOp, $orderQuantity);
+                return $this->addWorkingMinutes(
+                    $currentOp->work_center_id,
+                    $maxStart,
+                    $totalTimes['total_minutes']
+                );
+            }
+
+            // Non-overlapping: currentOp finish must be at or before successor start
+            return $succStart;
+        });
+
+        return $latestFinishTimestamps->min();
+    }
+
+    /**
+     * Calculate the earliest available start timestamp for an operation based on its scheduled predecessors.
+     * Respects overlap_enabled, transfer_batch_quantity, and transfer_lag_minutes for forward overlapping scheduling.
+     */
+    public function calculateEarliestStartFromPredecessors(
+        array $scheduledData,
+        int $opSequence,
+        ?string $parallelGroup,
+        bool $isParallel,
+        Carbon $defaultStart,
+        float $orderQuantity
+    ): Carbon {
+        $predecessors = collect($scheduledData)->filter(function ($prev) use ($opSequence, $parallelGroup, $isParallel) {
+            if ($prev['sequence'] >= $opSequence) {
+                return false;
+            }
+            if ($isParallel && $parallelGroup !== null && ($prev['parallel_group'] ?? null) === $parallelGroup) {
+                return false;
+            }
+            return true;
+        });
+
+        if ($predecessors->isEmpty()) {
+            return $defaultStart->copy();
+        }
+
+        $earliestStartTimestamps = $predecessors->map(function ($prev) use ($orderQuantity) {
+            $prevOrderOp = $prev['order_op'] ?? null;
+
+            // Check if overlap scheduling is enabled on the predecessor operation
+            if ($prevOrderOp && (bool) $prevOrderOp->overlap_enabled) {
+                $setupMinutes = (float) ($prevOrderOp->setup_time_planned ?? 0);
+                $batchQty = (float) ($prevOrderOp->transfer_batch_quantity ?? 0);
+                $lagMinutes = (float) ($prevOrderOp->transfer_lag_minutes ?? 0);
+                $effectiveTransferQty = min($batchQty, $orderQuantity);
+
+                $firstBatchTimes = $this->calculateOperationTimes($prevOrderOp, $effectiveTransferQty);
+                $firstBatchRunDuration = (float) ($firstBatchTimes['processing_minutes'] ?? 0);
+                $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+
+                if ($totalOffsetMinutes > 0 && isset($prev['work_center_id']) && isset($prev['planned_start'])) {
+                    return $this->addWorkingMinutes(
+                        $prev['work_center_id'],
+                        $prev['planned_start'],
+                        $totalOffsetMinutes
+                    );
+                }
+
+                return isset($prev['planned_start']) ? $prev['planned_start']->copy() : $prev['planned_finish']->copy();
+            }
+
+            // Fallback to standard Finish-to-Start dependency
+            return $prev['planned_finish']->copy();
+        });
+
+        return $earliestStartTimestamps->max()->copy();
     }
 
     private function resolveCalendar(WorkCenter $wc, int $tenantId): ProductionCalendar
@@ -1657,19 +1996,14 @@ class SchedulingService
                     }
 
                     // Calculate earliest start based on predecessors
-                    $predecessors = collect($scheduledData)->filter(function ($prev) use ($op) {
-                        if ($prev['sequence'] >= $op->sequence) {
-                            return false;
-                        }
-                        if ($op->orderOperation?->is_parallel && $op->orderOperation?->parallel_group !== null && $prev['parallel_group'] === $op->orderOperation?->parallel_group) {
-                            return false;
-                        }
-                        return true;
-                    });
-
-                    $earliestStart = $predecessors->isEmpty()
-                        ? $startDate->copy()
-                        : $predecessors->max('planned_finish')->copy();
+                    $earliestStart = $this->calculateEarliestStartFromPredecessors(
+                        $scheduledData,
+                        $op->sequence,
+                        $op->orderOperation?->parallel_group,
+                        (bool) $op->orderOperation?->is_parallel,
+                        $startDate,
+                        (float) ($order->quantity_ordered ?? 1)
+                    );
 
                     $times = $this->calculateOperationTimes($op->orderOperation, $order->quantity_ordered);
                     $duration = $times['total_minutes'];
@@ -1719,6 +2053,9 @@ class SchedulingService
                         'is_parallel' => $op->orderOperation?->is_parallel,
                         'planned_start' => $plannedStart,
                         'planned_finish' => $plannedFinish,
+                        'work_center_id' => $op->work_center_id,
+                        'machine_id' => $machineId,
+                        'order_op' => $op->orderOperation,
                     ];
 
                     // Write Event timeline entry
@@ -1749,19 +2086,15 @@ class SchedulingService
                         continue;
                     }
 
-                    $successors = collect($scheduledData)->filter(function ($succ) use ($op) {
-                        if ($succ['sequence'] <= $op->sequence) {
-                            return false;
-                        }
-                        if ($op->orderOperation?->is_parallel && $op->orderOperation?->parallel_group !== null && $succ['parallel_group'] === $op->orderOperation?->parallel_group) {
-                            return false;
-                        }
-                        return true;
-                    });
-
-                    $latestFinish = $successors->isEmpty()
-                        ? $startDate->copy() // here $startDate acts as due date
-                        : $successors->min('planned_start')->copy();
+                    $latestFinish = $this->calculateLatestFinishFromSuccessors(
+                        $scheduledData,
+                        $op->sequence,
+                        $op->orderOperation?->parallel_group,
+                        (bool) $op->orderOperation?->is_parallel,
+                        $startDate,
+                        (float) ($order->quantity_ordered ?? 1),
+                        $op->orderOperation
+                    );
 
                     $times = $this->calculateOperationTimes($op->orderOperation, $order->quantity_ordered);
                     $duration = $times['total_minutes'];

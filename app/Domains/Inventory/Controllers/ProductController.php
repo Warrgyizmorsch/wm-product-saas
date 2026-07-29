@@ -293,6 +293,16 @@ class ProductController extends Controller
         $this->authorize('create', Product::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
+        $defaultUomId = $request->input('uom_id') ?? \App\Domains\Inventory\Models\Uom::where('tenant_id', $tenantId)->value('id');
+        $request->merge([
+            'supplier_method' => $request->input('supplier_method', 'buy'),
+            'uom_id' => $defaultUomId,
+            'inventory_valuation_method' => $request->input('inventory_valuation_method', 'FIFO'),
+            'sales_account' => $request->input('sales_account', '4000 Sales'),
+            'purchase_account' => $request->input('purchase_account', '5000 COGS'),
+            'inventory_account' => $request->input('inventory_account', '1400 Inventory'),
+        ]);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'sku' => [

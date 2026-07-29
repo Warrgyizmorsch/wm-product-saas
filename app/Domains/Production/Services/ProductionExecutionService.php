@@ -34,23 +34,31 @@ class ProductionExecutionService
      * only receiveFinishedGoods() increments the order-level quantity_produced.
      */
     public function logProgress(
-        int     $operationId,
-        float   $produced,
-        float   $rejected,
-        float   $scrapped,
-        float   $setupMinutes,
-        float   $runMinutes,
-        ?string $remarks          = null,
-        ?int    $machineId        = null,
-        ?int    $userId           = null,
-        bool    $completeOperation = false
+        int $operationId,
+        float $produced,
+        float $rejected,
+        float $scrapped,
+        float $setupMinutes,
+        float $runMinutes,
+        ?string $remarks = null,
+        ?int $machineId = null,
+        ?int $userId = null,
+        bool $completeOperation = false,
+        ?string $idempotencyKey = null
     ): ProductionOrderProgressLog {
-        return DB::transaction(function () use (
-            $operationId, $produced, $rejected, $scrapped,
-            $setupMinutes, $runMinutes, $remarks, $machineId, $userId, $completeOperation
-        ) {
-            $op    = ProductionOrderOperation::findOrFail($operationId);
+        return DB::transaction(function () use ($operationId, $produced, $rejected, $scrapped, $setupMinutes, $runMinutes, $remarks, $machineId, $userId, $completeOperation, $idempotencyKey) {
+            $op = ProductionOrderOperation::findOrFail($operationId);
             $order = $op->order;
+
+            // Idempotency check
+            if (!empty($idempotencyKey)) {
+                $existingLog = ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
+                    ->where('idempotency_key', $idempotencyKey)
+                    ->first();
+                if ($existingLog) {
+                    return $existingLog;
+                }
+            }
 
             // 1. Enforce Order state validity
             if ($order->isClosed() || $order->isCompleted() || $order->isCancelled()) {
@@ -62,43 +70,46 @@ class ProductionExecutionService
                 throw new InvalidArgumentException('Cannot log progress on an already completed operation.');
             }
 
-            if ($produced > 0 && $op->quantity_produced >= $order->quantity_ordered) {
+            if ($op->quantity_produced >= $order->quantity_ordered) {
                 throw new InvalidArgumentException('Cannot log progress: The planned target has already been fully produced.');
             }
 
-            // Prevent logging total processed quantity (produced + rejected) beyond planned target.
-            // Scrapped quantities represent discarded material and should not restrict the production limit.
-            $plannedTarget = (float) $order->quantity_ordered;
-            $currentProcessed = (float) ($op->quantity_produced + $op->quantity_rejected);
-            $newProcessed = (float) ($produced + $rejected);
-            
-            if (($currentProcessed + $newProcessed) > $plannedTarget) {
-                $maxRemaining = max(0.0, $plannedTarget - $currentProcessed);
-                throw new InvalidArgumentException("Cannot log progress: The total processed quantity (Produced: {$produced}, Rejected: {$rejected}) exceeds the remaining planned target limit of {$maxRemaining} (Total Planned: {$plannedTarget}, Already Logged: {$currentProcessed}).");
+            // Prevent logging total processed quantity beyond available input WIP
+            $isFirstOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
+                ->where('production_order_id', $op->production_order_id)
+                ->where('sequence', '<', $op->sequence)
+                ->exists();
+
+            $availableWip = app(ProductionWipService::class)->getAvailableInputWip($op);
+            $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
+
+            if ($newConsumed > $availableWip) {
+                throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units.");
             }
 
             // 2. Create the progress log entry
             $log = ProductionOrderProgressLog::create([
-                'tenant_id'            => $op->tenant_id,
-                'production_order_id'  => $op->production_order_id,
-                'operation_id'         => $op->id,
-                'quantity_produced'    => $produced,
-                'quantity_rejected'    => $rejected,
-                'quantity_scrapped'    => $scrapped,
+                'tenant_id' => $op->tenant_id,
+                'idempotency_key' => $idempotencyKey,
+                'production_order_id' => $op->production_order_id,
+                'operation_id' => $op->id,
+                'quantity_produced' => $produced,
+                'quantity_rejected' => $rejected,
+                'quantity_scrapped' => $scrapped,
                 'setup_minutes_logged' => $setupMinutes,
-                'run_minutes_logged'   => $runMinutes,
-                'recorded_by'          => $userId,
-                'recorded_at'          => now(),
-                'machine_id'           => $machineId ?? $op->machine_id,
-                'remarks'              => $remarks,
+                'run_minutes_logged' => $runMinutes,
+                'recorded_by' => $userId,
+                'recorded_at' => now(),
+                'machine_id' => $machineId ?? $op->machine_id,
+                'remarks' => $remarks,
             ]);
 
             // 3. Update Operation-level metrics (accumulated per operation)
-            $op->setup_time_actual      += $setupMinutes;
+            $op->setup_time_actual += $setupMinutes;
             $op->processing_time_actual += $runMinutes;
-            $op->quantity_produced      += $produced;
-            $op->quantity_rejected      += $rejected;
-            $op->quantity_scrapped      += $scrapped;
+            $op->quantity_produced += $produced;
+            $op->quantity_rejected += $rejected;
+            $op->quantity_scrapped += $scrapped;
 
             // 4. Update Active Production Batches actual_quantity for this order
             if ($produced > 0) {
@@ -109,8 +120,9 @@ class ProductionExecutionService
 
                 $rem = $produced;
                 foreach ($activeBatches as $b) {
-                    if ($rem <= 0) break;
-                    $unfilled = max(0.0, (float)$b->planned_quantity - (float)$b->actual_quantity);
+                    if ($rem <= 0)
+                        break;
+                    $unfilled = max(0.0, (float) $b->planned_quantity - (float) $b->actual_quantity);
                     if ($unfilled > 0) {
                         $alloc = min($rem, $unfilled);
                         $b->actual_quantity += $alloc;
@@ -157,7 +169,7 @@ class ProductionExecutionService
 
                 $ncr = ProductionNcr::create([
                     'tenant_id' => $op->tenant_id,
-                    'ncr_number' => 'NCR-AUTO-'.strtoupper(uniqid()),
+                    'ncr_number' => 'NCR-AUTO-' . strtoupper(uniqid()),
                     'category' => 'process',
                     'status' => 'open',
                     'disposition_type' => 'scrap',
@@ -189,7 +201,7 @@ class ProductionExecutionService
 
                 $ncr = ProductionNcr::create([
                     'tenant_id' => $op->tenant_id,
-                    'ncr_number' => 'NCR-AUTO-'.strtoupper(uniqid()),
+                    'ncr_number' => 'NCR-AUTO-' . strtoupper(uniqid()),
                     'category' => 'process',
                     'status' => 'open',
                     'disposition_type' => 'rework',
@@ -213,7 +225,7 @@ class ProductionExecutionService
             if ($completeOperation) {
                 $this->ensureQualityGatePassed($op);
 
-                $op->status          = ProductionOrderOperation::STATUS_COMPLETED;
+                $op->status = ProductionOrderOperation::STATUS_COMPLETED;
                 $op->actual_end_time = now();
 
                 // Advance next sequential operation to READY
@@ -234,7 +246,7 @@ class ProductionExecutionService
                     if ($schedOp->isPaused() && $schedOp->last_paused_at) {
                         $pausedSeconds = max(0, $now->timestamp - $schedOp->last_paused_at->timestamp);
                     }
-                    
+
                     $schedOp->update([
                         'status' => \App\Domains\Production\Models\ProductionScheduleOperation::STATUS_COMPLETED,
                         'actual_finish' => $now,
@@ -282,6 +294,9 @@ class ProductionExecutionService
                     $op->status === ProductionOrderOperation::STATUS_COMPLETED
                 );
 
+                // Centralized sub-batch & completion WIP transfer evaluation
+                app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($op->id, $userId);
+
                 if ($completeOperation && isset($nextOp) && $nextOp && $produced > 0 && $op->routing_operation_id && $nextOp->routing_operation_id) {
                     app(ProductionWipService::class)->transferWip(
                         $wip->id,
@@ -296,7 +311,7 @@ class ProductionExecutionService
 
             // 4. Update parent order to in_progress on first execution log
             if ($order->isReleased()) {
-                $order->status            = ProductionOrder::STATUS_IN_PROGRESS;
+                $order->status = ProductionOrder::STATUS_IN_PROGRESS;
                 $order->actual_start_date = now();
                 $order->save();
             }
@@ -333,46 +348,46 @@ class ProductionExecutionService
      * @param int|null    $warehouseId    Warehouse from which to post outflow
      */
     public function logScrap(
-        int     $orderId,
-        ?int    $operationId,
-        ?int    $productId,
-        float   $quantity,
-        ?string $reason      = null,
-        ?int    $userId      = null,
-        ?int    $warehouseId = null,
-        bool    $createNcr   = false,
-        array   $ncrParams   = []
+        int $orderId,
+        ?int $operationId,
+        ?int $productId,
+        float $quantity,
+        ?string $reason = null,
+        ?int $userId = null,
+        ?int $warehouseId = null,
+        bool $createNcr = false,
+        array $ncrParams = []
     ): ProductionOrderScrap {
         if ($quantity <= 0) {
             throw new InvalidArgumentException('Scrap quantity must be greater than zero.');
         }
 
         return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId, $warehouseId, $createNcr, $ncrParams) {
-            $order     = ProductionOrder::findOrFail($orderId);
+            $order = ProductionOrder::findOrFail($orderId);
             $scrapProductId = $productId ?? $order->product_id;
 
             // Create the scrap record (stock_transaction_id null = not yet posted)
             $scrap = ProductionOrderScrap::create([
-                'tenant_id'                     => $order->tenant_id,
-                'production_order_id'           => $order->id,
+                'tenant_id' => $order->tenant_id,
+                'production_order_id' => $order->id,
                 'production_order_operation_id' => $operationId,
-                'product_id'                    => $scrapProductId,
-                'quantity'                      => $quantity,
-                'reason'                        => $reason,
-                'recorded_by'                   => $userId,
-                'recorded_at'                   => now(),
-                'stock_transaction_id'          => null,
+                'product_id' => $scrapProductId,
+                'quantity' => $quantity,
+                'reason' => $reason,
+                'recorded_by' => $userId,
+                'recorded_at' => now(),
+                'stock_transaction_id' => null,
             ]);
 
             // Optional Quality NCR creation
             if ($createNcr) {
                 app(NcrService::class)->createNcr($order->tenant_id, array_merge([
-                    'production_order_id'           => $order->id,
+                    'production_order_id' => $order->id,
                     'production_order_operation_id' => $operationId,
-                    'operator_id'                    => $userId,
-                    'category'                       => $ncrParams['category'] ?? 'Material Scrap',
-                    'description'                    => $reason ?: "Scrap logged: {$quantity} units of product #{$scrapProductId}",
-                    'disposition_type'               => 'scrap',
+                    'operator_id' => $userId,
+                    'category' => $ncrParams['category'] ?? 'Material Scrap',
+                    'description' => $reason ?: "Scrap logged: {$quantity} units of product #{$scrapProductId}",
+                    'disposition_type' => 'scrap',
                 ], $ncrParams));
             }
 
@@ -404,12 +419,12 @@ class ProductionExecutionService
                     // We record the scrap event regardless; the stock posting failure is noted in the event log.
                     app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                         'production_order_id' => $order->id,
-                        'event_type'          => 'Scrap Stock Warning',
-                        'title'               => 'Scrap Stock Outflow Skipped',
-                        'description'         => "Scrap logged for order #{$order->id} but stock outflow could not be posted: " . $e->getMessage(),
-                        'severity'            => 'warning',
-                        'event_source'        => 'ProductionExecutionService',
-                        'triggered_by'        => $userId,
+                        'event_type' => 'Scrap Stock Warning',
+                        'title' => 'Scrap Stock Outflow Skipped',
+                        'description' => "Scrap logged for order #{$order->id} but stock outflow could not be posted: " . $e->getMessage(),
+                        'severity' => 'warning',
+                        'event_source' => 'ProductionExecutionService',
+                        'triggered_by' => $userId,
                     ]);
                 }
             }
@@ -425,12 +440,12 @@ class ProductionExecutionService
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
-                'event_type'          => 'Scrap Logged',
-                'title'               => 'Production Scrap Recorded',
-                'description'         => "Scrapped {$quantity} units on order #{$order->order_number}.",
-                'severity'            => 'warning',
-                'event_source'        => 'ProductionExecutionService',
-                'triggered_by'        => $userId,
+                'event_type' => 'Scrap Logged',
+                'title' => 'Production Scrap Recorded',
+                'description' => "Scrapped {$quantity} units on order #{$order->order_number}.",
+                'severity' => 'warning',
+                'event_source' => 'ProductionExecutionService',
+                'triggered_by' => $userId,
             ]);
 
             return $scrap;
@@ -450,11 +465,11 @@ class ProductionExecutionService
      * This prevents double-counting: the same unit is NOT counted as produced AND reworked.
      */
     public function logRework(
-        int     $orderId,
-        ?int    $operationId,
-        float   $quantity,
-        ?string $reason  = null,
-        ?int    $userId  = null
+        int $orderId,
+        ?int $operationId,
+        float $quantity,
+        ?string $reason = null,
+        ?int $userId = null
     ): ProductionOrderRework {
         if ($quantity <= 0) {
             throw new InvalidArgumentException('Rework quantity must be greater than zero.');
@@ -463,14 +478,14 @@ class ProductionExecutionService
         $order = ProductionOrder::findOrFail($orderId);
 
         return ProductionOrderRework::create([
-            'tenant_id'                     => $order->tenant_id,
-            'production_order_id'           => $order->id,
+            'tenant_id' => $order->tenant_id,
+            'production_order_id' => $order->id,
             'production_order_operation_id' => $operationId,
-            'quantity'                      => $quantity,
-            'reason'                        => $reason,
-            'status'                        => 'pending',
-            'recorded_by'                   => $userId,
-            'recorded_at'                   => now(),
+            'quantity' => $quantity,
+            'reason' => $reason,
+            'status' => 'pending',
+            'recorded_by' => $userId,
+            'recorded_at' => now(),
         ]);
     }
 
@@ -487,7 +502,7 @@ class ProductionExecutionService
      */
     public function completeRework(int $reworkId): void
     {
-        $rework         = ProductionOrderRework::findOrFail($reworkId);
+        $rework = ProductionOrderRework::findOrFail($reworkId);
         $rework->status = 'completed';
         $rework->save();
     }
@@ -516,23 +531,20 @@ class ProductionExecutionService
      * @param array       $serialNumbers  Serial number strings for serial-tracked products
      */
     public function receiveFinishedGoods(
-        int     $orderId,
-        float   $quantity,
-        string  $qualityStatus         = 'passed',
-        ?string $remarks               = null,
-        ?int    $userId                = null,
-        ?int    $warehouseId           = null,
+        int $orderId,
+        float $quantity,
+        string $qualityStatus = 'passed',
+        ?string $remarks = null,
+        ?int $userId = null,
+        ?int $warehouseId = null,
         ?string $productionBatchNumber = null,
-        array   $serialNumbers         = []
+        array $serialNumbers = []
     ): ProductionOrderReceipt {
         if ($quantity <= 0) {
             throw new InvalidArgumentException('Receipt quantity must be greater than zero.');
         }
 
-        return DB::transaction(function () use (
-            $orderId, $quantity, $qualityStatus, $remarks, $userId, $warehouseId,
-            $productionBatchNumber, $serialNumbers
-        ) {
+        return DB::transaction(function () use ($orderId, $quantity, $qualityStatus, $remarks, $userId, $warehouseId, $productionBatchNumber, $serialNumbers) {
             $order = ProductionOrder::findOrFail($orderId);
 
             if ($order->isClosed() || $order->isCancelled()) {
@@ -557,13 +569,13 @@ class ProductionExecutionService
             }
 
             $warehouseId = $warehouseId ?: $this->defaultWarehouseId($order->tenant_id);
-            if (! $warehouseId) {
+            if (!$warehouseId) {
                 throw new InvalidArgumentException('A warehouse is required before receiving finished goods.');
             }
 
             // Validate warehouse belongs to tenant and is active
             $warehouse = Warehouse::where('tenant_id', $order->tenant_id)->where('id', $warehouseId)->first();
-            if (! $warehouse) {
+            if (!$warehouse) {
                 throw new InvalidArgumentException("Warehouse #{$warehouseId} does not belong to this tenant.");
             }
 
@@ -596,7 +608,7 @@ class ProductionExecutionService
             // The authoritative serial ledger is inventory serial_numbers table managed by StockService.
             // We only store a snapshot here for fast reference on the receipt record.
             $serialSnapshot = null;
-            if (! empty($serialNumbers)) {
+            if (!empty($serialNumbers)) {
                 // Validate each serial exists on this production order
                 $validSerials = ProductionSerialNumber::where('tenant_id', $order->tenant_id)
                     ->where('production_order_id', $order->id)
@@ -605,7 +617,7 @@ class ProductionExecutionService
                     ->toArray();
 
                 $invalid = array_diff($serialNumbers, $validSerials);
-                if (! empty($invalid)) {
+                if (!empty($invalid)) {
                     throw new InvalidArgumentException(
                         'The following serial numbers do not belong to this production order: ' . implode(', ', $invalid)
                     );
@@ -615,17 +627,17 @@ class ProductionExecutionService
 
             // ── Step 2: Create production receipt record ──────────────────────
             $receipt = ProductionOrderReceipt::create([
-                'tenant_id'           => $order->tenant_id,
+                'tenant_id' => $order->tenant_id,
                 'production_order_id' => $order->id,
-                'product_id'          => $order->product_id,
-                'warehouse_id'        => $warehouseId,
-                'inventory_batch_id'  => $inventoryBatchId,
-                'serial_numbers'      => $serialSnapshot,
-                'quantity_received'   => $quantity,
-                'quality_status'      => $qualityStatus,
-                'received_by'         => $userId,
-                'received_at'         => now(),
-                'remarks'             => $remarks,
+                'product_id' => $order->product_id,
+                'warehouse_id' => $warehouseId,
+                'inventory_batch_id' => $inventoryBatchId,
+                'serial_numbers' => $serialSnapshot,
+                'quantity_received' => $quantity,
+                'quality_status' => $qualityStatus,
+                'received_by' => $userId,
+                'received_at' => now(),
+                'remarks' => $remarks,
             ]);
 
             // ── Step 7: Write FG genealogy trace ─────────────────────────────
@@ -638,20 +650,20 @@ class ProductionExecutionService
                 if ($productionBatch) {
                     // Trace: production batch → inventory batch (FG stock created)
                     ProductionLotTrace::create([
-                        'tenant_id'   => $order->tenant_id,
+                        'tenant_id' => $order->tenant_id,
                         'source_type' => 'batch',            // production batch
-                        'source_id'   => $productionBatch->id,
+                        'source_id' => $productionBatch->id,
                         'target_type' => 'lot',              // inventory batch (FG lot)
-                        'target_id'   => $inventoryBatchId,
-                        'quantity'    => $quantity,
-                        'remarks'     => "Finished goods received into inventory batch #{$inventoryBatchId} from production batch {$productionBatchNumber}.",
+                        'target_id' => $inventoryBatchId,
+                        'quantity' => $quantity,
+                        'remarks' => "Finished goods received into inventory batch #{$inventoryBatchId} from production batch {$productionBatchNumber}.",
                     ]);
 
                     // Also update production batch actual quantity
                     $productionBatch->update([
-                        'actual_quantity'  => $productionBatch->actual_quantity + $quantity,
-                        'manufactured_at'  => $productionBatch->manufactured_at ?? now(),
-                        'status'           => 'completed',
+                        'actual_quantity' => $productionBatch->actual_quantity + $quantity,
+                        'manufactured_at' => $productionBatch->manufactured_at ?? now(),
+                        'status' => 'completed',
                     ]);
                 }
             }
@@ -685,12 +697,12 @@ class ProductionExecutionService
 
             app(ProductionEventService::class)->writeEvent($order->tenant_id, [
                 'production_order_id' => $order->id,
-                'event_type'          => 'Finished Goods Received',
-                'title'               => 'Finished Goods Received',
-                'description'         => "Received {$quantity} finished goods with quality status '{$qualityStatus}'.",
-                'severity'            => 'success',
-                'event_source'        => 'ProductionExecutionService',
-                'triggered_by'        => $userId,
+                'event_type' => 'Finished Goods Received',
+                'title' => 'Finished Goods Received',
+                'description' => "Received {$quantity} finished goods with quality status '{$qualityStatus}'.",
+                'severity' => 'success',
+                'event_source' => 'ProductionExecutionService',
+                'triggered_by' => $userId,
             ]);
 
             return $receipt;
@@ -701,7 +713,7 @@ class ProductionExecutionService
 
     private function ensureQualityGatePassed(ProductionOrderOperation $operation): void
     {
-        if (! $operation->routingOperation?->quality_required) {
+        if (!$operation->routingOperation?->quality_required) {
             return;
         }
 
@@ -711,7 +723,7 @@ class ProductionExecutionService
             ->where('result', 'passed')
             ->exists();
 
-        if (! $passedInspectionExists) {
+        if (!$passedInspectionExists) {
             throw new InvalidArgumentException('This operation requires an approved passed quality inspection before completion.');
         }
     }

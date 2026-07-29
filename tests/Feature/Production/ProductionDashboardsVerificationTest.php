@@ -25,29 +25,29 @@ class ProductionDashboardsVerificationTest extends TestCase
         parent::setUp();
 
         Tenant::factory()->create([
-            'id'   => $this->tenantId,
+            'id' => $this->tenantId,
             'slug' => 'test-tenant',
         ]);
 
         $this->user = User::factory()->create([
             'tenant_id' => $this->tenantId,
-            'role'      => 'admin',
+            'role' => 'admin',
         ]);
         $this->actingAs($this->user);
 
         $this->workCenter = WorkCenter::create([
             'tenant_id' => $this->tenantId,
-            'name'      => 'Main Assembly Center',
-            'code'      => 'WC-001',
-            'status'    => 'active',
+            'name' => 'Main Assembly Center',
+            'code' => 'WC-001',
+            'status' => 'active',
         ]);
 
         $this->machine = Machine::create([
-            'tenant_id'      => $this->tenantId,
+            'tenant_id' => $this->tenantId,
             'work_center_id' => $this->workCenter->id,
-            'name'           => 'CNC Mill 1',
-            'code'           => 'MCH-001',
-            'status'         => 'active',
+            'name' => 'CNC Mill 1',
+            'code' => 'MCH-001',
+            'status' => 'active',
         ]);
     }
 

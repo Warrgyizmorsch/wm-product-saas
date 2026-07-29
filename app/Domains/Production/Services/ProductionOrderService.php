@@ -86,6 +86,7 @@ class ProductionOrderService
             foreach ($plan->operations as $idx => $planOp) {
                 $status = ($idx === 0) ? ProductionOrderOperation::STATUS_READY : ProductionOrderOperation::STATUS_WAITING;
 
+                $routingOp = $planOp->routingOperation;
                 $op = ProductionOrderOperation::create([
                     'tenant_id' => $order->tenant_id,
                     'production_order_id' => $order->id,
@@ -104,6 +105,9 @@ class ProductionOrderService
                     'quantity_produced' => 0.0000,
                     'quantity_rejected' => 0.0000,
                     'quantity_scrapped' => 0.0000,
+                    'overlap_enabled' => (bool) ($routingOp?->overlap_enabled ?? false),
+                    'transfer_batch_quantity' => (float) ($routingOp?->transfer_batch_quantity ?? 0.0000),
+                    'transfer_lag_minutes' => (int) ($routingOp?->transfer_lag_minutes ?? 0),
                 ]);
                 $createdOps[] = $op;
             }
@@ -289,6 +293,9 @@ class ProductionOrderService
                     'quantity_produced' => 0.0000,
                     'quantity_rejected' => 0.0000,
                     'quantity_scrapped' => 0.0000,
+                    'overlap_enabled' => (bool) ($routingOp->overlap_enabled ?? false),
+                    'transfer_batch_quantity' => (float) ($routingOp->transfer_batch_quantity ?? 0.0000),
+                    'transfer_lag_minutes' => (int) ($routingOp->transfer_lag_minutes ?? 0),
                 ]);
                 $createdOps[] = $op;
             }

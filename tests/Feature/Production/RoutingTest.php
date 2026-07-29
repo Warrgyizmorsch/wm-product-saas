@@ -92,6 +92,8 @@ class RoutingTest extends TestCase
                     'setup_time_minutes' => 15,
                     'processing_time_minutes' => 5,
                     'expected_yield_percentage' => 98.00,
+                    'overlap_enabled' => 1,
+                    'transfer_batch_quantity' => 10,
                 ],
                 [
                     'sequence' => 20,
@@ -122,6 +124,8 @@ class RoutingTest extends TestCase
         $routing = Routing::first();
         $this->assertCount(2, $routing->operations);
         $this->assertEquals(98.00, $routing->operations[0]->expected_yield_percentage);
+        $this->assertTrue((bool) $routing->operations[0]->overlap_enabled);
+        $this->assertEquals(10.00, $routing->operations[0]->transfer_batch_quantity);
     }
 
     public function test_validation_rejects_duplicate_sequences(): void
@@ -232,10 +236,37 @@ class RoutingTest extends TestCase
         
         $newRouting = Routing::where('version', '1.1.0')->first();
         $this->assertNotNull($newRouting);
+        $this->assertNotNull($newRouting->routing_number);
+        $this->assertNotEmpty($newRouting->routing_number);
         $this->assertEquals(Routing::STATUS_DRAFT, $newRouting->status);
         $this->assertEquals(1, $newRouting->revision);
         $this->assertCount(1, $newRouting->operations);
         $this->assertEquals('Operation 1', $newRouting->operations[0]->name);
+
+        // Verify update on cloned routing maintains routing_number
+        $updateResponse = $this->actingAs($this->adminA)
+            ->withHeader('X-Tenant', 'tenant-a')
+            ->put(route('production.routing.update', $newRouting->id), [
+                'routing_number' => $newRouting->routing_number,
+                'name' => 'Updated Duplicated Routing',
+                'product_id' => $this->finishedProductA->id,
+                'version' => '1.1.0',
+                'effective_from' => '2026-06-30',
+                'operations' => [
+                    [
+                        'sequence' => 10,
+                        'name' => 'Operation 1 Modified',
+                        'operation_type' => 'manufacturing',
+                        'work_center_id' => $this->workCenterA->id,
+                    ]
+                ]
+            ]);
+
+        $updateResponse->assertRedirect();
+        $newRouting->refresh();
+        $this->assertNotNull($newRouting->routing_number);
+        $this->assertNotEmpty($newRouting->routing_number);
+        $this->assertEquals('Updated Duplicated Routing', $newRouting->name);
     }
 
     public function test_bulk_action_routing_processing(): void

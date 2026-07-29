@@ -21,7 +21,11 @@ return new class extends Migration
 
         $tenantIds = Tenant::pluck('id')->toArray();
         if (empty($tenantIds)) {
-            $tenantIds = [1];
+            if (Tenant::where('id', 1)->exists()) {
+                $tenantIds = [1];
+            } else {
+                return;
+            }
         }
 
         foreach ($tenantIds as $tenantId) {

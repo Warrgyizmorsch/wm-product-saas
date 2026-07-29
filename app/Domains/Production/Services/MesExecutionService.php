@@ -67,17 +67,27 @@ class MesExecutionService
                 }
             }
 
-            // Validate predecessor operations are complete
-            $predecessors = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
+            // Validate predecessor operations are complete or have transferred WIP via overlap
+            $incompletePredecessors = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                 ->where('sequence', '<', $schedOp->sequence)
                 ->whereNotIn('status', [
                     ProductionScheduleOperation::STATUS_COMPLETED,
                     ProductionScheduleOperation::STATUS_SKIPPED,
                     ProductionScheduleOperation::STATUS_CANCELLED,
                 ])
-                ->exists();
+                ->get();
 
-            if ($predecessors) {
+            $blockingPredecessors = $incompletePredecessors->filter(function (ProductionScheduleOperation $predOp) use ($orderOp, $schedOp): bool {
+                $predOrderOp = $predOp->orderOperation;
+                if ($predOrderOp && $predOrderOp->overlap_enabled) {
+                    if (($orderOp && (float) $orderOp->quantity_transferred_in > 0) || ((float) $predOrderOp->quantity_transferred_out > 0) || ($schedOp->status === ProductionScheduleOperation::STATUS_READY)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            if ($blockingPredecessors->isNotEmpty()) {
                 throw new InvalidArgumentException(
                     "Cannot start operation #{$schedOp->sequence}. All predecessor operations must be completed or skipped first."
                 );
@@ -228,27 +238,35 @@ class MesExecutionService
             $machineId = $schedOp->machine_id;
             $userId = $operatorId ?? auth()->id() ?? null;
             if ($machineId) {
-                $reason = $remarks ?? 'Operation Paused';
-                $category = 'Operator Shortage';
-                if (str_contains(strtolower($reason), 'material')) {
-                    $category = 'Material Shortage';
-                } elseif (str_contains(strtolower($reason), 'breakdown') || str_contains(strtolower($reason), 'failure')) {
-                    $category = 'Breakdown';
-                }
+                $tenantId = $schedOp->schedule->order->tenant_id;
+                $hasOpenDowntime = ProductionMachineDowntime::where('tenant_id', $tenantId)
+                    ->where('machine_id', $machineId)
+                    ->where('status', ProductionMachineDowntime::STATUS_OPEN)
+                    ->exists();
 
-                // startDowntime will automatically transition machine state and write events
-                app(DowntimeService::class)->startDowntime(
-                    $schedOp->schedule->order->tenant_id,
-                    $machineId,
-                    $category,
-                    $reason,
-                    $userId,
-                    [
-                        'production_order_id' => $schedOp->production_order_id,
-                        'production_order_operation_id' => $schedOp->production_order_operation_id,
-                        'remarks' => $remarks,
-                    ]
-                );
+                if (!$hasOpenDowntime) {
+                    $reason = $remarks ?? 'Operation Paused';
+                    $category = 'Operator Shortage';
+                    if (str_contains(strtolower($reason), 'material')) {
+                        $category = 'Material Shortage';
+                    } elseif (str_contains(strtolower($reason), 'breakdown') || str_contains(strtolower($reason), 'failure')) {
+                        $category = 'Breakdown';
+                    }
+
+                    // startDowntime will automatically transition machine state and write events
+                    app(DowntimeService::class)->startDowntime(
+                        $tenantId,
+                        $machineId,
+                        $category,
+                        $reason,
+                        $userId,
+                        [
+                            'production_order_id' => $schedOp->production_order_id,
+                            'production_order_operation_id' => $schedOp->production_order_operation_id,
+                            'remarks' => $remarks,
+                        ]
+                    );
+                }
             }
 
             app(ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [
@@ -431,6 +449,19 @@ class MesExecutionService
                     throw new InvalidArgumentException("Quantity exceeds the allowed overproduction limit of {$limitPercent}% (Max allowed: {$maxAllowed} units).");
                 }
 
+                // Prevent processing beyond available transferred input WIP
+                $isFirstOp = !ProductionOrderOperation::where('tenant_id', $orderOp->tenant_id)
+                    ->where('production_order_id', $orderOp->production_order_id)
+                    ->where('sequence', '<', $orderOp->sequence)
+                    ->exists();
+
+                $availableWip = app(ProductionWipService::class)->getAvailableInputWip($orderOp);
+                $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
+
+                if ($newConsumed > $availableWip) {
+                    throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units.");
+                }
+
                 if ($this->qualityGateIsPendingOrFailed($orderOp)) {
                     throw new InvalidArgumentException('This operation requires an approved passed quality inspection before completion.');
                 }
@@ -478,6 +509,9 @@ class MesExecutionService
                         $operatorId
                     );
                 }
+
+                // Trigger sub-batch WIP transfers to downstream operation if applicable
+                app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($orderOp->id, $operatorId);
             }
 
             // Advance next schedule operations to ready (including parallel operations sharing the same next sequence)
@@ -630,7 +664,8 @@ class MesExecutionService
                 $data['remarks'] ?? null,
                 $schedOp->machine_id,
                 $operatorId,
-                false // Do NOT complete operation
+                false, // Do NOT complete operation
+                $data['idempotency_key'] ?? null
             );
 
             app(ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [

@@ -18,6 +18,7 @@ class UpdateRoutingRequest extends FormRequest
         $operationTypes = implode(',', RoutingOperation::TYPES);
 
         return [
+            'routing_number'     => 'nullable|string|max:50',
             'name'               => 'required|string|max:255',
             'product_id'         => 'required|exists:products,id',
             'version'            => 'required|string|max:50',
@@ -43,6 +44,9 @@ class UpdateRoutingRequest extends FormRequest
             'operations.*.quality_required'                   => 'nullable|boolean',
             'operations.*.is_external'                        => 'nullable|boolean',
             'operations.*.vendor_id'                          => 'nullable|integer',
+            'operations.*.overlap_enabled'                    => 'nullable|boolean',
+            'operations.*.transfer_batch_quantity'            => 'nullable|numeric|min:0',
+            'operations.*.transfer_lag_minutes'               => 'nullable|integer|min:0',
         ];
     }
 
@@ -50,6 +54,8 @@ class UpdateRoutingRequest extends FormRequest
     {
         $validator->after(function ($validator): void {
             $operations = $this->input('operations', []);
+            usort($operations, fn($a, $b) => ($a['sequence'] ?? 0) <=> ($b['sequence'] ?? 0));
+            $totalOps = count($operations);
 
             $sequences = [];
             foreach ($operations as $index => $op) {
@@ -62,6 +68,24 @@ class UpdateRoutingRequest extends FormRequest
                         );
                     } else {
                         $sequences[] = $seq;
+                    }
+                }
+
+                $overlapEnabled = filter_var($op['overlap_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $batchQty = (float) ($op['transfer_batch_quantity'] ?? 0);
+
+                if ($overlapEnabled) {
+                    if ($batchQty <= 0) {
+                        $validator->errors()->add(
+                            "operations.{$index}.transfer_batch_quantity",
+                            "Transfer batch quantity must be greater than zero when overlapping is enabled."
+                        );
+                    }
+                    if ($index === $totalOps - 1) {
+                        $validator->errors()->add(
+                            "operations.{$index}.overlap_enabled",
+                            "Overlapping cannot be enabled on the final operation because it has no successor operation."
+                        );
                     }
                 }
             }

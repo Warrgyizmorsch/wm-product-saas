@@ -186,7 +186,7 @@
 
             function updateTimers() {
                 const now = new Date(new Date().getTime() + clockOffsetMs);
-                
+
                 document.querySelectorAll('.mes-timer-block').forEach(block => {
                     const startTimeStr = block.dataset.start;
                     const plannedStartStr = block.dataset.plannedStart;
@@ -194,10 +194,10 @@
                     const status = block.dataset.status;
                     const accumulatedPausedSecs = parseInt(block.dataset.accumulatedPausedSeconds || '0', 10);
                     const lastPausedAtStr = block.dataset.lastPausedAt;
-                    
+
                     if (startTimeStr) {
                         const start = new Date(startTimeStr);
-                        
+
                         let elapsedMs = 0;
                         if (status === 'paused' && lastPausedAtStr) {
                             const lastPausedAt = new Date(lastPausedAtStr);
@@ -205,22 +205,22 @@
                         } else {
                             elapsedMs = (now - start) - (accumulatedPausedSecs * 1000);
                         }
-                        
+
                         if (elapsedMs > 0) {
                             const elapsedSecs = Math.floor(elapsedMs / 1000);
                             const h = String(Math.floor(elapsedSecs / 3600)).padStart(2, '0');
                             const m = String(Math.floor((elapsedSecs % 3600) / 60)).padStart(2, '0');
                             const s = String(elapsedSecs % 60).padStart(2, '0');
-                            
+
                             const elapsedEl = block.querySelector('.timer-elapsed');
                             if (elapsedEl) elapsedEl.textContent = `${h}:${m}:${s}`;
                         }
                     }
-                    
+
                     if (finishTimeStr) {
                         const finish = new Date(finishTimeStr);
                         const start = plannedStartStr ? new Date(plannedStartStr) : (startTimeStr ? new Date(startTimeStr) : null);
-                        
+
                         // 1. Progress Bar (Calendar timeline progress)
                         if (start) {
                             const totalDuration = finish - start;
@@ -232,7 +232,7 @@
                             } else {
                                 percent = 100;
                             }
-                            
+
                             const progressBar = block.querySelector('.timer-progress-bar');
                             if (progressBar) {
                                 progressBar.style.width = `${percent}%`;
@@ -246,10 +246,10 @@
                                 }
                             }
                         }
-                        
+
                         // 2. Remaining Countdown (Calendar deadline countdown)
                         const remainingSecsLeft = (finish - now) / 1000;
-                        
+
                         const remainingEl = block.querySelector('.timer-remaining');
                         if (remainingEl) {
                             if (remainingSecsLeft > 0) {
@@ -271,7 +271,7 @@
                     }
                 });
             }
-            
+
             // Initial call and tick every second
             updateTimers();
             setInterval(updateTimers, 1000);
@@ -282,7 +282,7 @@
                     // Try to find card relative to modal or match by ID suffix
                     const opId = modal.id.replace('completeModal', '');
                     const block = document.querySelector(`.mes-timer-block[data-start]`);
-                    
+
                     // Fallback to find nearest block using sibling relationships
                     const card = modal.closest('.card') || document.getElementById(`completeModal${opId}`).closest('.card');
                     if (card) {
@@ -328,7 +328,7 @@
         <div class="row g-4">
             {{-- LEFT COLUMN: Production Project Dashboard (8 Cols) --}}
             <div class="col-lg-8">
-                
+
                 <div class="d-flex align-items-center mb-4">
                     <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
                         <i class="feather-grid me-2 text-primary"></i>Active Manufacturing Projects
@@ -343,7 +343,7 @@
                         $totalOps = $ops->count();
                         $completedOps = $ops->where('status', 'completed')->count();
                         $progressPercent = $totalOps > 0 ? ($completedOps / $totalOps) * 100 : 0;
-                        
+
                         // Active operations that need control panels
                         $activeOps = $ops->whereIn('status', ['running', 'paused', 'ready']);
                     @endphp
@@ -360,7 +360,7 @@
                                 <div class="text-muted fs-11">
                                     Schedule: <strong class="text-secondary">{{ $schedule->schedule_number }}</strong>
                                     <span class="mx-2">|</span>
-                                    Quantity: <strong class="text-secondary">{{ (int)$order->quantity_ordered }} units</strong>
+                                    Quantity: <strong class="text-secondary">{{ (int) $order->quantity_ordered }} units</strong>
                                 </div>
                             </div>
                             <div class="text-end">
@@ -376,7 +376,7 @@
                         {{-- Card Body: Visual Routing Flow --}}
                         <div class="card-body p-4 bg-white">
                             <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">Project Routing Sequence</h6>
-                            
+
                             <div class="mes-progress-track">
                                 @php
                                     $stepPercent = $totalOps > 1 ? ($completedOps / ($totalOps - 1)) * 100 : 0;
@@ -385,7 +385,7 @@
                                     }
                                 @endphp
                                 <div class="mes-track-line-filled" style="width: calc({{ $stepPercent }}% - 60px);"></div>
-                                
+
                                 @foreach($ops as $op)
                                     @php
                                         $stepClass = 'step-waiting';
@@ -404,7 +404,7 @@
                                             $stepIcon = 'arrow-right';
                                         }
                                     @endphp
-                                    
+
                                     <div class="mes-progress-step {{ $stepClass }}">
                                         <div class="mes-step-icon" title="{{ ucfirst($op->status) }}">
                                             <i class="feather-{{ $stepIcon }}"></i>
@@ -424,7 +424,7 @@
                             @if($activeOps->count() > 0)
                                 <div class="mt-4 pt-3 border-top">
                                     <h6 class="fw-bold text-secondary mb-3 fs-11 text-uppercase tracking-wider">Active Shopfloor Controls</h6>
-                                    
+
                                     @foreach($activeOps as $activeOp)
                                         <div class="p-3 bg-light rounded border mb-3">
                                             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
@@ -527,7 +527,7 @@
                             }
                             $elapsedMinutes = round($elapsedSecs / 60, 1);
                         @endphp
-                        <x-ui.modal id="completeModal{{ $activeOp->id }}" title="Log Production Progress — {{ $activeOp->orderOperation->name ?? 'Op #'.$activeOp->sequence }}" class="text-start">
+                        <x-ui.modal id="completeModal{{ $activeOp->id }}" title="Log Production Progress — {{ $activeOp->orderOperation->name ?? 'Op #' . $activeOp->sequence }}" class="text-start">
                             <form method="POST" action="{{ route('production.mes.complete', $activeOp->id) }}" id="completeForm{{ $activeOp->id }}">
                                 @csrf
                                 <div class="row g-3">
@@ -572,7 +572,7 @@
 
             {{-- RIGHT COLUMN: Secondary Metadata Widgets & Shortcuts (4 Cols) --}}
             <div class="col-lg-4">
-                
+
                 {{-- Side Widget A: Stats Summary --}}
                 <div class="card border-0 shadow-sm mb-4 sidebar-widget">
                     <div class="card-body p-4">

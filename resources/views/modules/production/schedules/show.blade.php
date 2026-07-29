@@ -121,10 +121,18 @@
                     <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.scheduling_type') }}:</span></div>
                     <div class="col-md-8">
                         <span class="badge bg-soft-info text-info text-capitalize">
-                            {{ __('production.' . $schedule->scheduling_type) ?? $schedule->scheduling_type }}
+                            {{ $schedule->scheduling_type === 'backward' ? 'Backward / JIT' : 'Forward' }}
                         </span>
                     </div>
                 </div>
+                @if($schedule->order && $schedule->order->end_date)
+                    <div class="row erp-form-row mb-2">
+                        <div class="col-md-4"><span class="fw-semibold text-muted fs-13">Due Date / Target:</span></div>
+                        <div class="col-md-8">
+                            <span class="fw-bold text-dark font-monospace fs-13">{{ \Illuminate\Support\Carbon::parse($schedule->order->end_date)->format('d/m/Y') }}</span>
+                        </div>
+                    </div>
+                @endif
                 @if($schedule->notes)
                     <div class="row erp-form-row mb-2">
                         <div class="col-md-4"><span class="fw-semibold text-muted fs-13">{{ __('production.description') ?? 'Notes' }}:</span></div>
@@ -232,6 +240,17 @@
                                     <td class="align-middle">
                                         <span class="fw-semibold text-dark">{{ $op->orderOperation->name ?? '—' }}</span>
                                         <br><small class="text-muted font-monospace">{{ $op->orderOperation->operation_number ?? '' }}</small>
+                                        @if($op->orderOperation && $op->orderOperation->overlap_enabled)
+                                            @php
+                                                $trTime = app(\App\Domains\Production\Services\SchedulingService::class)->calculateTransferReadyAt(
+                                                    $op->orderOperation,
+                                                    $op->planned_start,
+                                                    (float) ($schedule->order?->quantity_ordered ?? 1)
+                                                );
+                                            @endphp
+                                            <br><span class="badge bg-soft-info text-info font-monospace mt-1">⚡ Overlap Enabled (Batch: {{ (float) $op->orderOperation->transfer_batch_quantity }}, Lag: {{ (int) $op->orderOperation->transfer_lag_minutes }}m)</span>
+                                            <br><small class="text-primary font-monospace fs-11">Transfer-Ready: {{ $trTime->format('d/m/Y H:i') }}</small>
+                                        @endif
                                     </td>
                                     <td class="align-middle">{{ $op->workCenter->name ?? '—' }}</td>
                                     <td class="align-middle text-muted">
