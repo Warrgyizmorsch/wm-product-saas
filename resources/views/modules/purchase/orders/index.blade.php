@@ -154,15 +154,15 @@
                                                 <i class="feather-edit me-1.5 text-muted"></i> {{ __('purchase.edit_draft') }}
                                             </a>
                                         </li>
-                                        <li>
-                                            <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" onsubmit="return confirm('{{ __('purchase.confirm_delete_po') }}')">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="dropdown-item py-2 text-danger">
-                                                    <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
-                                                </button>
-                                            </form>
-                                        </li>
+                                         <li>
+                                             <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" id="deletePoListForm_{{ $order->id }}">
+                                                 @csrf
+                                                 @method('DELETE')
+                                                 <button type="button" class="dropdown-item py-2 text-danger" onclick="confirmAction({ title: 'Delete PO', message: '{{ __('purchase.confirm_delete_po') }}', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deletePoListForm_{{ $order->id }}').submit(); })">
+                                                     <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
+                                                 </button>
+                                             </form>
+                                         </li>
                                     @endif
                                 </x-ui.action-dropdown>
                             </td>

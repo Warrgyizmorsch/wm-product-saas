@@ -78,6 +78,31 @@ class LeadService
         ];
     }
 
+    public function cleanAdditionalContacts(?array $rawContacts): array
+    {
+        if (empty($rawContacts) || !is_array($rawContacts)) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($rawContacts as $c) {
+            $name = trim($c['name'] ?? '');
+            $designation = trim($c['designation'] ?? '');
+            $email = trim($c['email'] ?? '');
+            $phone = trim($c['phone'] ?? '');
+
+            if ($name !== '' || $email !== '' || $phone !== '' || $designation !== '') {
+                $clean[] = [
+                    'name' => $name,
+                    'designation' => $designation,
+                    'email' => $email,
+                    'phone' => $phone,
+                ];
+            }
+        }
+        return $clean;
+    }
+
     /**
      * Store new lead and log events.
      */
@@ -85,14 +110,17 @@ class LeadService
     {
         $callDateTime = $this->parseCallDateTime($validated);
         $processed = $this->processItems($rawItems, $rawProductIds);
+        $additionalContacts = $this->cleanAdditionalContacts($validated['additional_contacts'] ?? []);
+        $firstAddl = $additionalContacts[0] ?? null;
 
         $leadData = [
             'call_date' => $callDateTime,
-            'lead_owner_id' => $validated['lead_owner_id'] ?? null,
+            'lead_owner_id' => !empty($validated['lead_owner_id']) ? $validated['lead_owner_id'] : (auth()->id() ?: null),
             'company_name' => $validated['company_name'],
             'contact_person' => $validated['contact_person'] ?? null,
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
+            'additional_contacts' => $additionalContacts,
             'requirement' => $validated['requirement'] ?? null,
             'expected_amount' => !empty($validated['expected_amount']) ? floatval($validated['expected_amount']) : 0.00,
             'expected_sale_date' => !empty($validated['expected_sale_date']) ? Carbon::parse($validated['expected_sale_date']) : null,
@@ -139,6 +167,8 @@ class LeadService
     {
         $callDateTime = $this->parseCallDateTime($validated);
         $processed = $this->processItems($rawItems, $rawProductIds);
+        $additionalContacts = $this->cleanAdditionalContacts($validated['additional_contacts'] ?? []);
+        $firstAddl = $additionalContacts[0] ?? null;
 
         $leadData = [
             'call_date' => $callDateTime,
@@ -147,6 +177,7 @@ class LeadService
             'contact_person' => $validated['contact_person'] ?? null,
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
+            'additional_contacts' => $additionalContacts,
             'requirement' => $validated['requirement'] ?? null,
             'expected_amount' => !empty($validated['expected_amount']) ? floatval($validated['expected_amount']) : 0.00,
             'expected_sale_date' => !empty($validated['expected_sale_date']) ? Carbon::parse($validated['expected_sale_date']) : null,

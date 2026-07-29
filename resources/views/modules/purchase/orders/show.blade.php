@@ -206,6 +206,18 @@
                 </div>
 
                 <div class="card-body p-4 p-md-5">
+                    @if (in_array($order->status, ['Cancelled', 'Rejected']) && !empty($order->rejection_reason))
+                        <div class="alert alert-danger border-0 border-start border-4 border-danger mb-4 rounded-3 shadow-sm bg-soft-danger">
+                            <div class="d-flex align-items-top">
+                                <i class="feather-x-circle fs-18 text-danger me-3 mt-0.5"></i>
+                                <div>
+                                    <h6 class="fw-bold text-danger mb-1">Purchase Order Rejected / Cancelled</h6>
+                                    <p class="fs-13 text-dark mb-0"><strong>Reason:</strong> {{ $order->rejection_reason }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Header Section -->
                     <div class="row align-items-center mb-4">
                         <div class="col-sm-6 text-start">

@@ -138,6 +138,11 @@
                                     elseif ($quotation->status === 'Converted') $badgeClass = 'bg-soft-success text-success';
                                 @endphp
                                 <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $displayStatus }}</span>
+                                @if ($quotation->status === 'Rejected' && $quotation->rejection_reason)
+                                    <small class="d-block text-danger fs-11 mt-1 text-truncate" style="max-width: 180px;" title="Reason: {{ $quotation->rejection_reason }}" data-bs-toggle="tooltip">
+                                        <i class="feather-alert-circle me-1"></i>{{ $quotation->rejection_reason }}
+                                    </small>
+                                @endif
                             </td>
                             <td class="text-end pe-4">
                                 <div class="d-inline-flex gap-2 align-items-center justify-content-end">
@@ -166,24 +171,19 @@
                                                 </form>
                                             </li>
                                             <li>
-                                                <form action="{{ route('crm.quotations.reject', $quotation->id) }}" method="POST" class="d-inline">
-                                                    @csrf
-                                                    <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="feather-x me-2 text-danger fs-12"></i>Reject
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="dropdown-item text-danger" onclick="openRejectModal('{{ route('crm.quotations.reject', $quotation->id) }}', '{{ $quotation->quotation_number }}')">
+                                                    <i class="feather-x me-2 text-danger fs-12"></i>Reject
+                                                </button>
                                             </li>
                                         @endif
 
                                         <li><hr class="dropdown-divider"></li>
                                         <li>
-                                            <form action="{{ route('crm.quotations.destroy', $quotation->id) }}"
-                                                  method="POST"
-                                                  onsubmit="return confirm('Are you sure you want to delete this quotation?');">
+                                            <form action="{{ route('crm.quotations.destroy', $quotation->id) }}" method="POST" id="deleteQuoIndexForm_{{ $quotation->id }}">
                                                 @csrf
                                                 @method('DELETE')
 
-                                                <button type="submit" class="dropdown-item text-danger">
+                                                <button type="button" class="dropdown-item text-danger" onclick="confirmAction({ title: 'Delete Quotation', message: 'Are you sure you want to delete this quotation?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteQuoIndexForm_{{ $quotation->id }}').submit(); })">
                                                     <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Quotation
                                                 </button>
                                             </form>
@@ -245,5 +245,52 @@
                 $(this).closest('form').submit();
             });
         });
+
+        function openRejectModal(actionUrl, quotationNumber = '') {
+            $('#rejectQuotationForm').attr('action', actionUrl);
+            if (quotationNumber) {
+                $('#rejectModalQuotationNumber').text('(' + quotationNumber + ')');
+            } else {
+                $('#rejectModalQuotationNumber').text('');
+            }
+            $('#rejectionReasonInput').val('');
+            const modalEl = document.getElementById('rejectQuotationModal');
+            let modal = bootstrap.Modal.getInstance(modalEl);
+            if (!modal) {
+                modal = new bootstrap.Modal(modalEl);
+            }
+            modal.show();
+        }
     </script>
+
+    <!-- Rejection Reason Modal -->
+    <div class="modal fade" id="rejectQuotationModal" tabindex="-1" aria-labelledby="rejectQuotationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <form id="rejectQuotationForm" method="POST" action="">
+                    @csrf
+                    <div class="modal-header bg-soft-danger text-danger border-bottom-0">
+                        <h5 class="modal-title fw-bold" id="rejectQuotationModalLabel">
+                            <i class="feather-x-circle me-2"></i>Reject Quotation <span id="rejectModalQuotationNumber" class="text-dark"></span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <p class="text-muted fs-12 mb-3">Please specify the reason for rejecting this quotation. This reason will be saved in audit history and displayed on the quotation detail screen.</p>
+                        
+                        <div class="mb-3 text-start">
+                            <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">Rejection Reason / Remarks <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="Enter reason for rejection (e.g., Price too high, Scope changed, Customer declined, etc.)..." required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light border-top-0 px-4 py-3">
+                        <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold text-uppercase fs-11" style="background-color: #ea580c; border-color: #ea580c;">
+                            <i class="feather-x-circle me-1"></i> Confirm Rejection
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endpush

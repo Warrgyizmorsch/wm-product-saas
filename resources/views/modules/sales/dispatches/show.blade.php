@@ -46,6 +46,18 @@
                 </div>
 
                 <div class="d-flex gap-2">
+                    @if ($dispatch->status === 'Pending')
+                        <form action="{{ route('sales.dispatches.confirm', $dispatch->id) }}" method="POST" id="confirmDispatchForm">
+                            @csrf
+                            <button type="button" class="btn btn-success fw-bold px-3" onclick="confirmAction({ title: 'Confirm & Dispatch Shipment', message: 'Confirm dispatch for {{ $dispatch->dispatch_number }}? This will deduct finished stock from warehouse.', variant: 'success', confirmText: 'Confirm Dispatch' }, function() { document.getElementById('confirmDispatchForm').submit(); })">
+                                <i class="feather-check-circle me-1.5"></i> Confirm & Dispatch
+                            </button>
+                        </form>
+                    @elseif (in_array($dispatch->status, ['Dispatched', 'Delivered']))
+                        <a href="{{ route('sales.invoices.create', ['material_requirement_id' => $dispatch->material_requirement_id]) }}" class="btn btn-primary fw-bold px-3">
+                            <i class="feather-file-text me-1.5"></i> Create Invoice
+                        </a>
+                    @endif
                     <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="btn btn-light border">
                         <i class="feather-arrow-left me-2"></i>Back to MR
                     </a>

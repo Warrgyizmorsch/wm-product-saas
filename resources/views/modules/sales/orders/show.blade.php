@@ -11,12 +11,19 @@
         </a>
         
         @if ($order->status === 'Draft')
-            <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST" class="d-inline d-print-none">
+            <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST" class="d-inline d-print-none" id="confirmSoForm">
                 @csrf
-                <button type="submit" class="btn btn-success">
+                <button type="button" class="btn btn-success" onclick="confirmAction({ title: 'Confirm Sales Order', message: 'Confirm Sales Order {{ $order->sales_order_number }}?', variant: 'success', confirmText: 'Confirm' }, function() { document.getElementById('confirmSoForm').submit(); })">
                     <i class="feather-check-circle me-2"></i>Confirm Order
                 </button>
             </form>
+        @elseif (in_array($order->status, ['Confirmed', 'Partially Shipped', 'Shipped']))
+            <a href="{{ route('sales.dispatches.create') }}" class="btn btn-info text-white fw-bold px-3 d-print-none">
+                <i class="feather-truck me-1.5"></i> Dispatch Order
+            </a>
+            <a href="{{ route('sales.invoices.create', ['sales_order_id' => $order->id]) }}" class="btn btn-primary fw-bold px-3 d-print-none">
+                <i class="feather-file-text me-1.5"></i> Create Invoice
+            </a>
         @endif
 
         @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')

@@ -226,12 +226,12 @@ class PurchaseOrderController extends Controller
         return $this->confirm($id);
     }
 
-    public function reject(int $id)
+    public function reject(Request $request, int $id)
     {
-        return $this->cancel($id);
+        return $this->cancel($request, $id);
     }
 
-    public function cancel(int $id)
+    public function cancel(Request $request, int $id)
     {
         $order = $this->orderRepo->find($id);
         if (!$order) abort(404);
@@ -240,9 +240,16 @@ class PurchaseOrderController extends Controller
             return redirect()->back()->with('error', 'This Purchase Order cannot be cancelled.');
         }
 
-        $this->orderService->cancelOrder($order);
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|max:1000',
+        ]);
 
-        return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} cancelled.");
+        $this->orderService->cancelOrder($order);
+        $this->orderRepo->update($order, [
+            'rejection_reason' => $validated['rejection_reason'],
+        ]);
+
+        return redirect()->back()->with('success', "Purchase Order {$order->purchase_order_number} has been rejected/cancelled.");
     }
 
     public function downloadPdf(int $id)

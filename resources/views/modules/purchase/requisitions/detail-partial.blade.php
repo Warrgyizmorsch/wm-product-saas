@@ -42,20 +42,15 @@
 {{-- ── Approve / Reject (if Draft) ── --}}
 @if($requisition->status === 'Draft')
     <div class="d-flex gap-2 mb-3">
-        <form action="{{ route('purchase.requisitions.approve', $requisition->id) }}" method="POST"
-              class="flex-fill" onsubmit="return confirm('{{ __('purchase.confirm_approve') }}')">
+        <form action="{{ route('purchase.requisitions.approve', $requisition->id) }}" method="POST" class="flex-fill" id="approvePrDrawerForm_{{ $requisition->id }}">
             @csrf
-            <button type="submit" class="btn btn-success btn-sm w-100">
+            <button type="button" class="btn btn-success btn-sm w-100" onclick="confirmAction({ title: 'Approve Requisition', message: '{{ __('purchase.confirm_approve') }}', variant: 'success', confirmText: 'Approve' }, function() { document.getElementById('approvePrDrawerForm_{{ $requisition->id }}').submit(); })">
                 <i class="feather-check-circle me-1"></i> {{ __('purchase.approve') }}
             </button>
         </form>
-        <form action="{{ route('purchase.requisitions.reject', $requisition->id) }}" method="POST"
-              class="flex-fill" onsubmit="return confirm('{{ __('purchase.confirm_reject') }}')">
-            @csrf
-            <button type="submit" class="btn btn-danger btn-sm w-100">
-                <i class="feather-x-circle me-1"></i> {{ __('purchase.reject') }}
-            </button>
-        </form>
+        <button type="button" class="btn btn-danger btn-sm flex-fill" onclick="openRejectModal('{{ route('purchase.requisitions.reject', $requisition->id) }}', '{{ $requisition->requisition_number }}')">
+            <i class="feather-x-circle me-1"></i> {{ __('purchase.reject') }}
+        </button>
     </div>
 @endif
 

@@ -223,19 +223,32 @@ class QuotationController extends Controller
         return back()->with('success', 'Quotation approved successfully!');
     }
 
-    public function reject(int $id): RedirectResponse
+    public function reject(Request $request, int $id): RedirectResponse
     {
         $quotation = $this->quotationRepo->find($id);
         if (!$quotation) abort(404, 'Quotation not found.');
         $this->authorize('approve', $quotation);
 
+        $validated = $request->validate([
+            'rejection_reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
         $oldStatus = $quotation->status;
-        $this->quotationRepo->update($quotation, ['status' => 'Rejected']);
+        $reason = $validated['rejection_reason'] ?? null;
+
+        $this->quotationRepo->update($quotation, [
+            'status' => 'Rejected',
+            'rejection_reason' => $reason,
+        ]);
 
         if ($quotation->lead_id && $oldStatus !== 'Rejected' && ($lead = Lead::find($quotation->lead_id))) {
+            $logMessage = "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Rejected'";
+            if ($reason) {
+                $logMessage .= " (Reason: {$reason})";
+            }
             \App\Domains\CRM\Models\LeadHistory::logEvent(
                 $lead, 'quotation_status_changed', $oldStatus, 'Rejected',
-                "Quotation {$quotation->quotation_number} status changed from '{$oldStatus}' to 'Rejected'"
+                $logMessage
             );
         }
 

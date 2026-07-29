@@ -51,8 +51,7 @@ Route::prefix('sales')
         Route::get('dispatches/material-requirements', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');
         Route::get('dispatches/warehouse/{warehouse}/address', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'warehouseAddress'])->name('dispatches.warehouse-address');
         Route::get('dispatches/{dispatch}', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'show'])->name('dispatches.show');
-
-
+        Route::post('dispatches/{dispatch}/confirm', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'confirm'])->name('dispatches.confirm');
 
         // Invoices Routes
         Route::get('invoices', [\App\Domains\Sales\Controllers\InvoiceController::class, 'index'])->name('invoices.index');
@@ -74,5 +73,6 @@ Route::prefix('sales')
         Route::get('returns/create', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'create'])->name('returns.create');
         Route::post('returns', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'store'])->name('returns.store');
         Route::get('returns/{return}', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'show'])->name('returns.show');
+        Route::post('returns/{return}/approve', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'approve'])->name('returns.approve');
         Route::post('returns/{return}/complete', [\App\Domains\Sales\Controllers\SalesReturnController::class, 'complete'])->name('returns.complete');
     });

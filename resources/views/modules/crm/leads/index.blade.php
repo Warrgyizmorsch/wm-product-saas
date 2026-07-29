@@ -17,7 +17,7 @@
         $sortOrder = request('sort_order', 'desc');
     @endphp
 
-    <div class="erp-single-panel">
+    <div class="erp-single-panel ">
         @if (session('success'))
             <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
         @endif
@@ -208,9 +208,23 @@
                                     <span class="d-block text-dark"><i class="feather-phone fs-11 me-1 text-muted"></i>{{ $lead->phone }}</span>
                                 @endif
                                 @if ($lead->email)
-                                    <span class="text-muted fs-11"><i class="feather-mail fs-11 me-1 text-muted"></i>{{ $lead->email }}</span>
+                                    <span class="text-muted fs-11 d-block"><i class="feather-mail fs-11 me-1 text-muted"></i>{{ $lead->email }}</span>
                                 @endif
-                                @if (!$lead->phone && !$lead->email)
+                                @php
+                                    $addlContacts = $lead->additional_contacts ?: [];
+                                    $firstAddl = $addlContacts[0] ?? null;
+                                @endphp
+                                @if (!empty($firstAddl))
+                                    <small class="text-secondary d-block fs-10 mt-1" title="Additional Contact">
+                                        <i class="feather-user-plus me-1 text-primary"></i>
+                                        {{ !empty($firstAddl['name']) ? $firstAddl['name'] . ': ' : '' }}
+                                        {{ $firstAddl['phone'] ?? ($firstAddl['email'] ?? '') }}
+                                        @if(count($addlContacts) > 1)
+                                            <span class="badge bg-soft-primary text-primary fs-9 ms-1">+{{ count($addlContacts) - 1 }} more</span>
+                                        @endif
+                                    </small>
+                                @endif
+                                @if (!$lead->phone && !$lead->email && empty($firstAddl))
                                     <span class="text-muted">N/A</span>
                                 @endif
                             </td>
@@ -304,33 +318,46 @@
                                        </a>
                                    </li>
                            
-                                   {{-- Qualify Lead --}}
-                                   @if(($lead->status ?: 'New') !== 'Qualified' && ($lead->status ?: 'New') !== 'Converted')
-                                        <li>
-                                            <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST">
-                                                @csrf
-                                                @method('PATCH')
-                                                <button type="submit" class="dropdown-item text-success fw-semibold">
-                                                    <i class="feather-check-circle me-2 text-success fs-12"></i>Qualify (Genuine Lead)
-                                                </button>
-                                            </form>
-                                        </li>
+                                   @if(!empty($lead->is_duplicate))
+                                        {{-- Qualify Lead (Only if Duplicate) --}}
+                                        @if(($lead->status ?: 'New') !== 'Qualified' && ($lead->status ?: 'New') !== 'Converted')
+                                             <li>
+                                                 <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST">
+                                                     @csrf
+                                                     @method('PATCH')
+                                                     <button type="submit" class="dropdown-item text-success fw-semibold">
+                                                         <i class="feather-check-circle me-2 text-success fs-12"></i>Qualify (Genuine Lead)
+                                                     </button>
+                                                 </form>
+                                             </li>
+                                         @endif
+
+                                         {{-- Reject & Delete Lead (Only if Duplicate) --}}
+                                         <li><hr class="dropdown-divider"></li>
+                                         <li>
+                                             <form action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" id="deleteLeadForm_{{ $lead->id }}">
+                                                  @csrf
+                                                  @method('DELETE')
+
+                                                  <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Reject & Delete Lead', message: 'Reject & delete lead #{{ $lead->id }} ({{ $lead->company_name }}) permanently?', variant: 'danger', confirmText: 'Reject & Delete' }, function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); })">
+                                                      <i class="feather-x-circle me-2 text-danger fs-12"></i>Reject & Delete Lead
+                                                  </button>
+                                              </form>
+                                         </li>
+                                    @else
+                                         {{-- Regular Delete (If Not Duplicate) --}}
+                                         <li><hr class="dropdown-divider"></li>
+                                         <li>
+                                             <form action="{{ route('crm.leads.destroy', $lead->id) }}" method="POST" id="deleteLeadForm_{{ $lead->id }}">
+                                                  @csrf
+                                                  @method('DELETE')
+
+                                                  <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Delete Lead', message: 'Delete lead #{{ $lead->id }} ({{ $lead->company_name }}) permanently?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); })">
+                                                      <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Lead
+                                                  </button>
+                                              </form>
+                                         </li>
                                     @endif
-
-                                    {{-- Delete / Reject --}}
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <form action="{{ route('crm.leads.destroy', $lead->id) }}"
-                                              method="POST"
-                                              onsubmit="return confirm('Reject & delete lead #{{ $lead->id }} ({{ $lead->company_name }}) permanently?');">
-                                            @csrf
-                                            @method('DELETE')
-
-                                            <button type="submit" class="dropdown-item text-danger fw-semibold">
-                                                <i class="feather-x-circle me-2 text-danger fs-12"></i>Reject & Delete Lead
-                                            </button>
-                                        </form>
-                                    </li>
                            
                                </x-ui.action-dropdown>
                             </td>
@@ -347,7 +374,7 @@
             </x-ui.odoo-form-ui>
         </div>
 
-        <div class="c pt-3">
+        <div class="pt-3">
             <x-ui.pagination 
                 :currentPage="$leads->currentPage()" 
                 :totalPages="$leads->lastPage()" 

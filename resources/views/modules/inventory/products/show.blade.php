@@ -424,9 +424,12 @@
                                             <tr>
                                                 <td>{{ $tx->created_at->format('Y-m-d h:i A') }}</td>
                                                 <td>
-                                                    <span class="fw-semibold text-primary">{{ $tx->source_type }}</span>
-                                                    @if($tx->source_id)
-                                                        <span class="text-muted font-monospace">#{{ $tx->source_id }}</span>
+                                                    <span class="fw-semibold text-primary">{{ $tx->reference_type ?? $tx->source_type }}</span>
+                                                    @if($tx->reference_id || $tx->source_id)
+                                                        <span class="text-muted font-monospace">#{{ $tx->reference_id ?? $tx->source_id }}</span>
+                                                    @endif
+                                                    @if($product->variation_type === 'Variant' && $tx->product && $tx->product_id !== $product->id)
+                                                        <small class="d-block text-muted font-monospace fs-11">{{ $tx->product->variant_values['label'] ?? $tx->product->name }}</small>
                                                     @endif
                                                 </td>
                                                 <td>{{ $tx->warehouse ? $tx->warehouse->name : 'N/A' }}</td>
@@ -448,13 +451,13 @@
                                                             <span class="badge bg-light text-muted">{{ __('inventory.depleted') }}</span>
                                                         @endif
                                                     @else
-                                                        <span class="text-muted">&mdash;</span>
+                                                        <span class="text-muted">—</span>
                                                     @endif
                                                 </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="8" class="text-center py-4 text-muted">{{ __('inventory.no_transactions_logged') }}</td>
+                                                <td colspan="8" class="text-center py-4 text-muted">{{ __('inventory.no_stock_data_available') }}</td>
                                             </tr>
                                         @endforelse
                                     </tbody>

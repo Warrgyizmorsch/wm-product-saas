@@ -63,17 +63,18 @@
                         <thead>
                             <tr>
                                 <th>Product</th>
-                                <th style="width: 20%">Warehouse</th>
-                                <th class="text-end" style="width: 10%">Ordered</th>
-                                <th class="text-end" style="width: 11%">Reserved</th>
-                                <th class="text-end" style="width: 12%">Dispatched</th>
-                                <th class="text-end" style="width: 11%">Remaining</th>
-                                <th class="text-end" style="width: 13%">Dispatch Qty</th>
+                                <th style="width: 18%">Warehouse</th>
+                                <th class="text-end" style="width: 9%">Ordered</th>
+                                <th class="text-end" style="width: 10%">Available</th>
+                                <th class="text-end" style="width: 10%">Reserved</th>
+                                <th class="text-end" style="width: 11%">Dispatched</th>
+                                <th class="text-end" style="width: 10%">Remaining</th>
+                                <th class="text-end" style="width: 12%">Dispatch Qty</th>
                             </tr>
                         </thead>
                         <tbody id="dispatchItemsBody">
                             <tr id="emptyItemsRow">
-                                <td colspan="5" class="text-center py-4 text-muted fs-12">No items selected.</td>
+                                <td colspan="8" class="text-center py-4 text-muted fs-12">No items selected.</td>
                             </tr>
                         </tbody>
                     </x-ui.odoo-form-ui>
@@ -130,11 +131,12 @@
 
             fetch('{{ route('sales.dispatches.pending-mr') }}', { headers: { Accept: 'application/json' } })
                 .then(response => response.ok ? response.json() : Promise.reject())
-                .then(data => {
-                    deliveryOrders = data;
+                .then(res => {
+                    deliveryOrders = res.data || res || [];
                     renderDeliveryOrders();
                 })
-                .catch(() => {
+                .catch((err) => {
+                    console.error('Fetch error:', err);
                     deliveryOrderList.innerHTML = '<div class="alert alert-danger mb-0">Material requirements could not be loaded. Please try again.</div>';
                 });
         });
@@ -205,6 +207,7 @@
                             </td>
                             <td><span class="text-muted fs-12">—</span></td>
                             <td class="text-end">${item.quantity_ordered}</td>
+                            <td class="text-end fw-semibold text-success">${item.available_qty ?? 0}</td>
                             <td class="text-end">${item.quantity_reserved}</td>
                             <td class="text-end fw-bold text-success">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-muted">0</td>
@@ -224,6 +227,7 @@
                             </td>
                             <td><select name="items[${index}][warehouse_id]" class="odoo-table-select"><option value="">Select warehouse...</option>${options}</select></td>
                             <td class="text-end fw-semibold">${item.quantity_ordered}</td>
+                            <td class="text-end fw-semibold text-success">${item.available_qty ?? 0}</td>
                             <td class="text-end fw-semibold text-info">${item.quantity_reserved}</td>
                             <td class="text-end fw-bold ${item.already_dispatched > 0 ? 'text-warning' : 'text-muted'}">${item.already_dispatched}</td>
                             <td class="text-end fw-bold text-primary">${item.remaining_qty}</td>
@@ -231,15 +235,17 @@
                                 <input type="hidden" name="items[${index}][quantity_ordered]" value="${item.quantity_ordered}">
                                 <input
                                     type="number"
-                                    name="items[${index}][quantity_dispatched]"
-                                    class="odoo-table-input text-end"
+                                    name="items[${index}][quantity]"
+                                    class="odoo-table-input text-end dispatch-qty-input"
                                     value="${item.dispatch_qty}"
-                                    min="1"
+                                    min="0.0001"
                                     max="${item.remaining_qty}"
+                                    data-max="${item.remaining_qty}"
                                     title="Max dispatchable: ${item.remaining_qty}"
                                     required
                                 >
-                                <small class="text-muted d-block text-end" style="font-size:10px;">max: ${item.remaining_qty}</small>
+                                <small class="text-muted d-block text-end max-hint" style="font-size:10px;">max: ${item.remaining_qty}</small>
+                                <div class="text-danger fs-11 mt-1 text-end fw-semibold qty-error-msg d-none">Cannot exceed remaining (${item.remaining_qty})</div>
                             </td>
                         </tr>`;
                 }
@@ -248,6 +254,41 @@
             itemsBody.innerHTML = rowsHtml;
             itemsHint.textContent = `${dispatchableCount} item(s) available to dispatch.`;
             saveButton.disabled = dispatchableCount === 0;
+
+            itemsBody.querySelectorAll('.dispatch-qty-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    validateDispatchQty(this);
+                });
+            });
+        }
+
+        function validateDispatchQty(input) {
+            const max = parseFloat(input.dataset.max) || 0;
+            const val = parseFloat(input.value);
+            const parentTd = input.closest('td');
+            const errorMsg = parentTd ? parentTd.querySelector('.qty-error-msg') : null;
+
+            if (!isNaN(val) && val > max) {
+                input.classList.add('is-invalid');
+                if (errorMsg) {
+                    errorMsg.textContent = `Cannot exceed remaining qty (${max})`;
+                    errorMsg.classList.remove('d-none');
+                }
+                return false;
+            } else if (isNaN(val) || val <= 0) {
+                input.classList.add('is-invalid');
+                if (errorMsg) {
+                    errorMsg.textContent = 'Minimum quantity is 1';
+                    errorMsg.classList.remove('d-none');
+                }
+                return false;
+            } else {
+                input.classList.remove('is-invalid');
+                if (errorMsg) {
+                    errorMsg.classList.add('d-none');
+                }
+                return true;
+            }
         }
 
         function escapeHtml(value) {
@@ -257,9 +298,29 @@
         }
 
         document.getElementById('dispatchForm').addEventListener('submit', event => {
-            if (!deliveryOrderId.value || !itemsBody.querySelector('input[name$="[quantity_dispatched]"]')) {
+            if (!deliveryOrderId.value || !itemsBody.querySelector('input[name$="[quantity]"]')) {
                 event.preventDefault();
                 alert('Select a material requirement with at least one dispatch item before saving.');
+                return;
+            }
+
+            let allValid = true;
+            let firstInvalid = null;
+
+            itemsBody.querySelectorAll('.dispatch-qty-input').forEach(input => {
+                if (!validateDispatchQty(input)) {
+                    allValid = false;
+                    if (!firstInvalid) firstInvalid = input;
+                }
+            });
+
+            if (!allValid) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (firstInvalid) {
+                    firstInvalid.focus();
+                    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             }
         });
 
@@ -267,8 +328,8 @@
         if (preselectedId) {
             fetch('{{ route('sales.dispatches.pending-mr') }}', { headers: { Accept: 'application/json' } })
                 .then(response => response.ok ? response.json() : Promise.reject())
-                .then(data => {
-                    deliveryOrders = data;
+                .then(res => {
+                    deliveryOrders = res.data || res || [];
                     const order = deliveryOrders.find(o => o.id === preselectedId);
                     if (order) {
                         selectDeliveryOrder(order);

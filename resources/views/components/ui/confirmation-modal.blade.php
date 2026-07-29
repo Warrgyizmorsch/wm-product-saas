@@ -116,7 +116,7 @@
         if (typeof messageOrOptions === 'object' && messageOrOptions !== null) {
             opts = messageOrOptions;
             message = opts.message || '';
-            callback = opts.onConfirm;
+            callback = opts.onConfirm || onConfirm;
         } else {
             message = messageOrOptions || '';
             callback = onConfirm;

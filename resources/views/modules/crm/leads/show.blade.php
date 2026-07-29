@@ -206,7 +206,7 @@
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" :errorText="$errors->first('email')" />
 
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $lead->phone)" :placeholder="__('crm.contact_phone')" :errorText="$errors->first('phone')" />
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $lead->phone)" :placeholder="__('crm.contact_phone')" :errorText="$errors->first('phone')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
 
                                                 <x-ui.odoo-form-ui type="select" :label="__('crm.lead_owner')" name="lead_owner_id" :errorText="$errors->first('lead_owner_id')">
                                                     <option value="">{{ __('crm.select_owner_unassigned') }}</option>
@@ -215,7 +215,99 @@
                                                     @endforeach
                                                 </x-ui.odoo-form-ui>
 
-                                                <!-- Ultra Compact Product & Quantity Repeater Table Style -->
+                                                 @php
+                                                     $savedAddlContacts = old('additional_contacts', $lead->additional_contacts ?: []);
+                                                 @endphp
+
+                                                 <style>
+                                                     .addl-contact-card .odoo-form-label {
+                                                         width: 85px !important;
+                                                         min-width: 85px !important;
+                                                         white-space: nowrap !important;
+                                                         padding-right: 6px !important;
+                                                     }
+                                                 </style>
+
+                                                 <div class="my-3 border-top pt-3">
+                                                     <div class="d-flex align-items-center justify-content-between mb-2">
+                                                         <div class="d-flex align-items-center gap-2">
+                                                             <h6 class="fw-bold text-dark mb-0 fs-13">Additional Contacts</h6>
+                                                             <span class="badge bg-soft-primary text-primary rounded-circle px-2 py-0.5 font-monospace fs-11" id="showAddlContactCountBadge">{{ count($savedAddlContacts) }}</span>
+                                                         </div>
+                                                         <button type="button" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 text-uppercase text-white d-inline-flex align-items-center" id="showCloneContactMainBtn" style="border-radius: 4px; font-size: 11px;">
+                                                             <i class="feather-plus me-1 fs-12"></i> CLONE CONTACT
+                                                         </button>
+                                                     </div>
+
+                                                     <div id="showAdditionalContactsRepeaterContainer" class="d-flex flex-column gap-2">
+                                                         @forelse($savedAddlContacts as $idx => $ac)
+                                                             <div class="addl-contact-card p-2 px-3 mb-1 bg-white position-relative shadow-2xs" style="border: 1.5px solid var(--bs-primary) !important; border-radius: 8px !important;">
+                                                                 <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
+                                                                     <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> Contact Person #<span class="contact-num">{{ $loop->iteration }}</span></span>
+                                                                     <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="Delete Contact" style="width: 22px; height: 22px; border-radius: 50%;">
+                                                                         <i class="feather-trash-2 text-danger fs-11"></i>
+                                                                     </button>
+                                                                 </div>
+                                                                 <div class="row g-2">
+                                                                     <div class="col-md-6">
+                                                                         <x-ui.odoo-form-ui type="input" label="Name" name="additional_contacts[{{ $idx }}][name]" :value="$ac['name'] ?? ''" placeholder="Contact Name" class="contact-name-input" />
+                                                                     </div>
+                                                                     <div class="col-md-6">
+                                                                         <x-ui.odoo-form-ui type="input" label="Phone No." name="additional_contacts[{{ $idx }}][phone]" :value="$ac['phone'] ?? ''" placeholder="Phone Number" class="contact-phone-input" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                                                                     </div>
+                                                                     <div class="col-md-12">
+                                                                         <x-ui.odoo-form-ui type="input" label="Email" name="additional_contacts[{{ $idx }}][email]" inputType="email" :value="$ac['email'] ?? ''" placeholder="Email" class="contact-email-input" />
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                         @empty
+                                                         @endforelse
+                                                     </div>
+                                                </div>
+
+                                                 <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.address_details') }}</h6>
+
+                                                 <x-ui.odoo-form-ui type="textarea" :label="__('crm.street_address')" name="address" rows="3" :placeholder="__('crm.street_address_placeholder')" :errorText="$errors->first('address')">{{ old('address', $lead->address) }}</x-ui.odoo-form-ui>
+
+                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.country')" name="country" :value="old('country', $lead->country)" :placeholder="__('crm.country')" :errorText="$errors->first('country')" />
+
+                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.state')" name="state" :value="old('state', $lead->state)" :placeholder="__('crm.state')" :errorText="$errors->first('state')" />
+
+                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.city')" name="city" :value="old('city', $lead->city)" :placeholder="__('crm.city')" :errorText="$errors->first('city')" />
+                                             </div>
+
+                                            <!-- Right Column: Requirements, Lead Classification & Revenue -->
+                                            <div class="col-md-6">
+                                                <h6 class="fw-bold text-primary mb-3">{{ __('crm.requirements') }}</h6>
+
+                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.requirements')" name="requirement" rows="3" :placeholder="__('crm.requirements_placeholder')" :errorText="$errors->first('requirement')">{{ old('requirement', $lead->requirement) }}</x-ui.odoo-form-ui>
+
+                                                <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.lead_classification') }}</h6>
+
+                                                <x-ui.odoo-form-ui type="input" :label="__('crm.industry_type')" name="industry_type" :value="old('industry_type', $lead->industry_type)" :placeholder="__('crm.industry_type')" :errorText="$errors->first('industry_type')" />
+
+                                                <x-ui.odoo-form-ui type="select" :label="__('crm.lead_source')" name="source" :errorText="$errors->first('source')">
+                                                    <option value="">{{ __('crm.select_an_option') }}</option>
+                                                    @foreach (['Cold Call', 'Employee Referral', 'Partner', 'Web Search', 'Advertisement', 'Trade Show'] as $srcOption)
+                                                        <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ __('crm.sources.' . $srcOption) ?? $srcOption }}</option>
+                                                    @endforeach
+                                                </x-ui.odoo-form-ui>
+
+                                                <x-ui.odoo-form-ui type="select" :label="__('crm.priority')" name="priority" :errorText="$errors->first('priority')">
+                                                    <option value="">{{ __('crm.select_an_option') }}</option>
+                                                    @foreach (['Low', 'Medium', 'High'] as $prioOption)
+                                                        <option value="{{ $prioOption }}" @selected(old('priority', $lead->priority) === $prioOption)>{{ __('crm.priorities.' . $prioOption) ?? $prioOption }}</option>
+                                                    @endforeach
+                                                </x-ui.odoo-form-ui>
+
+                                                <x-ui.odoo-form-ui type="select" :label="__('crm.segment')" name="segment" :errorText="$errors->first('segment')">
+                                                    <option value="">{{ __('crm.select_an_option') }}</option>
+                                                    @foreach (['SMB', 'Mid-Market', 'Enterprise'] as $segOption)
+                                                        <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ __('crm.segments.' . $segOption) ?? $segOption }}</option>
+                                                    @endforeach
+                                                </x-ui.odoo-form-ui>
+
+                                                <!-- Ultra Compact Product & Quantity Repeater Table Style (Right Side) -->
                                                 <style>
                                                     #editProductItemsTable {
                                                         table-layout: fixed !important;
@@ -337,7 +429,7 @@
                                                                             </select>
                                                                         </td>
                                                                         <td class="py-1 px-1 align-top">
-                                                                            <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input @error('items.'.$idx.'.quantity') is-invalid @enderror" value="{{ $item['quantity'] ?? 1 }}" min="1" step="1" required>
+                                                                            <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input @error('items.'.$idx.'.quantity') is-invalid @enderror" value="{{ $item['quantity'] ?? 1 }}" min="1" step="1">
                                                                             @error('items.'.$idx.'.quantity')
                                                                                 <div class="text-danger fs-11 mt-1 fw-semibold text-center qty-error-msg">{{ $message }}</div>
                                                                             @enderror
@@ -396,46 +488,6 @@
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.expected_revenue_label')" name="expected_amount" inputType="number" :value="old('expected_amount', $lead->expected_amount)" min="0" step="0.01" :placeholder="__('crm.expected_revenue_label')" :errorText="$errors->first('expected_amount')" />
 
                                                 <x-ui.odoo-form-ui type="input" :label="__('crm.expected_sale_date')" name="expected_sale_date" inputType="date" :value="old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '')" :errorText="$errors->first('expected_sale_date')" />
-
-                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.requirements')" name="requirement" rows="3" :placeholder="__('crm.requirements_placeholder')" :errorText="$errors->first('requirement')">{{ old('requirement', $lead->requirement) }}</x-ui.odoo-form-ui>
-                                            </div>
-
-                                            <!-- Right Column: Location Details (Top Right) & Classification -->
-                                            <div class="col-md-6">
-                                                <h6 class="fw-bold text-primary mb-3">{{ __('crm.location_details') }}</h6>
-
-                                                <x-ui.odoo-form-ui type="textarea" :label="__('crm.street_address')" name="address" rows="3" :placeholder="__('crm.street_address_placeholder')" :errorText="$errors->first('address')">{{ old('address', $lead->address) }}</x-ui.odoo-form-ui>
-
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.country')" name="country" :value="old('country', $lead->country)" :placeholder="__('crm.country')" :errorText="$errors->first('country')" />
-
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.state')" name="state" :value="old('state', $lead->state)" :placeholder="__('crm.state')" :errorText="$errors->first('state')" />
-
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.city')" name="city" :value="old('city', $lead->city)" :placeholder="__('crm.city')" :errorText="$errors->first('city')" />
-
-                                                <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.lead_classification') }}</h6>
-
-                                                <x-ui.odoo-form-ui type="input" :label="__('crm.industry_type')" name="industry_type" :value="old('industry_type', $lead->industry_type)" :placeholder="__('crm.industry_type')" :errorText="$errors->first('industry_type')" />
-
-                                                <x-ui.odoo-form-ui type="select" :label="__('crm.lead_source')" name="source" :errorText="$errors->first('source')">
-                                                    <option value="">{{ __('crm.select_an_option') }}</option>
-                                                    @foreach (['Cold Call', 'Employee Referral', 'Partner', 'Web Search', 'Advertisement', 'Trade Show'] as $srcOption)
-                                                        <option value="{{ $srcOption }}" @selected(old('source', $lead->source) === $srcOption)>{{ __('crm.sources.' . $srcOption) ?? $srcOption }}</option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-
-                                                <x-ui.odoo-form-ui type="select" :label="__('crm.priority')" name="priority" :errorText="$errors->first('priority')">
-                                                    <option value="">{{ __('crm.select_an_option') }}</option>
-                                                    @foreach (['Low', 'Medium', 'High'] as $prioOption)
-                                                        <option value="{{ $prioOption }}" @selected(old('priority', $lead->priority) === $prioOption)>{{ __('crm.priorities.' . $prioOption) ?? $prioOption }}</option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
-
-                                                <x-ui.odoo-form-ui type="select" :label="__('crm.segment')" name="segment" :errorText="$errors->first('segment')">
-                                                    <option value="">{{ __('crm.select_an_option') }}</option>
-                                                    @foreach (['SMB', 'Mid-Market', 'Enterprise'] as $segOption)
-                                                        <option value="{{ $segOption }}" @selected(old('segment', $lead->segment) === $segOption)>{{ __('crm.segments.' . $segOption) ?? $segOption }}</option>
-                                                    @endforeach
-                                                </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
                                     </form>
@@ -462,129 +514,166 @@
                                         <div class="row g-0">
                                             <div class="col-md-6 pe-md-4">
                                                 <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.lead_owner') }}</div>
-                                                    <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 250px;">
-                                                        <form action="{{ route('crm.leads.updateOwner', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
-                                                            @csrf
-                                                            @method('PATCH')
-                                                            <select class="form-select odoo-select2 owner-select" name="lead_owner_id" style="border-radius:0;">
-                                                                <option value="">{{ __('crm.select_owner_unassigned') }}</option>
-                                                                @foreach($users as $user)
-                                                                    <option value="{{ $user->id }}" @selected($lead->lead_owner_id == $user->id)>{{ $user->name }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.contact_person') }}</div>
-                                                    <div class="zoho-field-value text-dark">{{ $lead->contact_person ?: '—' }}</div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.email') }}</div>
-                                                    <div class="zoho-field-value">
-                                                        @if($lead->email)
-                                                            <a href="mailto:{{ $lead->email }}" class="text-primary hover-underline">{{ $lead->email }}</a>
-                                                        @else
-                                                            —
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.contact_phone') }}</div>
-                                                    <div class="zoho-field-value text-dark">{{ $lead->phone ?: '—' }}</div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.lead_source') }}</div>
-                                                    <div class="zoho-field-value">
-                                                        <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ ($lead->source && $lead->source !== 'Select an Option') ? __('crm.sources.' . $lead->source) : '—' }}</span>
-                                                    </div>
-                                                </div>
-                                                <div class="zoho-field-row align-items-start">
-                                                    <div class="zoho-field-label mt-1">{{ __('crm.product_interest') }}</div>
-                                                    <div class="zoho-field-value text-dark">
-                                                        @php
-                                                            $pItems = $lead->product_items ?: [];
-                                                        @endphp
-                                                        @if(!empty($pItems))
-                                                            <div class="d-flex flex-column gap-1">
-                                                                @foreach($pItems as $pi)
-                                                                    @php
-                                                                        $prod = $products->firstWhere('id', $pi['product_id']);
-                                                                    @endphp
-                                                                    @if($prod)
-                                                                        <div class="d-flex align-items-center justify-content-between bg-soft-primary border border-primary-subtle rounded px-2 py-1" style="font-size: 11px; max-width: 280px;">
-                                                                            <span class="text-primary fw-medium text-truncate me-2" title="{{ $prod->name }}">{{ $prod->name }}</span>
-                                                                            <span class="badge bg-primary text-white font-mono px-1.5 py-0.5">x{{ $pi['quantity'] ?? 1 }}</span>
-                                                                        </div>
-                                                                    @endif
-                                                                @endforeach
-                                                            </div>
-                                                        @elseif($lead->products->count())
-                                                            <div class="d-flex flex-column gap-1">
-                                                                @foreach($lead->products as $p)
-                                                                    <div class="bg-soft-primary border border-primary-subtle rounded px-2 py-1 text-primary fw-medium" style="font-size: 11px; max-width: 280px;">
-                                                                        {{ $p->name }}
-                                                                    </div>
-                                                                @endforeach
-                                                            </div>
-                                                        @else
-                                                            —
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.segment') }}</div>
-                                                    <div class="zoho-field-value text-dark">{{ ($lead->segment && $lead->segment !== 'Select an Option') ? __('crm.segments.' . $lead->segment) : '—' }}</div>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6 ps-md-4">
-                                                <div class="zoho-field-row">
                                                     <div class="zoho-field-label">{{ __('crm.company_name') }}</div>
-                                                    <div class="zoho-field-value text-dark">{{ $lead->company_name }}</div>
+                                                    <div class="zoho-field-value text-dark fw-bold">{{ $lead->company_name }}</div>
                                                 </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.lead_status') }}</div>
-                                                    <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 250px;">
-                                                        <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
-                                                            @csrf
-                                                            @method('PATCH')
-                                                            <select class="form-select odoo-select2 status-select" name="status" style="border-radius:0;">
-                                                                <option value="New" @selected($lead->status === 'New' || !$lead->status)>{{ __('crm.statuses.New') }}</option>
-                                                                <option value="Contacted" @selected($lead->status === 'Contacted')>{{ __('crm.statuses.Contacted') }}</option>
-                                                                <option value="Follow-up Scheduled" @selected($lead->status === 'Follow-up Scheduled')>{{ __('crm.statuses.Follow-up Scheduled') }}</option>
-                                                                <option value="Qualified" @selected($lead->status === 'Qualified')>{{ __('crm.statuses.Qualified') }}</option>
-                                                                <option value="Converted" @selected($lead->status === 'Converted')>{{ __('crm.statuses.Converted') }}</option>
-                                                                <option value="Lost" @selected($lead->status === 'Lost')>{{ __('crm.statuses.Lost') }}</option>
-                                                            </select>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.expected_revenue_label') }}</div>
-                                                    <div class="zoho-field-value text-dark fw-bold">₹{{ $lead->expected_amount ? number_format($lead->expected_amount, 2) : '0.00' }}</div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.expected_sale_date') }}</div>
-                                                    <div class="zoho-field-value text-dark">{{ $lead->expected_sale_date ? $lead->expected_sale_date->format('d/m/Y') : '—' }}</div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.priority') }}</div>
-                                                    <div class="zoho-field-value">
-                                                        @php
-                                                            $prioBadge = 'bg-secondary';
-                                                            if($lead->priority === 'High') $prioBadge = 'bg-danger';
-                                                            elseif($lead->priority === 'Medium') $prioBadge = 'bg-warning text-dark';
-                                                            elseif($lead->priority === 'Low') $prioBadge = 'bg-info text-white';
-                                                        @endphp
-                                                        <span class="badge {{ $prioBadge }} px-2 py-0.5" style="font-size: 11px;">{{ ($lead->priority && $lead->priority !== 'Select an Option') ? __('crm.priorities.' . $lead->priority) : '—' }}</span>
-                                                    </div>
-                                                </div>
-                                                <div class="zoho-field-row">
-                                                    <div class="zoho-field-label">{{ __('crm.industry_type') }}</div>
-                                                    <div class="zoho-field-value text-dark">{{ $lead->industry_type ?: '—' }}</div>
-                                                </div>
-                                            </div>
+
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.lead_owner') }}</div>
+                                                     <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 250px;">
+                                                         <form action="{{ route('crm.leads.updateOwner', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
+                                                             @csrf
+                                                             @method('PATCH')
+                                                             <select class="form-select odoo-select2 owner-select" name="lead_owner_id" style="border-radius:0;">
+                                                                 <option value="">{{ __('crm.select_owner_unassigned') }}</option>
+                                                                 @foreach($users as $user)
+                                                                     <option value="{{ $user->id }}" @selected($lead->lead_owner_id == $user->id)>{{ $user->name }}</option>
+                                                                 @endforeach
+                                                             </select>
+                                                         </form>
+                                                     </div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.contact_person') }}</div>
+                                                     <div class="zoho-field-value text-dark">{{ $lead->contact_person ?: '—' }}</div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.email') }}</div>
+                                                     <div class="zoho-field-value">
+                                                         @if($lead->email)
+                                                             <a href="mailto:{{ $lead->email }}" class="text-primary hover-underline">{{ $lead->email }}</a>
+                                                         @else
+                                                             —
+                                                         @endif
+                                                     </div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.contact_phone') }}</div>
+                                                     <div class="zoho-field-value text-dark">{{ $lead->phone ?: '—' }}</div>
+                                                 </div>
+
+                                                 @php
+                                                     $allAddlContacts = $lead->additional_contacts ?: [];
+                                                 @endphp
+
+                                                 @if(!empty($allAddlContacts))
+                                                     <div class="mt-4 mb-3 p-3 border rounded-3" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                                                         <div class="d-flex align-items-center justify-content-between mb-2">
+                                                             <span class="fs-11 fw-bold text-uppercase text-primary letter-spacing-1">
+                                                                 <i class="feather-users me-1 text-primary"></i> Additional Contacts ({{ count($allAddlContacts) }})
+                                                             </span>
+                                                         </div>
+                                                         <div class="d-flex flex-column gap-2">
+                                                             @foreach($allAddlContacts as $ac)
+                                                                 @if(!empty($ac['name']) || !empty($ac['phone']) || !empty($ac['email']))
+                                                                     <div class="p-2 border rounded-2 bg-white shadow-2xs">
+                                                                         <div class="d-flex align-items-center justify-content-between border-bottom pb-1 mb-1">
+                                                                             <span class="fw-bold text-dark fs-12">
+                                                                                 <i class="feather-user me-1 text-primary fs-11"></i>{{ $ac['name'] ?: 'N/A' }}
+                                                                             </span>
+                                                                             <span class="badge bg-soft-primary text-primary fs-10 fw-semibold">Contact #{{ $loop->iteration }}</span>
+                                                                         </div>
+                                                                         <div class="d-flex flex-wrap gap-3 fs-11 text-muted">
+                                                                             @if(!empty($ac['phone']))
+                                                                                 <span><i class="feather-phone me-1 text-success fs-10"></i><strong class="text-dark">{{ $ac['phone'] }}</strong></span>
+                                                                             @endif
+                                                                             @if(!empty($ac['email']))
+                                                                                 <span><i class="feather-mail me-1 text-info fs-10"></i><a href="mailto:{{ $ac['email'] }}" class="text-primary hover-underline">{{ $ac['email'] }}</a></span>
+                                                                             @endif
+                                                                         </div>
+                                                                     </div>
+                                                                 @endif
+                                                             @endforeach
+                                                         </div>
+                                                     </div>
+                                                 @endif
+                                             </div>
+                                             <div class="col-md-6 ps-md-4">
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.lead_status') }}</div>
+                                                     <div class="zoho-field-value text-primary fw-bold" style="width: 100%; max-width: 250px;">
+                                                         <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline m-0 p-0 w-100">
+                                                             @csrf
+                                                             @method('PATCH')
+                                                             <select class="form-select odoo-select2 status-select" name="status" style="border-radius:0;">
+                                                                 <option value="New" @selected($lead->status === 'New' || !$lead->status)>{{ __('crm.statuses.New') }}</option>
+                                                                 <option value="Contacted" @selected($lead->status === 'Contacted')>{{ __('crm.statuses.Contacted') }}</option>
+                                                                 <option value="Follow-up Scheduled" @selected($lead->status === 'Follow-up Scheduled')>{{ __('crm.statuses.Follow-up Scheduled') }}</option>
+                                                                 <option value="Qualified" @selected($lead->status === 'Qualified')>{{ __('crm.statuses.Qualified') }}</option>
+                                                                 <option value="Converted" @selected($lead->status === 'Converted')>{{ __('crm.statuses.Converted') }}</option>
+                                                                 <option value="Lost" @selected($lead->status === 'Lost')>{{ __('crm.statuses.Lost') }}</option>
+                                                             </select>
+                                                         </form>
+                                                     </div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.expected_revenue_label') }}</div>
+                                                     <div class="zoho-field-value text-dark fw-bold">₹{{ $lead->expected_amount ? number_format($lead->expected_amount, 2) : '0.00' }}</div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.expected_sale_date') }}</div>
+                                                     <div class="zoho-field-value text-dark">{{ $lead->expected_sale_date ? $lead->expected_sale_date->format('d/m/Y') : '—' }}</div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.priority') }}</div>
+                                                     <div class="zoho-field-value">
+                                                         @php
+                                                             $prioBadge = 'bg-secondary';
+                                                             if($lead->priority === 'High') $prioBadge = 'bg-danger';
+                                                             elseif($lead->priority === 'Medium') $prioBadge = 'bg-warning text-dark';
+                                                             elseif($lead->priority === 'Low') $prioBadge = 'bg-info text-white';
+                                                         @endphp
+                                                         <span class="badge {{ $prioBadge }} px-2 py-0.5" style="font-size: 11px;">{{ ($lead->priority && $lead->priority !== 'Select an Option') ? __('crm.priorities.' . $lead->priority) : '—' }}</span>
+                                                     </div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.industry_type') }}</div>
+                                                     <div class="zoho-field-value text-dark">{{ $lead->industry_type ?: '—' }}</div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.segment') }}</div>
+                                                     <div class="zoho-field-value text-dark">{{ ($lead->segment && $lead->segment !== 'Select an Option') ? __('crm.segments.' . $lead->segment) : '—' }}</div>
+                                                 </div>
+                                                 <div class="zoho-field-row">
+                                                     <div class="zoho-field-label">{{ __('crm.lead_source') }}</div>
+                                                     <div class="zoho-field-value">
+                                                         <span class="badge bg-light text-dark border px-2 py-0.5" style="font-size: 11px;">{{ ($lead->source && $lead->source !== 'Select an Option') ? __('crm.sources.' . $lead->source) : '—' }}</span>
+                                                     </div>
+                                                 </div>
+                                                 <div class="zoho-field-row align-items-start">
+                                                     <div class="zoho-field-label mt-1">{{ __('crm.product_interest') }}</div>
+                                                     <div class="zoho-field-value text-dark">
+                                                         @php
+                                                             $pItems = $lead->product_items ?: [];
+                                                         @endphp
+                                                         @if(!empty($pItems))
+                                                             <div class="d-flex flex-column gap-1">
+                                                                 @foreach($pItems as $pi)
+                                                                     @php
+                                                                         $prod = $products->firstWhere('id', $pi['product_id']);
+                                                                     @endphp
+                                                                     @if($prod)
+                                                                         <div class="d-flex align-items-center justify-content-between bg-soft-primary border border-primary-subtle rounded px-2 py-1" style="font-size: 11px; max-width: 280px;">
+                                                                             <span class="text-primary fw-medium text-truncate me-2" title="{{ $prod->name }}">{{ $prod->name }}</span>
+                                                                             <span class="badge bg-primary text-white font-mono px-1.5 py-0.5">x{{ $pi['quantity'] ?? 1 }}</span>
+                                                                         </div>
+                                                                     @endif
+                                                                 @endforeach
+                                                             </div>
+                                                         @elseif($lead->products->count())
+                                                             <div class="d-flex flex-column gap-1">
+                                                                 @foreach($lead->products as $p)
+                                                                     <div class="bg-soft-primary border border-primary-subtle rounded px-2 py-1 text-primary fw-medium" style="font-size: 11px; max-width: 280px;">
+                                                                         {{ $p->name }}
+                                                                     </div>
+                                                                 @endforeach
+                                                             </div>
+                                                         @else
+                                                             —
+                                                         @endif
+                                                     </div>
+                                                 </div>
+                                             </div>
                                         </div>
                                     </div>
                                 </div>
@@ -673,23 +762,94 @@
                                         </div>
 
                                         @if($lead->leadDocuments->isEmpty())
-                                            <div class="text-muted fs-12">{{ __('crm.no_documents_uploaded') }}</div>
+                                            <div class="text-center py-4 border border-dashed rounded bg-light-subtle">
+                                                <i class="feather-file-text fs-24 text-muted mb-1 d-block opacity-50"></i>
+                                                <div class="text-muted fs-12">{{ __('crm.no_documents_uploaded') }}</div>
+                                            </div>
                                         @else
-                                            <div class="list-group list-group-flush">
+                                            <div class="row g-3">
                                                 @foreach($lead->leadDocuments as $document)
-                                                    <div class="list-group-item px-0 py-2 d-flex align-items-center justify-content-between border-bottom">
-                                                        <div>
-                                                            <div class="fw-semibold text-dark">{{ $document->file_name }}</div>
-                                                            <div class="text-muted fs-11">{{ strtoupper($document->file_type) }} · {{ round($document->size / 1024, 2) }} KB</div>
-                                                        </div>
-                                                        <div class="d-flex align-items-center gap-2">
-                                                            <x-ui.icon-btn href="{{ route('crm.leads.documents.view', $document->id) }}" variant="soft-info" size="sm" icon="feather-eye" title="View document" target="_blank" />
-                                                            <x-ui.icon-btn href="{{ route('crm.leads.documents.download', $document->id) }}" variant="soft-success" size="sm" icon="feather-download" title="Download document" />
-                                                            <form action="{{ route('crm.leads.documents.delete', $document->id) }}" method="POST" class="m-0 p-0">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <x-ui.icon-btn type="submit" variant="soft-danger" size="sm" icon="feather-trash-2" title="Delete document" onclick="return confirm('{{ __('crm.confirm_delete_document') }}')" />
-                                                            </form>
+                                                    @php
+                                                        $ext = strtolower(pathinfo($document->file_name, PATHINFO_EXTENSION) ?: $document->file_type);
+                                                        $fileTypeCategory = 'other';
+
+                                                        if (in_array($ext, ['xlsx', 'xls', 'csv'])) {
+                                                            $fileTypeCategory = 'excel';
+                                                        } elseif ($ext === 'pdf') {
+                                                            $fileTypeCategory = 'pdf';
+                                                        } elseif (in_array($ext, ['doc', 'docx'])) {
+                                                            $fileTypeCategory = 'word';
+                                                        } elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'])) {
+                                                            $fileTypeCategory = 'image';
+                                                        } elseif (in_array($ext, ['zip', 'rar', '7z', 'tar', 'gz'])) {
+                                                            $fileTypeCategory = 'archive';
+                                                        }
+                                                    @endphp
+                                                    <div class="col-md-6">
+                                                        <div class="p-3 border rounded-3 d-flex align-items-center justify-content-between h-100 shadow-2xs" style="background-color: #f8fafc; border-color: #e2e8f0 !important;">
+                                                            <div class="d-flex align-items-center overflow-hidden me-2" style="gap: 12px;">
+                                                                <div class="d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;">
+                                                                    @if($fileTypeCategory === 'excel')
+                                                                        <!-- MS Excel Logo -->
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                            <rect width="36" height="36" rx="6" fill="#107C41"/>
+                                                                            <path d="M10.5 9L16.5 18L10.5 27H14.25L18 21.375L21.75 27H25.5L19.5 18L25.5 9H21.75L18 14.625L14.25 9H10.5Z" fill="white"/>
+                                                                        </svg>
+                                                                    @elseif($fileTypeCategory === 'word')
+                                                                        <!-- MS Word Logo -->
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                            <rect width="36" height="36" rx="6" fill="#185ABD"/>
+                                                                            <path d="M9 9L12.75 27H15.75L18 17.25L20.25 27H23.25L27 9H23.7L21.45 20.7L19.05 9H16.95L14.55 20.7L12.3 9H9Z" fill="white"/>
+                                                                        </svg>
+                                                                    @elseif($fileTypeCategory === 'pdf')
+                                                                        <!-- PDF Logo -->
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                            <rect width="36" height="36" rx="6" fill="#E11D48"/>
+                                                                            <text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="12" font-weight="900" font-family="'Inter', sans-serif" letter-spacing="0.5">PDF</text>
+                                                                        </svg>
+                                                                    @elseif($fileTypeCategory === 'image')
+                                                                        <!-- Image Logo -->
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                            <rect width="36" height="36" rx="6" fill="#0891B2"/>
+                                                                            <circle cx="13" cy="13" r="3" fill="white"/>
+                                                                            <path d="M7.5 27L14.25 18.75L18.75 24.75L24 16.5L28.5 27H7.5Z" fill="white"/>
+                                                                        </svg>
+                                                                    @elseif($fileTypeCategory === 'archive')
+                                                                        <!-- Zip Logo -->
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                            <rect width="36" height="36" rx="6" fill="#D97706"/>
+                                                                            <path d="M18 6V21M18 21L12 15M18 21L24 15M9 27H27" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                                                        </svg>
+                                                                    @else
+                                                                        <!-- Default Document Logo -->
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 36 36" fill="none">
+                                                                            <rect width="36" height="36" rx="6" fill="#475569"/>
+                                                                            <path d="M10.5 9H25.5M10.5 15H25.5M10.5 21H19.5M10.5 27H16.5" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                                                                        </svg>
+                                                                    @endif
+                                                                </div>
+                                                                <div class="overflow-hidden">
+                                                                    <a href="{{ route('crm.leads.documents.view', $document->id) }}" target="_blank" class="fw-bold text-dark text-decoration-none hover-primary fs-12 text-truncate d-block mb-1" title="Click to view file: {{ $document->file_name }}">
+                                                                        {{ $document->file_name }}
+                                                                    </a>
+                                                                    <div class="text-muted fs-11 d-flex align-items-center gap-1.5 flex-wrap">
+                                                                        <span class="badge bg-white text-secondary border px-1.5 py-0.5 text-uppercase fw-semibold" style="font-size: 9px; border-color: #cbd5e1 !important;">{{ strtoupper($ext) }}</span>
+                                                                        <span>{{ round($document->size / 1024, 2) }} KB</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                                                <a href="{{ route('crm.leads.documents.download', $document->id) }}" class="btn btn-xs btn-soft-success rounded-circle p-0 d-inline-flex align-items-center justify-content-center border" style="width: 30px; height: 30px; border-color: #bbf7d0 !important;" title="Download Document">
+                                                                    <i class="feather-download fs-13 text-success"></i>
+                                                                </a>
+                                                                <form action="{{ route('crm.leads.documents.delete', $document->id) }}" method="POST" class="m-0 p-0" id="deleteDocForm_{{ $document->id }}">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    <button type="button" class="btn btn-xs btn-soft-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center border" style="width: 30px; height: 30px; border-color: #fecdd3 !important;" title="Delete Document" onclick="confirmAction({ title: 'Delete Document', message: '{{ __('crm.confirm_delete_document') }}', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteDocForm_{{ $document->id }}').submit(); })">
+                                                                        <i class="feather-trash-2 fs-13 text-danger"></i>
+                                                                    </button>
+                                                                </form>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 @endforeach
@@ -1176,23 +1336,8 @@
                                                     :value="old('expiry_date', $activeQuotation->expiry_date ? $activeQuotation->expiry_date->format('Y-m-d') : '')" :errorText="$errors->first('expiry_date')" />
 
                                                 <x-ui.odoo-form-ui type="select" :label="__('crm.status')" name="status" :required="true" :errorText="$errors->first('status')">
-                                                     @if ($activeQuotation->status === 'Draft')
-                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
-                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval')>{{ __('crm.send_for_approval') }}</option>
-                                                     @elseif ($activeQuotation->status === 'Pending Approval')
-                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval')>{{ __('crm.quotation_statuses.Pending Approval') }}</option>
-                                                     @elseif ($activeQuotation->status === 'Approved')
-                                                         <option value="Rejected" @selected(old('status', $activeQuotation->status) === 'Rejected')>{{ __('crm.quotation_statuses.Rejected') }}</option>
-                                                         <option value="Quotation Rework" @selected(old('status', $activeQuotation->status) === 'Quotation Rework')>{{ __('crm.quotation_statuses.Quotation Rework') }}</option>
-                                                     @else
-                                                         <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
-                                                         <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval')>{{ __('crm.quotation_statuses.Pending Approval') }}</option>
-                                                         <option value="Approved" @selected(old('status', $activeQuotation->status) === 'Approved')>{{ __('crm.quotation_statuses.Approved') }}</option>
-                                                         <option value="Quotation Sent" @selected(old('status', $activeQuotation->status) === 'Quotation Sent')>{{ __('crm.quotation_statuses.Quotation Sent') }}</option>
-                                                         <option value="Accepted" @selected(old('status', $activeQuotation->status) === 'Accepted')>{{ __('crm.quotation_statuses.Accepted') }}</option>
-                                                         <option value="Rejected" @selected(old('status', $activeQuotation->status) === 'Rejected')>{{ __('crm.quotation_statuses.Rejected') }}</option>
-                                                         <option value="Quotation Rework" @selected(old('status', $activeQuotation->status) === 'Quotation Rework')>{{ __('crm.quotation_statuses.Quotation Rework') }}</option>
-                                                     @endif
+                                                     <option value="Draft" @selected(old('status', $activeQuotation->status) === 'Draft')>{{ __('crm.quotation_statuses.Draft') }}</option>
+                                                     <option value="Pending Approval" @selected(old('status', $activeQuotation->status) === 'Pending Approval' || old('status', $activeQuotation->status) === 'Rejected' || old('status', $activeQuotation->status) === 'Quotation Rework' || old('status', $activeQuotation->status) === 'Approved' || old('status', $activeQuotation->status) === 'Declined')>{{ __('crm.quotation_statuses.Pending Approval') }}</option>
                                                 </x-ui.odoo-form-ui>
                                             </div>
                                         </div>
@@ -1281,10 +1426,9 @@
                                                          @csrf
                                                          <button type="submit" class="btn btn-sm btn-success"><i class="feather-check me-1"></i>{{ __('crm.approve') }}</button>
                                                      </form>
-                                                     <form action="{{ route('crm.quotations.reject', $activeQuotation->id) }}" method="POST" class="d-inline">
-                                                         @csrf
-                                                         <button type="submit" class="btn btn-sm btn-danger"><i class="feather-x me-1"></i>{{ __('crm.reject') }}</button>
-                                                     </form>
+                                                     <button type="button" class="btn btn-sm btn-danger" onclick="openRejectModal('{{ route('crm.quotations.reject', $activeQuotation->id) }}', '{{ $activeQuotation->quotation_number }}')">
+                                                         <i class="feather-x me-1"></i>{{ __('crm.reject') }}
+                                                     </button>
                                                  @elseif ($activeQuotation->status === 'Approved')
                                                      <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
                                                          @csrf
@@ -1299,12 +1443,9 @@
                                                          <input type="hidden" name="status" value="Accepted">
                                                          <button type="submit" class="btn btn-sm btn-success">{{ __('crm.accept_quotation') }}</button>
                                                      </form>
-                                                     <form action="{{ route('crm.quotations.updateStatus', $activeQuotation->id) }}" method="POST" class="d-inline">
-                                                         @csrf
-                                                         @method('PATCH')
-                                                         <input type="hidden" name="status" value="Rejected">
-                                                         <button type="submit" class="btn btn-sm btn-danger">{{ __('crm.reject') }}</button>
-                                                     </form>
+                                                     <button type="button" class="btn btn-sm btn-danger" onclick="openRejectModal('{{ route('crm.quotations.reject', $activeQuotation->id) }}', '{{ $activeQuotation->quotation_number }}')">
+                                                         <i class="feather-x me-1"></i>{{ __('crm.reject') }}
+                                                     </button>
                                                  @elseif ($activeQuotation->status === 'Accepted')
                                                      <a href="{{ route('sales.orders.create', ['quotation_id' => $activeQuotation->id]) }}" class="btn btn-sm btn-success">
                                                          <i class="feather-shopping-cart me-1"></i>{{ __('crm.convert_to_sales_order') }}
@@ -1312,6 +1453,23 @@
                                                  @endif
                                             </div>
                                         </div>
+
+                                        @if (in_array($activeQuotation->status, ['Rejected', 'Declined']))
+                                             <div class="alert alert-danger border-danger border-start border-4 shadow-sm mb-4 d-print-none" role="alert" style="background-color: #fff5f5;">
+                                                 <div class="d-flex align-items-start">
+                                                     <div class="avatar-text avatar-md bg-danger text-white me-3 mt-0.5 rounded-circle flex-shrink-0">
+                                                         <i class="feather-x-circle fs-18"></i>
+                                                     </div>
+                                                     <div class="flex-grow-1">
+                                                         <h6 class="alert-heading fw-bold text-danger mb-1"><i class="feather-alert-triangle me-1"></i> Quotation Rejected</h6>
+                                                         <p class="fs-13 text-dark mb-0">
+                                                             <strong>Rejection Reason / Remarks:</strong> 
+                                                             <span class="text-danger fw-semibold">{{ $activeQuotation->rejection_reason ?: 'No specific reason provided.' }}</span>
+                                                         </p>
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         @endif
 
                                         <!-- Quotation Details Table -->
                                         <div class="row g-4 mb-4 fs-13 text-dark">
@@ -2308,7 +2466,7 @@
                         'id' => $p->id,
                         'name' => $p->name,
                         'sku' => $p->sku,
-                        'unit_cost' => $p->unit_cost
+                        'selling_price' => (float) ($p->selling_price ?: ($p->parent?->selling_price ?: 0))
                     ];
                 });
             @endphp
@@ -2319,7 +2477,7 @@
                 opts += '<option value="__ADD_NEW__" class="fw-bold text-primary" data-master="product">+ {{ __('crm.add_new_product') }}</option>';
                 crmProductsList.forEach(function(p) {
                     const sel = (p.id == selectedId) ? ' selected' : '';
-                    opts += `<option value="${p.id}" data-unit-cost="${p.unit_cost ?? 0}"${sel}>${p.name} (${p.sku})</option>`;
+                    opts += `<option value="${p.id}" data-selling-price="${p.selling_price ?? 0}"${sel}>${p.name} (${p.sku})</option>`;
                 });
                 return opts;
             }
@@ -2375,21 +2533,25 @@
                 } else if (hasCreateQ && (prefillProductItems.length > 0 || prefillProductIds.length > 0 || prefillAmount)) {
                     if (prefillProductItems.length > 0) {
                         prefillProductItems.forEach(function(pItem) {
+                            const pObj = crmProductsList.find(p => p.id == pItem.product_id);
+                            const unitPrice = (pObj && parseFloat(pObj.selling_price) > 0) ? parseFloat(pObj.selling_price) : (parseFloat(prefillAmount) || 0.00);
                             addRow({
                                 product_id: pItem.product_id || '',
                                 description: '',
                                 quantity: parseFloat(pItem.quantity) || 1,
-                                unit_price: parseFloat(prefillAmount) || 0.00,
+                                unit_price: unitPrice,
                                 tax_rate: 18.00
                             });
                         });
                     } else if (prefillProductIds.length > 0) {
                         prefillProductIds.forEach(function(pid) {
+                            const pObj = crmProductsList.find(p => p.id == pid);
+                            const unitPrice = (pObj && parseFloat(pObj.selling_price) > 0) ? parseFloat(pObj.selling_price) : (parseFloat(prefillAmount) || 0.00);
                             addRow({
                                 product_id: pid || '',
                                 description: '',
                                 quantity: 1,
-                                unit_price: parseFloat(prefillAmount) || 0.00,
+                                unit_price: unitPrice,
                                 tax_rate: 18.00
                             });
                         });
@@ -2434,7 +2596,12 @@
                     $(this).closest('tr').remove();
                     calculateTotals();
                 } else {
-                    alert("{{ __('crm.alert_at_least_one_item') }}");
+                    confirmAction({
+                        title: 'Warning',
+                        message: "{{ __('crm.alert_at_least_one_item') }}",
+                        variant: 'warning',
+                        confirmText: 'OK'
+                    });
                 }
             });
 
@@ -2489,20 +2656,28 @@
                         newRow.find('.toggle-desc-btn').html('<i class="feather-minus me-1"></i>{{ __('crm.remove_description') }}');
                     }
                     newRow.find('.qty-input').val(item.quantity);
-                    newRow.find('.price-input').val(item.unit_price);
+
+                    let finalUnitPrice = parseFloat(item.unit_price);
+                    if (isNaN(finalUnitPrice) || finalUnitPrice === 0) {
+                        const foundProd = crmProductsList.find(p => p.id == item.product_id);
+                        if (foundProd && parseFloat(foundProd.selling_price) > 0) {
+                            finalUnitPrice = parseFloat(foundProd.selling_price);
+                        } else {
+                            finalUnitPrice = 0.00;
+                        }
+                    }
+                    newRow.find('.price-input').val(finalUnitPrice.toFixed(2));
                     newRow.find('.tax-input').val(item.tax_rate);
                     isPrefilling = false;
                 }
 
-                // Auto-fill unit price from product's unit_cost when product is selected by user
+                // Auto-fill unit price from product's selling_price when product is selected by user
                 newRow.find('.item-name-input').on('change', function() {
                     if (isPrefilling) return;
                     const selectedOption = $(this).find('option:selected');
-                    const unitCost = parseFloat(selectedOption.attr('data-unit-cost')) || 0;
-                    if (unitCost > 0) {
-                        $(this).closest('tr').find('.price-input').val(unitCost.toFixed(2));
-                        calculateTotals();
-                    }
+                    const sellingPrice = parseFloat(selectedOption.attr('data-selling-price')) || 0;
+                    $(this).closest('tr').find('.price-input').val(sellingPrice.toFixed(2));
+                    calculateTotals();
                 });
 
                 rowIndex++;
@@ -2558,7 +2733,7 @@
                     <tr class="lead-item-row border-bottom">
                         <td class="py-1 ps-1 pe-1 align-top"></td>
                         <td class="py-1 px-1 align-top">
-                            <input type="number" name="items[${editItemRowIndex}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="1" min="1" step="1" required>
+                            <input type="number" name="items[${editItemRowIndex}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="1" min="1" step="1">
                         </td>
                         <td class="py-1 text-center align-top pt-2">
                             <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="Remove Product">
@@ -2587,8 +2762,134 @@
                     updateEditRemoveButtonsState();
                 }
             });
+
+            // Show Page Inline Edit Mode Additional Contacts JS
+            function updateShowContactNumbersAndNames() {
+                var cards = $('#showAdditionalContactsRepeaterContainer .addl-contact-card');
+                $('#showAddlContactCountBadge').text(cards.length);
+                cards.each(function(index) {
+                    $(this).find('.contact-num').text(index + 1);
+                    $(this).find('.contact-name-input').attr('name', 'additional_contacts[' + index + '][name]');
+                    $(this).find('.contact-email-input').attr('name', 'additional_contacts[' + index + '][email]');
+                    $(this).find('.contact-phone-input').attr('name', 'additional_contacts[' + index + '][phone]');
+                });
+            }
+
+            function addShowAddlContactCard(cloneValues) {
+                var count = $('#showAdditionalContactsRepeaterContainer .addl-contact-card').length;
+                var nameVal = cloneValues ? (cloneValues.name || '') : '';
+                var emailVal = cloneValues ? (cloneValues.email || '') : '';
+                var phoneVal = cloneValues ? (cloneValues.phone || '') : '';
+
+                var html = `
+                    <div class="addl-contact-card p-2 px-3 mb-1 bg-white position-relative shadow-2xs" style="border: 1.5px solid var(--bs-primary) !important; border-radius: 8px !important;">
+                        <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
+                            <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> Contact Person #<span class="contact-num">${count + 1}</span></span>
+                            <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="Delete Contact" style="width: 22px; height: 22px; border-radius: 50%;">
+                                <i class="feather-trash-2 text-danger fs-11"></i>
+                            </button>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label">Name</label>
+                                    <div class="flex-grow-1">
+                                        <input type="text" name="additional_contacts[${count}][name]" class="odoo-form-control contact-name-input" value="${nameVal}" placeholder="Contact Name">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label">Phone No.</label>
+                                    <div class="flex-grow-1">
+                                        <input type="text" name="additional_contacts[${count}][phone]" class="odoo-form-control contact-phone-input" value="${phoneVal}" placeholder="Phone Number" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label">Email</label>
+                                    <div class="flex-grow-1">
+                                        <input type="email" name="additional_contacts[${count}][email]" class="odoo-form-control contact-email-input" value="${emailVal}" placeholder="Email">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                $('#showAdditionalContactsRepeaterContainer').append(html);
+                updateShowContactNumbersAndNames();
+            }
+
+            // Main + CLONE CONTACT Button Handler
+            $('#showCloneContactMainBtn').on('click', function() {
+                var lastCard = $('#showAdditionalContactsRepeaterContainer .addl-contact-card').last();
+                var values = null;
+                if (lastCard.length > 0) {
+                    values = {
+                        name: lastCard.find('.contact-name-input').val(),
+                        email: lastCard.find('.contact-email-input').val(),
+                        phone: lastCard.find('.contact-phone-input').val()
+                    };
+                }
+                addShowAddlContactCard(values);
+            });
+
+            // Delete Contact Button Handler
+            $(document).on('click', '#showAdditionalContactsRepeaterContainer .remove-contact-btn', function() {
+                $(this).closest('.addl-contact-card').remove();
+                updateShowContactNumbersAndNames();
+            });
         });
+
+        function openRejectModal(actionUrl, quotationNumber = '') {
+            $('#rejectQuotationForm').attr('action', actionUrl);
+            if (quotationNumber) {
+                $('#rejectModalQuotationNumber').text('(' + quotationNumber + ')');
+            } else {
+                $('#rejectModalQuotationNumber').text('');
+            }
+            $('#rejectionReasonInput').val('');
+            const modalEl = document.getElementById('rejectQuotationModal');
+            let modal = bootstrap.Modal.getInstance(modalEl);
+            if (!modal) {
+                modal = new bootstrap.Modal(modalEl);
+            }
+            modal.show();
+        }
     </script>
+
+    <!-- Rejection Reason Modal -->
+    <div class="modal fade" id="rejectQuotationModal" tabindex="-1" aria-labelledby="rejectQuotationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <form id="rejectQuotationForm" method="POST" action="">
+                    @csrf
+                    <div class="modal-header bg-soft-danger text-danger border-bottom-0">
+                        <h5 class="modal-title fw-bold" id="rejectQuotationModalLabel">
+                            <i class="feather-x-circle me-2"></i>Reject Quotation <span id="rejectModalQuotationNumber" class="text-dark"></span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <p class="text-muted fs-12 mb-3">Please specify the reason for rejecting this quotation. This reason will be saved in audit history and displayed on the quotation detail screen.</p>
+                        
+                        <div class="mb-3 text-start">
+                            <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">Rejection Reason / Remarks <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="Enter reason for rejection (e.g., Price too high, Scope changed, Customer declined, etc.)..." required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light border-top-0 px-4 py-3">
+                        <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold text-uppercase fs-11" style="background-color: #ea580c; border-color: #ea580c;">
+                            <i class="feather-x-circle me-1"></i> Confirm Rejection
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     {{-- Product quick-create modal --}}
     <x-ui.master-modals :masters="['product']" />

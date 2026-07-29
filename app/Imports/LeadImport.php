@@ -37,6 +37,8 @@ class LeadImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmptyR
             }
         }
 
+        $ownerId = !empty($row['lead_owner_id']) ? $row['lead_owner_id'] : (!empty($row['lead_owner']) ? $row['lead_owner'] : (!empty($row['owner_id']) ? $row['owner_id'] : auth()->id()));
+
         return new Lead([
             'company_name' => $row['company_name'],
             'contact_person' => $row['contact_person'] ?? null,
@@ -52,7 +54,7 @@ class LeadImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmptyR
             'city' => $row['city'] ?? null,
             'address' => $row['address'] ?? null,
             'status' => !empty($row['status']) ? $row['status'] : 'New',
-            'lead_owner_id' => auth()->id(),
+            'lead_owner_id' => $ownerId,
             'call_date' => now(),
         ]);
     }

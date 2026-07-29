@@ -173,51 +173,37 @@
                                     </button>
 
                                     {{-- Approve --}}
-                                    <form action="{{ route('purchase.requisitions.approve', $req->id) }}" method="POST"
-                                          class="d-inline-flex flex-shrink-0"
-                                          onsubmit="return confirm('{{ __('purchase.confirm_approve') }}')">
-                                        @csrf
-                                        <button type="submit"
-                                                class="action-dropdown-btn action-btn-approve"
-                                                title="Approve"
-                                                data-bs-toggle="tooltip">
-                                            <i class="feather feather-check-circle"></i>
-                                        </button>
-                                    </form>
+                                     <form action="{{ route('purchase.requisitions.approve', $req->id) }}" method="POST" class="d-inline-flex flex-shrink-0" id="approvePrForm_{{ $req->id }}">
+                                         @csrf
+                                         <button type="button" class="action-dropdown-btn action-btn-approve" title="Approve" data-bs-toggle="tooltip" onclick="confirmAction({ title: 'Approve Requisition', message: '{{ __('purchase.confirm_approve') }}', variant: 'success', confirmText: 'Approve' }, function() { document.getElementById('approvePrForm_{{ $req->id }}').submit(); })">
+                                             <i class="feather feather-check-circle"></i>
+                                         </button>
+                                     </form>
 
-                                    {{-- Reject --}}
-                                    <form action="{{ route('purchase.requisitions.reject', $req->id) }}" method="POST"
-                                          class="d-inline-flex flex-shrink-0"
-                                          onsubmit="return confirm('{{ __('purchase.confirm_reject') }}')">
-                                        @csrf
-                                        <button type="submit"
-                                                class="action-dropdown-btn action-btn-reject"
-                                                title="Reject"
-                                                data-bs-toggle="tooltip">
-                                            <i class="feather feather-x-circle"></i>
-                                        </button>
-                                    </form>
+                                     {{-- Reject --}}
+                                     <button type="button" class="action-dropdown-btn action-btn-reject flex-shrink-0" title="Reject" data-bs-toggle="tooltip" onclick="openRejectModal('{{ route('purchase.requisitions.reject', $req->id) }}', '{{ $req->requisition_number }}')">
+                                         <i class="feather feather-x-circle"></i>
+                                     </button>
 
-                                    {{-- More (Edit / Delete) --}}
-                                    <div class="flex-shrink-0">
-                                        <x-ui.action-dropdown id="prApprovalActions-{{ $req->id }}">
-                                            <li>
-                                                <a class="dropdown-item py-2" href="{{ route('purchase.requisitions.edit', $req->id) }}">
-                                                    <i class="feather-edit me-1.5 text-muted"></i> {{ __('purchase.edit') }}
-                                                </a>
-                                            </li>
-                                            <li>
-                                                <form action="{{ route('purchase.requisitions.destroy', $req->id) }}" method="POST"
-                                                      onsubmit="return confirm('{{ __('purchase.confirm_delete') }}')">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item py-2 text-danger">
-                                                        <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
-                                                    </button>
-                                                </form>
-                                            </li>
-                                        </x-ui.action-dropdown>
-                                    </div>
+                                     {{-- More (Edit / Delete) --}}
+                                     <div class="flex-shrink-0">
+                                         <x-ui.action-dropdown id="prApprovalActions-{{ $req->id }}">
+                                             <li>
+                                                 <a class="dropdown-item py-2" href="{{ route('purchase.requisitions.edit', $req->id) }}">
+                                                     <i class="feather-edit me-1.5 text-muted"></i> {{ __('purchase.edit') }}
+                                                 </a>
+                                             </li>
+                                             <li>
+                                                 <form action="{{ route('purchase.requisitions.destroy', $req->id) }}" method="POST" id="deletePrForm_{{ $req->id }}">
+                                                     @csrf
+                                                     @method('DELETE')
+                                                     <button type="button" class="dropdown-item py-2 text-danger" onclick="confirmAction({ title: 'Delete Requisition', message: '{{ __('purchase.confirm_delete') }}', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deletePrForm_{{ $req->id }}').submit(); })">
+                                                         <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
+                                                     </button>
+                                                 </form>
+                                             </li>
+                                         </x-ui.action-dropdown>
+                                     </div>
                                 </div>
                             </td>
                         </tr>
@@ -294,6 +280,22 @@
 
 @push('scripts')
 <script>
+    window.openRejectModal = function(actionUrl, docNumber = '') {
+        $('#rejectActionForm').attr('action', actionUrl);
+        if (docNumber) {
+            $('#rejectModalDocNumber').text('(' + docNumber + ')');
+        } else {
+            $('#rejectModalDocNumber').text('');
+        }
+        $('#rejectionReasonInput').val('');
+        const modalEl = document.getElementById('rejectActionModal');
+        let modal = bootstrap.Modal.getInstance(modalEl);
+        if (!modal) {
+            modal = new bootstrap.Modal(modalEl);
+        }
+        modal.show();
+    };
+
     $(document).ready(function () {
         // Select All
         $('.select-all').on('change', function () {
@@ -329,4 +331,35 @@
         }
     });
 </script>
+
+<!-- Rejection Reason Modal -->
+<div class="modal fade" id="rejectActionModal" tabindex="-1" aria-labelledby="rejectActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3">
+            <form id="rejectActionForm" method="POST" action="">
+                @csrf
+                <div class="modal-header bg-soft-danger text-danger border-bottom-0">
+                    <h5 class="modal-title fw-bold" id="rejectActionModalLabel">
+                        <i class="feather-x-circle me-2"></i>Reject Requisition <span id="rejectModalDocNumber" class="text-dark"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted fs-12 mb-3">Please specify the reason for rejecting this requisition. This reason will be saved in audit history and displayed on details screen.</p>
+                    
+                    <div class="mb-3 text-start">
+                        <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">Rejection Reason / Remarks <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="Enter reason for rejection (e.g., Budget constraints, Requirements changed, Duplicate request, etc.)..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0 px-4 py-3">
+                    <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold text-uppercase fs-11" style="background-color: #ea580c; border-color: #ea580c;">
+                        <i class="feather-x-circle me-1"></i> Confirm Rejection
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endpush

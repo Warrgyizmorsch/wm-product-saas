@@ -184,7 +184,7 @@ class PurchaseRequisitionController extends Controller
         return redirect()->back()->with('success', 'Purchase Requisition has been successfully approved.');
     }
 
-    public function reject(int $id)
+    public function reject(Request $request, int $id)
     {
         $requisition = $this->requisitionRepo->find($id);
         if (!$requisition) abort(404);
@@ -193,9 +193,16 @@ class PurchaseRequisitionController extends Controller
             return redirect()->back()->with('error', 'Only Draft Purchase Requisitions can be rejected.');
         }
 
-        $this->requisitionRepo->update($requisition, ['status' => 'Cancelled']);
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|max:1000',
+        ]);
 
-        return redirect()->back()->with('success', 'Purchase Requisition has been successfully cancelled/rejected.');
+        $this->requisitionRepo->update($requisition, [
+            'status' => 'Cancelled',
+            'rejection_reason' => $validated['rejection_reason'],
+        ]);
+
+        return redirect()->back()->with('success', 'Purchase Requisition has been rejected.');
     }
 
     public function getSourceItems(Request $request)

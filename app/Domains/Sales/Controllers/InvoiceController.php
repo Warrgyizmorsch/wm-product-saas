@@ -34,12 +34,12 @@ class InvoiceController extends Controller
         $this->authorize('create', Invoice::class);
 
         $salesOrderId = $request->input('sales_order_id');
-        $deliveryOrderId = $request->input('material_requirement_id');
+        $materialRequirementId = $request->input('material_requirement_id');
 
-        $deliveryOrder = null;
-        if ($deliveryOrderId) {
-            $deliveryOrder = MaterialRequirement::with('items.product', 'items.warehouse', 'items.salesOrderItem')->findOrFail($deliveryOrderId);
-            $salesOrderId = $deliveryOrder->sales_order_id;
+        $materialRequirement = null;
+        if ($materialRequirementId) {
+            $materialRequirement = MaterialRequirement::with('items.product', 'items.warehouse', 'items.salesOrderItem')->findOrFail($materialRequirementId);
+            $salesOrderId = $materialRequirement->sales_order_id;
         }
 
         $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->findOrFail($salesOrderId);
@@ -53,8 +53,8 @@ class InvoiceController extends Controller
             ->sum('allocated_amount');
 
         $invoiceItems = [];
-        if ($deliveryOrder) {
-            foreach ($deliveryOrder->items as $doItem) {
+        if ($materialRequirement) {
+            foreach ($materialRequirement->items as $doItem) {
                 $soItem = $doItem->salesOrderItem;
                 $quantity = floatval($doItem->quantity);
                 $unitPrice = $soItem ? floatval($soItem->unit_price) : 0.0;
@@ -67,16 +67,22 @@ class InvoiceController extends Controller
                 $taxAmt = $taxable * ($taxRate / 100);
 
                 $invoiceItems[] = [
-                    'sales_order_item_id' => $soItem?->id,
-                    'product_id'          => $doItem->product_id,
-                    'item_name'           => $doItem->product?->name ?? 'Item',
-                    'description'         => $doItem->description,
-                    'quantity'            => $quantity,
-                    'unit_price'          => $unitPrice,
-                    'discount'            => $discount,
-                    'tax_rate'            => $taxRate,
-                    'tax_amount'          => $taxAmt,
-                    'total_amount'        => $taxable + $taxAmt,
+                    'sales_order_item_id'          => $soItem?->id,
+                    'material_requirement_item_id' => $doItem->id,
+                    'product_id'                   => $doItem->product_id,
+                    'product_name'                 => $doItem->product?->name ?? 'Item',
+                    'sku'                          => $doItem->product?->sku ?? null,
+                    'item_name'                    => $doItem->product?->name ?? 'Item',
+                    'description'                  => $doItem->description,
+                    'quantity'                     => $quantity,
+                    'unit_price'                   => $unitPrice,
+                    'discount'                     => $discount,
+                    'tax_rate'                     => $taxRate,
+                    'tax_amount'                   => $taxAmt,
+                    'subtotal'                     => $subtotal,
+                    'total_amount'                 => $taxable + $taxAmt,
+                    'warehouse_id'                 => $doItem->warehouse_id ?? null,
+                    'warehouse_name'               => $doItem->warehouse?->name ?? null,
                 ];
             }
         } else {
@@ -92,21 +98,27 @@ class InvoiceController extends Controller
                 $taxAmt = $taxable * ($taxRate / 100);
 
                 $invoiceItems[] = [
-                    'sales_order_item_id' => $soItem->id,
-                    'product_id'          => $soItem->product_id,
-                    'item_name'           => $soItem->product?->name ?? 'Item',
-                    'description'         => $soItem->description,
-                    'quantity'            => $quantity,
-                    'unit_price'          => $unitPrice,
-                    'discount'            => $discount,
-                    'tax_rate'            => $taxRate,
-                    'tax_amount'          => $taxAmt,
-                    'total_amount'        => $taxable + $taxAmt,
+                    'sales_order_item_id'          => $soItem->id,
+                    'material_requirement_item_id' => null,
+                    'product_id'                   => $soItem->product_id,
+                    'product_name'                 => $soItem->product?->name ?? 'Item',
+                    'sku'                          => $soItem->product?->sku ?? null,
+                    'item_name'                    => $soItem->product?->name ?? 'Item',
+                    'description'                  => $soItem->description,
+                    'quantity'                     => $quantity,
+                    'unit_price'                   => $unitPrice,
+                    'discount'                     => $discount,
+                    'tax_rate'                     => $taxRate,
+                    'tax_amount'                   => $taxAmt,
+                    'subtotal'                     => $subtotal,
+                    'total_amount'                 => $taxable + $taxAmt,
+                    'warehouse_id'                 => $soItem->warehouse_id ?? null,
+                    'warehouse_name'               => $soItem->warehouse?->name ?? null,
                 ];
             }
         }
 
-        return view('modules.sales.invoices.create', compact('salesOrder', 'deliveryOrder', 'nextInvoiceNumber', 'invoiceItems', 'advanceAllocations'));
+        return view('modules.sales.invoices.create', compact('salesOrder', 'materialRequirement', 'nextInvoiceNumber', 'invoiceItems', 'advanceAllocations'));
     }
 
     public function store(Request $request): RedirectResponse

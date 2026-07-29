@@ -132,6 +132,11 @@
                                     elseif ($quotation->status === 'Quotation Rework') $badgeClass = 'bg-soft-warning text-warning';
                                 @endphp
                                 <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $quotation->status }}</span>
+                                @if ($quotation->status === 'Rejected' && $quotation->rejection_reason)
+                                    <small class="d-block text-danger fs-11 mt-1 text-truncate" style="max-width: 200px;" title="Reason: {{ $quotation->rejection_reason }}" data-bs-toggle="tooltip">
+                                        <i class="feather-alert-circle me-1"></i>{{ $quotation->rejection_reason }}
+                                    </small>
+                                @endif
                             </td>
                             <td class="text-end pe-4" style="white-space: nowrap;">
                                 <div class="d-inline-flex gap-1 align-items-center justify-content-end">
@@ -142,46 +147,38 @@
                                     </button>
 
                                     @if ($quotation->status === 'Pending Approval')
-                                        <form action="{{ route('crm.quotations.approve', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Approve this quotation?')">
+                                        <form action="{{ route('crm.quotations.approve', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" id="approveQuoForm_{{ $quotation->id }}">
                                             @csrf
-                                            <button type="submit" class="action-dropdown-btn action-btn-approve" title="Approve" data-bs-toggle="tooltip">
+                                            <button type="button" class="action-dropdown-btn action-btn-approve" title="Approve" data-bs-toggle="tooltip" onclick="confirmAction({ title: 'Approve Quotation', message: 'Approve this quotation?', variant: 'success', confirmText: 'Approve' }, function() { document.getElementById('approveQuoForm_{{ $quotation->id }}').submit(); })">
                                                 <i class="feather-check-circle"></i>
                                             </button>
                                         </form>
-                                        <form action="{{ route('crm.quotations.reject', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Reject this quotation?')">
-                                            @csrf
-                                            <button type="submit" class="action-dropdown-btn action-btn-reject" title="Reject" data-bs-toggle="tooltip">
-                                                <i class="feather-x-circle"></i>
-                                            </button>
-                                        </form>
+                                        <button type="button" class="action-dropdown-btn action-btn-reject flex-shrink-0" title="Reject" data-bs-toggle="tooltip" onclick="openRejectModal('{{ route('crm.quotations.reject', $quotation->id) }}', '{{ $quotation->quotation_number }}')">
+                                            <i class="feather-x-circle"></i>
+                                        </button>
                                     @endif
 
                                     @if ($quotation->status === 'Approved')
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Mark this quotation as Sent to customer?')">
+                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" id="markSentQuoForm_{{ $quotation->id }}">
                                             @csrf
                                             @method('PATCH')
                                             <input type="hidden" name="status" value="Sent">
-                                            <button type="submit" class="action-dropdown-btn" title="Mark as Sent" data-bs-toggle="tooltip" style="color: #0284c7; background-color: #e0f2fe; border-color: #bae6fd;">
+                                            <button type="button" class="action-dropdown-btn" title="Mark as Sent" data-bs-toggle="tooltip" style="color: #0284c7; background-color: #e0f2fe; border-color: #bae6fd;" onclick="confirmAction({ title: 'Mark as Sent', message: 'Mark this quotation as Sent to customer?', variant: 'info', confirmText: 'Mark Sent' }, function() { document.getElementById('markSentQuoForm_{{ $quotation->id }}').submit(); })">
                                                 <i class="feather-send"></i>
                                             </button>
                                         </form>
                                     @elseif (in_array($quotation->status, ['Sent', 'Quotation Sent']))
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Mark this quotation as Accepted by customer?')">
+                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" id="acceptQuoForm_{{ $quotation->id }}">
                                             @csrf
                                             @method('PATCH')
                                             <input type="hidden" name="status" value="Accepted">
-                                            <button type="submit" class="action-dropdown-btn action-btn-approve" title="Accept" data-bs-toggle="tooltip">
+                                            <button type="button" class="action-dropdown-btn action-btn-approve" title="Accept" data-bs-toggle="tooltip" onclick="confirmAction({ title: 'Accept Quotation', message: 'Mark this quotation as Accepted by customer?', variant: 'success', confirmText: 'Accept' }, function() { document.getElementById('acceptQuoForm_{{ $quotation->id }}').submit(); })">
                                                 <i class="feather-check-circle"></i>
                                             </button>
                                         </form>
-                                        <form action="{{ route('crm.quotations.updateStatus', $quotation->id) }}" method="POST" class="d-inline-flex flex-shrink-0 m-0" onsubmit="return confirm('Mark this quotation as Rejected by customer?')">
-                                            @csrf
-                                            @method('PATCH')
-                                            <input type="hidden" name="status" value="Rejected">
-                                            <button type="submit" class="action-dropdown-btn action-btn-reject" title="Reject" data-bs-toggle="tooltip">
-                                                <i class="feather-x-circle"></i>
-                                            </button>
-                                        </form>
+                                        <button type="button" class="action-dropdown-btn action-btn-reject flex-shrink-0" title="Reject" data-bs-toggle="tooltip" onclick="openRejectModal('{{ route('crm.quotations.reject', $quotation->id) }}', '{{ $quotation->quotation_number }}')">
+                                            <i class="feather-x-circle"></i>
+                                        </button>
                                     @elseif ($quotation->status === 'Accepted' && !$quotation->salesOrder)
                                         <a href="{{ route('sales.orders.create', ['quotation_id' => $quotation->id]) }}" class="action-dropdown-btn" title="Convert to Sales Order" data-bs-toggle="tooltip" style="color: #6366f1; border-color: #c7d2fe; background-color: #e0e7ff; text-decoration: none;">
                                             <i class="feather-shopping-cart"></i>
@@ -200,12 +197,10 @@
 
                                             <li><hr class="dropdown-divider"></li>
                                             <li>
-                                                <form action="{{ route('crm.quotations.destroy', $quotation->id) }}"
-                                                      method="POST"
-                                                      onsubmit="return confirm('Are you sure you want to delete this quotation?');">
+                                                <form action="{{ route('crm.quotations.destroy', $quotation->id) }}" method="POST" id="deleteQuoForm_{{ $quotation->id }}">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">
+                                                    <button type="button" class="dropdown-item text-danger" onclick="confirmAction({ title: 'Delete Quotation', message: 'Are you sure you want to delete this quotation?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteQuoForm_{{ $quotation->id }}').submit(); })">
                                                         <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Quotation
                                                     </button>
                                                 </form>
@@ -350,5 +345,52 @@
                 $(this).closest('form').submit();
             });
         });
+
+        function openRejectModal(actionUrl, quotationNumber = '') {
+            $('#rejectQuotationForm').attr('action', actionUrl);
+            if (quotationNumber) {
+                $('#rejectModalQuotationNumber').text('(' + quotationNumber + ')');
+            } else {
+                $('#rejectModalQuotationNumber').text('');
+            }
+            $('#rejectionReasonInput').val('');
+            const modalEl = document.getElementById('rejectQuotationModal');
+            let modal = bootstrap.Modal.getInstance(modalEl);
+            if (!modal) {
+                modal = new bootstrap.Modal(modalEl);
+            }
+            modal.show();
+        }
     </script>
+
+    <!-- Rejection Reason Modal -->
+    <div class="modal fade" id="rejectQuotationModal" tabindex="-1" aria-labelledby="rejectQuotationModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-3">
+                <form id="rejectQuotationForm" method="POST" action="">
+                    @csrf
+                    <div class="modal-header bg-soft-danger text-danger border-bottom-0">
+                        <h5 class="modal-title fw-bold" id="rejectQuotationModalLabel">
+                            <i class="feather-x-circle me-2"></i>Reject Quotation <span id="rejectModalQuotationNumber" class="text-dark"></span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <p class="text-muted fs-12 mb-3">Please specify the reason for rejecting this quotation. This reason will be saved in audit history and displayed on the quotation detail screen.</p>
+                        
+                        <div class="mb-3 text-start">
+                            <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">Rejection Reason / Remarks <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="Enter reason for rejection (e.g., Price too high, Scope changed, Customer declined, etc.)..." required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light border-top-0 px-4 py-3">
+                        <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold text-uppercase fs-11" style="background-color: #ea580c; border-color: #ea580c;">
+                            <i class="feather-x-circle me-1"></i> Confirm Rejection
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endpush

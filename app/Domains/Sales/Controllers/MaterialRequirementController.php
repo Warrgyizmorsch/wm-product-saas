@@ -21,12 +21,24 @@ class MaterialRequirementController extends Controller
         private readonly MaterialRequirementService $deliveryService,
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', MaterialRequirement::class);
-        $deliveries = $this->requirementRepo->getAll();
 
-        return view('modules.sales.material-requirements.index', compact('deliveries'));
+        $filters = $request->only([
+            'search', 'status', 'date_from', 'date_to', 'sort_by', 'sort_order', 'per_page'
+        ]);
+
+        $perPage = (int) $request->input('per_page', 15);
+        if ($perPage < 5 || $perPage > 100) {
+            $perPage = 15;
+        }
+
+        $deliveries = $this->requirementRepo->getPaginatedRequirements($filters, $perPage);
+        $sortBy = $filters['sort_by'] ?? 'id';
+        $sortOrder = strtolower($filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+        return view('modules.sales.material-requirements.index', compact('deliveries', 'sortBy', 'sortOrder'));
     }
 
     public function create(Request $request): View

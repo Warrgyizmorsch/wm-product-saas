@@ -33,6 +33,22 @@
                 </div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    @endif
+
+    @if (in_array($quotation->status, ['Rejected', 'Declined']))
+        <div class="alert alert-danger border-danger border-start border-4 shadow-sm mb-4 d-print-none" role="alert" style="background-color: #fff5f5;">
+            <div class="d-flex align-items-start">
+                <div class="avatar-text avatar-md bg-danger text-white me-3 mt-0.5 rounded-circle flex-shrink-0">
+                    <i class="feather-x-circle fs-18"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="alert-heading fw-bold text-danger mb-1"><i class="feather-alert-triangle me-1"></i> Quotation Rejected</h6>
+                    <p class="fs-13 text-dark mb-0">
+                        <strong>Rejection Reason / Remarks:</strong> 
+                        <span class="text-danger fw-semibold">{{ $quotation->rejection_reason ?: 'No specific reason provided.' }}</span>
+                    </p>
+                </div>
+            </div>
         </div>
     @endif
 

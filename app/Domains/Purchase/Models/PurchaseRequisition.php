@@ -21,6 +21,7 @@ class PurchaseRequisition extends BaseModel
         'requested_by',
         'requisition_date',
         'status', // Draft, Approved, Cancelled
+        'rejection_reason',
         'notes',
         'source_type',
         'source_id',

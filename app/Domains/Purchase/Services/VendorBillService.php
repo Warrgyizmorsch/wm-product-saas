@@ -51,21 +51,8 @@ class VendorBillService
 
             $grandTotal = $subtotal + $taxAmount;
 
-            $advanceAvailable = 0.0;
-            if (!empty($validated['use_vendor_advance']) && $vendorId) {
-                $advanceAvailable = $this->getAvailableVendorAdvance($vendorId, $tenantId);
-            }
-
-            $appliedAdvance = min($grandTotal, $advanceAvailable);
-            $dueAmount = max(0.0, round($grandTotal - $appliedAdvance, 2));
-
-            $status = 'Unpaid';
-            if ($dueAmount <= 0.001 && $grandTotal > 0) {
-                $status = 'Paid';
-            } elseif ($appliedAdvance > 0) {
-                $status = 'Partially Paid';
-            }
-
+            // Bill is always created as Unpaid — advance is applied separately
+            // after the bill is posted (Odoo/Zoho style)
             $bill = $this->billRepo->create([
                 'tenant_id'             => $tenantId,
                 'bill_number'           => $billNumber,
@@ -75,32 +62,15 @@ class VendorBillService
                 'vendor_id'             => $vendorId,
                 'bill_date'             => $validated['bill_date'],
                 'due_date'              => $validated['due_date'],
-                'status'                => $status,
+                'status'                => 'Unpaid',
                 'subtotal'              => $subtotal,
                 'tax_amount'            => $taxAmount,
                 'grand_total'           => $grandTotal,
-                'paid_amount'           => $appliedAdvance,
-                'due_amount'            => $dueAmount,
+                'paid_amount'           => 0,
+                'due_amount'            => round($grandTotal, 2),
                 'notes'                 => $validated['notes'] ?? null,
                 'created_by'            => auth()->id() ?: 1,
             ]);
-
-            if ($appliedAdvance > 0) {
-                $advPayment = VendorPayment::where('tenant_id', $tenantId)
-                    ->where('vendor_id', $vendorId)
-                    ->where('payment_type', 'Advance')
-                    ->latest()
-                    ->first();
-
-                if ($advPayment) {
-                    VendorPaymentAllocation::create([
-                        'tenant_id'         => $tenantId,
-                        'vendor_payment_id' => $advPayment->id,
-                        'vendor_bill_id'    => $bill->id,
-                        'allocated_amount'  => $appliedAdvance,
-                    ]);
-                }
-            }
 
             foreach ($validated['items'] as $item) {
                 $qty = (float)$item['quantity'];
@@ -131,21 +101,27 @@ class VendorBillService
 
     public function getAvailableVendorAdvance(int $vendorId, int $tenantId): float
     {
+        // Total advance paid to vendor (direct advance payments)
         $directAdvances = VendorPayment::where('tenant_id', $tenantId)
             ->where('vendor_id', $vendorId)
             ->where('payment_type', 'Advance')
             ->sum('amount');
 
+        // Total PO-linked advance payments
         $poAdvances = PurchaseAdvancePayment::where('tenant_id', $tenantId)
             ->where('vendor_id', $vendorId)
             ->sum('amount');
 
-        // Sum paid_amount across existing bills for this vendor
-        $usedInBills = VendorBill::where('tenant_id', $tenantId)
-            ->where('vendor_id', $vendorId)
-            ->sum('paid_amount');
+        // Only deduct advance amounts actually allocated to bills
+        // (NOT total paid_amount — that includes direct payments too)
+        $usedAsAdvance = VendorPaymentAllocation::where('tenant_id', $tenantId)
+            ->whereHas('vendorPayment', function ($q) use ($vendorId) {
+                $q->where('vendor_id', $vendorId)
+                  ->where('payment_type', 'Advance');
+            })
+            ->sum('allocated_amount');
 
-        return max(0.0, round(($directAdvances + $poAdvances) - $usedInBills, 2));
+        return max(0.0, round(($directAdvances + $poAdvances) - $usedAsAdvance, 2));
     }
 
     public function applyAdvanceCredit(VendorBill $bill, int $tenantId): bool

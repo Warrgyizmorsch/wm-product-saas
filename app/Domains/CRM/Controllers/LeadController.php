@@ -109,7 +109,7 @@ class LeadController extends Controller
         $this->authorize('create', Lead::class);
         $lead = new Lead();
         $users = User::orderBy('name')->get();
-        $products = Product::sellable()->orderBy('name')->get();
+        $products = Product::sellable()->with('parent')->orderBy('name')->get();
         return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
     }
 
@@ -118,7 +118,7 @@ class LeadController extends Controller
         $this->authorize('view', $lead);
         $details = $this->leadRepo->getLeadDetails($lead, request()->input('active_quotation_id'));
         $users = User::orderBy('name')->get();
-        $products = Product::sellable()->orderBy('name')->get();
+        $products = Product::sellable()->with('parent')->orderBy('name')->get();
         $nextQuotationNumber = $this->quotationService->getNextQuotationNumber();
 
         return view('modules.crm.leads.show', array_merge(
@@ -140,7 +140,7 @@ class LeadController extends Controller
     {
         $this->authorize('update', $lead);
         $users = User::orderBy('name')->get();
-        $products = Product::sellable()->orderBy('name')->get();
+        $products = Product::sellable()->with('parent')->orderBy('name')->get();
         return view('modules.crm.leads.create', compact('lead', 'users', 'products'));
     }
 
@@ -229,7 +229,12 @@ class LeadController extends Controller
             'company_name' => 'required|string|max:255',
             'contact_person' => 'nullable|string|max:255',
             'email' => 'nullable|email|max:255',
-            'phone' => 'nullable|string|max:50',
+            'phone' => 'nullable|string|regex:/^[0-9]+$/',
+            'additional_contacts' => 'nullable|array',
+            'additional_contacts.*.name' => 'nullable|string|max:255',
+            'additional_contacts.*.designation' => 'nullable|string|max:255',
+            'additional_contacts.*.email' => 'nullable|email|max:255',
+            'additional_contacts.*.phone' => 'nullable|string|regex:/^[0-9]+$/',
             'requirement' => 'nullable|string',
             'expected_amount' => 'nullable|numeric|min:0',
             'expected_sale_date' => 'nullable|date',
@@ -244,7 +249,7 @@ class LeadController extends Controller
             'product_ids' => 'nullable|array',
             'product_ids.*' => 'nullable',
             'items' => 'nullable|array',
-            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.product_id' => 'nullable|integer|exists:products,id',
             'items.*.quantity' => 'nullable|numeric|min:1',
         ];
 
@@ -263,6 +268,9 @@ class LeadController extends Controller
     private function getLeadValidationMessages(): array
     {
         return [
+            'phone.regex' => 'Phone number must contain digits/numbers only (no special characters or letters).',
+            'additional_contact_phone.regex' => 'Additional contact phone number must contain digits/numbers only (no special characters or letters).',
+            'additional_contacts.*.phone.regex' => 'Additional contact phone number must contain digits/numbers only (no special characters or letters).',
             'items.*.product_id.required' => 'Please select a valid Product from the dropdown for each item line.',
             'items.*.product_id.exists'   => 'The selected product does not exist in inventory.',
             'items.*.quantity.min' => 'Minimum quantity 1 is required.',
