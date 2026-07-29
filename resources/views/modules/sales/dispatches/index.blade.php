@@ -10,6 +10,9 @@
             <h5 class="card-title mb-0 fw-bold text-dark">
                 <i class="feather-send me-2 text-primary"></i>All Dispatch Orders
             </h5>
+            <a href="{{ route('sales.dispatches.create') }}" class="btn btn-primary btn-sm fw-bold">
+                <i class="feather-plus me-1"></i>Create Dispatch Order
+            </a>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">

@@ -44,11 +44,11 @@
             <i class="feather-arrow-left me-1"></i>Back to Returns
         </a>
         <div class="d-flex gap-2">
-            @if ($return->status === 'Draft')
-                <form action="{{ route('sales.returns.complete', $return->id) }}" method="POST">
+            @if (in_array($return->status, ['Pending', 'Draft']))
+                <form action="{{ route('sales.returns.approve', $return->id) }}" method="POST" id="approveReturnForm">
                     @csrf
-                    <button type="submit" class="btn btn-sm btn-success py-1.5 px-3 fw-bold">
-                        <i class="feather-check me-1"></i>Complete Return (Restock Inventory)
+                    <button type="button" class="btn btn-sm btn-success py-1.5 px-3 fw-bold" onclick="confirmAction({ title: 'Approve Sales Return', message: 'Approve sales return {{ $return->return_number }}? This will restore returned stock to inventory.', variant: 'success', confirmText: 'Approve & Restock' }, function() { document.getElementById('approveReturnForm').submit(); })">
+                        <i class="feather-check-circle me-1"></i>Approve & Restock Inventory
                     </button>
                 </form>
             @endif

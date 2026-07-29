@@ -376,7 +376,8 @@
                                 type="number"
                                 name="quantity_reserve"
                                 id="reserve-qty-input-{{ $item->id }}"
-                                class="odoo-form-control"
+                                class="odoo-form-control reserve-qty-input"
+                                data-item-id="{{ $item->id }}"
                                 min="1"
                                 max="{{ min((int)$pendingQty, (int)$availableQty) }}"
                                 value="{{ min((int)$pendingQty, (int)$availableQty) }}"
@@ -385,6 +386,7 @@
                             <div class="text-muted fs-11 mt-1">
                                 Max: <span id="reserve-max-label-{{ $item->id }}" class="fw-bold">{{ min((int)$pendingQty, (int)$availableQty) }}</span> units
                             </div>
+                            <div class="text-danger fs-11 mt-1 fw-bold" id="reserve-qty-error-{{ $item->id }}" style="display: none; color: #dc2626 !important;"></div>
                         </div>
                     </div>
                 </div>
@@ -647,6 +649,60 @@
             $input.attr('max', maxVal);
             $input.val(maxVal > 0 ? maxVal : '');
             $(`#reserve-max-label-${itemId}`).text(maxVal);
+
+            $input.removeClass('is-invalid');
+            $(`#reserve-qty-error-${itemId}`).text('').css('display', 'none');
+        }
+
+        // Prevent default HTML5 validation tooltip so custom red text error message is displayed
+        $(document).on('show.bs.modal', '[id^="reserveModal-"]', function () {
+            $(this).find('form').attr('novalidate', 'novalidate');
+        });
+
+        // Live validation on Qty to Reserve inputs
+        $(document).on('input change keyup', '.reserve-qty-input', function () {
+            validateReserveQty($(this));
+        });
+
+        // Intercept form submit and validate on submit button click
+        $(document).on('submit', '[id^="reserveModal-"] form', function (e) {
+            const $input = $(this).find('.reserve-qty-input');
+            if ($input.length) {
+                const isValid = validateReserveQty($input);
+                if (!isValid) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    $input.focus();
+                    return false;
+                }
+            }
+        });
+
+        function validateReserveQty($input) {
+            const itemId = $input.data('item-id') || $input.attr('id').replace('reserve-qty-input-', '');
+            const $errorEl = $(`#reserve-qty-error-${itemId}`);
+            const rawVal = $input.val();
+            const val = parseFloat(rawVal);
+            const maxVal = parseFloat($(`#reserve-max-label-${itemId}`).text());
+            const effectiveMax = !isNaN(maxVal) ? maxVal : (parseFloat($input.attr('max')) || 0);
+
+            if (isNaN(val) || rawVal === '' || rawVal === null) {
+                $input.addClass('is-invalid');
+                $errorEl.text('Quantity to reserve is required.').css('display', 'block');
+                return false;
+            } else if (val < 1) {
+                $input.addClass('is-invalid');
+                $errorEl.text('Minimum 1 unit required to reserve.').css('display', 'block');
+                return false;
+            } else if (val > effectiveMax) {
+                $input.addClass('is-invalid');
+                $errorEl.text(`Quantity cannot exceed max available limit of ${effectiveMax} unit(s).`).css('display', 'block');
+                return false;
+            } else {
+                $input.removeClass('is-invalid');
+                $errorEl.text('').css('display', 'none');
+                return true;
+            }
         }
 
         $(document).ready(function () {

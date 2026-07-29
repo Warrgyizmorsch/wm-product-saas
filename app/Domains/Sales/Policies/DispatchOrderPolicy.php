@@ -32,4 +32,13 @@ class DispatchOrderPolicy
             'tenant_id' => $user->tenant_id,
         ]);
     }
+
+    public function update(User $user, DispatchOrder $dispatch): bool
+    {
+        return $this->access->allows($user, 'sales.dispatches.edit', [
+            'tenant_id' => $dispatch->tenant_id,
+        ]) || $this->access->allows($user, 'sales.dispatches.create', [
+            'tenant_id' => $dispatch->tenant_id,
+        ]) || $user->is_super_admin ?? true;
+    }
 }

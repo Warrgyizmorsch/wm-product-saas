@@ -107,6 +107,8 @@
                                             <input type="hidden" name="items[{{ $index }}][sales_order_item_id]" value="{{ $item['sales_order_item_id'] }}">
                                             <input type="hidden" name="items[{{ $index }}][material_requirement_item_id]" value="{{ $item['material_requirement_item_id'] }}">
                                             <input type="hidden" name="items[{{ $index }}][product_id]" value="{{ $item['product_id'] }}">
+                                            <input type="hidden" name="items[{{ $index }}][item_name]" value="{{ $item['product_name'] }}">
+                                            <input type="hidden" name="items[{{ $index }}][description]" value="{{ $item['description'] ?? '' }}">
                                         </td>
                                         <td>
                                             <span class="fw-semibold text-muted">{{ $item['warehouse_name'] ?: '—' }}</span>

@@ -129,30 +129,17 @@
                                     </button>
 
                                     {{-- Approve --}}
-                                    <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST"
-                                          class="d-inline-flex flex-shrink-0"
-                                          onsubmit="return confirm('{{ __('purchase.confirm_approve_po') }}')">
+                                    <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST" class="d-inline-flex flex-shrink-0" id="approvePoForm_{{ $order->id }}">
                                         @csrf
-                                        <button type="submit"
-                                                class="action-dropdown-btn action-btn-approve"
-                                                title="Approve"
-                                                data-bs-toggle="tooltip">
+                                        <button type="button" class="action-dropdown-btn action-btn-approve" title="Approve" data-bs-toggle="tooltip" onclick="confirmAction({ title: 'Approve PO', message: '{{ __('purchase.confirm_approve_po') }}', variant: 'success', confirmText: 'Approve' }, function() { document.getElementById('approvePoForm_{{ $order->id }}').submit(); })">
                                             <i class="feather feather-check-circle"></i>
                                         </button>
                                     </form>
 
-                                    {{-- Reject --}}
-                                    <form action="{{ route('purchase.orders.reject', $order->id) }}" method="POST"
-                                          class="d-inline-flex flex-shrink-0"
-                                          onsubmit="return confirm('{{ __('purchase.confirm_reject_po') }}')">
-                                        @csrf
-                                        <button type="submit"
-                                                class="action-dropdown-btn action-btn-reject"
-                                                title="Reject"
-                                                data-bs-toggle="tooltip">
-                                            <i class="feather feather-x-circle"></i>
-                                        </button>
-                                    </form>
+                                     {{-- Reject --}}
+                                     <button type="button" class="action-dropdown-btn action-btn-reject flex-shrink-0" title="Reject" data-bs-toggle="tooltip" onclick="openRejectModal('{{ route('purchase.orders.reject', $order->id) }}', '{{ $order->purchase_order_number }}')">
+                                         <i class="feather feather-x-circle"></i>
+                                     </button>
 
                                     {{-- More --}}
                                     <div class="flex-shrink-0">
@@ -163,11 +150,10 @@
                                                 </a>
                                             </li>
                                             <li>
-                                                <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST"
-                                                      onsubmit="return confirm('{{ __('purchase.confirm_delete_po') }}')">
+                                                <form action="{{ route('purchase.orders.destroy', $order->id) }}" method="POST" id="deletePoForm_{{ $order->id }}">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="dropdown-item py-2 text-danger">
+                                                    <button type="button" class="dropdown-item py-2 text-danger" onclick="confirmAction({ title: 'Delete PO', message: '{{ __('purchase.confirm_delete_po') }}', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deletePoForm_{{ $order->id }}').submit(); })">
                                                         <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
                                                     </button>
                                                 </form>
@@ -250,6 +236,22 @@
 
 @push('scripts')
 <script>
+    window.openRejectModal = function(actionUrl, docNumber = '') {
+        $('#rejectActionForm').attr('action', actionUrl);
+        if (docNumber) {
+            $('#rejectModalDocNumber').text('(' + docNumber + ')');
+        } else {
+            $('#rejectModalDocNumber').text('');
+        }
+        $('#rejectionReasonInput').val('');
+        const modalEl = document.getElementById('rejectActionModal');
+        let modal = bootstrap.Modal.getInstance(modalEl);
+        if (!modal) {
+            modal = new bootstrap.Modal(modalEl);
+        }
+        modal.show();
+    };
+
     $(document).ready(function () {
         $('.select-all').on('change', function () {
             $('.row-checkbox').prop('checked', $(this).prop('checked'));
@@ -283,4 +285,35 @@
         }
     });
 </script>
+
+<!-- Rejection Reason Modal -->
+<div class="modal fade" id="rejectActionModal" tabindex="-1" aria-labelledby="rejectActionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3">
+            <form id="rejectActionForm" method="POST" action="">
+                @csrf
+                <div class="modal-header bg-soft-danger text-danger border-bottom-0">
+                    <h5 class="modal-title fw-bold" id="rejectActionModalLabel">
+                        <i class="feather-x-circle me-2"></i>Reject Purchase Order <span id="rejectModalDocNumber" class="text-dark"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted fs-12 mb-3">Please specify the reason for rejecting this purchase order. This reason will be saved in audit history and displayed on details screen.</p>
+                    
+                    <div class="mb-3 text-start">
+                        <label for="rejectionReasonInput" class="form-label fw-bold text-dark fs-12 mb-1">Rejection Reason / Remarks <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="rejectionReasonInput" name="rejection_reason" rows="4" placeholder="Enter reason for rejection (e.g., Price mismatch, Terms unacceptable, Duplicate order, etc.)..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top-0 px-4 py-3">
+                    <button type="button" class="btn btn-light btn-sm border text-uppercase fs-11 fw-bold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold text-uppercase fs-11" style="background-color: #ea580c; border-color: #ea580c;">
+                        <i class="feather-x-circle me-1"></i> Confirm Rejection
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endpush

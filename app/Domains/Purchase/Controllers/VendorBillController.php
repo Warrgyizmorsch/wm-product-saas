@@ -62,9 +62,8 @@ class VendorBillController extends Controller
 
         $vendors = Vendor::where('tenant_id', $tenantId)->where('status', 'active')->get();
         $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
-        $availableAdvance = $selectedGrn ? $this->billService->getAvailableVendorAdvance($selectedGrn->vendor_id, $tenantId) : 0.0;
 
-        return view('modules.purchase.bills.create', compact('selectedGrn', 'vendors', 'warehouses', 'availableAdvance'));
+        return view('modules.purchase.bills.create', compact('selectedGrn', 'vendors', 'warehouses'));
     }
 
     public function store(Request $request)
@@ -77,10 +76,9 @@ class VendorBillController extends Controller
             'purchase_order_id' => 'nullable|integer',
             'goods_receipt_note_id' => 'nullable|integer',
             'vendor_id' => 'required|integer|exists:vendors,id',
-            'vendor_bill_number' => 'nullable|string|max:255',
+            'vendor_bill_number'    => 'nullable|string|max:255',
             'vendor_invoice_number' => 'nullable|string|max:255',
-            'use_vendor_advance' => 'nullable|boolean',
-            'notes' => 'nullable|string',
+            'notes'                 => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'nullable|integer',
             'items.*.purchase_order_item_id' => 'nullable|integer',

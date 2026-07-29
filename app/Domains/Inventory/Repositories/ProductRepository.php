@@ -66,6 +66,15 @@ class ProductRepository
             'stockReservations.warehouse'
         ]);
 
+        if ($product->variation_type === 'Variant') {
+            $variantIds = $product->variants->pluck('id')->push($product->id);
+            $transactions = \App\Domains\Inventory\Models\StockTransaction::with(['warehouse', 'product'])
+                ->whereIn('product_id', $variantIds)
+                ->latest()
+                ->get();
+            $product->setRelation('stockTransactions', $transactions);
+        }
+
         return $product;
     }
 

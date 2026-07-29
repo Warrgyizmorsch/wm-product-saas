@@ -28,6 +28,12 @@ class VendorPaymentAllocation extends BaseModel
         return $this->belongsTo(VendorPayment::class, 'vendor_payment_id');
     }
 
+    // Alias for use in whereHas() queries
+    public function vendorPayment(): BelongsTo
+    {
+        return $this->belongsTo(VendorPayment::class, 'vendor_payment_id');
+    }
+
     public function bill(): BelongsTo
     {
         return $this->belongsTo(VendorBill::class, 'vendor_bill_id');

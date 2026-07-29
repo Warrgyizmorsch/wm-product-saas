@@ -108,4 +108,35 @@ class SalesReturnController extends Controller
 
         return view('modules.sales.returns.show', compact('return'));
     }
+
+    public function approve(int $id): RedirectResponse
+    {
+        $returnOrder = $this->returnRepo->find($id);
+        if (!$returnOrder) abort(404);
+        $this->authorize('update', $returnOrder);
+
+        if ($returnOrder->status !== 'Pending') {
+            return redirect()->back()->with('error', 'Only Pending Sales Returns can be approved.');
+        }
+
+        DB::transaction(function () use ($returnOrder) {
+            $tenantId = $returnOrder->tenant_id ?: (tenant_id() ?? 1);
+
+            foreach ($returnOrder->items as $item) {
+                \App\Domains\Inventory\Services\StockService::recordInflow(
+                    $tenantId,
+                    (int)$item->product_id,
+                    (int)$item->warehouse_id,
+                    (float)$item->quantity,
+                    (float)$item->unit_price,
+                    'SalesReturn',
+                    (int)$returnOrder->id
+                );
+            }
+
+            $returnOrder->update(['status' => 'Completed']);
+        });
+
+        return redirect()->route('sales.returns.show', $returnOrder->id)->with('success', "Sales Return {$returnOrder->return_number} approved and stock restored to inventory successfully.");
+    }
 }

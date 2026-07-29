@@ -39,6 +39,7 @@ class PurchaseOrder extends BaseModel
         'tax_amount',
         'grand_total',
         'status', // Draft, Approved, Cancelled
+        'rejection_reason',
         'notes',
         'created_by',
     ];

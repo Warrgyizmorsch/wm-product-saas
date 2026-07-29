@@ -23,20 +23,15 @@
 
     {{-- Approve / Reject inside drawer --}}
     <div class="d-flex gap-2 mt-3">
-        <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST"
-              class="d-inline" onsubmit="return confirm('Approve this Purchase Order?')">
+        <form action="{{ route('purchase.orders.approve', $order->id) }}" method="POST" class="d-inline" id="approvePoDrawerForm_{{ $order->id }}">
             @csrf
-            <button type="submit" class="btn btn-sm btn-success px-3">
+            <button type="button" class="btn btn-sm btn-success px-3" onclick="confirmAction({ title: 'Approve PO', message: 'Approve this Purchase Order?', variant: 'success', confirmText: 'Approve' }, function() { document.getElementById('approvePoDrawerForm_{{ $order->id }}').submit(); })">
                 <i class="feather-check-circle me-1"></i> Approve
             </button>
         </form>
-        <form action="{{ route('purchase.orders.reject', $order->id) }}" method="POST"
-              class="d-inline" onsubmit="return confirm('Reject this Purchase Order?')">
-            @csrf
-            <button type="submit" class="btn btn-sm btn-danger px-3">
-                <i class="feather-x-circle me-1"></i> Reject
-            </button>
-        </form>
+        <button type="button" class="btn btn-sm btn-danger px-3" onclick="openRejectModal('{{ route('purchase.orders.reject', $order->id) }}', '{{ $order->purchase_order_number }}')">
+            <i class="feather-x-circle me-1"></i> Reject
+        </button>
     </div>
 </div>
 

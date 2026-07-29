@@ -67,7 +67,7 @@
     @push('scripts')
         <script>
             $(document).ready(function() {
-                // Custom toggle handler to prevent Bootstrap double-event conflict
+                // Custom toggle handler to prevent Bootstrap double-event conflict & auto-detect position
                 $(document).on('click', '.dropdown-toggle-custom', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -75,12 +75,44 @@
                     var parent = $(this).closest('.dropdown');
                     var menu = parent.find('.dropdown-menu');
                     
+                    var willShow = !menu.hasClass('show');
+                    
                     // Close other open dropdowns
                     $('.dropdown-menu.show').not(menu).removeClass('show');
                     $('.dropdown.show').not(parent).removeClass('show');
                     
-                    parent.toggleClass('show');
-                    menu.toggleClass('show');
+                    if (willShow) {
+                        var btn = $(this);
+                        var btnOffset = btn.offset();
+                        var btnHeight = btn.outerHeight();
+                        var menuHeight = menu.outerHeight() || 150;
+                        var windowScrollTop = $(window).scrollTop();
+                        var windowHeight = $(window).height();
+                        
+                        var spaceBelow = windowHeight - (btnOffset.top - windowScrollTop + btnHeight);
+                        
+                        if (spaceBelow < menuHeight + 20 && (btnOffset.top - windowScrollTop) > menuHeight) {
+                            menu.css({
+                                'top': 'auto',
+                                'bottom': '100%',
+                                'margin-bottom': '6px',
+                                'margin-top': '0'
+                            });
+                        } else {
+                            menu.css({
+                                'top': '100%',
+                                'bottom': 'auto',
+                                'margin-top': '6px',
+                                'margin-bottom': '0'
+                            });
+                        }
+                        
+                        parent.addClass('show');
+                        menu.addClass('show');
+                    } else {
+                        parent.removeClass('show');
+                        menu.removeClass('show');
+                    }
                 });
                 
                 // Close dropdown when clicking outside

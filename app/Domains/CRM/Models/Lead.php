@@ -17,6 +17,17 @@ class Lead extends Model
 {
     use BelongsToTenant, HasFactory, SoftDeletes;
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($lead) {
+            if (empty($lead->lead_owner_id) && auth()->check()) {
+                $lead->lead_owner_id = auth()->id();
+            }
+        });
+    }
+
     protected $fillable = [
         'tenant_id',
         'lead_owner_id',
@@ -42,6 +53,7 @@ class Lead extends Model
         'next_followup_date',
         'is_customer',
         'documents',
+        'additional_contacts',
     ];
 
     protected $casts = [
@@ -53,6 +65,7 @@ class Lead extends Model
         'product_ids' => 'array',
         'product_items' => 'array',
         'documents' => 'array',
+        'additional_contacts' => 'array',
     ];
 
     /**

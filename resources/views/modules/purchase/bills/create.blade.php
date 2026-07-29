@@ -28,27 +28,6 @@
                 </div>
             </div>
 
-            @php
-                $availAdv = max($availableAdvance ?? 0, $selectedGrn->purchaseOrder?->total_advance_paid ?? 0);
-            @endphp
-
-            @if($availAdv > 0)
-                <div class="alert alert-info border-info p-3 mb-4 rounded shadow-sm">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                        <div>
-                            <strong class="text-dark fs-13"><i class="feather-info text-info me-1.5"></i>Vendor Advance Credit Available:</strong>
-                            <span class="text-success fw-bold font-monospace fs-14 ms-1">₹{{ number_format($availAdv, 2) }}</span>
-                            <small class="text-muted d-block fs-11 mt-0.5">Check the toggle option to automatically apply and deduct advance credit on this bill.</small>
-                        </div>
-                        <div class="form-check form-switch fs-14 bg-white p-2 px-3 rounded border shadow-sm">
-                            <input class="form-check-input ms-0 me-2" type="checkbox" name="use_vendor_advance" value="1" id="useVendorAdvance" checked style="cursor: pointer;">
-                            <label class="form-check-label fw-bold text-dark" for="useVendorAdvance" style="cursor: pointer;">
-                                Deduct Advance Credit (₹{{ number_format($availAdv, 2) }})
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            @endif
 
             <div class="row g-3 mb-4">
                 <div class="col-md-4">

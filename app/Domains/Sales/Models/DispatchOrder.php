@@ -42,6 +42,18 @@ class DispatchOrder extends BaseModel
         return $this->belongsTo(SalesOrder::class, 'sales_order_id');
     }
 
+    public function customer()
+    {
+        return $this->hasOneThrough(
+            \App\Domains\CRM\Models\Customer::class,
+            SalesOrder::class,
+            'id',
+            'id',
+            'sales_order_id',
+            'customer_id'
+        );
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(DispatchOrderItem::class, 'dispatch_order_id');

@@ -23,11 +23,10 @@
                     </a>
                 </li>
                 <li>
-                    <form action="{{ route('purchase.requisitions.destroy', $requisition->id) }}" method="POST"
-                          onsubmit="return confirm('{{ __('purchase.confirm_delete') }}')">
+                    <form action="{{ route('purchase.requisitions.destroy', $requisition->id) }}" method="POST" class="d-inline" id="deletePrShowForm">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="dropdown-item py-2 text-danger">
+                        <button type="button" class="dropdown-item py-2 text-danger" onclick="confirmAction({ title: 'Delete Requisition', message: '{{ __('purchase.confirm_delete') }}', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deletePrShowForm').submit(); })">
                             <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
                         </button>
                     </form>
@@ -69,6 +68,18 @@
                     </span>
                 </div>
             </div>
+
+            @if ($requisition->status === 'Cancelled' && !empty($requisition->rejection_reason))
+                <div class="alert alert-danger border-0 border-start border-4 border-danger m-4 mb-0 rounded-3 shadow-sm bg-soft-danger">
+                    <div class="d-flex align-items-top">
+                        <i class="feather-x-circle fs-18 text-danger me-3 mt-0.5"></i>
+                        <div>
+                            <h6 class="fw-bold text-danger mb-1">Requisition Rejected / Cancelled</h6>
+                            <p class="fs-13 text-dark mb-0"><strong>Reason:</strong> {{ $requisition->rejection_reason }}</p>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             <!-- Summary Block and Links -->
             <div class="px-4 py-4 border-bottom bg-light-50">

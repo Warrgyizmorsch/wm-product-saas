@@ -45,18 +45,114 @@
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.contact_email')" name="email" inputType="email" :value="old('email', $lead->email)" placeholder="email@address.com" />
 
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $lead->phone)" :placeholder="__('crm.contact_phone')" />
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.contact_phone')" name="phone" :value="old('phone', $lead->phone)" :placeholder="__('crm.contact_phone')" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
 
                             <x-ui.odoo-form-ui type="select" :label="__('crm.lead_owner')" name="lead_owner_id">
                                 <option value="">{{ __('crm.select_owner_unassigned') }}</option>
                                 @foreach ($users as $user)
-                                    <option value="{{ $user->id }}" @selected(old('lead_owner_id', $lead->lead_owner_id) == $user->id)>
+                                    <option value="{{ $user->id }}" @selected(old('lead_owner_id', $lead->lead_owner_id ?? auth()->id()) == $user->id)>
                                         {{ $user->name }}
                                     </option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
+
+                            @php
+                                $savedAddlContacts = old('additional_contacts', $lead->additional_contacts ?: []);
+                            @endphp
+
+                            <style>
+                                .addl-contact-card .odoo-form-label {
+                                    width: 85px !important;
+                                    min-width: 85px !important;
+                                    white-space: nowrap !important;
+                                    padding-right: 6px !important;
+                                }
+                            </style>
+
+                            <div class="my-3 border-top pt-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <h6 class="fw-bold text-dark mb-0 fs-13">Additional Contacts</h6>
+                                        <span class="badge bg-soft-primary text-primary rounded-circle px-2 py-0.5 font-monospace fs-11" id="addlContactCountBadge">{{ count($savedAddlContacts) }}</span>
+                                    </div>
+                                    <button type="button" class="btn btn-xs btn-primary fw-bold px-2.5 py-1 text-uppercase text-white d-inline-flex align-items-center" id="cloneContactMainBtn" style="border-radius: 4px; font-size: 11px;">
+                                        <i class="feather-plus me-1 fs-12"></i> CLONE CONTACT
+                                    </button>
+                                </div>
+
+                                <div id="additionalContactsRepeaterContainer" class="d-flex flex-column gap-2">
+                                    @forelse($savedAddlContacts as $idx => $ac)
+                                        <div class="addl-contact-card p-2 px-3 mb-1 bg-white position-relative shadow-2xs" style="border: 1.5px solid var(--bs-primary) !important; border-radius: 8px !important;">
+                                            <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
+                                                <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> Contact Person #<span class="contact-num">{{ $loop->iteration }}</span></span>
+                                                <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="Delete Contact" style="width: 22px; height: 22px; border-radius: 50%;">
+                                                    <i class="feather-trash-2 text-danger fs-11"></i>
+                                                </button>
+                                            </div>
+                                            <div class="row g-2">
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="input" label="Name" name="additional_contacts[{{ $idx }}][name]" :value="$ac['name'] ?? ''" placeholder="Contact Name" class="contact-name-input" />
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <x-ui.odoo-form-ui type="input" label="Phone No." name="additional_contacts[{{ $idx }}][phone]" :value="$ac['phone'] ?? ''" placeholder="Phone Number" class="contact-phone-input" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                                                </div>
+                                                <div class="col-md-12">
+                                                    <x-ui.odoo-form-ui type="input" label="Email" name="additional_contacts[{{ $idx }}][email]" inputType="email" :value="$ac['email'] ?? ''" placeholder="Email" class="contact-email-input" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @empty
+                                    @endforelse
+                                </div>
+                            </div>
                             
-                            <!-- Ultra Compact Product & Quantity Repeater Table -->
+                            <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.address_details') }}</h6>
+
+                            <x-ui.odoo-form-ui type="textarea" :label="__('crm.street_address')" name="address" rows="3" :placeholder="__('crm.street_address_placeholder')">{{ old('address', $lead->address) }}</x-ui.odoo-form-ui>
+
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.country')" name="country" :value="old('country', $lead->country)" :placeholder="__('crm.country')" />
+
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.state')" name="state" :value="old('state', $lead->state)" :placeholder="__('crm.state')" />
+
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.city')" name="city" :value="old('city', $lead->city)" :placeholder="__('crm.city')" />
+                        </div>
+
+                        <!-- Right Column: Requirements, Lead Classification, Products & Revenue -->
+                        <div class="col-lg-6">
+                            <h6 class="fw-bold text-primary mb-3">{{ __('crm.requirements') }}</h6>
+
+                            <x-ui.odoo-form-ui type="textarea" :label="__('crm.requirements')" name="requirement" rows="3" :placeholder="__('crm.requirements_placeholder')">{{ old('requirement', $lead->requirement) }}</x-ui.odoo-form-ui>
+
+                            <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.lead_classification') }}</h6>
+
+                            <x-ui.odoo-form-ui type="input" :label="__('crm.industry_type')" name="industry_type" :value="old('industry_type', $lead->industry_type)" :placeholder="__('crm.industry_type')" />
+
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.source')" name="source">
+                                <option value="">{{ __('crm.select_option') }}</option>
+                                <option value="Cold Call" @selected(old('source', $lead->source) === 'Cold Call')>{{ __('crm.sources.Cold Call') }}</option>
+                                <option value="Employee Referral" @selected(old('source', $lead->source) === 'Employee Referral')>{{ __('crm.sources.Employee Referral') }}</option>
+                                <option value="Partner" @selected(old('source', $lead->source) === 'Partner')>{{ __('crm.sources.Partner') }}</option>
+                                <option value="Web Search" @selected(old('source', $lead->source) === 'Web Search')>{{ __('crm.sources.Web Search') }}</option>
+                                <option value="Advertisement" @selected(old('source', $lead->source) === 'Advertisement')>{{ __('crm.sources.Advertisement') }}</option>
+                                <option value="Trade Show" @selected(old('source', $lead->source) === 'Trade Show')>{{ __('crm.sources.Trade Show') }}</option>
+                            </x-ui.odoo-form-ui>
+
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.priority')" name="priority">
+                                <option value="">{{ __('crm.select_option') }}</option>
+                                <option value="Low" @selected(old('priority', $lead->priority) === 'Low')>{{ __('crm.priorities.Low') }}</option>
+                                <option value="Medium" @selected(old('priority', $lead->priority) === 'Medium')>{{ __('crm.priorities.Medium') }}</option>
+                                <option value="High" @selected(old('priority', $lead->priority) === 'High')>{{ __('crm.priorities.High') }}</option>
+                                <option value="Urgent" @selected(old('priority', $lead->priority) === 'Urgent')>{{ __('crm.priorities.Urgent') }}</option>
+                            </x-ui.odoo-form-ui>
+
+                            <x-ui.odoo-form-ui type="select" :label="__('crm.segment')" name="segment">
+                                <option value="">{{ __('crm.select_option') }}</option>
+                                <option value="SMB" @selected(old('segment', $lead->segment) === 'SMB')>{{ __('crm.segments.SMB') }}</option>
+                                <option value="Mid-Market" @selected(old('segment', $lead->segment) === 'Mid-Market')>{{ __('crm.segments.Mid-Market') }}</option>
+                                <option value="Enterprise" @selected(old('segment', $lead->segment) === 'Enterprise')>{{ __('crm.segments.Enterprise') }}</option>
+                            </x-ui.odoo-form-ui>
+
+                            <!-- Ultra Compact Product & Quantity Repeater Table (On Right Side) -->
                             <style>
                                 #productItemsTable {
                                     table-layout: fixed !important;
@@ -98,7 +194,7 @@
                                 }
                             </style>
 
-                            <div class="mb-3" id="productItemsContainer">
+                            <div class="mb-3 mt-4" id="productItemsContainer">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <label class="form-label fw-bold text-dark fs-12 mb-0">
                                         <i class="feather-package me-1 text-primary"></i>{{ __('crm.product') }} & Quantity
@@ -183,7 +279,7 @@
                                                         </select>
                                                     </td>
                                                     <td class="py-1 px-1 align-top">
-                                                        <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input @error('items.'.$idx.'.quantity') is-invalid @enderror" value="{{ $item['quantity'] ?? 1 }}" min="1" step="1" required>
+                                                        <input type="number" name="items[{{ $idx }}][quantity]" class="form-control form-control-sm text-center qty-row-input @error('items.'.$idx.'.quantity') is-invalid @enderror" value="{{ $item['quantity'] ?? 1 }}" min="1" step="1">
                                                         @error('items.'.$idx.'.quantity')
                                                             <div class="text-danger fs-11 mt-1 fw-semibold text-center qty-error-msg">{{ $message }}</div>
                                                         @enderror
@@ -242,50 +338,6 @@
                             <x-ui.odoo-form-ui type="input" :label="__('crm.expected_amount')" name="expected_amount" inputType="number" :value="old('expected_amount', $lead->expected_amount)" min="0" step="0.01" :placeholder="__('crm.expected_amount_placeholder')" />
 
                             <x-ui.odoo-form-ui type="input" :label="__('crm.expected_sale')" name="expected_sale_date" inputType="date" :value="old('expected_sale_date', $lead->expected_sale_date ? $lead->expected_sale_date->format('Y-m-d') : '')" />
-
-                            <x-ui.odoo-form-ui type="textarea" :label="__('crm.requirements')" name="requirement" rows="3" :placeholder="__('crm.requirements_placeholder')">{{ old('requirement', $lead->requirement) }}</x-ui.odoo-form-ui>
-                        </div>
-
-                        <!-- Right Column: Address Details & Lead Classification -->
-                        <div class="col-lg-6">
-                            <h6 class="fw-bold text-primary mb-3">{{ __('crm.address_details') }}</h6>
-
-                            <x-ui.odoo-form-ui type="textarea" :label="__('crm.street_address')" name="address" rows="3" :placeholder="__('crm.street_address_placeholder')">{{ old('address', $lead->address) }}</x-ui.odoo-form-ui>
-
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.country')" name="country" :value="old('country', $lead->country)" :placeholder="__('crm.country')" />
-
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.state')" name="state" :value="old('state', $lead->state)" :placeholder="__('crm.state')" />
-
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.city')" name="city" :value="old('city', $lead->city)" :placeholder="__('crm.city')" />
-
-                            <h6 class="fw-bold text-primary mb-3 mt-4">{{ __('crm.lead_classification') }}</h6>
-
-                            <x-ui.odoo-form-ui type="input" :label="__('crm.industry_type')" name="industry_type" :value="old('industry_type', $lead->industry_type)" :placeholder="__('crm.industry_type')" />
-
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.source')" name="source">
-                                <option value="">{{ __('crm.select_option') }}</option>
-                                <option value="Cold Call" @selected(old('source', $lead->source) === 'Cold Call')>{{ __('crm.sources.Cold Call') }}</option>
-                                <option value="Employee Referral" @selected(old('source', $lead->source) === 'Employee Referral')>{{ __('crm.sources.Employee Referral') }}</option>
-                                <option value="Partner" @selected(old('source', $lead->source) === 'Partner')>{{ __('crm.sources.Partner') }}</option>
-                                <option value="Web Search" @selected(old('source', $lead->source) === 'Web Search')>{{ __('crm.sources.Web Search') }}</option>
-                                <option value="Advertisement" @selected(old('source', $lead->source) === 'Advertisement')>{{ __('crm.sources.Advertisement') }}</option>
-                                <option value="Trade Show" @selected(old('source', $lead->source) === 'Trade Show')>{{ __('crm.sources.Trade Show') }}</option>
-                            </x-ui.odoo-form-ui>
-
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.priority')" name="priority">
-                                <option value="">{{ __('crm.select_option') }}</option>
-                                <option value="Low" @selected(old('priority', $lead->priority) === 'Low')>{{ __('crm.priorities.Low') }}</option>
-                                <option value="Medium" @selected(old('priority', $lead->priority) === 'Medium')>{{ __('crm.priorities.Medium') }}</option>
-                                <option value="High" @selected(old('priority', $lead->priority) === 'High')>{{ __('crm.priorities.High') }}</option>
-                                <option value="Urgent" @selected(old('priority', $lead->priority) === 'Urgent')>{{ __('crm.priorities.Urgent') }}</option>
-                            </x-ui.odoo-form-ui>
-
-                            <x-ui.odoo-form-ui type="select" :label="__('crm.segment')" name="segment">
-                                <option value="">{{ __('crm.select_option') }}</option>
-                                <option value="SMB" @selected(old('segment', $lead->segment) === 'SMB')>{{ __('crm.segments.SMB') }}</option>
-                                <option value="Mid-Market" @selected(old('segment', $lead->segment) === 'Mid-Market')>{{ __('crm.segments.Mid-Market') }}</option>
-                                <option value="Enterprise" @selected(old('segment', $lead->segment) === 'Enterprise')>{{ __('crm.segments.Enterprise') }}</option>
-                            </x-ui.odoo-form-ui>
                         </div>         </div>
                     </div>
 
@@ -352,7 +404,7 @@
                     <tr class="lead-item-row border-bottom">
                         <td class="py-1 ps-1 pe-1 align-top"></td>
                         <td class="py-1 px-1 align-top">
-                            <input type="number" name="items[${itemRowIndex}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="1" min="1" step="1" required>
+                            <input type="number" name="items[${itemRowIndex}][quantity]" class="form-control form-control-sm text-center qty-row-input" value="1" min="1" step="1">
                         </td>
                         <td class="py-1 text-center align-top pt-2">
                             <button type="button" class="btn btn-link text-danger p-0 opacity-75 remove-product-row-btn" title="Remove Product">
@@ -414,6 +466,85 @@
                     $(this).removeClass('is-invalid');
                     errDiv.addClass('d-none');
                 }
+            });
+
+            // Additional Contacts Repeater Logic matching reference UI design
+            function updateContactNumbersAndNames() {
+                var cards = $('#additionalContactsRepeaterContainer .addl-contact-card');
+                $('#addlContactCountBadge').text(cards.length);
+                cards.each(function(index) {
+                    $(this).find('.contact-num').text(index + 1);
+                    $(this).find('.contact-name-input').attr('name', 'additional_contacts[' + index + '][name]');
+                    $(this).find('.contact-email-input').attr('name', 'additional_contacts[' + index + '][email]');
+                    $(this).find('.contact-phone-input').attr('name', 'additional_contacts[' + index + '][phone]');
+                });
+            }
+
+            function addAddlContactCard(cloneValues) {
+                var count = $('#additionalContactsRepeaterContainer .addl-contact-card').length;
+                var nameVal = cloneValues ? (cloneValues.name || '') : '';
+                var emailVal = cloneValues ? (cloneValues.email || '') : '';
+                var phoneVal = cloneValues ? (cloneValues.phone || '') : '';
+
+                var html = `
+                    <div class="addl-contact-card p-2 px-3 mb-1 bg-white position-relative shadow-2xs" style="border: 1.5px solid var(--bs-primary) !important; border-radius: 8px !important;">
+                        <div class="d-flex align-items-center justify-content-between mb-1 pb-1 border-bottom">
+                            <span class="fs-11 fw-bold text-muted text-uppercase letter-spacing-1"><i class="feather-user me-1 text-primary"></i> Contact Person #<span class="contact-num">${count + 1}</span></span>
+                            <button type="button" class="btn btn-xs btn-soft-danger rounded-circle remove-contact-btn p-0 d-inline-flex align-items-center justify-content-center" title="Delete Contact" style="width: 22px; height: 22px; border-radius: 50%;">
+                                <i class="feather-trash-2 text-danger fs-11"></i>
+                            </button>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label">Name</label>
+                                    <div class="flex-grow-1">
+                                        <input type="text" name="additional_contacts[${count}][name]" class="odoo-form-control contact-name-input" value="${nameVal}" placeholder="Contact Name">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label">Phone No.</label>
+                                    <div class="flex-grow-1">
+                                        <input type="text" name="additional_contacts[${count}][phone]" class="odoo-form-control contact-phone-input" value="${phoneVal}" placeholder="Phone Number" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="odoo-form-group">
+                                    <label class="odoo-form-label">Email</label>
+                                    <div class="flex-grow-1">
+                                        <input type="email" name="additional_contacts[${count}][email]" class="odoo-form-control contact-email-input" value="${emailVal}" placeholder="Email">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                $('#additionalContactsRepeaterContainer').append(html);
+                updateContactNumbersAndNames();
+            }
+
+            // Main + CLONE CONTACT Button Handler
+            $('#cloneContactMainBtn').on('click', function() {
+                var lastCard = $('#additionalContactsRepeaterContainer .addl-contact-card').last();
+                var values = null;
+                if (lastCard.length > 0) {
+                    values = {
+                        name: lastCard.find('.contact-name-input').val(),
+                        email: lastCard.find('.contact-email-input').val(),
+                        phone: lastCard.find('.contact-phone-input').val()
+                    };
+                }
+                addAddlContactCard(values);
+            });
+
+            // Delete Contact Button Handler
+            $(document).on('click', '#additionalContactsRepeaterContainer .remove-contact-btn', function() {
+                $(this).closest('.addl-contact-card').remove();
+                updateContactNumbersAndNames();
             });
         });
     </script>

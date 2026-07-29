@@ -2,22 +2,22 @@
 
 namespace App\Domains\Sales\Controllers;
 
-use App\Domains\Sales\Models\MaterialRequirement;
-use App\Domains\Sales\Models\DispatchOrder;
-use App\Domains\Sales\Models\DispatchOrderItem;
-use App\Domains\Sales\Repositories\DispatchOrderRepository;
 use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Sales\Models\DispatchOrder;
+use App\Domains\Sales\Repositories\DispatchOrderRepository;
+use App\Domains\Sales\Services\DispatchOrderService;
 use App\Http\Controllers\Controller;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class DispatchOrderController extends Controller
 {
     public function __construct(
+        private readonly DispatchOrderService $dispatchService,
         private readonly DispatchOrderRepository $dispatchRepo
     ) {}
 
@@ -25,16 +25,8 @@ class DispatchOrderController extends Controller
     {
         $this->authorize('viewAny', DispatchOrder::class);
 
-        $dispatches = DispatchOrder::with('salesOrder.customer', 'materialRequirement')
-            ->latest()
-            ->get();
-
-        $pendingDOs = MaterialRequirement::with('salesOrder.customer')
-            ->whereNotIn('id', DispatchOrder::pluck('material_requirement_id'))
-            ->whereNotIn('status', ['Cancelled', 'Delivered'])
-            ->latest()
-            ->take(5)
-            ->get();
+        $dispatches = $this->dispatchRepo->getAllDispatches();
+        $pendingDOs = $this->dispatchRepo->getPendingDOs(5);
 
         return view('modules.sales.dispatches.index', compact('dispatches', 'pendingDOs'));
     }
@@ -44,11 +36,7 @@ class DispatchOrderController extends Controller
         $this->authorize('create', DispatchOrder::class);
 
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();
-
-        $pendingDOs = MaterialRequirement::with('salesOrder.customer')
-            ->whereNotIn('status', ['Cancelled'])
-            ->latest()
-            ->get();
+        $pendingDOs = $this->dispatchRepo->getAllPendingMaterialRequirements();
 
         return view('modules.sales.dispatches.create', compact('warehouses', 'pendingDOs'));
     }
@@ -57,46 +45,7 @@ class DispatchOrderController extends Controller
     {
         $this->authorize('create', DispatchOrder::class);
 
-        $materialRequirements = MaterialRequirement::with([
-            'salesOrder.customer',
-            'items.product',
-            'items.warehouse',
-        ])
-        ->whereNotIn('status', ['Cancelled'])
-        ->latest()
-        ->get();
-
-        $result = $materialRequirements->map(function ($requirement) {
-            $itemsData = $requirement->items->map(function ($item) {
-                $alreadyDispatched = DispatchOrderItem::whereHas('dispatchOrder', function ($q) {
-                    $q->where('status', '!=', 'Cancelled');
-                })
-                ->where('material_requirement_item_id', $item->id)
-                ->sum('quantity');
-
-                $remainingQty = max(0, (float) $item->quantity - (float) $alreadyDispatched);
-
-                return [
-                    'id' => $item->id,
-                    'product_id' => $item->product_id,
-                    'product_name' => $item->product?->name ?? 'Unknown',
-                    'sku' => $item->product?->sku ?? '',
-                    'warehouse_id' => $item->warehouse_id,
-                    'warehouse_name' => $item->warehouse?->name ?? 'Main Warehouse',
-                    'ordered_qty' => (float) $item->quantity,
-                    'dispatched_qty' => (float) $alreadyDispatched,
-                    'remaining_qty' => $remainingQty,
-                ];
-            })->filter(fn ($i) => $i['remaining_qty'] > 0)->values();
-
-            return [
-                'id' => $requirement->id,
-                'requirement_number' => $requirement->requirement_number,
-                'sales_order_number' => $requirement->salesOrder?->sales_order_number ?? 'N/A',
-                'customer_name' => $requirement->salesOrder?->customer?->name ?? 'N/A',
-                'items' => $itemsData,
-            ];
-        })->filter(fn ($do) => count($do['items']) > 0)->values();
+        $result = $this->dispatchService->getPendingMaterialRequirementsFormatted();
 
         return response()->json(['data' => $result]);
     }
@@ -120,41 +69,12 @@ class DispatchOrderController extends Controller
             'items.*.quantity'        => ['required', 'numeric', 'min:0.0001'],
         ]);
 
-        $req = MaterialRequirement::findOrFail($validated['material_requirement_id']);
-
-        $count = DispatchOrder::whereYear('created_at', now()->year)->count() + 1;
-        $dispatchNumber = 'DISP-' . now()->format('Y') . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
-
-        DB::transaction(function () use ($validated, $req, $dispatchNumber) {
-            $dispatch = DispatchOrder::create([
-                'tenant_id' => $req->tenant_id,
-                'material_requirement_id' => $req->id,
-                'sales_order_id' => $req->sales_order_id,
-                'customer_id' => $req->salesOrder?->customer_id,
-                'dispatch_number' => $dispatchNumber,
-                'dispatch_date' => $validated['dispatch_date'],
-                'status' => 'Pending',
-                'vehicle_number' => $validated['vehicle_number'] ?? null,
-                'driver_name' => $validated['driver_name'] ?? null,
-                'driver_phone' => $validated['driver_phone'] ?? null,
-                'shipping_agent' => $validated['shipping_agent'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'created_by' => Auth::id(),
-            ]);
-
-            foreach ($validated['items'] as $item) {
-                DispatchOrderItem::create([
-                    'dispatch_order_id' => $dispatch->id,
-                    'material_requirement_item_id' => $item['material_requirement_item_id'],
-                    'product_id' => $item['product_id'],
-                    'warehouse_id' => $item['warehouse_id'],
-                    'quantity' => $item['quantity'],
-                    'status' => 'Pending',
-                ]);
-            }
-        });
-
-        return redirect()->route('sales.dispatches.index')->with('success', "Dispatch Order {$dispatchNumber} created successfully.");
+        try {
+            $dispatch = $this->dispatchService->createDispatchOrder($validated, Auth::id() ?? 1);
+            return redirect()->route('sales.dispatches.index')->with('success', "Dispatch Order {$dispatch->dispatch_number} created successfully.");
+        } catch (Exception $e) {
+            return redirect()->back()->withInput()->with('error', $e->getMessage());
+        }
     }
 
     public function show(int $id): View
@@ -164,5 +84,19 @@ class DispatchOrderController extends Controller
         $this->authorize('view', $dispatch);
 
         return view('modules.sales.dispatches.show', compact('dispatch'));
+    }
+
+    public function confirm(int $id): RedirectResponse
+    {
+        $dispatch = $this->dispatchRepo->find($id);
+        if (!$dispatch) abort(404);
+        $this->authorize('update', $dispatch);
+
+        try {
+            $dispatch = $this->dispatchService->confirmDispatchOrder($dispatch);
+            return redirect()->route('sales.dispatches.show', $dispatch->id)->with('success', "Dispatch Order {$dispatch->dispatch_number} confirmed and stock deducted successfully.");
+        } catch (Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 }

@@ -165,10 +165,10 @@
                                             </a>
                                         </li>
                                         <li>
-                                            <form action="{{ route('purchase.requisitions.destroy', $req->id) }}" method="POST" onsubmit="return confirm('{{ __('purchase.confirm_delete') }}')">
+                                            <form action="{{ route('purchase.requisitions.destroy', $req->id) }}" method="POST" id="deletePrListForm_{{ $req->id }}">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="dropdown-item py-2 text-danger">
+                                                <button type="button" class="dropdown-item py-2 text-danger" onclick="confirmAction({ title: 'Delete Requisition', message: '{{ __('purchase.confirm_delete') }}', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deletePrListForm_{{ $req->id }}').submit(); })">
                                                     <i class="feather-trash-2 me-1.5"></i> {{ __('purchase.delete') }}
                                                 </button>
                                             </form>
