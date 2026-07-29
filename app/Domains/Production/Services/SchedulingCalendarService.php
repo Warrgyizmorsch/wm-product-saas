@@ -530,14 +530,42 @@ class SchedulingCalendarService
         $orderOps = $allOrderOps->get($op->production_order_id, collect());
         foreach ($orderOps as $otherOp) {
             if ($otherOp->sequence < $op->sequence) {
-                // Prior sequence must complete before this start
-                if ($otherOp->planned_finish && $op->planned_start && $otherOp->planned_finish->gt($op->planned_start)) {
-                    $conflicts[] = [
-                        'type' => 'dependency_violation',
-                        'message' => "Sequence conflict: starts before predecessor (Seq #{$otherOp->sequence}) finishes.",
-                        'severity' => 'warning',
-                        'related_ids' => [$otherOp->id],
-                    ];
+                $predOrderOp = $otherOp->orderOperation;
+                if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
+                    $setupMinutes = (float) ($predOrderOp->setup_time_planned ?? 0);
+                    $batchQty = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
+                    $lagMinutes = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
+                    $orderQty = (float) ($op->order?->quantity_ordered ?? 1);
+                    $effectiveBatchQty = min($batchQty, $orderQty);
+                    $firstBatchRunDuration = (float) $predOrderOp->processing_time_planned * $effectiveBatchQty;
+                    $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+
+                    $earliestAllowedStart = $otherOp->planned_start
+                        ? app(SchedulingService::class)->addWorkingMinutes(
+                            $otherOp->work_center_id,
+                            $otherOp->planned_start,
+                            $totalOffsetMinutes
+                        )
+                        : null;
+
+                    if ($earliestAllowedStart && $op->planned_start && $op->planned_start->lt($earliestAllowedStart)) {
+                        $conflicts[] = [
+                            'type' => 'dependency_violation',
+                            'message' => "Sequence conflict: starts before predecessor (Seq #{$otherOp->sequence}) transfer-ready time.",
+                            'severity' => 'warning',
+                            'related_ids' => [$otherOp->id],
+                        ];
+                    }
+                } else {
+                    // Prior sequence must complete before this start
+                    if ($otherOp->planned_finish && $op->planned_start && $otherOp->planned_finish->gt($op->planned_start)) {
+                        $conflicts[] = [
+                            'type' => 'dependency_violation',
+                            'message' => "Sequence conflict: starts before predecessor (Seq #{$otherOp->sequence}) finishes.",
+                            'severity' => 'warning',
+                            'related_ids' => [$otherOp->id],
+                        ];
+                    }
                 }
             }
         }
@@ -560,5 +588,24 @@ class SchedulingCalendarService
             'conflict_count' => count($conflicts),
             'conflicts' => $conflicts,
         ];
+    }
+
+    /**
+     * Helper method to retrieve conflicts for a specific scheduled operation.
+     */
+    public function getOperationConflicts(int $schedOpId): array
+    {
+        $op = ProductionScheduleOperation::with(['orderOperation', 'workCenter', 'machine', 'order'])->find($schedOpId);
+        if (!$op) {
+            return ['has_conflict' => false, 'conflicts' => []];
+        }
+
+        $allOrderOps = collect([
+            $op->production_order_id => ProductionScheduleOperation::where('production_order_id', $op->production_order_id)
+                ->with(['orderOperation', 'order'])
+                ->get()
+        ]);
+
+        return $this->evaluateConflicts($op, collect(), collect(), collect(), $allOrderOps, []);
     }
 }

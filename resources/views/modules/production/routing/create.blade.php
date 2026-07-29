@@ -136,6 +136,14 @@
                                                     <span class="fs-10 text-muted">{{ __('production.yield') }} %:</span>
                                                     <input type="number" step="any" x-bind:name="'operations['+index+'][expected_yield_percentage]'" class="odoo-table-input text-center" style="width: 60px; padding: 2px !important;" x-model="operation.expected_yield_percentage" min="0.01" max="100.00" required />
                                                 </div>
+                                                <div class="form-check me-1">
+                                                    <input type="checkbox" class="form-check-input" x-model="operation.overlap_enabled" x-bind:name="'operations['+index+'][overlap_enabled]'" x-bind:id="'ovl_' + operation.uid" value="1">
+                                                    <label class="form-check-label fs-11 text-info fw-semibold ms-1" x-bind:for="'ovl_' + operation.uid">Overlap</label>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-1.5" x-show="operation.overlap_enabled">
+                                                    <span class="fs-10 text-muted">Transfer Qty:</span>
+                                                    <input type="number" step="any" x-bind:name="'operations['+index+'][transfer_batch_quantity]'" class="odoo-table-input text-center" style="width: 70px; padding: 2px !important;" x-model="operation.transfer_batch_quantity" min="0.0001" />
+                                                </div>
                                             </div>
                                         </td>
                                         
@@ -255,6 +263,8 @@
                         expected_yield_percentage: '100.00',
                         quality_required: false,
                         is_external: false,
+                        overlap_enabled: false,
+                        transfer_batch_quantity: '0.00',
                         availableMachines: []
                     });
                     this.$nextTick(() => this.initAllOperationSelects());

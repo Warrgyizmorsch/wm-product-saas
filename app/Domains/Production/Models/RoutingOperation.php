@@ -52,6 +52,9 @@ class RoutingOperation extends BaseModel
         'parallel_group',
         'is_parallel',
         'parallel_type',
+        'overlap_enabled',
+        'transfer_batch_quantity',
+        'transfer_lag_minutes',
     ];
 
     protected $casts = [
@@ -64,6 +67,9 @@ class RoutingOperation extends BaseModel
         'machine_cost_rate'         => 'float',
         'quality_required'          => 'boolean',
         'is_external'               => 'boolean',
+        'overlap_enabled'           => 'boolean',
+        'transfer_batch_quantity'   => 'float',
+        'transfer_lag_minutes'      => 'integer',
     ];
 
     // ─── Relationships ────────────────────────────────────────────────────────

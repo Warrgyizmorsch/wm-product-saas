@@ -248,19 +248,41 @@ class CapacityPlanningService
             $oldMachineName = $schedOp->machine ? $schedOp->machine->name : 'N/A';
 
             // Validate sequence timeline rules
-            // Predecessor must finish before newStart
             $predecessor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                 ->where('sequence', '<', $schedOp->sequence)
                 ->whereNotIn('status', ['cancelled', 'skipped'])
                 ->orderBy('sequence', 'desc')
                 ->first();
 
-            if ($predecessor && $newStart->lt($predecessor->planned_finish)) {
-                throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor finishes (Predecessor finishes at: {$predecessor->planned_finish->toDateTimeString()}).");
+            if ($predecessor) {
+                $predOrderOp = $predecessor->orderOperation;
+                if ($predOrderOp && (bool) $predOrderOp->overlap_enabled) {
+                    $setupMinutes = (float) ($predOrderOp->setup_time_planned ?? 0);
+                    $batchQty = (float) ($predOrderOp->transfer_batch_quantity ?? 0);
+                    $lagMinutes = (float) ($predOrderOp->transfer_lag_minutes ?? 0);
+                    $orderQty = (float) ($order->quantity_ordered ?? 1);
+                    $effectiveBatchQty = min($batchQty, $orderQty);
+                    $firstBatchRunDuration = (float) $predOrderOp->processing_time_planned * $effectiveBatchQty;
+                    $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+
+                    $earliestAllowedStart = $this->schedulingService->addWorkingMinutes(
+                        $predecessor->work_center_id,
+                        $predecessor->planned_start,
+                        $totalOffsetMinutes
+                    );
+
+                    if ($newStart->lt($earliestAllowedStart)) {
+                        throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor transfer-ready time (Predecessor transfer-ready at: {$earliestAllowedStart->toDateTimeString()}).");
+                    }
+                } else {
+                    if ($newStart->lt($predecessor->planned_finish)) {
+                        throw new InvalidArgumentException("Reschedule conflict: Starts before predecessor finishes (Predecessor finishes at: {$predecessor->planned_finish->toDateTimeString()}).");
+                    }
+                }
             }
 
-            // Successor must start after newFinish
-            $newFinish = $newStart->copy()->addMinutes($schedOp->planned_duration_minutes);
+            // Successor must start after newFinish (or after new transfer-ready time if overlap enabled)
+            $newFinish = $newStart->copy()->addMinutes((int) ceil($schedOp->planned_duration_minutes));
 
             $successor = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                 ->where('sequence', '>', $schedOp->sequence)
@@ -268,8 +290,31 @@ class CapacityPlanningService
                 ->orderBy('sequence', 'asc')
                 ->first();
 
-            if ($successor && $newFinish->gt($successor->planned_start)) {
-                throw new InvalidArgumentException("Reschedule conflict: Finishes after successor starts (Successor starts at: {$successor->planned_start->toDateTimeString()}).");
+            if ($successor) {
+                $orderOp = $schedOp->orderOperation;
+                if ($orderOp && (bool) $orderOp->overlap_enabled) {
+                    $setupMinutes = (float) ($orderOp->setup_time_planned ?? 0);
+                    $batchQty = (float) ($orderOp->transfer_batch_quantity ?? 0);
+                    $lagMinutes = (float) ($orderOp->transfer_lag_minutes ?? 0);
+                    $orderQty = (float) ($order->quantity_ordered ?? 1);
+                    $effectiveBatchQty = min($batchQty, $orderQty);
+                    $firstBatchRunDuration = (float) $orderOp->processing_time_planned * $effectiveBatchQty;
+                    $totalOffsetMinutes = $setupMinutes + $firstBatchRunDuration + $lagMinutes;
+
+                    $earliestSuccessorStart = $this->schedulingService->addWorkingMinutes(
+                        $schedOp->work_center_id,
+                        $newStart,
+                        $totalOffsetMinutes
+                    );
+
+                    if ($successor->planned_start->lt($earliestSuccessorStart)) {
+                        throw new InvalidArgumentException("Reschedule conflict: Moving this operation delays predecessor transfer-ready time beyond successor start.");
+                    }
+                } else {
+                    if ($newFinish->gt($successor->planned_start)) {
+                        throw new InvalidArgumentException("Reschedule conflict: Finishes after successor starts (Successor starts at: {$successor->planned_start->toDateTimeString()}).");
+                    }
+                }
             }
 
             // Validate Working Day & Holiday rules

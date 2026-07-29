@@ -6,6 +6,7 @@ use App\Domains\Production\Models\ProductionWip;
 use App\Domains\Production\Models\ProductionWipTransaction;
 use App\Domains\Production\Models\ProductionOrder;
 use App\Domains\Production\Models\ProductionOrderOperation;
+use App\Domains\Production\Models\ProductionSchedule;
 use App\Domains\Production\Models\ProductionScheduleOperation;
 use App\Domains\Production\Models\RoutingOperation;
 use Illuminate\Support\Facades\DB;
@@ -345,6 +346,172 @@ class ProductionWipService
                 'triggered_by' => $userId,
             ]);
         });
+    }
+
+    /**
+     * Authoritative Central WIP Transfer Evaluator and Execution Engine.
+     * Evaluates untransferred good output on a source operation and executes
+     * sub-batch WIP transfer to the successor operation.
+     */
+    public function evaluateAndExecuteWipTransfers(int $sourceOrderOpId, ?int $userId = null): float
+    {
+        return DB::transaction(function () use ($sourceOrderOpId, $userId) {
+            $tenantId = require_tenant_id();
+            $sourceOp = ProductionOrderOperation::where('tenant_id', $tenantId)
+                ->lockForUpdate()
+                ->findOrFail($sourceOrderOpId);
+
+            $order = $sourceOp->order;
+            if (!$order || $order->isClosed() || $order->isCancelled()) {
+                return 0.0;
+            }
+
+            // Find immediate successor operation respecting sequence
+            $nextOp = ProductionOrderOperation::where('tenant_id', $sourceOp->tenant_id)
+                ->where('production_order_id', $sourceOp->production_order_id)
+                ->where('sequence', '>', $sourceOp->sequence)
+                ->orderBy('sequence', 'asc')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$nextOp) {
+                return 0.0; // Final operation has no downstream operation to transfer to
+            }
+
+            // Check operation-level active Quality Holds or failed Inspections
+            $hasQualityHold = \App\Domains\Production\Models\ProductionQualityInspection::where('tenant_id', $sourceOp->tenant_id)
+                ->where('production_order_id', $sourceOp->production_order_id)
+                ->where('production_order_operation_id', $sourceOp->id)
+                ->whereIn('status', ['hold', 'failed'])
+                ->exists();
+
+            if ($hasQualityHold) {
+                return 0.0; // Held output cannot be transferred
+            }
+
+            // Calculate untransferred good output
+            $cumulativeGood = (float) $sourceOp->quantity_produced;
+            $alreadyTransferred = (float) $sourceOp->quantity_transferred_out;
+            $untransferred = round(max(0.0, $cumulativeGood - $alreadyTransferred), 4);
+
+            $transferQty = 0.0;
+
+            if ($sourceOp->overlap_enabled && (float)$sourceOp->transfer_batch_quantity > 0) {
+                $batchSize = (float) $sourceOp->transfer_batch_quantity;
+                $eligibleBatches = floor($untransferred / $batchSize);
+                $transferQty = round($eligibleBatches * $batchSize, 4);
+
+                // If source operation is completed, transfer final remainder
+                if ($sourceOp->status === ProductionOrderOperation::STATUS_COMPLETED && $untransferred > 0) {
+                    $transferQty = $untransferred;
+                }
+            } elseif ($sourceOp->status === ProductionOrderOperation::STATUS_COMPLETED && $untransferred > 0) {
+                // Standard non-overlapping completion transfer
+                $transferQty = $untransferred;
+            }
+
+            if ($transferQty <= 0.0) {
+                return 0.0;
+            }
+
+            // Update transfer quantities
+            $sourceOp->quantity_transferred_out = round($sourceOp->quantity_transferred_out + $transferQty, 4);
+            $sourceOp->save();
+
+            $nextOp->quantity_transferred_in = round($nextOp->quantity_transferred_in + $transferQty, 4);
+            if ($nextOp->status === ProductionOrderOperation::STATUS_WAITING) {
+                $nextOp->status = ProductionOrderOperation::STATUS_READY;
+            }
+            $nextOp->save();
+
+            // Lock & update active schedule operation ONLY
+            $activeSchedOp = ProductionScheduleOperation::where('tenant_id', $sourceOp->tenant_id)
+                ->where('production_order_operation_id', $nextOp->id)
+                ->whereHas('schedule', function ($q) use ($sourceOp) {
+                    $q->where('tenant_id', $sourceOp->tenant_id)
+                      ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]);
+                })
+                ->lockForUpdate()
+                ->first();
+
+            if ($activeSchedOp && $activeSchedOp->status === ProductionScheduleOperation::STATUS_WAITING) {
+                $activeSchedOp->status = ProductionScheduleOperation::STATUS_READY;
+                $activeSchedOp->save();
+            }
+
+            // Update WIP model stage
+            $wip = ProductionWip::where('tenant_id', $sourceOp->tenant_id)
+                ->where('production_order_id', $sourceOp->production_order_id)
+                ->first();
+
+            if ($wip) {
+                $wip->update([
+                    'current_routing_operation_id' => $nextOp->routing_operation_id,
+                    'current_work_center_id' => $nextOp->work_center_id,
+                    'current_machine_id' => $nextOp->machine_id ?? $wip->current_machine_id,
+                    'available_quantity' => round($wip->available_quantity + $transferQty, 4),
+                    'last_moved_at' => now(),
+                ]);
+
+                // Create WIP Transaction Ledger
+                ProductionWipTransaction::create([
+                    'tenant_id' => $sourceOp->tenant_id,
+                    'wip_id' => $wip->id,
+                    'production_order_id' => $sourceOp->production_order_id,
+                    'production_batch_id' => $wip->production_batch_id,
+                    'from_operation_id' => $sourceOp->routing_operation_id,
+                    'to_operation_id' => $nextOp->routing_operation_id,
+                    'from_work_center_id' => $sourceOp->work_center_id,
+                    'to_work_center_id' => $nextOp->work_center_id,
+                    'machine_id' => $nextOp->machine_id,
+                    'operator_id' => $userId,
+                    'transaction_type' => 'transferred',
+                    'quantity' => $transferQty,
+                    'good_quantity' => $transferQty,
+                    'cost_before' => $wip->total_value,
+                    'cost_added' => 0.00,
+                    'cost_after' => $wip->total_value,
+                    'remarks' => "Sub-batch transfer of {$transferQty} units from Op {$sourceOp->sequence} to Op {$nextOp->sequence}.",
+                    'transaction_at' => now(),
+                    'created_by' => auth()->id() ?? $userId,
+                ]);
+
+                app(ProductionEventService::class)->writeEvent($sourceOp->tenant_id, [
+                    'production_order_id' => $sourceOp->production_order_id,
+                    'event_type' => 'WIP Transferred',
+                    'title' => 'WIP Transferred Step',
+                    'description' => "Transferred {$transferQty} units from operation {$sourceOp->sequence} to operation {$nextOp->sequence}.",
+                    'severity' => 'info',
+                    'event_source' => 'ProductionWipService',
+                    'triggered_by' => $userId,
+                ]);
+            }
+
+            return $transferQty;
+        });
+    }
+
+    /**
+     * Calculate available input WIP for downstream operations.
+     */
+    public function getAvailableInputWip(ProductionOrderOperation $op): float
+    {
+        // First operation in routing has target input based on order planned quantity
+        $isFirstOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
+            ->where('production_order_id', $op->production_order_id)
+            ->where('sequence', '<', $op->sequence)
+            ->exists();
+
+        if ($isFirstOp) {
+            $plannedTarget = (float) ($op->order?->quantity_ordered ?? 0.0);
+            $processed = (float) ($op->quantity_produced + $op->quantity_rejected);
+            return round(max(0.0, $plannedTarget - $processed), 4);
+        }
+
+        $transferredIn = (float) $op->quantity_transferred_in;
+        $processed = (float) ($op->quantity_produced + $op->quantity_rejected + $op->quantity_scrapped);
+
+        return round(max(0.0, $transferredIn - $processed), 4);
     }
 
     /**

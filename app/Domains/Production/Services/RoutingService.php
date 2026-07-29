@@ -85,7 +85,12 @@ class RoutingService
         $this->checkRoutingConflicts($dto->product_id, $dto->version, $routing->tenant_id, $id);
 
         return DB::transaction(function () use ($routing, $dto) {
-            $this->routingRepository->update($routing->id, $dto->toArray());
+            $data = $dto->toArray();
+            if (empty($data['routing_number'])) {
+                unset($data['routing_number']);
+            }
+
+            $this->routingRepository->update($routing->id, $data);
             $routing->refresh();
 
             $this->syncOperations($routing, $dto->operations, $routing->tenant_id);

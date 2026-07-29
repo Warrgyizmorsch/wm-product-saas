@@ -19,7 +19,8 @@ class MesController extends Controller
 {
     public function __construct(
         private readonly MesExecutionService $mesService
-    ) {}
+    ) {
+    }
 
     /**
      * Operator Dashboard — shows all operations assigned to or relevant for the current user.
@@ -27,8 +28,8 @@ class MesController extends Controller
     public function dashboard(Request $request)
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
-        $tenantId  = require_tenant_id();
-        $userId    = auth()->id();
+        $tenantId = require_tenant_id();
+        $userId = auth()->id();
 
         // Retrieve active schedules in this tenant with operations
         $activeSchedules = ProductionSchedule::with([
@@ -37,15 +38,15 @@ class MesController extends Controller
             'operations.machine',
             'operations.orderOperation'
         ])
-        ->where('tenant_id', $tenantId)
-        ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
-        ->orderBy('created_at', 'desc')
-        ->get();
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS])
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         // Running operations (for stopwatch timer block countdowns)
         $running = ProductionScheduleOperation::where('tenant_id', $tenantId)
             ->with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+            ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
             ->orderBy('planned_start')
             ->get();
@@ -53,7 +54,7 @@ class MesController extends Controller
         // Paused operations (for completion modals)
         $paused = ProductionScheduleOperation::where('tenant_id', $tenantId)
             ->with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+            ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
             ->orderBy('planned_start')
             ->get();
@@ -66,7 +67,7 @@ class MesController extends Controller
 
         // Active ready count (for performance sidebar tracker badge)
         $readyCount = ProductionScheduleOperation::where('tenant_id', $tenantId)
-            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+            ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_READY)
             ->count();
 
@@ -74,7 +75,12 @@ class MesController extends Controller
         $shifts = ProductionShift::where('tenant_id', $tenantId)->where('active', true)->get();
 
         return view('modules.production.mes.dashboard', compact(
-            'activeSchedules', 'running', 'paused', 'completedToday', 'readyCount', 'shifts'
+            'activeSchedules',
+            'running',
+            'paused',
+            'completedToday',
+            'readyCount',
+            'shifts'
         ));
     }
 
@@ -174,8 +180,8 @@ class MesController extends Controller
         $request->validate([
             'category' => 'required|string|max:100',
             'severity' => 'nullable|string|in:info,warning,critical',
-            'reason'   => 'required|string|max:255',
-            'remarks'  => 'nullable|string|max:1000',
+            'reason' => 'required|string|max:255',
+            'remarks' => 'nullable|string|max:1000',
         ]);
 
         try {
@@ -201,7 +207,7 @@ class MesController extends Controller
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
-        $userId   = auth()->id();
+        $userId = auth()->id();
 
         // My operator assignments
         $myAssignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])
@@ -212,19 +218,19 @@ class MesController extends Controller
 
         // Running operations
         $running = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+            ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_RUNNING)
             ->get();
 
         // Ready queue
         $ready = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+            ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_READY)
             ->get();
 
         // Paused
         $paused = ProductionScheduleOperation::with(['schedule.order.product', 'workCenter', 'machine'])
-            ->whereHas('schedule', fn ($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
+            ->whereHas('schedule', fn($q) => $q->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]))
             ->where('status', ProductionScheduleOperation::STATUS_PAUSED)
             ->get();
 
@@ -234,7 +240,11 @@ class MesController extends Controller
             ->count();
 
         return view('modules.production.mes.operator.dashboard', compact(
-            'myAssignments', 'running', 'ready', 'paused', 'completedToday'
+            'myAssignments',
+            'running',
+            'ready',
+            'paused',
+            'completedToday'
         ));
     }
 
@@ -245,7 +255,7 @@ class MesController extends Controller
     {
         abort_unless(auth()->user() && auth()->user()->hasProductionPermission('production.mes.execute'), 403);
         $tenantId = require_tenant_id();
-        $userId   = auth()->id();
+        $userId = auth()->id();
 
         $assignments = ProductionOperatorAssignment::with(['operation.order.product', 'operation.workCenter'])
             ->where('tenant_id', $tenantId)
@@ -282,7 +292,13 @@ class MesController extends Controller
         $scheduleOp = ProductionScheduleOperation::where('production_order_operation_id', $opId)->first();
 
         return view('modules.production.mes.operator.operation-execution', compact(
-            'op', 'order', 'batches', 'serials', 'assignment', 'operators', 'scheduleOp'
+            'op',
+            'order',
+            'batches',
+            'serials',
+            'assignment',
+            'operators',
+            'scheduleOp'
         ));
     }
 }

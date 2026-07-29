@@ -11,7 +11,8 @@ class ReworkService
 {
     public function __construct(
         private readonly ProductionEventService $eventService
-    ) {}
+    ) {
+    }
 
     /**
      * Create a Rework Order and operations.
@@ -21,7 +22,7 @@ class ReworkService
         return DB::transaction(function () use ($tenantId, $ncrId, $data) {
             $rework = ProductionReworkOrder::create([
                 'tenant_id' => $tenantId,
-                'rework_number' => 'RWK-'.strtoupper(uniqid()),
+                'rework_number' => 'RWK-' . strtoupper(uniqid()),
                 'ncr_id' => $ncrId,
                 'original_production_order_id' => $data['original_production_order_id'],
                 'status' => 'draft',
@@ -48,11 +49,11 @@ class ReworkService
 
             $this->eventService->writeEvent($tenantId, [
                 'production_order_id' => $rework->original_production_order_id,
-                'event_type'          => 'REWORK_CREATED',
-                'title'               => 'Rework Order Created',
-                'description'         => "Rework Order {$rework->rework_number} created for NCR #{$ncrId}.",
-                'severity'            => 'warning',
-                'event_source'        => 'ReworkService',
+                'event_type' => 'REWORK_CREATED',
+                'title' => 'Rework Order Created',
+                'description' => "Rework Order {$rework->rework_number} created for NCR #{$ncrId}.",
+                'severity' => 'warning',
+                'event_source' => 'ReworkService',
             ]);
 
             return $rework;
@@ -65,7 +66,7 @@ class ReworkService
     public function startOperation(int $reworkOpId, ?int $tenantId = null): void
     {
         $op = ProductionReworkOperation::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->when($tenantId !== null, fn($query) => $query->where('tenant_id', $tenantId))
             ->findOrFail($reworkOpId);
 
         if ($op->status === 'completed') {
@@ -104,7 +105,7 @@ class ReworkService
     {
         DB::transaction(function () use ($reworkOpId, $data, $tenantId) {
             $op = ProductionReworkOperation::query()
-                ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+                ->when($tenantId !== null, fn($query) => $query->where('tenant_id', $tenantId))
                 ->findOrFail($reworkOpId);
 
             if ($op->status === 'completed') {
@@ -146,7 +147,7 @@ class ReworkService
                 ->where('status', '!=', 'completed')
                 ->exists();
 
-            if (! $incomplete) {
+            if (!$incomplete) {
                 $rework->update(['status' => 'completed']);
 
                 // Auto-resolve NCR
@@ -156,7 +157,7 @@ class ReworkService
                         'status' => 'closed',
                         'closed_by' => auth()->id(),
                         'closed_at' => Carbon::now(),
-                        'esignature_closed' => hash('sha256', (auth()->id() ?? 'system').$ncr->id.'closed'.now()->timestamp),
+                        'esignature_closed' => hash('sha256', (auth()->id() ?? 'system') . $ncr->id . 'closed' . now()->timestamp),
                     ]);
 
                     $this->eventService->writeEvent($ncr->tenant_id, [
@@ -201,7 +202,7 @@ class ReworkService
                         $wip->available_quantity += $reworkQty;
                         $wip->save();
                     }
-                    
+
                     // Update original production order's quantity_rejected
                     $originalOrder = $rework->originalOrder;
                     if ($originalOrder) {

@@ -55,6 +55,11 @@ class ProductionOrderOperation extends BaseModel
         'parallel_group',
         'is_parallel',
         'parallel_type',
+        'overlap_enabled',
+        'transfer_batch_quantity',
+        'transfer_lag_minutes',
+        'quantity_transferred_out',
+        'quantity_transferred_in',
     ];
 
     protected $casts = [
@@ -64,11 +69,16 @@ class ProductionOrderOperation extends BaseModel
         'total_time_planned'      => 'float',
         'setup_time_actual'       => 'float',
         'processing_time_actual'  => 'float',
-        'actual_start_time'       => 'datetime',
-        'actual_end_time'         => 'datetime',
         'quantity_produced'       => 'float',
         'quantity_rejected'       => 'float',
         'quantity_scrapped'       => 'float',
+        'actual_start_time'       => 'datetime',
+        'actual_end_time'         => 'datetime',
+        'overlap_enabled'         => 'boolean',
+        'transfer_batch_quantity' => 'float',
+        'transfer_lag_minutes'    => 'integer',
+        'quantity_transferred_out'=> 'float',
+        'quantity_transferred_in' => 'float',
     ];
 
     public function order(): BelongsTo
