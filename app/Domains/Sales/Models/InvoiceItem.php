@@ -18,11 +18,15 @@ class InvoiceItem extends Model
         'material_requirement_item_id',
         'product_id',
         'warehouse_id',
+        'item_name',
+        'description',
         'quantity',
         'unit_price',
         'tax_rate',
+        'tax_amount',
         'discount',
-        'subtotal'
+        'subtotal',
+        'total_amount',
     ];
 
     public function invoice(): BelongsTo

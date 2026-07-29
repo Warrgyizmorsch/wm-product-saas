@@ -33,9 +33,16 @@ class InvoicePolicy
         ]);
     }
 
+    public function update(User $user, Invoice $invoice): bool
+    {
+        return $this->access->allows($user, 'sales.invoices.create', [
+            'tenant_id' => $invoice->tenant_id,
+        ]);
+    }
+
     public function send(User $user, Invoice $invoice): bool
     {
-        return $this->access->allows($user, 'sales.invoices.send', [
+        return $this->access->allows($user, 'sales.invoices.create', [
             'tenant_id' => $invoice->tenant_id,
         ]);
     }

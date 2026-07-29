@@ -29,7 +29,7 @@ class PostInvoiceJournal
             $salesRevenue = $this->accounts->findByCode('4010', $invoice->tenant_id);
             $taxesPayable = $this->accounts->findByCode('2020', $invoice->tenant_id);
 
-            if (!$accountsReceivable || !$salesRevenue || ($invoice->tax_total > 0 && !$taxesPayable)) {
+            if (!$accountsReceivable || !$salesRevenue || ($invoice->tax_amount > 0 && !$taxesPayable)) {
                 Log::warning('PostInvoiceJournal: missing chart of accounts, skipping auto-post', [
                     'invoice_id' => $invoice->id,
                     'tenant_id' => $invoice->tenant_id,
@@ -41,20 +41,20 @@ class PostInvoiceJournal
             $lines = [
                 [
                     'chart_of_account_id' => $accountsReceivable->id,
-                    'debit' => (float) $invoice->grand_total,
+                    'debit' => (float) $invoice->total_amount,
                     'description' => "Invoice {$invoice->invoice_number}",
                 ],
                 [
                     'chart_of_account_id' => $salesRevenue->id,
-                    'credit' => (float) $invoice->subtotal - (float) $invoice->discount,
+                    'credit' => (float) $invoice->subtotal - (float) $invoice->discount_amount,
                     'description' => "Invoice {$invoice->invoice_number}",
                 ],
             ];
 
-            if ((float) $invoice->tax_total > 0) {
+            if ((float) $invoice->tax_amount > 0) {
                 $lines[] = [
                     'chart_of_account_id' => $taxesPayable->id,
-                    'credit' => (float) $invoice->tax_total,
+                    'credit' => (float) $invoice->tax_amount,
                     'description' => "Tax on invoice {$invoice->invoice_number}",
                 ];
             }

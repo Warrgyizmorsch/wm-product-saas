@@ -230,6 +230,11 @@ class AppServiceProvider extends ServiceProvider
             \App\Domains\Accounting\Listeners\PostCogsJournal::class
         );
 
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Domains\Sales\Events\SalesReturnApproved::class,
+            \App\Domains\Accounting\Listeners\PostSalesReturnJournal::class
+        );
+
         // ── Production Policies ───────────────────────────────────────────────
         \Illuminate\Support\Facades\Gate::policy(
             \App\Domains\Production\Models\ProductionKpiTarget::class,

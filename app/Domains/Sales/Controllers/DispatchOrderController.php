@@ -21,14 +21,13 @@ class DispatchOrderController extends Controller
         private readonly DispatchOrderRepository $dispatchRepo
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', DispatchOrder::class);
 
-        $dispatches = $this->dispatchRepo->getAllDispatches();
-        $pendingDOs = $this->dispatchRepo->getPendingDOs(5);
+        $dispatches = $this->dispatchRepo->getPaginated($request->all(), 15);
 
-        return view('modules.sales.dispatches.index', compact('dispatches', 'pendingDOs'));
+        return view('modules.sales.dispatches.index', compact('dispatches'));
     }
 
     public function create(): View

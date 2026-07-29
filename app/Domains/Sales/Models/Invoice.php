@@ -3,6 +3,7 @@
 namespace App\Domains\Sales\Models;
 
 use App\Core\Database\BaseModel;
+use App\Domains\CRM\Models\Customer;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -10,6 +11,7 @@ class Invoice extends BaseModel
 {
     protected $fillable = [
         'tenant_id',
+        'customer_id',
         'sales_order_id',
         'material_requirement_id',
         'invoice_number',
@@ -17,11 +19,18 @@ class Invoice extends BaseModel
         'due_date',
         'status',
         'subtotal',
-        'tax_total',
-        'discount',
-        'grand_total',
-        'notes'
+        'tax_amount',
+        'discount_amount',
+        'total_amount',
+        'amount_paid',
+        'balance_due',
+        'notes',
     ];
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
 
     public function salesOrder(): BelongsTo
     {

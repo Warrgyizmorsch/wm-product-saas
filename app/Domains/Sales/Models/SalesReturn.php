@@ -10,15 +10,22 @@ class SalesReturn extends BaseModel
 {
     protected $fillable = [
         'tenant_id',
+        'customer_id',
         'sales_order_id',
         'material_requirement_id',
         'invoice_id',
         'return_number',
         'return_date',
         'status',
+        'total_amount',
         'total_refund_amount',
         'reason'
     ];
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\CRM\Models\Customer::class);
+    }
 
     public function salesOrder(): BelongsTo
     {

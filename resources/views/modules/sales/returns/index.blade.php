@@ -67,9 +67,18 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <span class="fw-bold">{{ $ret->salesOrder?->customer?->name ?: '—' }}</span>
+                                    <span class="fw-bold">{{ $ret->customer?->name ?: ($ret->salesOrder?->customer?->name ?: '—') }}</span>
                                 </td>
-                                <td class="text-end fw-bold text-dark">₹{{ number_format($ret->total_refund_amount, 2) }}</td>
+                                <td class="text-end fw-bold text-dark">
+                                    @php
+                                        $retTotal = $ret->total_refund_amount > 0
+                                            ? $ret->total_refund_amount
+                                            : ($ret->total_amount > 0
+                                                ? $ret->total_amount
+                                                : $ret->items->sum(fn($i) => (float)$i->quantity * (float)$i->unit_price));
+                                    @endphp
+                                    ₹{{ number_format($retTotal, 2) }}
+                                </td>
                                 <td>
                                     @php
                                         $badgeClass = 'bg-soft-secondary text-secondary';

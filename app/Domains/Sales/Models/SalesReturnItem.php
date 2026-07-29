@@ -19,7 +19,8 @@ class SalesReturnItem extends Model
         'product_id',
         'warehouse_id',
         'quantity',
-        'unit_price'
+        'unit_price',
+        'total_amount'
     ];
 
     public function salesReturn(): BelongsTo

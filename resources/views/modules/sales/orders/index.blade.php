@@ -143,29 +143,48 @@
                                 <span class="badge {{ $badgeClass }} px-2 py-0.5 fs-11 fw-semibold">{{ $order->status }}</span>
                             </td>
                             <td class="text-end pe-4">
-                                <div class="d-flex justify-content-end gap-2 align-items-center">
+                                <div class="hstack gap-2 justify-content-end align-items-center">
                                     @if ($order->status === 'Draft')
                                         <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST" class="d-inline">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-soft-success py-1 px-2 fs-11 fw-bold border-0" data-bs-toggle="tooltip" title="Confirm Order">
-                                                <i class="feather-check me-1"></i>Confirm
-                                            </button>
+                                            <x-ui.button type="submit" variant="soft-success" size="sm" icon="feather-check" class="py-1 px-2.5 fs-11 fw-bold text-uppercase border-0">
+                                                Confirm
+                                            </x-ui.button>
                                         </form>
                                     @elseif ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
-                                        <a href="{{ route('sales.material-requirements.create', ['sales_order_id' => $order->id]) }}" class="btn btn-sm btn-soft-primary py-1 px-2 fs-11 fw-bold border-0" data-bs-toggle="tooltip" title="Create Material Requirement">
-                                            <i class="feather-clipboard me-1"></i>Fulfill
-                                        </a>
+                                        <x-ui.button href="{{ route('sales.dispatches.create', ['sales_order_id' => $order->id]) }}" variant="soft-primary" size="sm" icon="feather-truck" class="py-1 px-2.5 fs-11 fw-bold text-uppercase border-0">
+                                            Fulfill
+                                        </x-ui.button>
                                     @endif
 
-                                    <a href="{{ route('sales.orders.show', $order->id) }}" class="avatar-text avatar-md bg-soft-primary text-primary" data-bs-toggle="tooltip" title="View Sales Order">
-                                        <i class="feather feather-eye"></i>
-                                    </a>
+                                    <x-ui.action-dropdown :viewUrl="route('sales.orders.show', $order->id)" id="soActions-{{ $order->id }}">
+                                        <x-ui.dropdown-item href="{{ route('sales.orders.show', $order->id) }}" icon="feather-eye me-2">
+                                            View Details
+                                        </x-ui.dropdown-item>
+                                        
+                                        @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
+                                            <x-ui.dropdown-item href="{{ route('sales.orders.edit', $order->id) }}" icon="feather-edit-2 me-2">
+                                                Edit Sales Order
+                                            </x-ui.dropdown-item>
+                                        @endif
 
-                                    @if ($order->status !== 'Shipped' && $order->status !== 'Cancelled')
-                                        <a href="{{ route('sales.orders.edit', $order->id) }}" class="avatar-text avatar-md bg-soft-warning text-warning" data-bs-toggle="tooltip" title="Edit Sales Order">
-                                            <i class="feather feather-edit-2"></i>
-                                        </a>
-                                    @endif
+                                        @if ($order->status === 'Draft')
+                                            <li>
+                                                <form action="{{ route('sales.orders.confirm', $order->id) }}" method="POST">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item fw-semibold text-success">
+                                                        <i class="feather-check-circle me-2"></i>Confirm Order
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+
+                                        @if ($order->status === 'Confirmed' || $order->status === 'Partially Shipped')
+                                            <x-ui.dropdown-item href="{{ route('sales.dispatches.create', ['sales_order_id' => $order->id]) }}" icon="feather-truck me-2" class="text-primary fw-semibold">
+                                                Fulfill / Dispatch Order
+                                            </x-ui.dropdown-item>
+                                        @endif
+                                    </x-ui.action-dropdown>
                                 </div>
                             </td>
                         </tr>

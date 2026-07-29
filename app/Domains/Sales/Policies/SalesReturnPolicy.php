@@ -33,10 +33,21 @@ class SalesReturnPolicy
         ]);
     }
 
+    public function update(User $user, SalesReturn $return): bool
+    {
+        return $this->access->allows($user, 'sales.returns.complete', ['tenant_id' => $return->tenant_id])
+            || $this->access->allows($user, 'sales.returns.create', ['tenant_id' => $return->tenant_id]);
+    }
+
+    public function approve(User $user, SalesReturn $return): bool
+    {
+        return $this->access->allows($user, 'sales.returns.complete', ['tenant_id' => $return->tenant_id])
+            || $this->access->allows($user, 'sales.returns.create', ['tenant_id' => $return->tenant_id]);
+    }
+
     public function complete(User $user, SalesReturn $return): bool
     {
-        return $this->access->allows($user, 'sales.returns.complete', [
-            'tenant_id' => $return->tenant_id,
-        ]);
+        return $this->access->allows($user, 'sales.returns.complete', ['tenant_id' => $return->tenant_id])
+            || $this->access->allows($user, 'sales.returns.create', ['tenant_id' => $return->tenant_id]);
     }
 }
