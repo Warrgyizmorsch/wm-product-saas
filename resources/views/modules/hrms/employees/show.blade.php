@@ -988,6 +988,11 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link {{ in_array($activeTabName, ['shift_overtime', 'shift-overtime']) ? 'active' : '' }}" id="shift-overtime-tab" data-bs-toggle="tab" data-bs-target="#shift-overtime-pane" type="button" role="tab" aria-controls="shift-overtime-pane" aria-selected="{{ in_array($activeTabName, ['shift_overtime', 'shift-overtime']) ? 'true' : 'false' }}">
+                    <i class="feather-clock"></i> Shift & Overtime
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link {{ in_array($activeTabName, ['penalization', 'penalties']) ? 'active' : '' }}" id="penalization-tab" data-bs-toggle="tab" data-bs-target="#penalization-pane" type="button" role="tab" aria-controls="penalization-pane" aria-selected="{{ in_array($activeTabName, ['penalization', 'penalties']) ? 'true' : 'false' }}">
                     <i class="feather-alert-triangle"></i> {{ __('hrms.employees.tab_penalties') }}
                 </button>
@@ -1835,7 +1840,7 @@
                                             {{ __('hrms.leave.app.no_requests') ?? 'No leave applications submitted by this employee yet.' }}
                                         </div>
                                     @else
-                                        <div style="overflow-x: hidden; width: 100%;">
+                                        <div class="table-responsive">
                                             <table class="table table-hover align-middle mb-0" id="leaveAppTable" style="table-layout: fixed; width: 100%;">
                                                 <thead class="table-light">
                                                     <tr>
@@ -2079,7 +2084,7 @@
                                                             @if($isAdminUser)
                                                                 <td class="text-end pe-3" style="white-space: nowrap;">
                                                                     <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" style="background-color: #8c4444 !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
+                                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="background-color: #8c4444 !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
                                                                             <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
                                                                         </button>
                                                                         <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0; background: #ffffff;">
@@ -2362,7 +2367,7 @@
                                 <div class="fw-bold mb-1">No WFH applications submitted yet.</div>
                             </div>
                         @else
-                            <div style="overflow-x: hidden; width: 100%;">
+                            <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0" id="empWfhTable" style="table-layout: fixed; width: 100%;">
                                     <thead class="table-light">
                                         <tr>
@@ -2488,7 +2493,7 @@
                                                                     <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
                                                                             type="button" 
                                                                             data-bs-toggle="dropdown" 
-                                                                            data-bs-display="static"
+                                                                            data-bs-boundary="viewport"
                                                                             aria-expanded="false"
                                                                             style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
                                                                             title="Action">
@@ -2521,7 +2526,7 @@
                                                                     <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
                                                                             type="button" 
                                                                             data-bs-toggle="dropdown" 
-                                                                            data-bs-display="static"
+                                                                            data-bs-boundary="viewport"
                                                                             aria-expanded="false"
                                                                             style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
                                                                             title="Change Status">
@@ -2639,6 +2644,350 @@
                                 </div>
                             </div>
                         @endif
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 3B. SHIFT & OVERTIME TAB -->
+            <div class="tab-pane fade {{ in_array($activeTabName, ['shift_overtime', 'shift-overtime']) ? 'show active' : '' }}" id="shift-overtime-pane" role="tabpanel" aria-labelledby="shift-overtime-tab">
+                <div class="row g-4">
+                    <!-- LEFT COLUMN: Current Shift & Weekly Pattern Details -->
+                    <div class="col-lg-4 col-12 shift-left-col">
+                        <div class="card-custom">
+                            <div class="card-custom-header">
+                                <h5 class="card-custom-title"><i class="feather-info text-primary me-1.5"></i> Current Shift Details</h5>
+                            </div>
+                            <div class="card-body p-3">
+                                <!-- Default Shift Info -->
+                                <div class="p-3 bg-light rounded border border-light-subtle">
+                                    <div class="d-flex align-items-center justify-content-between">
+                                        <h6 class="fw-bold mb-0 text-dark fs-14">
+                                            @if($employee->shift)
+                                                {{ $employee->shift->name }}
+                                            @else
+                                                No Shift Assigned
+                                            @endif
+                                        </h6>
+                                        @if($employee->shift)
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 px-2 py-0.5 rounded">Default</span>
+                                        @endif
+                                    </div>
+                                    @if($employee->shift)
+                                        <p class="text-muted fs-12 mb-0 mt-1">
+                                            <i class="feather-clock me-1"></i> Timing: {{ substr($employee->shift->start_time, 0, 5) }} - {{ substr($employee->shift->end_time, 0, 5) }}
+                                        </p>
+                                        <p class="text-muted fs-12 mb-0 mt-1">
+                                            <i class="feather-zap me-1"></i> Overtime: 
+                                            @if($employee->shift->overtime_allowed)
+                                                <span class="text-success fw-bold">Allowed</span>
+                                            @else
+                                                <span class="text-danger fw-bold">Not Allowed</span>
+                                            @endif
+                                        </p>
+                                    @endif
+                                </div>
+
+                                <!-- Weekly Pattern Details -->
+                                @if(isset($employee->weekly_pattern) && !empty($employee->weekly_pattern))
+                                    <div class="mt-3">
+                                        <span class="text-muted fs-11 text-uppercase fw-semibold mb-2 d-block">Weekly Shift Pattern</span>
+                                        <div class="list-group list-group-flush fs-12">
+                                            @php
+                                                $dayNames = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 0 => 'Sun'];
+                                            @endphp
+                                            @foreach($dayNames as $dayNum => $dayName)
+                                                @if(isset($employee->weekly_pattern[$dayNum]))
+                                                    @php
+                                                        $val = $employee->weekly_pattern[$dayNum];
+                                                        $patternShiftName = 'Off Day';
+                                                        if ($val !== 'off') {
+                                                            $ps = $shifts->firstWhere('id', $val);
+                                                            $patternShiftName = $ps ? $ps->name : 'Shift #' . $val;
+                                                        }
+                                                    @endphp
+                                                    <div class="d-flex justify-content-between align-items-center py-1">
+                                                        <span class="text-dark fw-medium">{{ $dayName }}</span>
+                                                        <span class="{{ $val === 'off' ? 'text-danger fw-semibold' : 'text-primary fw-semibold' }}">{{ $patternShiftName }}</span>
+                                                    </div>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <!-- Action Buttons: Apply Shift Change & Apply Overtime -->
+                                <div class="d-flex align-items-center gap-2 mt-3 pt-2 border-top">
+                                    <button type="button"
+                                        class="btn btn-sm btn-primary flex-grow-1 fw-bold text-uppercase d-flex align-items-center justify-content-center gap-1 px-2"
+                                        style="font-size: 11px; white-space: nowrap;"
+                                        data-bs-toggle="modal" data-bs-target="#empApplyShiftChangeModal">
+                                        <i class="feather-plus fs-12"></i> Apply Shift Change
+                                    </button>
+                                    <button type="button"
+                                        class="btn btn-sm btn-primary flex-grow-1 fw-bold text-uppercase d-flex align-items-center justify-content-center gap-1 px-2"
+                                        style="font-size: 11px; white-space: nowrap;"
+                                        data-bs-toggle="modal" data-bs-target="#empApplyOvertimeModal">
+                                        <i class="feather-plus fs-12"></i> Apply Overtime
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: Shift Change Requests & Overtime Toggle Container -->
+                    <div class="col-lg-8 col-12 shift-right-col">
+                        <!-- MAIN CARD BOX -->
+                        <div class="card-custom">
+                            <div class="card-custom-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <!-- Shift Change Title -->
+                                    <div id="shiftAppsHeaderTitle" class="d-flex align-items-center gap-2">
+                                        <h5 class="card-custom-title mb-0">
+                                            <i class="feather-git-pull-request text-primary me-1.5"></i> Shift Change Applications
+                                        </h5>
+                                        <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1 fs-11 ms-1 fw-bold">
+                                            {{ $empShiftChangeRequests->count() }} {{ $empShiftChangeRequests->count() === 1 ? 'Application' : 'Applications' }}
+                                        </span>
+                                    </div>
+                                    <!-- Overtime Title -->
+                                    <div id="overtimeAppsHeaderTitle" class="d-flex align-items-center gap-2 d-none">
+                                        <h5 class="card-custom-title mb-0">
+                                            <i class="feather-clock text-primary me-1.5"></i> Overtime Applications
+                                        </h5>
+                                        <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1 fs-11 ms-1 fw-bold">
+                                            {{ $empOvertimeRequests->count() }} {{ $empOvertimeRequests->count() === 1 ? 'Application' : 'Applications' }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <!-- View Toggle Button -->
+                                    <x-ui.button 
+                                        type="button" 
+                                        id="btnToggleShiftOvertimeView" 
+                                        variant="soft-primary" 
+                                        size="sm" 
+                                        class="fw-bold text-uppercase" 
+                                        style="font-size: 11px;"
+                                    >
+                                        <span id="toggleShiftOvertimeBtnLabel"><i class="feather-clock me-1"></i> Overtime Details</span>
+                                    </x-ui.button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                 <!-- 1. SHIFT APPLICATIONS VIEW -->
+                                <div id="shiftApplicationsViewContainer">
+                                    <div>
+                                        <table class="table table-hover align-middle mb-0" style="width:100%; table-layout: fixed;">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:13%; white-space:nowrap;">Type</th>
+                                                    <th style="width:14%; white-space:nowrap;">Effective Period</th>
+                                                    <th style="width:20%; white-space:nowrap;">Current Shift</th>
+                                                    <th style="width:18%; white-space:nowrap;">Requested Shift</th>
+                                                    <th style="width:10%; white-space:nowrap;">Status</th>
+                                                    <th class="text-end" style="width:25%; white-space:nowrap;">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($empShiftChangeRequests as $req)
+                                                    <tr>
+                                                        <td>
+                                                            <span class="badge text-uppercase fs-10" style="background-color: {{ $req->type === 'permanent' ? 'rgba(25, 135, 84, 0.1)' : ($req->type === 'recurring' ? 'rgba(13, 110, 253, 0.1)' : 'rgba(108, 117, 125, 0.1)') }}; color: {{ $req->type === 'permanent' ? '#198754' : ($req->type === 'recurring' ? '#0d6efd' : '#6c757d') }};">
+                                                                {{ $req->type }}
+                                                            </span>
+                                                            @if($req->type === 'recurring' && is_array($req->recurring_days))
+                                                                @php
+                                                                    $dayNames = [0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat'];
+                                                                    $mapped = array_map(fn($d) => $dayNames[$d] ?? '', $req->recurring_days);
+                                                                @endphp
+                                                                <div class="fs-10 text-muted mt-1 fw-medium" style="max-width: 120px; line-height: 1.2;">{{ implode(', ', $mapped) }}</div>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            <div class="fw-medium text-dark">{{ $req->start_date->format('d M Y') }}</div>
+                                                            @if($req->type === 'temporary' && $req->end_date)
+                                                                <div class="text-muted fs-11">to {{ $req->end_date->format('d M Y') }}</div>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            @if($req->currentShift)
+                                                                <div class="fw-medium text-dark">{{ $req->currentShift->name }}</div>
+                                                            @else
+                                                                <span class="badge bg-soft-secondary text-secondary">Day Off</span>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            @if($req->requestedShift)
+                                                                <div class="fw-medium text-dark">{{ $req->requestedShift->name }}</div>
+                                                            @else
+                                                                <span class="badge bg-soft-secondary text-secondary">Day Off</span>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge text-uppercase fs-10 px-2 py-1" style="white-space: nowrap; background-color: {{ $req->status === 'approved' ? 'rgba(25, 135, 84, 0.1)' : ($req->status === 'rejected' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(255, 193, 7, 0.1)') }}; color: {{ $req->status === 'approved' ? '#198754' : ($req->status === 'rejected' ? '#dc3545' : '#ffc107') }};">
+                                                                {{ $req->status }}
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <div class="d-flex align-items-center justify-content-end flex-nowrap gap-2">
+                                                                @if($isAdminUser)
+                                                                    <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="white-space:nowrap;">
+                                                                            <span>{{ $req->status === 'approved' ? 'Approved' : ($req->status === 'rejected' ? 'Rejected' : 'Pending') }}</span>
+                                                                        </button>
+                                                                        <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
+                                                                            <li>
+                                                                                <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('approve', {{ $req->id }})">
+                                                                                    Approved
+                                                                                </button>
+                                                                            </li>
+                                                                            <li>
+                                                                                <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('reject', {{ $req->id }})">
+                                                                                    Rejected
+                                                                                </button>
+                                                                            </li>
+                                                                            <li>
+                                                                                <button type="button" class="dropdown-item {{ $req->status === 'pending' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('pending', {{ $req->id }})">
+                                                                                    Pending
+                                                                                </button>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </div>
+                                                                @endif
+
+                                                                <form action="{{ route('hrms.shift-change.destroy', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this shift change request?', { title: 'Delete Shift Change Request', variant: 'danger', confirmButtonText: 'Delete' });" class="d-inline m-0">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    @if($req->status === 'approved')
+                                                                        <button type="button" class="btn btn-sm btn-light border disabled"
+                                                                                title="Approved requests cannot be deleted"
+                                                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;"
+                                                                                disabled>
+                                                                            <i class="feather-trash-2 fs-14"></i>
+                                                                        </button>
+                                                                    @else
+                                                                        <button type="submit" class="btn btn-sm btn-soft-danger border"
+                                                                                title="Delete Request"
+                                                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                                            <i class="feather-trash-2 fs-14"></i>
+                                                                        </button>
+                                                                    @endif
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="6" class="text-center py-4 text-muted fs-13">No shift change requests found.</td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <!-- 2. OVERTIME APPLICATIONS VIEW -->
+                                <div id="overtimeApplicationsViewContainer" class="d-none">
+                                    <div>
+                                        <table class="table table-hover align-middle mb-0" style="width:100%; table-layout: fixed;">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width:13%; white-space:nowrap;">Date</th>
+                                                    <th style="width:16%; white-space:nowrap;">Time Frame</th>
+                                                    <th style="width:12%; white-space:nowrap;">Req. Hours</th>
+                                                    <th style="width:11%; white-space:nowrap;">App. Hours</th>
+                                                    <th style="width:13%; white-space:nowrap;">Comp. Type</th>
+                                                    <th style="width:13%; white-space:nowrap;">Status</th>
+                                                    <th class="text-end" style="width:22%; white-space:nowrap;">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($empOvertimeRequests as $req)
+                                                    <tr>
+                                                        <td>
+                                                            <div class="fw-medium text-dark" style="white-space: nowrap;">{{ $req->date->format('d M Y') }}</div>
+                                                        </td>
+                                                        <td>
+                                                            <div class="fw-semibold text-dark">{{ substr($req->start_time, 0, 5) }} - {{ substr($req->end_time, 0, 5) }}</div>
+                                                        </td>
+                                                        <td>
+                                                            <div class="fw-bold text-dark">{{ number_format($req->duration_hours, 1) }} hrs</div>
+                                                        </td>
+                                                        <td>
+                                                            @if($req->status === 'approved' && $req->approved_duration_hours !== null)
+                                                                <div class="fw-bold text-success">{{ number_format($req->approved_duration_hours, 1) }} hrs</div>
+                                                            @else
+                                                                <span class="text-muted fs-11">-</span>
+                                                            @endif
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge text-uppercase fs-10" style="background-color: {{ $req->compensation_type === 'comp_off' ? 'rgba(13, 110, 253, 0.1)' : 'rgba(25, 135, 84, 0.1)' }}; color: {{ $req->compensation_type === 'comp_off' ? '#0d6efd' : '#198754' }};">
+                                                                {{ $req->compensation_type === 'comp_off' ? 'Comp Off' : 'Payout' }}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge text-uppercase fs-10 px-2 py-1" style="white-space: nowrap; background-color: {{ $req->status === 'approved' ? 'rgba(25, 135, 84, 0.1)' : ($req->status === 'rejected' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(255, 193, 7, 0.1)') }}; color: {{ $req->status === 'approved' ? '#198754' : ($req->status === 'rejected' ? '#dc3545' : '#ffc107') }};">
+                                                                {{ $req->status }}
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <div class="d-flex align-items-center justify-content-end flex-nowrap gap-2">
+                                                                @if($isAdminUser)
+                                                                    <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="white-space:nowrap;">
+                                                                            <span>{{ $req->status === 'approved' ? 'Approved' : ($req->status === 'rejected' ? 'Rejected' : 'Pending') }}</span>
+                                                                        </button>
+                                                                        <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
+                                                                            <li>
+                                                                                <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('approve', {{ $req->id }}, {{ $req->duration_hours }})">
+                                                                                    Approved
+                                                                                </button>
+                                                                            </li>
+                                                                            <li>
+                                                                                <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('reject', {{ $req->id }}, {{ $req->duration_hours }})">
+                                                                                    Rejected
+                                                                                </button>
+                                                                            </li>
+                                                                            <li>
+                                                                                <button type="button" class="dropdown-item {{ $req->status === 'pending' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('pending', {{ $req->id }}, {{ $req->duration_hours }})">
+                                                                                    Pending
+                                                                                </button>
+                                                                            </li>
+                                                                        </ul>
+                                                                    </div>
+                                                                @endif
+                                                                <form action="{{ route('hrms.overtime.destroy', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this overtime request?', { title: 'Delete Overtime Request', variant: 'danger', confirmButtonText: 'Delete' });" class="d-inline m-0">
+                                                                    @csrf
+                                                                    @method('DELETE')
+                                                                    @if($req->status === 'approved')
+                                                                        <button type="button" class="btn btn-sm btn-light border disabled"
+                                                                                title="Approved requests cannot be deleted"
+                                                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;"
+                                                                                disabled>
+                                                                            <i class="feather-trash-2 fs-14"></i>
+                                                                        </button>
+                                                                    @else
+                                                                        <button type="submit" class="btn btn-sm btn-soft-danger border"
+                                                                                title="Delete Request"
+                                                                                style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                                            <i class="feather-trash-2 fs-14"></i>
+                                                                        </button>
+                                                                    @endif
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="7" class="text-center py-4 text-muted fs-13">No overtime requests found.</td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4176,7 +4525,191 @@
         </div>
     </div>
 
+    <!-- EMPLOYEE PROFILE APPLY SHIFT CHANGE MODAL -->
+    <div class="modal fade" id="empApplyShiftChangeModal" tabindex="-1" aria-labelledby="empApplyShiftChangeModalLabel" aria-hidden="true" data-bs-backdrop="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form action="{{ route('hrms.shift-change.store') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                    <div class="modal-header border-bottom py-3">
+                        <h5 class="modal-title fw-bold" id="empApplyShiftChangeModalLabel">Apply Shift Change</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="select" label="Type" name="type" id="profile_shift_change_type" :required="true">
+                               <option value="temporary">Temporary (Date Range)</option>
+                               <option value="permanent">Permanent (Effective Date onwards)</option>
+                               <option value="recurring">Recurring Weekdays</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
 
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" id="profile_shift_start_date" :required="true" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
+                        </div>
+
+                        <div class="mb-3" id="profile_end_date_container">
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="End Date" name="end_date" id="profile_shift_end_date" :required="false" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
+                        </div>
+
+                        <div class="mb-3 d-none" id="profile_recurring_days_container">
+                            <label class="form-label fw-bold d-block text-dark fs-12 mb-2">Recurring Weekdays</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="recurring_days[]" value="1" id="profile_day_mon">
+                                    <label class="form-check-label fs-12 text-muted" for="profile_day_mon">Mon</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="recurring_days[]" value="2" id="profile_day_tue">
+                                    <label class="form-check-label fs-12 text-muted" for="profile_day_tue">Tue</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="recurring_days[]" value="3" id="profile_day_wed">
+                                    <label class="form-check-label fs-12 text-muted" for="profile_day_wed">Wed</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="recurring_days[]" value="4" id="profile_day_thu">
+                                    <label class="form-check-label fs-12 text-muted" for="profile_day_thu">Thu</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="recurring_days[]" value="5" id="profile_day_fri">
+                                    <label class="form-check-label fs-12 text-muted" for="profile_day_fri">Fri</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="recurring_days[]" value="6" id="profile_day_sat">
+                                    <label class="form-check-label fs-12 text-muted" for="profile_day_sat">Sat</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="recurring_days[]" value="0" id="profile_day_sun">
+                                    <label class="form-check-label fs-12 text-muted" for="profile_day_sun">Sun</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="select" label="Requested Shift" name="requested_shift_id" id="profile_shift_requested_shift_id" :required="false">
+                                <option value="">Select Shift (Empty for Day Off)</option>
+                                @foreach($shifts as $sf)
+                                    @if((int)$sf->id !== (int)$employee->shift_id)
+                                        <option value="{{ $sf->id }}">{{ $sf->name }} ({{ substr($sf->start_time, 0, 5) }} - {{ substr($sf->end_time, 0, 5) }})</option>
+                                    @endif
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="textarea" label="Reason" name="reason" id="profile_shift_reason" :required="true" class="odoo-underline-input" placeholder="Describe the reason for change..." />
+                        </div>
+
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="file" label="Attachment (Optional)" name="attachment" id="profile_shift_attachment" :required="false" />
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top py-3">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Submit Request</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- EMPLOYEE PROFILE APPLY OVERTIME MODAL -->
+    <div class="modal fade" id="empApplyOvertimeModal" tabindex="-1" aria-labelledby="empApplyOvertimeModalLabel" aria-hidden="true" data-bs-backdrop="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form action="{{ route('hrms.overtime.store') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                    <div class="modal-header border-bottom py-3">
+                        <h5 class="modal-title fw-bold" id="empApplyOvertimeModalLabel">Apply Overtime</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="Date" name="date" id="profile_ot_date" :required="true" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
+                        </div>
+
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="input" inputType="time" label="Start Time" name="start_time" id="profile_ot_start_time" :required="true" class="odoo-underline-input" value="18:00" />
+                        </div>
+
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="input" inputType="time" label="End Time" name="end_time" id="profile_ot_end_time" :required="true" class="odoo-underline-input" value="20:00" />
+                        </div>
+
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="select" label="Compensation" name="compensation_type" id="profile_ot_compensation_type" :required="true">
+                                <option value="payout">Payout (Financial Payout)</option>
+                                <option value="comp_off">Comp-Off (Credit to Leave Balance)</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="textarea" label="Reason" name="reason" id="profile_ot_reason" :required="true" class="odoo-underline-input" placeholder="Describe details of work performed..." />
+                        </div>
+
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="file" label="Attachment (Optional)" name="attachment" id="profile_ot_attachment" :required="false" />
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top py-3">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Submit Application</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- EMPLOYEE PROFILE OVERTIME DECISION MODALS -->
+    {{-- Overtime Approve Modal --}}
+    <div class="modal fade" id="empApproveOvertimeModal" tabindex="-1" aria-labelledby="empApproveOvertimeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="empApproveOvertimeModalLabel">Approve Overtime</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Approved Hours</label>
+                        <input type="number" id="empApproveHoursInput" class="form-control" step="0.5" min="0.5" placeholder="e.g. 2.0">
+                        <div class="form-text text-muted">Enter the actual hours to approve (can differ from requested hours).</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="confirmEmpApproveBtn">Approve</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Overtime Reject Modal --}}
+    <div class="modal fade" id="empRejectOvertimeModal" tabindex="-1" aria-labelledby="empRejectOvertimeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="empRejectOvertimeModalLabel">Reject Overtime</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Rejection Reason <span class="text-muted fw-normal">(optional)</span></label>
+                        <textarea id="empRejectReasonInput" class="form-control" rows="3" placeholder="Enter reason for rejection..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmEmpRejectBtn">Reject</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     @push('scripts')
 
         <script src="{{ asset('assets/vendors/js/select2.min.js') }}"></script>
@@ -4199,6 +4732,112 @@
                 $('#empApplyWfhModal').appendTo('body');
                 $('#wfhCancellationModal').appendTo('body');
                 $('#rejectWfhModal').appendTo('body');
+                $('#empApplyShiftChangeModal').appendTo('body');
+                $('#empApplyOvertimeModal').appendTo('body');
+                $('#empApproveOvertimeModal').appendTo('body');
+                $('#empRejectOvertimeModal').appendTo('body');
+
+                // Initialize select2 inside modals with dropdownParent to fix Bootstrap focus/typing issue
+                $('#empApplyShiftChangeModal select.odoo-select2, #empApplyOvertimeModal select.odoo-select2').each(function() {
+                    var $select = $(this);
+                    if ($select.hasClass('select2-hidden-accessible')) {
+                        $select.select2('destroy');
+                    }
+                    $select.select2({
+                        theme: 'bootstrap-5',
+                        dropdownParent: $select.closest('.modal-content'),
+                        width: '100%'
+                    });
+                });
+
+                // Shift & Overtime Profile Event Listeners & Functions (Select2 compatible)
+                $(document).on('change', '#profile_shift_change_type', function() {
+                    const val = $(this).val();
+                    const $endDateContainer = $('#profile_end_date_container');
+                    const $recurringContainer = $('#profile_recurring_days_container');
+
+                    if (val === 'temporary') {
+                        $endDateContainer.removeClass('d-none');
+                        $recurringContainer.addClass('d-none');
+                    } else if (val === 'permanent') {
+                        $endDateContainer.addClass('d-none');
+                        $recurringContainer.addClass('d-none');
+                    } else if (val === 'recurring') {
+                        $endDateContainer.addClass('d-none');
+                        $recurringContainer.removeClass('d-none');
+                    }
+                });
+
+                // Auto-fill end date when start date is selected (matching Leave and WFH)
+                $('#profile_shift_start_date').on('change', function() {
+                    var startDate = $(this).val();
+                    if (startDate) {
+                        $('#profile_shift_end_date').val(startDate);
+                    }
+                });
+
+                window.handleEmpShiftDecision = function(action, requestId) {
+                    const form = $('<form>', {
+                        method: 'POST',
+                        action: `{{ url('hrms/shift-change') }}/${requestId}/update-status`
+                    });
+                    form.append($('<input>', { type: 'hidden', name: '_token', value: '{{ csrf_token() }}' }));
+                    form.append($('<input>', { type: 'hidden', name: 'action', value: action === 'approve' ? 'approved' : (action === 'reject' ? 'rejected' : 'pending') }));
+                    if (action === 'reject') {
+                        const reason = prompt('Please enter a rejection reason:');
+                        if (reason === null) return;
+                        form.append($('<input>', { type: 'hidden', name: 'rejection_reason', value: reason }));
+                    }
+                    $('body').append(form);
+                    form.submit();
+                };
+
+                var _pendingEmpOvertimeDecisionId = null;
+
+                window.handleEmpOvertimeDecision = function(action, requestId, requestedHours) {
+                    _pendingEmpOvertimeDecisionId = requestId;
+
+                    if (action === 'approve') {
+                        $('#empApproveHoursInput').val(requestedHours);
+                        var modal = new bootstrap.Modal(document.getElementById('empApproveOvertimeModal'));
+                        modal.show();
+                    } else if (action === 'reject') {
+                        $('#empRejectReasonInput').val('');
+                        var modal = new bootstrap.Modal(document.getElementById('empRejectOvertimeModal'));
+                        modal.show();
+                    } else if (action === 'pending') {
+                        submitEmpOvertimeForm('pending', '', '');
+                    }
+                };
+
+                function submitEmpOvertimeForm(action, approvedHours, reason) {
+                    const form = $('<form>', {
+                        method: 'POST',
+                        action: `{{ url('hrms/overtime') }}/${_pendingEmpOvertimeDecisionId}/update-status`
+                    });
+                    form.append($('<input>', { type: 'hidden', name: '_token', value: '{{ csrf_token() }}' }));
+                    form.append($('<input>', { type: 'hidden', name: 'action', value: action }));
+                    form.append($('<input>', { type: 'hidden', name: 'approved_duration_hours', value: approvedHours }));
+                    form.append($('<input>', { type: 'hidden', name: 'rejection_reason', value: reason }));
+                    $('body').append(form);
+                    form.submit();
+                }
+
+                $('#confirmEmpApproveBtn').on('click', function() {
+                    const hoursVal = parseFloat($('#empApproveHoursInput').val());
+                    if (isNaN(hoursVal) || hoursVal <= 0) {
+                        alert('Please enter a valid positive number for hours.');
+                        return;
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('empApproveOvertimeModal')).hide();
+                    submitEmpOvertimeForm('approved', hoursVal, '');
+                });
+
+                $('#confirmEmpRejectBtn').on('click', function() {
+                    const reason = $('#empRejectReasonInput').val().trim();
+                    bootstrap.Modal.getInstance(document.getElementById('empRejectOvertimeModal')).hide();
+                    submitEmpOvertimeForm('rejected', '', reason);
+                });
 
                 // Initialize Select2 dropdowns inside Apply Leave & Encashment modals
                 function initEmpModalSelects() {
@@ -5255,6 +5894,28 @@
                 }
             });
 
+            // Toggle view between Shift Applications and Overtime Applications in Employee Profile
+            $(document).on('click', '#btnToggleShiftOvertimeView', function () {
+                var isOvertimeHidden = $('#overtimeApplicationsViewContainer').hasClass('d-none');
+                if (isOvertimeHidden) {
+                    $('#shiftApplicationsViewContainer').addClass('d-none');
+                    $('#shiftAppsHeaderTitle').addClass('d-none');
+
+                    $('#overtimeApplicationsViewContainer').removeClass('d-none');
+                    $('#overtimeAppsHeaderTitle').removeClass('d-none');
+
+                    $('#toggleShiftOvertimeBtnLabel').html('<i class="feather-git-pull-request me-1"></i> Shift Details');
+                } else {
+                    $('#overtimeApplicationsViewContainer').addClass('d-none');
+                    $('#overtimeAppsHeaderTitle').addClass('d-none');
+
+                    $('#shiftApplicationsViewContainer').removeClass('d-none');
+                    $('#shiftAppsHeaderTitle').removeClass('d-none');
+
+                    $('#toggleShiftOvertimeBtnLabel').html('<i class="feather-clock me-1"></i> Overtime Details');
+                }
+            });
+
             // ── Employee Leave Applications Search, Sort & Filter & Pagination ──
             var empLeaveAppSortMode = 'date_desc';
             var empLeaveAppFilters = { status: '', leave_type_id: '' };
@@ -6240,6 +6901,168 @@
         .select2-container--bootstrap-5 .select2-results__option--highlighted {
             background-color: var(--bs-primary) !important;
             color: #fff !important;
+        }
+
+        /* High-specificity overrides to force Select2 options and selection text to dark grey, not blue */
+        body .select2-container--bootstrap-5 .select2-dropdown .select2-results__options .select2-results__option,
+        body .select2-container--bootstrap-5 .select2-dropdown .select2-results__options .select2-results__option *,
+        body .select2-container .select2-results__option,
+        body .select2-container .select2-results__option *,
+        body .select2-results__option,
+        body .select2-results__option *,
+        .select2-results__option,
+        .select2-results__option * {
+            color: #1e293b !important;
+        }
+
+        body .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered,
+        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+            color: #1e293b !important;
+        }
+
+        /* High-specificity overrides for highlighted/hovered items */
+        body .select2-container--bootstrap-5 .select2-dropdown .select2-results__options .select2-results__option--highlighted,
+        body .select2-container--bootstrap-5 .select2-dropdown .select2-results__options .select2-results__option--highlighted *,
+        body .select2-container .select2-results__option--highlighted,
+        body .select2-container .select2-results__option--highlighted *,
+        body .select2-results__option--highlighted,
+        body .select2-results__option--highlighted *,
+        .select2-results__option--highlighted,
+        .select2-results__option--highlighted * {
+            color: #ffffff !important;
+            background-color: var(--bs-primary) !important;
+        }
+
+        /* Action Status Dropdown Styling */
+        .btn-status-dropdown {
+            background-color: #7c6f6c !important;
+            color: #ffffff !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            height: 36px !important;
+            border-radius: 8px !important;
+            width: 120px !important;
+            border: none !important;
+            padding: 0 12px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+        }
+        .btn-status-dropdown:hover,
+        .btn-status-dropdown:focus,
+        .btn-status-dropdown:active {
+            background-color: #6a5e5a !important;
+            color: #ffffff !important;
+        }
+        .btn-status-dropdown::after {
+            display: inline-block;
+            margin-left: 8px;
+            vertical-align: 0.255em;
+            content: "";
+            border-top: 0.3em solid;
+            border-right: 0.3em solid transparent;
+            border-bottom: 0;
+            border-left: 0.3em solid transparent;
+            color: #ffffff !important;
+        }
+
+        .status-dropdown-menu {
+            min-width: 120px !important;
+            width: 120px !important;
+            border-radius: 8px !important;
+            border: none !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+            padding: 6px !important;
+            background: #ffffff !important;
+        }
+        .status-dropdown-menu .dropdown-item {
+            text-align: center !important;
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            padding: 8px 12px !important;
+            border-radius: 6px !important;
+            color: #1e293b !important;
+            background: transparent !important;
+            transition: all 0.2s ease;
+        }
+        .status-dropdown-menu .dropdown-item:hover {
+            background-color: #f8fafc !important;
+            color: #1e293b !important;
+        }
+        .status-dropdown-menu .dropdown-item.active-status {
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+            font-weight: 700 !important;
+        }
+
+        @media (min-width: 992px) {
+            #shift-overtime-pane .shift-left-col {
+                flex: 0 0 30% !important;
+                max-width: 30% !important;
+                width: 30% !important;
+            }
+            #shift-overtime-pane .shift-right-col {
+                flex: 0 0 70% !important;
+                max-width: 70% !important;
+                width: 70% !important;
+            }
+        }
+
+        /* ── Shift & Overtime tables: no scrollbar, all content wraps ── */
+
+        /* Outer containers: fill width, no clipping that would hide dropdowns */
+        #shiftApplicationsViewContainer,
+        #overtimeApplicationsViewContainer {
+            width: 100%;
+        }
+
+        /* Tables always fill the container exactly with fixed column widths */
+        #shiftApplicationsViewContainer table,
+        #overtimeApplicationsViewContainer table {
+            width: 100% !important;
+            table-layout: fixed !important;
+        }
+
+        /* HEADERS: stay on one line, consistent padding */
+        #shiftApplicationsViewContainer th,
+        #overtimeApplicationsViewContainer th {
+            padding: 10px 12px;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+        /* CELLS: wrap long text within fixed column width */
+        #shiftApplicationsViewContainer td,
+        #overtimeApplicationsViewContainer td {
+            padding: 10px 12px;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            vertical-align: middle;
+        }
+
+        /* Left indent on first column */
+        #shiftApplicationsViewContainer th:first-child,
+        #shiftApplicationsViewContainer td:first-child,
+        #overtimeApplicationsViewContainer th:first-child,
+        #overtimeApplicationsViewContainer td:first-child {
+            padding-left: 20px;
+        }
+
+        /* Right indent on last column */
+        #shiftApplicationsViewContainer th:last-child,
+        #shiftApplicationsViewContainer td:last-child,
+        #overtimeApplicationsViewContainer th:last-child,
+        #overtimeApplicationsViewContainer td:last-child {
+            padding-right: 20px;
+        }
+
+        /* Badges inside cells: keep badge text on one line */
+        #shiftApplicationsViewContainer td .badge,
+        #overtimeApplicationsViewContainer td .badge {
+            white-space: nowrap;
+            display: inline-block;
+            max-width: 100%;
         }
     </style>
 @endpush

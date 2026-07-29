@@ -419,6 +419,11 @@ class Employee extends BaseModel
         }
     }
 
+    public function defaultShift(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domains\Production\Models\ProductionShift::class, 'shift_id');
+    }
+
     /**
      * Resolve the active shift for a given date.
      * Precedence:

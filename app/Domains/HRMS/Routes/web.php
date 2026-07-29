@@ -11,6 +11,9 @@ use App\Domains\HRMS\Controllers\LeaveRequestController;
 use Illuminate\Support\Facades\Route;
 
 use App\Domains\HRMS\Controllers\WfhRequestController;
+use App\Domains\HRMS\Controllers\ShiftChangeRequestController;
+use App\Domains\HRMS\Controllers\OvertimeRequestController;
+use App\Domains\HRMS\Controllers\ShiftOvertimeController;
 
 Route::prefix('hrms')
     ->as('hrms.')
@@ -166,6 +169,28 @@ Route::prefix('hrms')
             // Admin cancellation decision
             Route::post('/{wfhRequest}/approve-cancellation', [WfhRequestController::class, 'approveCancellation'])->name('wfh.approve-cancellation');
             Route::post('/{wfhRequest}/deny-cancellation', [WfhRequestController::class, 'denyCancellation'])->name('wfh.deny-cancellation');
+        });
+
+        // Combined Shift & Overtime Management
+        Route::get('/shift-overtime', [ShiftOvertimeController::class, 'index'])->name('shift-overtime.index');
+
+        // Shift Change Request Management (Actions only)
+        Route::prefix('shift-change')->group(function (): void {
+            Route::post('/store', [ShiftChangeRequestController::class, 'store'])->name('shift-change.store');
+            Route::post('/{shiftChangeRequest}/approve', [ShiftChangeRequestController::class, 'approve'])->name('shift-change.approve');
+            Route::post('/{shiftChangeRequest}/reject', [ShiftChangeRequestController::class, 'reject'])->name('shift-change.reject');
+            Route::post('/{shiftChangeRequest}/update-status', [ShiftChangeRequestController::class, 'updateStatus'])->name('shift-change.update-status');
+            Route::delete('/{shiftChangeRequest}', [ShiftChangeRequestController::class, 'destroy'])->name('shift-change.destroy');
+        });
+
+        // Overtime Request Management (Actions only)
+        Route::prefix('overtime')->group(function (): void {
+            Route::post('/store', [OvertimeRequestController::class, 'store'])->name('overtime.store');
+            Route::post('/{overtimeRequest}/approve', [OvertimeRequestController::class, 'approve'])->name('overtime.approve');
+            Route::post('/{overtimeRequest}/reject', [OvertimeRequestController::class, 'reject'])->name('overtime.reject');
+            Route::post('/{overtimeRequest}/update-status', [OvertimeRequestController::class, 'updateStatus'])->name('overtime.update-status');
+            Route::delete('/{overtimeRequest}', [OvertimeRequestController::class, 'destroy'])->name('overtime.destroy');
+            Route::post('/settings', [OvertimeRequestController::class, 'updateSettings'])->name('overtime.update-settings');
         });
 
         // Asset Management
