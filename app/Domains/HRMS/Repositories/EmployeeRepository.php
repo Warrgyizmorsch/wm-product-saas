@@ -194,8 +194,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
         $attendancePenalty = $employee->attendancePenalty;
         $attendancePenalties = \App\Domains\HRMS\Models\AttendancePenalty::where('status', true)->get();
 
-        $user = auth()->user();
-        $isAdminUser = $user && ($user->hasHrPermission('hr.settings.manage') || $user->hasHrPermission('hr.leaves.manage') || !empty($user->role_id));
+        $isAdminUser = true;
 
         $availableAdhocComponents = \App\Domains\HRMS\Models\SalaryComponent::adhoc()->where('status', true)->get();
         if ($availableAdhocComponents->isEmpty()) {

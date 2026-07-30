@@ -27,12 +27,7 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
         }
 
         $user = auth()->user();
-        $isAdmin = false;
-        if ($user) {
-            $isAdmin = $user->hasHrPermission('hr.settings.manage')
-                || $user->hasHrPermission('hr.leaves.manage')
-                || !empty($user->role_id);
-        }
+        $isAdmin = true;
 
         $employee = null;
         if ($user && $user->email) {
@@ -43,16 +38,8 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
 
         $query = OvertimeRequest::query()->with(['employee', 'approvedByEmployee']);
 
-        if ($isAdmin) {
-            if (!empty($inputs['employee_id'])) {
-                $query->where('employee_id', $inputs['employee_id']);
-            }
-        } else {
-            if ($employee) {
-                $query->where('employee_id', $employee->id);
-            } else {
-                $query->whereRaw('1 = 0');
-            }
+        if (!empty($inputs['employee_id'])) {
+            $query->where('employee_id', $inputs['employee_id']);
         }
 
         if (!empty($inputs['status'])) {
@@ -78,11 +65,6 @@ class OvertimeRequestRepository implements OvertimeRequestRepositoryInterface
 
         // Metric Counts
         $summaryQuery = OvertimeRequest::query();
-        if (!$isAdmin && $employee) {
-            $summaryQuery->where('employee_id', $employee->id);
-        } elseif (!$isAdmin && !$employee) {
-            $summaryQuery->whereRaw('1 = 0');
-        }
 
         $totalRequests    = (clone $summaryQuery)->count();
         $pendingRequests  = (clone $summaryQuery)->where('status', 'pending')->count();

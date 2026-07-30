@@ -57,14 +57,6 @@ class OvertimeRequestApiController extends Controller
         return null;
     }
 
-    private function isHrAdmin(): bool
-    {
-        return auth()->check() && (
-            auth()->user()->hasHrPermission('hr.settings.manage') ||
-            auth()->user()->hasHrPermission('hr.leaves.manage') ||
-            !empty(auth()->user()->role_id)
-        );
-    }
 
     public function summary(): JsonResponse
     {
@@ -72,15 +64,11 @@ class OvertimeRequestApiController extends Controller
             return $authError;
         }
 
-        $isAdmin = $this->isHrAdmin();
         $employee = Employee::where('personal_email', auth()->user()->email)
             ->orWhere('office_email', auth()->user()->email)
             ->first();
 
         $query = OvertimeRequest::query();
-        if (!$isAdmin) {
-            $query->where('employee_id', $employee?->id ?? 0);
-        }
 
         $totalRequests   = (clone $query)->count();
         $pendingRequests = (clone $query)->where('status', 'pending')->count();
@@ -88,7 +76,6 @@ class OvertimeRequestApiController extends Controller
         $rejectedRequests= (clone $query)->where('status', 'rejected')->count();
 
         return $this->sendSuccess([
-            'is_admin'          => $isAdmin,
             'total_requests'    => $totalRequests,
             'pending_requests'  => $pendingRequests,
             'approved_requests' => $approvedRequests,
@@ -128,10 +115,10 @@ class OvertimeRequestApiController extends Controller
             return $authError;
         }
 
-        $isAdmin = $this->isHrAdmin();
+
 
         $validated = $request->validate([
-            'employee_id'       => $isAdmin ? 'required|exists:employees,id' : 'nullable',
+            'employee_id'       => 'required|exists:employees,id',
             'date'              => 'required|date',
             'start_time'        => 'required|date_format:H:i',
             'end_time'          => 'required|date_format:H:i',
@@ -140,13 +127,7 @@ class OvertimeRequestApiController extends Controller
             'attachment'        => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
         ]);
 
-        if ($isAdmin && !empty($validated['employee_id'])) {
-            $employee = Employee::find($validated['employee_id']);
-        } else {
-            $employee = Employee::where('personal_email', auth()->user()->email)
-                ->orWhere('office_email', auth()->user()->email)
-                ->first();
-        }
+        $employee = Employee::find($validated['employee_id']);
 
         if (!$employee) {
             return $this->sendError('Employee record not found.', 404);
@@ -187,10 +168,6 @@ class OvertimeRequestApiController extends Controller
     {
         if ($authError = $this->authorizeUser()) {
             return $authError;
-        }
-
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized action.', 403);
         }
 
         $overtimeRequest = OvertimeRequest::find($id);

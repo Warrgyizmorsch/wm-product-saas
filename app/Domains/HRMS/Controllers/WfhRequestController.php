@@ -27,16 +27,8 @@ class WfhRequestController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = false;
-        if ($user) {
-            $isAdmin = $user->hasHrPermission('hr.settings.manage')
-                || $user->hasHrPermission('hr.leaves.manage')
-                || !empty($user->role_id);
-        }
-
         $validated = $request->validate([
-            'employee_id'         => $isAdmin ? 'required|exists:employees,id' : 'nullable',
+            'employee_id'         => 'required|exists:employees,id',
             'start_date'          => 'required|date',
             'end_date'            => 'required|date|after_or_equal:start_date',
             'start_date_type'     => 'required|string|in:full_day,first_half,second_half',
@@ -47,13 +39,7 @@ class WfhRequestController extends Controller
             'notified_contacts.*' => 'exists:employees,id',
         ]);
 
-        if ($isAdmin && !empty($validated['employee_id'])) {
-            $employee = Employee::findOrFail($validated['employee_id']);
-        } else {
-            $employee = Employee::where('personal_email', $user?->email)
-                ->orWhere('office_email', $user?->email)
-                ->first();
-        }
+        $employee = Employee::findOrFail($validated['employee_id']);
 
         if (!$employee) {
             return redirect()->back()->with('error', 'Employee profile not found.');
@@ -119,15 +105,6 @@ class WfhRequestController extends Controller
 
     public function updateStatus(Request $request, WfhRequest $wfhRequest, ?string $overrideAction = null): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if ($wfhRequest->status === 'cancelled') {
             return redirect()->back()->with('error', 'Cannot change the status of a cancelled WFH application.');
         }
@@ -164,19 +141,6 @@ class WfhRequestController extends Controller
 
     public function withdraw(Request $request, WfhRequest $wfhRequest): RedirectResponse
     {
-        $user     = auth()->user();
-        $employee = Employee::where('personal_email', $user?->email)
-            ->orWhere('office_email', $user?->email)
-            ->first();
-
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin && (!$employee || $employee->id !== $wfhRequest->employee_id)) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if (!$wfhRequest->canWithdraw()) {
             return redirect()->back()->with('error', 'Only pending applications can be withdrawn.');
         }
@@ -192,19 +156,6 @@ class WfhRequestController extends Controller
 
     public function requestCancellation(Request $request, WfhRequest $wfhRequest): RedirectResponse
     {
-        $user     = auth()->user();
-        $employee = Employee::where('personal_email', $user?->email)
-            ->orWhere('office_email', $user?->email)
-            ->first();
-
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin && (!$employee || $employee->id !== $wfhRequest->employee_id)) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if (!$wfhRequest->canRequestCancellation()) {
             return redirect()->back()->with('error', 'Only approved applications can have a cancellation requested.');
         }
@@ -227,15 +178,6 @@ class WfhRequestController extends Controller
 
     public function approveCancellation(WfhRequest $wfhRequest): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if ($wfhRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
         }
@@ -251,15 +193,6 @@ class WfhRequestController extends Controller
 
     public function denyCancellation(WfhRequest $wfhRequest): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if ($wfhRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
         }

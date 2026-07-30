@@ -58,10 +58,6 @@ class PenalizationPolicyApiController extends Controller
             }
         }
 
-        if (!auth()->user()->hasHrPermission('hr.settings.manage')) {
-            return $this->sendError('Unauthorized access. Your user role does not have hr.settings.manage permission.', 403);
-        }
-
         return null;
     }
 

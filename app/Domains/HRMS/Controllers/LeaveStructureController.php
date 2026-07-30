@@ -16,8 +16,6 @@ class LeaveStructureController extends Controller
 
     public function index(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $data = $this->leaveStructureRepository->getIndexData($request->all());
 
         return view('modules.hrms.leave-structure.index', $data);
@@ -25,8 +23,6 @@ class LeaveStructureController extends Controller
 
     public function storePlan(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $request->validate([
             'name' => 'required|max:255',
             'company_id' => 'nullable|integer',
@@ -50,8 +46,6 @@ class LeaveStructureController extends Controller
 
     public function updatePlan(Request $request, LeavePlan $leavePlan)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $request->validate([
             'name' => 'required|max:255',
             'company_id' => 'nullable|integer',
@@ -75,8 +69,6 @@ class LeaveStructureController extends Controller
 
     public function destroyPlan(LeavePlan $leavePlan)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $this->leaveStructureRepository->destroyPlan($leavePlan);
 
         return redirect()->route('hrms.leave-structure.index')->with('success', __('hrms.leave.plan_deleted'));
@@ -84,8 +76,6 @@ class LeaveStructureController extends Controller
 
     public function storeType(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $request->validate([
             'leave_plan_id' => 'required|exists:leave_plans,id',
             'name' => 'required|max:255',
@@ -129,8 +119,6 @@ class LeaveStructureController extends Controller
 
     public function updateType(Request $request, LeaveType $leaveType)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $request->validate([
             'name' => 'required|max:255',
             'code' => 'required|max:50',
@@ -172,8 +160,6 @@ class LeaveStructureController extends Controller
 
     public function destroyType(LeaveType $leaveType)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $planId = $leaveType->leave_plan_id;
         $this->leaveStructureRepository->destroyType($leaveType);
 
@@ -186,8 +172,6 @@ class LeaveStructureController extends Controller
 
     public function updateRules(\Illuminate\Http\Request $request, LeaveType $leaveType)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'rules' => 'required|array',
         ]);
@@ -200,8 +184,6 @@ class LeaveStructureController extends Controller
 
     public function renewPlanBalances(\Illuminate\Http\Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'leave_plan_id' => 'required|exists:leave_plans,id',
             'yearend_rules' => 'nullable|array',
@@ -290,8 +272,6 @@ class LeaveStructureController extends Controller
 
     public function transitionView(\Illuminate\Http\Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $data = $this->leaveStructureRepository->getIndexData($request->all());
 
         return view('modules.hrms.leave-structure.transition', $data);
@@ -299,8 +279,6 @@ class LeaveStructureController extends Controller
 
     public function processTransition(\Illuminate\Http\Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'employee_ids'            => 'required|array',
             'employee_ids.*'          => 'exists:employees,id',

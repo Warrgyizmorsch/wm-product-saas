@@ -15,7 +15,7 @@ class LeaveEncashmentController extends Controller
 {
     public function store(Request $request): RedirectResponse
     {
-        $isAdmin = auth()->user()->hasHrPermission('hr.settings.manage');
+
 
         $request->validate([
             'employee_id' => 'required|exists:employees,id',
@@ -80,10 +80,7 @@ class LeaveEncashmentController extends Controller
 
     public function approve(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        $isAuthorized = auth()->user()->hasHrPermission('hr.settings.manage') 
-            || auth()->user()->hasHrPermission('hr.leaves.manage') 
-            || !empty(auth()->user()->role_id);
-        abort_unless($isAuthorized, 403);
+
 
         $leaveEncashment->update([
             'status' => 'approved',
@@ -99,10 +96,7 @@ class LeaveEncashmentController extends Controller
 
     public function reject(Request $request, LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        $isAuthorized = auth()->user()->hasHrPermission('hr.settings.manage') 
-            || auth()->user()->hasHrPermission('hr.leaves.manage') 
-            || !empty(auth()->user()->role_id);
-        abort_unless($isAuthorized, 403);
+
 
         $leaveEncashment->update([
             'status' => 'rejected',
@@ -117,8 +111,6 @@ class LeaveEncashmentController extends Controller
 
     public function destroy(LeaveEncashment $leaveEncashment): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $empId = $leaveEncashment->employee_id;
         $typeId = $leaveEncashment->leave_type_id;
 
