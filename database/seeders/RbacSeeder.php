@@ -109,6 +109,8 @@ class RbacSeeder extends Seeder
             'inventory.products.delete' => $permissions['inventory.products.delete'],
             'inventory.warehouses.manage' => $permissions['inventory.warehouses.manage'],
             'inventory.uoms.manage' => $permissions['inventory.uoms.manage'],
+            'sales.material_requirements.view' => $permissions['sales.material_requirements.view'],
+            'sales.material_requirements.ship' => $permissions['sales.material_requirements.ship'],
         ], RolePermission::SCOPE_TENANT);
 
         $this->grant($roles['sales_manager'], [
