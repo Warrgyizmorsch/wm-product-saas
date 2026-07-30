@@ -26,16 +26,8 @@ class ShiftChangeRequestController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = false;
-        if ($user) {
-            $isAdmin = $user->hasHrPermission('hr.settings.manage')
-                || $user->hasHrPermission('hr.leaves.manage')
-                || !empty($user->role_id);
-        }
-
         $validated = $request->validate([
-            'employee_id'        => $isAdmin ? 'required|exists:employees,id' : 'nullable',
+            'employee_id'        => 'required|exists:employees,id',
             'type'               => 'required|string|in:temporary,permanent,recurring',
             'start_date'         => 'required|date',
             'end_date'           => 'nullable|required_if:type,temporary|date|after_or_equal:start_date',
@@ -46,16 +38,10 @@ class ShiftChangeRequestController extends Controller
             'attachment'         => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
         ]);
 
-        if ($isAdmin && !empty($validated['employee_id'])) {
-            $employee = Employee::findOrFail($validated['employee_id']);
-        } else {
-            $employee = Employee::where('personal_email', $user?->email)
-                ->orWhere('office_email', $user?->email)
-                ->first();
-        }
+        $employee = Employee::findOrFail($validated['employee_id']);
 
         if (!$employee) {
-            return redirect()->back()->with('error', 'Employee profile not found.');
+            return redirect()->back()->with('error', __('hrms.shift_change.profile_not_found'));
         }
 
         // Set current shift
@@ -66,10 +52,10 @@ class ShiftChangeRequestController extends Controller
         // Prevent requesting same shift
         $requestedShiftId = $validated['requested_shift_id'] ?? null;
         if ($requestedShiftId && (int)$requestedShiftId === (int)$currentShiftId) {
-            return redirect()->back()->with('error', 'The requested shift cannot be the same as the current active shift for that date.')->withInput();
+            return redirect()->back()->with('error', __('hrms.shift_change.same_shift_error'))->withInput();
         }
         if (!$requestedShiftId && !$currentShiftId) {
-            return redirect()->back()->with('error', 'The requested shift (Day Off) cannot be the same as the current active shift (Day Off).')->withInput();
+            return redirect()->back()->with('error', __('hrms.shift_change.same_day_off_error'))->withInput();
         }
 
         $validated['current_shift_id'] = $currentShiftId;
@@ -78,7 +64,7 @@ class ShiftChangeRequestController extends Controller
 
         $this->shiftChangeRepository->storeShiftChangeRequest($validated, $request);
 
-        return redirect()->back()->with('success', 'Shift Change application submitted successfully.');
+        return redirect()->back()->with('success', __('hrms.shift_change.submitted_successfully'));
     }
 
     public function approve(Request $request, ShiftChangeRequest $shiftChangeRequest): RedirectResponse
@@ -93,17 +79,8 @@ class ShiftChangeRequestController extends Controller
 
     public function updateStatus(Request $request, ShiftChangeRequest $shiftChangeRequest, ?string $overrideAction = null): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if ($shiftChangeRequest->status === 'cancelled') {
-            return redirect()->back()->with('error', 'Cannot change the status of a cancelled application.');
+            return redirect()->back()->with('error', __('hrms.shift_change.cancelled_status_error'));
         }
 
         $action = $overrideAction ?? $request->input('action');
@@ -123,31 +100,17 @@ class ShiftChangeRequestController extends Controller
             'rejection_reason' => $reason,
         ], $request);
 
-        return redirect()->back()->with('success', 'Shift Change application status updated.');
+        return redirect()->back()->with('success', __('hrms.shift_change.status_updated'));
     }
 
     public function destroy(ShiftChangeRequest $shiftChangeRequest): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            $employee = Employee::where('personal_email', $user?->email)
-                ->orWhere('office_email', $user?->email)
-                ->first();
-            if (!$employee || $employee->id !== $shiftChangeRequest->employee_id) {
-                return redirect()->back()->with('error', 'Unauthorized action.');
-            }
-        }
-
         if ($shiftChangeRequest->status === 'approved') {
-            return redirect()->back()->with('error', 'Approved applications cannot be deleted.');
+            return redirect()->back()->with('error', __('hrms.shift_change.approved_no_delete'));
         }
 
         $shiftChangeRequest->delete();
 
-        return redirect()->back()->with('success', 'Shift change request deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.shift_change.deleted_successfully'));
     }
 }

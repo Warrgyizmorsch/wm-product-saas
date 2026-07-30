@@ -1,16 +1,16 @@
 @extends('layouts.duralux')
 
-@section('title', 'Shift & Overtime Applications | SaaS ERP')
-@section('page-title', 'Shift & Overtime Applications')
-@section('breadcrumb', 'HRMS / Shift & Overtime')
+@section('title', __('hrms.sidebar.shift_roster') . ' | SaaS ERP')
+@section('page-title', __('hrms.sidebar.shift_roster'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.sidebar.shift_roster'))
 
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <button type="button" id="btnApplyShift" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#applyShiftChangeModal" style="height: 38px;">
-            <i class="feather-plus"></i> Apply Shift Change
+            <i class="feather-plus"></i> {{ __('hrms.shift_change.apply_shift_change') }}
         </button>
         <button type="button" id="btnApplyOvertime" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1 d-none" data-bs-toggle="modal" data-bs-target="#applyOvertimeModal" style="height: 38px;">
-            <i class="feather-plus"></i> Apply Overtime
+            <i class="feather-plus"></i> {{ __('hrms.overtime.apply_overtime') }}
         </button>
     </div>
 @endsection
@@ -232,12 +232,12 @@
             <ul class="nav gap-2 border-bottom pb-2" id="shiftOvertimeTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                     <button class="nav-link @if($activeTab === 'shift') active @endif" id="tab-shift" data-bs-toggle="tab" data-bs-target="#shift-pane" type="button" role="tab" aria-controls="shift-pane" aria-selected="@if($activeTab === 'shift') true @else false @endif">
-                        <i class="feather-git-pull-request me-1"></i> Shift Change Requests
+                        <i class="feather-git-pull-request me-1"></i> {{ __('hrms.shift_change.title') }}
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link @if($activeTab === 'overtime') active @endif" id="tab-overtime" data-bs-toggle="tab" data-bs-target="#overtime-pane" type="button" role="tab" aria-controls="overtime-pane" aria-selected="@if($activeTab === 'overtime') true @else false @endif">
-                        <i class="feather-clock me-1"></i> Overtime Requests
+                        <i class="feather-clock me-1"></i> {{ __('hrms.overtime.title') }}
                     </button>
                 </li>
             </ul>
@@ -253,8 +253,8 @@
                     <div class="card border-0 shadow-sm rounded-3">
                         <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
                             <div>
-                                <h5 class="fw-bold text-dark mb-0"><i class="feather-git-pull-request me-2 text-primary"></i> Shift Change Applications</h5>
-                                <p class="text-muted fs-12 mb-0">Review and manage shift change applications</p>
+                                <h5 class="fw-bold text-dark mb-0"><i class="feather-git-pull-request me-2 text-primary"></i> {{ __('hrms.shift_change.title') }}</h5>
+                                <p class="text-muted fs-12 mb-0">{{ __('hrms.shift_change.title') }}</p>
                             </div>
                     
                     <div class="d-flex align-items-center gap-2">
@@ -262,28 +262,28 @@
                             <!-- Search Input -->
                             <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; height: 38px;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                <input type="text" name="search" id="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search employee..." style="box-shadow: none; height: 32px;">
+                                <input type="text" name="search" id="shift_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.shift_change.search_employee') }}" style="box-shadow: none; height: 32px;">
                             </div>
 
                             <!-- Sort Dropdown -->
-                            <x-ui.sort-dropdown label="Sort">
+                            <x-ui.sort-dropdown label="{{ __('hrms.assets.filters') }}">
                                 <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="setShiftSort('newest', this); event.preventDefault();">
-                                    <span>Newest First</span>
+                                    <span>{{ __('hrms.assets.sort_newest') }}</span>
                                 </a>
                                 <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setShiftSort('oldest', this); event.preventDefault();">
-                                    <span>Oldest First</span>
+                                    <span>{{ __('hrms.assets.sort_oldest') }}</span>
                                 </a>
                             </x-ui.sort-dropdown>
 
                             <!-- Filter Dropdown -->
-                            <x-ui.filter label="Filter" offset="0, 5">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.assets.filters') }}</h6>
                                 
                                 @if($isAdmin)
                                     <div class="mb-3" style="min-width: 250px;">
-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Employee</label>
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.shift_change.employee') }}</label>
                                         <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_shift_employee_id">
-                                            <option value="">All Employees</option>
+                                            <option value="">{{ __('hrms.common.all_employees') }}</option>
                                             @foreach(($employees ?? []) as $emp)
                                                 <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                                             @endforeach
@@ -292,12 +292,12 @@
                                 @endif
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.shift_change.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="status" id="filter_shift_status">
-                                        <option value="">All Statuses</option>
-                                        <option value="pending">Pending</option>
-                                        <option value="approved">Approved</option>
-                                        <option value="rejected">Rejected</option>
+                                        <option value="">{{ __('hrms.shift_change.all_statuses') }}</option>
+                                        <option value="pending">{{ __('hrms.shift_change.pending') }}</option>
+                                        <option value="approved">{{ __('hrms.shift_change.approved') }}</option>
+                                        <option value="rejected">{{ __('hrms.shift_change.rejected') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
@@ -315,13 +315,13 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Employee</th>
-                                    <th>Type</th>
-                                    <th>Effective Period</th>
-                                    <th>Current Shift</th>
-                                    <th>Requested Shift</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
+                                    <th>{{ __('hrms.shift_change.employee') }}</th>
+                                    <th>{{ __('hrms.shift_change.type') }}</th>
+                                    <th>{{ __('hrms.shift_change.effective_period') }}</th>
+                                    <th>{{ __('hrms.shift_change.current_shift') }}</th>
+                                    <th>{{ __('hrms.shift_change.requested_shift') }}</th>
+                                    <th>{{ __('hrms.shift_change.status') }}</th>
+                                    <th class="text-end">{{ __('hrms.shift_change.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="shiftTableBody">
@@ -374,7 +374,7 @@
                                         </td>
                                         <td>
                                             <span class="badge text-uppercase fs-10" style="background-color: {{ $req->status === 'approved' ? 'rgba(25, 135, 84, 0.1)' : ($req->status === 'rejected' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(255, 193, 7, 0.1)') }}; color: {{ $req->status === 'approved' ? '#198754' : ($req->status === 'rejected' ? '#dc3545' : '#ffc107') }};">
-                                                {{ $req->status }}
+                                                {{ $req->status === 'approved' ? __('hrms.shift_change.approved') : ($req->status === 'rejected' ? __('hrms.shift_change.rejected') : __('hrms.shift_change.pending')) }}
                                             </span>
                                         </td>
                                         <td class="text-end">
@@ -382,17 +382,17 @@
                                                 @if($isAdmin)
                                                     <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
                                                         <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
-                                                            <span>{{ $req->status === 'approved' ? 'Approved' : ($req->status === 'rejected' ? 'Rejected' : 'Pending') }}</span>
+                                                            <span>{{ $req->status === 'approved' ? __('hrms.shift_change.approved') : ($req->status === 'rejected' ? __('hrms.shift_change.rejected') : __('hrms.shift_change.pending')) }}</span>
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
                                                             <li>
                                                                 <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleShiftDecision('approve', {{ $req->id }})">
-                                                                    Approved
+                                                                    {{ __('hrms.shift_change.approved') }}
                                                                 </button>
                                                             </li>
                                                             <li>
                                                                 <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleShiftDecision('reject', {{ $req->id }})">
-                                                                    Rejected
+                                                                    {{ __('hrms.shift_change.rejected') }}
                                                                 </button>
                                                             </li>
                                                         </ul>
@@ -447,12 +447,12 @@
                         <div class="d-flex align-items-center gap-2">
                             <i class="feather-info text-primary fs-4"></i>
                             <div>
-                                <h6 class="fw-bold mb-0 text-dark">Active Overtime Policies</h6>
+                                <h6 class="fw-bold mb-0 text-dark">{{ __('hrms.overtime.title') }}</h6>
                                 <p class="text-muted fs-11 mb-0">Threshold: <strong>{{ number_format($tenantSettings['auto_overtime_threshold_hours'] ?? 0.0, 1) }} hours</strong> (auto-approved on punch)</p>
                             </div>
                         </div>
                         <button type="button" class="btn btn-primary btn-sm rounded text-uppercase fw-bold" data-bs-toggle="modal" data-bs-target="#overtimeSettingsModal">
-                            Modify Policies
+                            {{ __('hrms.overtime.modify_policies') }}
                         </button>
                     </div>
                 </div>
@@ -462,8 +462,8 @@
             <div class="card border-0 shadow-sm rounded-3">
                 <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div>
-                        <h5 class="fw-bold text-dark mb-0"><i class="feather-clock me-2 text-primary"></i> Overtime Applications</h5>
-                        <p class="text-muted fs-12 mb-0">Review and manage employee overtime requests</p>
+                        <h5 class="fw-bold text-dark mb-0"><i class="feather-clock me-2 text-primary"></i> {{ __('hrms.overtime.title') }}</h5>
+                        <p class="text-muted fs-12 mb-0">{{ __('hrms.overtime.title') }}</p>
                     </div>
                     
                     <div class="d-flex align-items-center gap-2">
@@ -471,34 +471,28 @@
                             <!-- Search Input -->
                             <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; height: 38px;">
                                 <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                                <input type="text" name="search" id="overtime_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search employee..." style="box-shadow: none; height: 32px;">
+                                <input type="text" name="search" id="overtime_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.overtime.search_employee') }}" style="box-shadow: none; height: 32px;">
                             </div>
 
                             <!-- Sort Dropdown -->
-                            <x-ui.sort-dropdown label="Sort">
+                            <x-ui.sort-dropdown label="{{ __('hrms.assets.filters') }}">
                                 <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="setOvertimeSort('newest', this); event.preventDefault();">
-                                    <span>Newest First</span>
+                                    <span>{{ __('hrms.assets.sort_newest') }}</span>
                                 </a>
                                 <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setOvertimeSort('oldest', this); event.preventDefault();">
-                                    <span>Oldest First</span>
-                                </a>
-                                <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setOvertimeSort('duration_high', this); event.preventDefault();">
-                                    <span>Duration: High to Low</span>
-                                </a>
-                                <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setOvertimeSort('duration_low', this); event.preventDefault();">
-                                    <span>Duration: Low to High</span>
+                                    <span>{{ __('hrms.assets.sort_oldest') }}</span>
                                 </a>
                             </x-ui.sort-dropdown>
 
                             <!-- Filter Dropdown -->
-                            <x-ui.filter label="Filter" offset="0, 5">
-                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                            <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
+                                <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.assets.filters') }}</h6>
                                 
                                 @if($isAdmin)
                                     <div class="mb-3" style="min-width: 250px;">
-                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Employee</label>
+                                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.overtime.employee') }}</label>
                                         <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_overtime_employee_id">
-                                            <option value="">All Employees</option>
+                                            <option value="">{{ __('hrms.common.all_employees') }}</option>
                                             @foreach(($employees ?? []) as $emp)
                                                 <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                                             @endforeach
@@ -507,12 +501,12 @@
                                 @endif
 
                                 <div class="mb-3" style="min-width: 250px;">
-                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                    <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.overtime.status') }}</label>
                                     <x-ui.odoo-form-ui type="select" name="status" id="filter_overtime_status">
-                                        <option value="">All Statuses</option>
-                                        <option value="pending">Pending</option>
-                                        <option value="approved">Approved</option>
-                                        <option value="rejected">Rejected</option>
+                                        <option value="">{{ __('hrms.overtime.all_statuses') }}</option>
+                                        <option value="pending">{{ __('hrms.overtime.pending') }}</option>
+                                        <option value="approved">{{ __('hrms.overtime.approved') }}</option>
+                                        <option value="rejected">{{ __('hrms.overtime.rejected') }}</option>
                                     </x-ui.odoo-form-ui>
                                 </div>
 
@@ -530,14 +524,14 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Employee</th>
-                                    <th>Date</th>
-                                    <th>Time Frame</th>
-                                    <th>Requested Hours</th>
-                                    <th>Approved Hours</th>
-                                    <th>Comp. Type</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Actions</th>
+                                    <th>{{ __('hrms.overtime.employee') }}</th>
+                                    <th>{{ __('hrms.overtime.date') }}</th>
+                                    <th>{{ __('hrms.overtime.time_frame') }}</th>
+                                    <th>{{ __('hrms.overtime.requested_hours') }}</th>
+                                    <th>{{ __('hrms.overtime.approved_hours') }}</th>
+                                    <th>{{ __('hrms.overtime.comp_type') }}</th>
+                                    <th>{{ __('hrms.overtime.status') }}</th>
+                                    <th class="text-end">{{ __('hrms.overtime.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="overtimeTableBody">
@@ -572,12 +566,12 @@
                                         </td>
                                         <td>
                                             <span class="badge text-uppercase fs-10" style="background-color: {{ $req->compensation_type === 'comp_off' ? 'rgba(13, 110, 253, 0.1)' : 'rgba(25, 135, 84, 0.1)' }}; color: {{ $req->compensation_type === 'comp_off' ? '#0d6efd' : '#198754' }};">
-                                                {{ $req->compensation_type === 'comp_off' ? 'Comp Off' : 'Payout' }}
+                                                {{ $req->compensation_type === 'comp_off' ? __('hrms.overtime.comp_off') : __('hrms.overtime.payout') }}
                                             </span>
                                         </td>
                                         <td>
                                             <span class="badge text-uppercase fs-10" style="background-color: {{ $req->status === 'approved' ? 'rgba(25, 135, 84, 0.1)' : ($req->status === 'rejected' ? 'rgba(220, 53, 69, 0.1)' : 'rgba(255, 193, 7, 0.1)') }}; color: {{ $req->status === 'approved' ? '#198754' : ($req->status === 'rejected' ? '#dc3545' : '#ffc107') }};">
-                                                {{ $req->status }}
+                                                {{ $req->status === 'approved' ? __('hrms.overtime.approved') : ($req->status === 'rejected' ? __('hrms.overtime.rejected') : __('hrms.overtime.pending')) }}
                                             </span>
                                         </td>
                                         <td class="text-end">
@@ -585,22 +579,22 @@
                                                 @if($isAdmin)
                                                     <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
                                                         <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
-                                                            <span>{{ $req->status === 'approved' ? 'Approved' : ($req->status === 'rejected' ? 'Rejected' : 'Pending') }}</span>
+                                                            <span>{{ $req->status === 'approved' ? __('hrms.overtime.approved') : ($req->status === 'rejected' ? __('hrms.overtime.rejected') : __('hrms.overtime.pending')) }}</span>
                                                         </button>
                                                         <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
                                                             <li>
                                                                 <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleOvertimeDecision('approve', {{ $req->id }}, {{ $req->duration_hours }})">
-                                                                    Approved
+                                                                    {{ __('hrms.overtime.approved') }}
                                                                 </button>
                                                             </li>
                                                             <li>
                                                                 <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleOvertimeDecision('reject', {{ $req->id }}, {{ $req->duration_hours }})">
-                                                                    Rejected
+                                                                    {{ __('hrms.overtime.rejected') }}
                                                                 </button>
                                                             </li>
                                                             <li>
                                                                 <button type="button" class="dropdown-item {{ $req->status === 'pending' ? 'active-status' : '' }}" onclick="handleOvertimeDecision('pending', {{ $req->id }}, {{ $req->duration_hours }})">
-                                                                    Pending
+                                                                    {{ __('hrms.overtime.pending') }}
                                                                 </button>
                                                             </li>
                                                         </ul>
@@ -663,14 +657,14 @@
                 <form action="{{ route('hrms.shift-change.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-header border-bottom py-3">
-                        <h5 class="modal-title fw-bold" id="applyShiftChangeModalLabel">Apply Shift Change</h5>
+                        <h5 class="modal-title fw-bold" id="applyShiftChangeModalLabel">{{ __('hrms.shift_change.apply_for_shift_change') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
                         @if($isAdmin)
                             <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Employee" name="employee_id" id="shift_employee_id" :required="true">
-                                    <option value="">Select Employee</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.shift_change.employee') }}" name="employee_id" id="shift_employee_id" :required="true">
+                                    <option value="">{{ __('hrms.shift_change.select_employee') }}</option>
                                     @foreach($employees as $emp)
                                         <option value="{{ $emp->id }}" data-shift-id="{{ $emp->shift_id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                                     @endforeach
@@ -679,23 +673,23 @@
                         @endif
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="Type" name="type" id="shift_change_type" :required="true">
-                                <option value="temporary">Temporary (Date Range)</option>
-                                <option value="permanent">Permanent (Effective Date onwards)</option>
-                                <option value="recurring">Recurring Weekdays</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.shift_change.change_type') }}" name="type" id="shift_change_type" :required="true">
+                                <option value="temporary">{{ __('hrms.shift_change.one_time') }}</option>
+                                <option value="permanent">{{ __('hrms.shift_change.recurring') }}</option>
+                                <option value="recurring">{{ __('hrms.shift_change.recurring') }} Weekdays</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" id="shift_start_date" :required="true" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.shift_change.start_date') }}" name="start_date" id="shift_start_date" :required="true" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
                         </div>
 
                         <div class="mb-3" id="end_date_container">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="End Date" name="end_date" id="shift_end_date" :required="false" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.shift_change.end_date') }}" name="end_date" id="shift_end_date" :required="false" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
                         </div>
 
                         <div class="mb-3 d-none" id="recurring_days_container">
-                            <label class="form-label fw-bold d-block text-dark fs-12 mb-2">Recurring Weekdays</label>
+                            <label class="form-label fw-bold d-block text-dark fs-12 mb-2">{{ __('hrms.shift_change.select_recurring_days') }}</label>
                             <div class="d-flex flex-wrap gap-2">
                                 <div class="form-check form-check-inline">
                                     <input class="form-check-input" type="checkbox" name="recurring_days[]" value="1" id="day_mon">
@@ -729,8 +723,8 @@
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="Requested Shift" name="requested_shift_id" id="shift_requested_shift_id" :required="false">
-                                <option value="">Select Shift (Empty for Day Off)</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.shift_change.requested_shift') }}" name="requested_shift_id" id="shift_requested_shift_id" :required="false">
+                                <option value="">{{ __('hrms.shift_change.select_requested_shift') }} ({{ __('hrms.shift_change.one_time') }} Off)</option>
                                 @foreach($shifts as $sf)
                                     @if(!$isAdmin && isset($employee) && (int)$sf->id === (int)$employee->shift_id)
                                         @continue
@@ -741,16 +735,16 @@
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="textarea" label="Reason" name="reason" id="shift_reason" :required="true" class="odoo-underline-input" placeholder="Describe the reason for change..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.shift_change.reason_comments') }}" name="reason" id="shift_reason" :required="true" class="odoo-underline-input" placeholder="{{ __('hrms.shift_change.reason_placeholder') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="file" label="Attachment (Optional)" name="attachment" id="shift_attachment" :required="false" />
+                            <x-ui.odoo-form-ui type="file" label="{{ __('hrms.shift_change.attachment_optional') }}" name="attachment" id="shift_attachment" :required="false" helperText="{{ __('hrms.shift_change.attachment_help') }}" />
                         </div>
                     </div>
                     <div class="modal-footer border-top py-3">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Submit Request</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.shift_change.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.shift_change.submit_application') }}</button>
                     </div>
                 </form>
             </div>
@@ -764,14 +758,14 @@
                 <form action="{{ route('hrms.overtime.store') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="modal-header border-bottom py-3">
-                        <h5 class="modal-title fw-bold" id="applyOvertimeModalLabel">Apply Overtime</h5>
+                        <h5 class="modal-title fw-bold" id="applyOvertimeModalLabel">{{ __('hrms.overtime.apply_for_overtime') }}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body p-4">
                         @if($isAdmin)
                             <div class="mb-3">
-                                <x-ui.odoo-form-ui type="select" label="Employee" name="employee_id" id="ot_employee_id" :required="true">
-                                    <option value="">Select Employee</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.overtime.employee') }}" name="employee_id" id="ot_employee_id" :required="true">
+                                    <option value="">{{ __('hrms.overtime.select_employee') }}</option>
                                     @foreach($employees as $emp)
                                         <option value="{{ $emp->id }}">{{ $emp->full_name }} ({{ $emp->employee_id }})</option>
                                     @endforeach
@@ -780,7 +774,7 @@
                         @endif
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Date" name="date" id="ot_date" :required="true" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.overtime.overtime_date') }}" name="date" id="ot_date" :required="true" class="odoo-underline-input" value="{{ date('Y-m-d') }}" />
                         </div>
 
                         <div class="mb-3">
@@ -792,23 +786,23 @@
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="select" label="Compensation" name="compensation_type" id="ot_compensation_type" :required="true">
-                                <option value="payout">Payout (Financial Payout)</option>
-                                <option value="comp_off">Comp-Off (Credit to Leave Balance)</option>
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.overtime.compensation') }}" name="compensation_type" id="ot_compensation_type" :required="true">
+                                <option value="payout">{{ __('hrms.overtime.payout_desc') }}</option>
+                                <option value="comp_off">{{ __('hrms.overtime.comp_off_desc') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="textarea" label="Reason" name="reason" id="ot_reason" :required="true" class="odoo-underline-input" placeholder="Describe details of work performed..." />
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.overtime.reason_comments') }}" name="reason" id="ot_reason" :required="true" class="odoo-underline-input" placeholder="{{ __('hrms.overtime.reason_placeholder') }}" />
                         </div>
 
                         <div class="mb-3">
-                            <x-ui.odoo-form-ui type="file" label="Attachment (Optional)" name="attachment" id="ot_attachment" :required="false" />
+                            <x-ui.odoo-form-ui type="file" label="{{ __('hrms.overtime.attachment_optional') }}" name="attachment" id="ot_attachment" :required="false" helperText="{{ __('hrms.overtime.attachment_help') }}" />
                         </div>
                     </div>
                     <div class="modal-footer border-top py-3">
-                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Submit Application</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.overtime.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.overtime.submit_application') }}</button>
                     </div>
                 </form>
             </div>
@@ -825,22 +819,22 @@
                     <form action="{{ route('hrms.overtime.update-settings') }}" method="POST">
                         @csrf
                         <div class="modal-header border-bottom py-3">
-                            <h5 class="modal-title fw-bold" id="overtimeSettingsModalLabel">Overtime Policy Configurations</h5>
+                            <h5 class="modal-title fw-bold" id="overtimeSettingsModalLabel">{{ __('hrms.overtime.policy_config') }}</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body p-4">
                             <div class="mb-3">
-                                <x-ui.odoo-form-ui type="input" inputType="number" label="Overtime Threshold (Hrs)" name="auto_overtime_threshold_hours" id="ot_policy_threshold" :required="true" class="odoo-underline-input" step="0.5" min="0" value="{{ $tenantSettings['auto_overtime_threshold_hours'] ?? 0.0 }}" />
-                                <div class="form-text text-muted">If actual worked extra hours equal or exceed this number, the system automatically logs and approves overtime.</div>
+                                <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('hrms.overtime.threshold_hours') }}" name="auto_overtime_threshold_hours" id="ot_policy_threshold" :required="true" class="odoo-underline-input" step="0.5" min="0" value="{{ $tenantSettings['auto_overtime_threshold_hours'] ?? 0.0 }}" />
+                                <div class="form-text text-muted">{{ __('hrms.overtime.threshold_help') }}</div>
                             </div>
                             <div class="mb-3 mt-4">
-                                <x-ui.odoo-form-ui type="input" inputType="number" label="Min Request Hours" name="min_overtime_request_hours" id="ot_policy_min_request" :required="true" class="odoo-underline-input" step="0.5" min="0.5" value="{{ $tenantSettings['min_overtime_request_hours'] ?? 0.5 }}" />
-                                <div class="form-text text-muted">Minimum hours required for a manual overtime request (e.g. 2.0 hrs).</div>
+                                <x-ui.odoo-form-ui type="input" inputType="number" label="{{ __('hrms.overtime.min_request_hours') }}" name="min_overtime_request_hours" id="ot_policy_min_request" :required="true" class="odoo-underline-input" step="0.5" min="0.5" value="{{ $tenantSettings['min_overtime_request_hours'] ?? 0.5 }}" />
+                                <div class="form-text text-muted">{{ __('hrms.overtime.min_request_help') }}</div>
                             </div>
                         </div>
                         <div class="modal-footer border-top py-3">
-                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
-                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.overtime.close') }}</button>
+                            <button type="submit" class="btn btn-primary">{{ __('hrms.common.save_changes') }}</button>
                         </div>
                     </form>
                 </div>

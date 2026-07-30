@@ -46,4 +46,36 @@ class LoginController extends Controller
 
         return redirect()->route('login');
     }
+
+    public function apiLogin(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
+
+        if (! Auth::attempt($credentials)) {
+            return response()->json([
+                'message' => 'These credentials do not match our records.'
+            ], 401);
+        }
+
+        $user = Auth::user();
+        $token = $user->createToken('api-token')->plainTextToken;
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+        ]);
+    }
+
+    public function apiLogout(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
+
+        return response()->json([
+            'message' => 'Successfully logged out.'
+        ]);
+    }
 }
+

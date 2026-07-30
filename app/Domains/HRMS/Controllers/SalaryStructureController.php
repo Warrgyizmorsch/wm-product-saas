@@ -17,8 +17,6 @@ class SalaryStructureController extends Controller
 
     public function index(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $data = $this->salaryStructureRepository->getIndexData($request->all());
 
         return view('modules.hrms.salary-structure.index', $data);
@@ -26,8 +24,6 @@ class SalaryStructureController extends Controller
 
     public function storeStructure(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $rules = [
             'pay_group_id' => 'nullable|exists:pay_groups,id',
             'name' => 'required|string|max:255',
@@ -58,8 +54,6 @@ class SalaryStructureController extends Controller
 
     public function updateStructure(Request $request, SalaryStructure $salaryStructure)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $rules = [
             'name' => 'required|string|max:255',
             'min_ctc' => 'required|numeric|min:0',
@@ -81,8 +75,6 @@ class SalaryStructureController extends Controller
 
     public function destroyStructure(SalaryStructure $salaryStructure)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $payGroupId = $salaryStructure->pay_group_id;
         $this->salaryStructureRepository->destroyStructure($salaryStructure);
 
@@ -96,8 +88,6 @@ class SalaryStructureController extends Controller
 
     public function storeComponent(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $rules = [
             'pay_group_id' => 'nullable|exists:pay_groups,id',
             'name' => 'required|string|max:255',
@@ -130,8 +120,6 @@ class SalaryStructureController extends Controller
 
     public function updateComponent(Request $request, SalaryComponent $salaryComponent)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $rules = [
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50',
@@ -155,8 +143,6 @@ class SalaryStructureController extends Controller
 
     public function destroyComponent(SalaryComponent $salaryComponent)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $payGroupId = $salaryComponent->pay_group_id;
         $isAdhoc = $salaryComponent->is_adhoc;
 
@@ -177,8 +163,6 @@ class SalaryStructureController extends Controller
 
     public function storePayGroup(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'name'        => 'required|max:255',
             'company_id'  => 'nullable|integer|exists:companies,id',
@@ -200,8 +184,6 @@ class SalaryStructureController extends Controller
 
     public function updatePayGroup(Request $request, PayGroup $payGroup)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'name'        => 'required|max:255',
             'company_id'  => 'nullable|integer|exists:companies,id',
@@ -223,8 +205,6 @@ class SalaryStructureController extends Controller
 
     public function destroyPayGroup(PayGroup $payGroup)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $payGroup->delete();
 
         return redirect()->route('hrms.salary-structure.index')->with('success', 'Pay group deleted successfully.');

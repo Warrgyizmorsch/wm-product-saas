@@ -1,8 +1,8 @@
 @extends('layouts.duralux')
 
-@section('title', 'WFH Applications | SaaS ERP')
-@section('page-title', 'WFH Applications')
-@section('breadcrumb', 'HRMS / WFH Applications')
+@section('title', __('hrms.wfh.title') . ' | SaaS ERP')
+@section('page-title', __('hrms.wfh.title'))
+@section('breadcrumb', 'HRMS / ' . __('hrms.wfh.title'))
 
 @push('styles')
     <style>
@@ -78,7 +78,7 @@
 @section('page-actions')
     <div class="d-flex align-items-center gap-2">
         <button type="button" class="btn btn-primary fw-bold text-uppercase d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#applyWfhModal" style="height: 38px;">
-            <i class="feather-plus"></i> Apply WFH
+            <i class="feather-plus"></i> {{ __('hrms.wfh.apply_wfh') }}
         </button>
     </div>
 @endsection
@@ -117,7 +117,7 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex align-items-center justify-content-between p-3">
                     <div>
-                        <div class="text-muted small fw-semibold text-uppercase">Total Requests</div>
+                        <div class="text-muted small fw-semibold text-uppercase">{{ __('hrms.wfh.total_requests') }}</div>
                         <h3 class="fw-bold mb-0 text-dark mt-1">{{ number_format($totalRequests) }}</h3>
                     </div>
                     <div class="avatar-lg bg-soft-primary text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background-color: rgba(13, 110, 253, 0.1);">
@@ -131,7 +131,7 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex align-items-center justify-content-between p-3">
                     <div>
-                        <div class="text-muted small fw-semibold text-uppercase">Pending Approval</div>
+                        <div class="text-muted small fw-semibold text-uppercase">{{ __('hrms.wfh.pending_approval') }}</div>
                         <h3 class="fw-bold mb-0 text-warning mt-1">{{ number_format($pendingRequests) }}</h3>
                     </div>
                     <div class="avatar-lg bg-soft-warning text-warning rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background-color: rgba(255, 193, 7, 0.1);">
@@ -145,7 +145,7 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex align-items-center justify-content-between p-3">
                     <div>
-                        <div class="text-muted small fw-semibold text-uppercase">Approved</div>
+                        <div class="text-muted small fw-semibold text-uppercase">{{ __('hrms.wfh.approved') }}</div>
                         <h3 class="fw-bold mb-0 text-success mt-1">{{ number_format($approvedRequests) }}</h3>
                     </div>
                     <div class="avatar-lg bg-soft-success text-success rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background-color: rgba(25, 135, 84, 0.1);">
@@ -159,7 +159,7 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body d-flex align-items-center justify-content-between p-3">
                     <div>
-                        <div class="text-muted small fw-semibold text-uppercase">Rejected</div>
+                        <div class="text-muted small fw-semibold text-uppercase">{{ __('hrms.wfh.rejected') }}</div>
                         <h3 class="fw-bold mb-0 text-danger mt-1">{{ number_format($rejectedRequests) }}</h3>
                     </div>
                     <div class="avatar-lg bg-soft-danger text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; background-color: rgba(220, 53, 69, 0.1);">
@@ -174,8 +174,8 @@
     <div class="card border-0 shadow-sm rounded-3">
         <div class="card-header bg-white border-0 pt-4 px-4 d-flex align-items-center justify-content-between">
             <div>
-                <h5 class="fw-bold text-dark mb-0"><i class="feather-home me-2 text-primary"></i> Work From Home Applications</h5>
-                <p class="text-muted fs-12 mb-0">Review and manage work from home applications</p>
+                <h5 class="fw-bold text-dark mb-0"><i class="feather-home me-2 text-primary"></i> {{ __('hrms.wfh.title') }}</h5>
+                <p class="text-muted fs-12 mb-0">{{ __('hrms.wfh.title') }}</p>
             </div>
             
             <div class="d-flex align-items-center gap-2">
@@ -183,34 +183,34 @@
                     <!-- Search Input -->
                     <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 220px; max-width: 280px; height: 38px;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                        <input type="text" name="search" id="wfh_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search employee..." value="{{ request('search') }}" style="box-shadow: none; height: 32px;">
+                        <input type="text" name="search" id="wfh_search" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.wfh.search_employee') }}" value="{{ request('search') }}" style="box-shadow: none; height: 32px;">
                     </div>
 
                     <!-- Sort Dropdown -->
-                    <x-ui.sort-dropdown label="Sort">
+                    <x-ui.sort-dropdown label="{{ __('hrms.assets.filters') }}">
                         <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="setWfhSort('newest', this); event.preventDefault();">
-                            <span>Newest First</span>
+                            <span>{{ __('hrms.assets.sort_newest') }}</span>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('oldest', this); event.preventDefault();">
-                            <span>Oldest First</span>
+                            <span>{{ __('hrms.assets.sort_oldest') }}</span>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('duration_high', this); event.preventDefault();">
-                            <span>Duration: High to Low</span>
+                            <span>{{ __('hrms.wfh.sort_duration_high_low') }}</span>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setWfhSort('duration_low', this); event.preventDefault();">
-                            <span>Duration: Low to High</span>
+                            <span>{{ __('hrms.wfh.sort_duration_low_high') }}</span>
                         </a>
                     </x-ui.sort-dropdown>
 
                     <!-- Filter Dropdown -->
-                    <x-ui.filter label="Filter" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                    <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.assets.filters') }}</h6>
                         
                         @if($isAdmin)
                             <div class="mb-3" style="min-width: 250px;">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Employee</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.wfh.employee') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="employee_id" id="filter_wfh_employee_id">
-                                    <option value="">All Employees</option>
+                                    <option value="">{{ __('hrms.common.all_employees') }}</option>
                                     @foreach(($employees ?? []) as $emp)
                                         <option value="{{ $emp->id }}" {{ request('employee_id') == $emp->id ? 'selected' : '' }}>
                                             {{ $emp->full_name }} ({{ $emp->employee_id }})
@@ -221,12 +221,12 @@
                         @endif
 
                         <div class="mb-3" style="min-width: 250px;">
-                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.wfh.status') }}</label>
                             <x-ui.odoo-form-ui type="select" name="status" id="filter_wfh_status">
-                                <option value="">All Statuses</option>
-                                <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
-                                <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Approved</option>
-                                <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                <option value="">{{ __('hrms.wfh.all_statuses') }}</option>
+                                <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>{{ __('hrms.wfh.pending') }}</option>
+                                <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>{{ __('hrms.wfh.approved') }}</option>
+                                <option value="rejected" {{ request('status') == 'rejected' ? 'selected' : '' }}>{{ __('hrms.wfh.rejected') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
 
@@ -248,14 +248,14 @@
                     <thead class="table-light">
                         <tr>
                             @if($isAdmin)
-                                <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="min-width:160px;">Employee</th>
+                                <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="min-width:160px;">{{ __('hrms.wfh.employee') }}</th>
                             @endif
-                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="min-width:170px;">Timeline</th>
-                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:70px;">Days</th>
-                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:240px;">Reason</th>
-                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:65px;">File</th>
-                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="min-width:130px;">Status</th>
-                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="min-width:110px;">Actions</th>
+                            <th class="fs-12 text-uppercase text-muted fw-semibold {{ !$isAdmin ? 'ps-3' : '' }}" style="min-width:170px;">{{ __('hrms.wfh.start_date') }} – {{ __('hrms.wfh.end_date') }}</th>
+                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:70px;">{{ __('hrms.wfh.duration') }}</th>
+                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="min-width:240px;">{{ __('hrms.wfh.reason') }}</th>
+                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width:65px;">{{ __('hrms.employees.tbl_file') }}</th>
+                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="min-width:130px;">{{ __('hrms.wfh.status') }}</th>
+                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="min-width:110px;">{{ __('hrms.wfh.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -269,11 +269,11 @@
                                     : '—';
 
                                 $statusBadge = match($req->status) {
-                                    'approved'               => ['cls' => 'bg-soft-success text-success', 'icon' => 'feather-check-circle',  'lbl' => 'Approved'],
-                                    'pending'                => ['cls' => 'bg-soft-warning text-warning', 'icon' => 'feather-clock',          'lbl' => 'Pending'],
-                                    'rejected'               => ['cls' => 'bg-soft-danger text-danger',   'icon' => 'feather-x-circle',       'lbl' => 'Rejected'],
-                                    'cancellation_requested' => ['cls' => 'bg-soft-info text-info',       'icon' => 'feather-rotate-ccw',     'lbl' => 'Cancellation Requested'],
-                                    'cancelled'              => ['cls' => 'bg-soft-secondary text-secondary', 'icon' => 'feather-slash',      'lbl' => 'Cancelled'],
+                                    'approved'               => ['cls' => 'bg-soft-success text-success', 'icon' => 'feather-check-circle',  'lbl' => __('hrms.wfh.approved')],
+                                    'pending'                => ['cls' => 'bg-soft-warning text-warning', 'icon' => 'feather-clock',          'lbl' => __('hrms.wfh.pending')],
+                                    'rejected'               => ['cls' => 'bg-soft-danger text-danger',   'icon' => 'feather-x-circle',       'lbl' => __('hrms.wfh.rejected')],
+                                    'cancellation_requested' => ['cls' => 'bg-soft-info text-info',       'icon' => 'feather-rotate-ccw',     'lbl' => __('hrms.wfh.cancellation_requested')],
+                                    'cancelled'              => ['cls' => 'bg-soft-secondary text-secondary', 'icon' => 'feather-slash',      'lbl' => __('hrms.wfh.cancelled')],
                                     default                  => ['cls' => 'bg-light text-secondary',      'icon' => 'feather-circle',         'lbl' => ucfirst($req->status)],
                                 };
 
@@ -368,15 +368,15 @@
                                                             data-bs-display="static"
                                                             aria-expanded="false"
                                                             style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
-                                                            title="Action">
-                                                        <span>Action</span>
+                                                            title="{{ __('hrms.wfh.status') }}">
+                                                        <span>{{ __('hrms.wfh.status') }}</span>
                                                     </button>
                                                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
                                                         <li>
                                                             <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirm('Approve this WFH cancellation?')" class="m-0">
                                                                 @csrf
                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-success">
-                                                                    <span>Accept</span>
+                                                                    <span>{{ __('hrms.wfh.approved') }}</span>
                                                                     <i class="feather-check text-success fs-12"></i>
                                                                 </button>
                                                             </form>
@@ -385,7 +385,7 @@
                                                             <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirm('Deny this cancellation request?')" class="m-0">
                                                                 @csrf
                                                                 <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-danger">
-                                                                    <span>Deny</span>
+                                                                    <span>{{ __('hrms.wfh.rejected') }}</span>
                                                                     <i class="feather-x text-danger fs-12"></i>
                                                                 </button>
                                                             </form>
@@ -411,7 +411,7 @@
                                                                href="#"
                                                                onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'approved'); return false;"
                                                                style="{{ $req->status === 'approved' ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                <span>Approved</span>
+                                                                <span>{{ __('hrms.wfh.approved') }}</span>
                                                             </a>
                                                         </li>
                                                         <li>
@@ -420,7 +420,7 @@
                                                                data-action="{{ route('hrms.wfh.reject', $req->id) }}"
                                                                onclick="openWfhRejectModal(this); return false;"
                                                                style="{{ $req->status === 'rejected' ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                <span>Rejected</span>
+                                                                <span>{{ __('hrms.wfh.rejected') }}</span>
                                                             </a>
                                                         </li>
                                                         <li>
@@ -428,7 +428,7 @@
                                                                href="#"
                                                                onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'pending'); return false;"
                                                                style="{{ $req->status === 'pending' ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                <span>Pending</span>
+                                                                <span>{{ __('hrms.wfh.pending') }}</span>
                                                             </a>
                                                         </li>
                                                     </ul>
@@ -523,7 +523,7 @@
         <div class="modal-content border-0 shadow">
             <div class="modal-header border-bottom py-3">
                 <h5 class="modal-title fw-bold text-dark" id="wfhCancellationModalLabel">
-                    <i class="feather-x-circle text-warning me-2"></i>Request WFH Cancellation
+                    <i class="feather-x-circle text-warning me-2"></i>{{ __('hrms.wfh.delete_application') }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -531,17 +531,17 @@
                 @csrf
                 <div class="modal-body p-4">
                     <p class="text-muted fs-13 mb-3">
-                        Please provide a reason for requesting cancellation of this approved WFH. The admin will review and approve or deny your request.
+                        {{ __('hrms.wfh.confirm_delete') }}
                     </p>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold text-dark fs-13">Cancellation Reason <span class="text-danger">*</span></label>
-                        <textarea name="cancellation_reason" id="wfh_cancellation_reason" class="form-control fs-13" rows="3" placeholder="Explain why you want to cancel this WFH..." required maxlength="1000"></textarea>
+                        <label class="form-label fw-semibold text-dark fs-13">{{ __('hrms.wfh.reason_comments') }} <span class="text-danger">*</span></label>
+                        <textarea name="cancellation_reason" id="wfh_cancellation_reason" class="form-control fs-13" rows="3" placeholder="{{ __('hrms.wfh.reason_placeholder') }}" required maxlength="1000"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-top py-3 d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('hrms.wfh.close') }}</button>
                     <button type="submit" class="btn btn-warning text-dark fw-semibold">
-                        <i class="feather-send me-1"></i>Submit Request
+                        <i class="feather-send me-1"></i>{{ __('hrms.wfh.submit_application') }}
                     </button>
                 </div>
             </form>
@@ -554,7 +554,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow">
             <div class="modal-header border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark" id="applyWfhModalLabel"><i class="feather-home me-2 text-primary"></i> Apply Work From Home</h5>
+                <h5 class="modal-title fw-bold text-dark" id="applyWfhModalLabel"><i class="feather-home me-2 text-primary"></i> {{ __('hrms.wfh.apply_for_wfh') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{{ route('hrms.wfh.store') }}" method="POST" enctype="multipart/form-data">
@@ -573,8 +573,8 @@
                     @if($isAdmin)
                         <div class="row mb-3">
                             <div class="col-12">
-                                <x-ui.odoo-form-ui type="select" label="Employee" name="employee_id" id="wfh_employee_select" :required="true" class="odoo-select2-custom">
-                                    <option value="">-- Select Employee --</option>
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.wfh.employee') }}" name="employee_id" id="wfh_employee_select" :required="true" class="odoo-select2-custom">
+                                    <option value="">-- {{ __('hrms.wfh.select_employee') }} --</option>
                                     @foreach($employees as $emp)
                                         <option value="{{ $emp->id }}" {{ (old('employee_id') == $emp->id || ($employee && $employee->id == $emp->id)) ? 'selected' : '' }}>
                                             {{ $emp->full_name }} ({{ $emp->employee_id }})
@@ -587,10 +587,10 @@
 
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="Start Date" name="start_date" id="wfh_start_date" :required="true" value="{{ old('start_date') }}" class="odoo-underline-input" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.wfh.start_date') }}" name="start_date" id="wfh_start_date" :required="true" value="{{ old('start_date') }}" class="odoo-underline-input" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="Start Date Session" name="start_date_type" id="wfh_start_type" :required="true" class="odoo-select2-custom">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.wfh.start_date') }} Session" name="start_date_type" id="wfh_start_type" :required="true" class="odoo-select2-custom">
                                 <option value="full_day" {{ old('start_date_type') == 'full_day' ? 'selected' : '' }}>Full Day</option>
                                 <option value="first_half" {{ old('start_date_type') == 'first_half' ? 'selected' : '' }}>First Half</option>
                                 <option value="second_half" {{ old('start_date_type') == 'second_half' ? 'selected' : '' }}>Second Half</option>
@@ -600,10 +600,10 @@
 
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="input" inputType="date" label="End Date" name="end_date" id="wfh_end_date" :required="true" value="{{ old('end_date') }}" class="odoo-underline-input" />
+                            <x-ui.odoo-form-ui type="input" inputType="date" label="{{ __('hrms.wfh.end_date') }}" name="end_date" id="wfh_end_date" :required="true" value="{{ old('end_date') }}" class="odoo-underline-input" />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui type="select" label="End Date Session" name="end_date_type" id="wfh_end_type" :required="true" class="odoo-select2-custom">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.wfh.end_date') }} Session" name="end_date_type" id="wfh_end_type" :required="true" class="odoo-select2-custom">
                                 <option value="full_day" {{ old('end_date_type') == 'full_day' ? 'selected' : '' }}>Full Day</option>
                                 <option value="first_half" {{ old('end_date_type') == 'first_half' ? 'selected' : '' }}>First Half</option>
                                 <option value="second_half" {{ old('end_date_type') == 'second_half' ? 'selected' : '' }}>Second Half</option>
@@ -614,7 +614,7 @@
                     <div class="col-12 mb-3">
                         <div id="wfh_calculated_duration_display" class="alert alert-info py-2 fs-12 mb-0 d-flex justify-content-between align-items-center">
                             <div>
-                                <i class="feather-info me-1"></i> Estimated Duration: <strong id="wfh_duration_val">0.0</strong> Day(s)
+                                <i class="feather-info me-1"></i> Estimated {{ __('hrms.wfh.duration') }}: <strong id="wfh_duration_val">0.0</strong> Day(s)
                             </div>
                             <div class="fw-semibold text-primary" id="wfh_session_flow_val">
                                 (Full Day)
@@ -625,19 +625,19 @@
 
                     <div class="row mb-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="textarea" label="Reason for WFH" name="reason" :required="true" class="odoo-underline-input" placeholder="Specify your reason for working from home...">{{ old('reason') }}</x-ui.odoo-form-ui>
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.wfh.reason_comments') }}" name="reason" :required="true" class="odoo-underline-input" placeholder="{{ __('hrms.wfh.reason_placeholder') }}">{{ old('reason') }}</x-ui.odoo-form-ui>
                         </div>
                     </div>
 
                     <div class="row mb-3">
                         <div class="col-12">
-                            <x-ui.odoo-form-ui type="file" label="Attachment (Optional)" name="attachment" id="wfh_attachment" :required="false" helperText="Allowed formats: PDF, JPG, PNG, DOC (Max 5MB)" />
+                            <x-ui.odoo-form-ui type="file" label="{{ __('hrms.wfh.attachment_optional') }}" name="attachment" id="wfh_attachment" :required="false" helperText="{{ __('hrms.wfh.attachment_help') }}" />
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer border-top py-3">
-                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">Discard</button>
-                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">Submit Application</button>
+                    <button type="button" class="btn btn-light border px-4 text-uppercase fw-bold" data-bs-dismiss="modal" style="font-size: 11px;">{{ __('hrms.wfh.close') }}</button>
+                    <button type="submit" class="btn btn-primary px-4 text-uppercase fw-bold" style="font-size: 11px;">{{ __('hrms.wfh.submit_application') }}</button>
                 </div>
             </form>
         </div>
@@ -649,20 +649,20 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow">
             <div class="modal-header border-bottom py-3">
-                <h5 class="modal-title fw-bold text-danger"><i class="feather-x-circle me-2"></i> Reject WFH Application</h5>
+                <h5 class="modal-title fw-bold text-danger"><i class="feather-x-circle me-2"></i> {{ __('hrms.wfh.rejected') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="rejectWfhForm" method="POST" action="">
                 @csrf
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary fs-13">Rejection Reason <span class="text-danger">*</span></label>
-                        <textarea name="rejection_reason" class="form-control" rows="3" placeholder="Please provide reason for rejecting this WFH application..." required></textarea>
+                        <label class="form-label fw-semibold text-secondary fs-13">{{ __('hrms.wfh.reason_comments') }} <span class="text-danger">*</span></label>
+                        <textarea name="rejection_reason" class="form-control" rows="3" placeholder="{{ __('hrms.wfh.reason_placeholder') }}" required></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-top py-3">
-                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger">Confirm Rejection</button>
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">{{ __('hrms.wfh.close') }}</button>
+                    <button type="submit" class="btn btn-danger">{{ __('hrms.wfh.rejected') }}</button>
                 </div>
             </form>
         </div>

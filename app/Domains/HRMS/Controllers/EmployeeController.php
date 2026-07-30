@@ -18,8 +18,6 @@ class EmployeeController extends Controller
 
     public function index(Request $request): View
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $data = $this->employeeRepository->getDirectoryData($request->all());
 
         return view('modules.hrms.employees.index', $data);
@@ -27,8 +25,6 @@ class EmployeeController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $this->validatePayload($request);
         $validated = $this->normalizeHierarchy($validated);
 
@@ -41,8 +37,6 @@ class EmployeeController extends Controller
 
     public function show(Request $request, Employee $employee): View
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $data = $this->employeeRepository->getProfileData($employee, $request->all());
 
         return view('modules.hrms.employees.show', $data);
@@ -50,8 +44,6 @@ class EmployeeController extends Controller
 
     public function update(Request $request, Employee $employee): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $oldPlanId = $employee->leave_plan_id;
 
         $validated = $this->validatePayload($request, $employee);
@@ -85,8 +77,6 @@ class EmployeeController extends Controller
 
     public function destroy(Employee $employee): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $this->employeeRepository->deleteEmployee($employee);
 
         return redirect()
@@ -159,8 +149,6 @@ class EmployeeController extends Controller
 
     public function storeAdhocComponent(Request $request, Employee $employee): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'salary_component_id' => 'required|exists:salary_components,id',
             'amount'              => 'required|numeric|min:0',
@@ -173,22 +161,18 @@ class EmployeeController extends Controller
 
         \App\Domains\HRMS\Models\EmployeeAdhocComponent::create($validated);
 
-        return redirect()->back()->with('success', 'Ad-hoc salary component added successfully.');
+        return redirect()->back()->with('success', __('hrms.employees.adhoc_add_success'));
     }
 
     public function destroyAdhocComponent(\App\Domains\HRMS\Models\EmployeeAdhocComponent $adhocComponent): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $adhocComponent->delete();
 
-        return redirect()->back()->with('success', 'Ad-hoc salary component deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.employees.adhoc_delete_success'));
     }
 
     public function storePenalty(Request $request, Employee $employee): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'date'           => 'required|date',
             'rule_type'      => 'required|string|max:255',
@@ -202,22 +186,18 @@ class EmployeeController extends Controller
 
         \App\Domains\HRMS\Models\EmployeePenalty::create($validated);
 
-        return redirect()->back()->with('success', 'Attendance penalty instance logged successfully.');
+        return redirect()->back()->with('success', __('hrms.employees.penalty_log_success'));
     }
 
     public function destroyPenalty(\App\Domains\HRMS\Models\EmployeePenalty $penalty): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $penalty->delete();
 
-        return redirect()->back()->with('success', 'Attendance penalty instance deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.employees.penalty_delete_success'));
     }
 
     public function storeEmploymentHistory(Request $request, Employee $employee): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_name'    => 'required|string|max:255',
             'designation'     => 'required|string|max:255',
@@ -228,22 +208,18 @@ class EmployeeController extends Controller
 
         $employee->employmentHistories()->create($validated);
 
-        return redirect()->back()->with('success', 'Employment history record added successfully.');
+        return redirect()->back()->with('success', __('hrms.employees.history_add_success'));
     }
 
     public function destroyEmploymentHistory(Employee $employee, \App\Domains\HRMS\Models\EmployeeEmploymentHistory $history): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $history->delete();
 
-        return redirect()->back()->with('success', 'Employment history record deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.employees.history_delete_success'));
     }
 
     public function requestDocument(Request $request, Employee $employee): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $request->validate([
             'name'        => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
@@ -263,16 +239,11 @@ class EmployeeController extends Controller
             'requested_by_id'   => auth()->id(),
         ]);
 
-        return redirect()->back()->with('success', 'Document request created successfully.');
+        return redirect()->back()->with('success', __('hrms.employees.doc_request_success'));
     }
 
     public function uploadDocument(Request $request, Employee $employee): RedirectResponse
     {
-        $isHR = auth()->user()->hasHrPermission('hr.settings.manage');
-        $isOwnProfile = auth()->id() === ($employee->user_id ?? null);
-        
-        abort_unless($isHR || $isOwnProfile, 403);
-
         $request->validate([
             'document_id' => 'nullable|exists:documents,id',
             'name'        => 'nullable|required_without:document_id|string|max:255',
@@ -323,8 +294,6 @@ class EmployeeController extends Controller
 
     public function destroyDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($document->file_path);
         }
@@ -336,8 +305,6 @@ class EmployeeController extends Controller
 
     public function approveDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $document->update([
             'status' => 'approved',
         ]);
@@ -347,8 +314,6 @@ class EmployeeController extends Controller
 
     public function rejectDocument(\App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $document->update([
             'status' => 'rejected',
         ]);
@@ -358,8 +323,6 @@ class EmployeeController extends Controller
 
     public function updateDocumentStatus(Request $request, \App\Domains\HRMS\Models\Document $document): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'status' => 'required|in:approved,rejected',
         ]);

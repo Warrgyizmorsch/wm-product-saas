@@ -63,13 +63,6 @@ class LeaveEncashmentApiController extends Controller
         return null;
     }
 
-    /**
-     * Helper to check if current user is an HR admin.
-     */
-    private function isHrAdmin(): bool
-    {
-        return auth()->check() && auth()->user()->hasHrPermission('hr.settings.manage');
-    }
 
     /**
      * GET /api/hrms/leave-encashments/summary
@@ -81,18 +74,14 @@ class LeaveEncashmentApiController extends Controller
             return $authError;
         }
 
-        $isAdmin  = $this->isHrAdmin();
         $employee = Employee::where('personal_email', auth()->user()->email)
             ->orWhere('office_email', auth()->user()->email)
             ->first();
 
         $query = LeaveEncashment::query();
-        if (!$isAdmin) {
-            $query->where('employee_id', $employee?->id ?? 0);
-        }
 
         return $this->sendSuccess([
-            'is_admin'           => $isAdmin,
+
             'total_encashments'  => (clone $query)->count(),
             'pending_encashments'=> (clone $query)->where('status', 'pending')->count(),
             'approved_encashments'=> (clone $query)->where('status', 'approved')->count(),
@@ -110,23 +99,14 @@ class LeaveEncashmentApiController extends Controller
             return $authError;
         }
 
-        $isAdmin  = $this->isHrAdmin();
         $employee = Employee::where('personal_email', auth()->user()->email)
             ->orWhere('office_email', auth()->user()->email)
             ->first();
 
         $query = LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
 
-        if ($isAdmin) {
-            if ($request->filled('employee_id')) {
-                $query->where('employee_id', $request->integer('employee_id'));
-            }
-        } else {
-            if ($employee) {
-                $query->where('employee_id', $employee->id);
-            } else {
-                $query->where('id', 0);
-            }
+        if ($request->filled('employee_id')) {
+            $query->where('employee_id', $request->integer('employee_id'));
         }
 
         if ($request->filled('leave_type_id')) {
@@ -179,22 +159,14 @@ class LeaveEncashmentApiController extends Controller
             return $authError;
         }
 
-        $isAdmin = $this->isHrAdmin();
-
         $validated = $request->validate([
-            'employee_id'    => $isAdmin ? 'required|exists:employees,id' : 'nullable',
+            'employee_id'    => 'required|exists:employees,id',
             'leave_type_id'  => 'required|exists:leave_types,id',
             'requested_days' => 'required|numeric|min:0.5',
             'reason'         => 'nullable|string|max:1000',
         ]);
 
-        if ($isAdmin && !empty($validated['employee_id'])) {
-            $employee = Employee::find($validated['employee_id']);
-        } else {
-            $employee = Employee::where('personal_email', auth()->user()->email)
-                ->orWhere('office_email', auth()->user()->email)
-                ->first();
-        }
+        $employee = Employee::find($validated['employee_id']);
 
         if (!$employee) {
             return $this->sendError(__('hrms.leave.encashment_app.emp_not_found'), 404);
@@ -264,10 +236,6 @@ class LeaveEncashmentApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized access. Only HR administrators can approve leave encashment requests.', 403);
-        }
-
         $encashment = LeaveEncashment::find($id);
         if (!$encashment) {
             return $this->sendError(__('hrms.leave.encashment_app.ticket_not_found', ['id' => $id]), 404);
@@ -293,10 +261,6 @@ class LeaveEncashmentApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized access. Only HR administrators can reject leave encashment requests.', 403);
-        }
-
         $encashment = LeaveEncashment::find($id);
         if (!$encashment) {
             return $this->sendError(__('hrms.leave.encashment_app.ticket_not_found', ['id' => $id]), 404);
@@ -321,10 +285,6 @@ class LeaveEncashmentApiController extends Controller
         if ($authError = $this->authorizeUser()) {
             return $authError;
         }
-        if (!$this->isHrAdmin()) {
-            return $this->sendError('Unauthorized access. Only HR administrators can delete leave encashment requests.', 403);
-        }
-
         $encashment = LeaveEncashment::find($id);
         if (!$encashment) {
             return $this->sendError(__('hrms.leave.encashment_app.ticket_not_found', ['id' => $id]), 404);

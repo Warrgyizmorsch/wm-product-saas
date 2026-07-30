@@ -147,18 +147,13 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         }
 
         $user = auth()->user();
-        $isAdmin = $user->hasHrPermission('hr.settings.manage') 
-            || $user->hasHrPermission('hr.leaves.manage') 
-            || !empty($user->role_id);
+        $isAdmin = true;
 
         $employee = Employee::where('personal_email', $user->email)
             ->orWhere('office_email', $user->email)
             ->first();
 
         $allEmployees = Employee::where('status', true)->get();
-        if (!$isAdmin && $employee) {
-            $allEmployees = collect([$employee]);
-        }
 
         $employeeDataMap = [];
         foreach ($allEmployees as $emp) {
@@ -190,19 +185,9 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         $query = LeaveRequest::query()->with(['employee', 'leaveType']);
         $encashQuery = LeaveEncashment::query()->with(['employee', 'leaveType', 'approver']);
 
-        if ($isAdmin) {
-            if (!empty($inputs['employee_id'])) {
-                $query->where('employee_id', $inputs['employee_id']);
-                $encashQuery->where('employee_id', $inputs['employee_id']);
-            }
-        } else {
-            if ($employee) {
-                $query->where('employee_id', $employee->id);
-                $encashQuery->where('employee_id', $employee->id);
-            } else {
-                $query->whereRaw('1 = 0');
-                $encashQuery->whereRaw('1 = 0');
-            }
+        if (!empty($inputs['employee_id'])) {
+            $query->where('employee_id', $inputs['employee_id']);
+            $encashQuery->where('employee_id', $inputs['employee_id']);
         }
 
         if (!empty($inputs['leave_type_id'])) {

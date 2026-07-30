@@ -24,7 +24,7 @@ use App\Domains\HRMS\Controllers\Api\OvertimeRequestApiController;
 // 1. ORGANIZATION STRUCTURE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/org')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.org.')
     ->group(function () {
 
@@ -71,7 +71,7 @@ Route::prefix('api/hrms/org')
 // 2. SALARY STRUCTURE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/salary-structure')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.salary-structure.')
     ->group(function () {
 
@@ -104,7 +104,7 @@ Route::prefix('api/hrms/salary-structure')
 // 3. LEAVE STRUCTURE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/leave-structure')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.leave-structure.')
     ->group(function () {
 
@@ -135,7 +135,7 @@ Route::prefix('api/hrms/leave-structure')
 // 4. PENALIZATION POLICY API ROUTES
 // ==========================================
 Route::prefix('api/hrms/penalization-policy')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.penalization-policy.')
     ->group(function () {
 
@@ -156,7 +156,7 @@ Route::prefix('api/hrms/penalization-policy')
 // 5. WORK ROSTER & SHIFT SCHEDULING API ROUTES
 // ==========================================
 Route::prefix('api/hrms/roster')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.roster.')
     ->group(function () {
 
@@ -182,7 +182,7 @@ Route::prefix('api/hrms/roster')
 // 6. ASSET MANAGEMENT API ROUTES
 // ==========================================
 Route::prefix('api/hrms/assets')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.assets.')
     ->group(function () {
 
@@ -217,7 +217,7 @@ Route::prefix('api/hrms/assets')
 // 7. EMPLOYEE DIRECTORY & PROFILE API ROUTES
 // ==========================================
 Route::prefix('api/hrms/employees')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.employees.')
     ->group(function () {
 
@@ -260,7 +260,7 @@ Route::prefix('api/hrms/employees')
 // 8. LEAVE REQUESTS & APPLICATIONS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/leave-requests')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.leave-requests.')
     ->group(function () {
 
@@ -281,7 +281,7 @@ Route::prefix('api/hrms/leave-requests')
 // 8B. WFH REQUESTS & APPLICATIONS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/wfh-requests')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.wfh-requests.')
     ->group(function () {
         Route::get('/summary', [WfhRequestApiController::class, 'summary'])->name('summary');
@@ -297,7 +297,7 @@ Route::prefix('api/hrms/wfh-requests')
 // 8C. SHIFT CHANGE REQUESTS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/shift-change-requests')
-    ->middleware(['web'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.shift-change-requests.')
     ->group(function () {
         Route::get('/summary', [ShiftChangeRequestApiController::class, 'summary'])->name('summary');
@@ -312,7 +312,7 @@ Route::prefix('api/hrms/shift-change-requests')
 // 8D. OVERTIME REQUESTS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/overtime-requests')
-    ->middleware(['web'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.overtime-requests.')
     ->group(function () {
         Route::get('/summary', [OvertimeRequestApiController::class, 'summary'])->name('summary');
@@ -328,7 +328,7 @@ Route::prefix('api/hrms/overtime-requests')
 // 9. LEAVE ENCASHMENTS API ROUTES
 // ==========================================
 Route::prefix('api/hrms/leave-encashments')
-    ->middleware(['throttle:60,1'])
+    ->middleware(['auth:sanctum', 'throttle:60,1'])
     ->name('api.hrms.leave-encashments.')
     ->group(function () {
 

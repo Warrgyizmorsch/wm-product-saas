@@ -1669,7 +1669,6 @@
                         @php
                             $empLeaveRequests = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
                             $empLeaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
-                            $isAdminUser      = auth()->user() && (auth()->user()->hasHrPermission('hr.settings.manage') || !empty(auth()->user()->role_id));
                             $allLeaveTypes    = $employee->leavePlan ? $employee->leavePlan->types : \App\Domains\HRMS\Models\LeaveType::where('is_active', true)->orderBy('name')->get();
                         @endphp
 
@@ -2036,9 +2035,7 @@
                                                         <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 25%;">{{ __('hrms.leave.leave_type_and_detail') }}</th>
                                                         <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 35%;">{{ __('hrms.leave.encashment_app.reason') }}</th>
                                                         <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 15%;">{{ __('ui.status') ?? 'Status' }}</th>
-                                                        @if($isAdminUser)
-                                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-4" style="width: 25%;">{{ __('hrms.leave.app.actions') }}</th>
-                                                        @endif
+                                                        <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-4" style="width: 25%;">{{ __('hrms.leave.app.actions') }}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -2081,33 +2078,31 @@
                                                                     <i class="{{ $encStatusBadge['icon'] }} me-1"></i>{{ $encStatusBadge['lbl'] }}
                                                                 </span>
                                                             </td>
-                                                            @if($isAdminUser)
-                                                                <td class="text-end pe-3" style="white-space: nowrap;">
-                                                                    <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="background-color: #8c4444 !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
-                                                                            <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
-                                                                        </button>
-                                                                        <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0; background: #ffffff;">
-                                                                            <li>
-                                                                                <form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST">
-                                                                                    @csrf
-                                                                                    <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'approved' ? 'color: #8c4444 !important;' : '' }}">
-                                                                                        <span>{{ __('hrms.leave.app.status_approved') }}</span>
-                                                                                    </button>
-                                                                                </form>
-                                                                            </li>
-                                                                            <li>
-                                                                                <form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST">
-                                                                                    @csrf
-                                                                                    <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'rejected' ? 'color: #8c4444 !important;' : '' }}">
-                                                                                        <span>{{ __('hrms.leave.app.status_rejected') }}</span>
-                                                                                    </button>
-                                                                                </form>
-                                                                            </li>
-                                                                        </ul>
-                                                                    </div>
-                                                                </td>
-                                                            @endif
+                                                            <td class="text-end pe-3" style="white-space: nowrap;">
+                                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                    <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="background-color: #8c4444 !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" title="Change Status">
+                                                                        <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
+                                                                    </button>
+                                                                    <ul class="dropdown-menu dropdown-menu-start shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 100%; width: 100%; border-radius: 8px; left: 0; background: #ffffff;">
+                                                                        <li>
+                                                                            <form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST">
+                                                                                @csrf
+                                                                                <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'approved' ? 'color: #8c4444 !important;' : '' }}">
+                                                                                    <span>{{ __('hrms.leave.app.status_approved') }}</span>
+                                                                                </button>
+                                                                            </form>
+                                                                        </li>
+                                                                        <li>
+                                                                            <form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST">
+                                                                                @csrf
+                                                                                <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'rejected' ? 'color: #8c4444 !important;' : '' }}">
+                                                                                    <span>{{ __('hrms.leave.app.status_rejected') }}</span>
+                                                                                </button>
+                                                                            </form>
+                                                                        </li>
+                                                                    </ul>
+                                                                </div>
+                                                            </td>
                                                         </tr>
                                                     @endforeach
                                                     <tr id="no_matching_emp_leave_enc_row" class="d-none">
@@ -2136,7 +2131,6 @@
                                     <x-ui.drawer id="leaveDetailDrawer" :title="__('hrms.employees.lbl_leave_app_detail')" style="width:440px;max-width:100%;">
                                          {{-- Merged Employee & Leave Type Card --}}
                                          <div class="mb-3 p-3 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
-                                             @if($isAdminUser)
                                                  <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom" style="border-color: #e2e8f0 !important;">
                                                      <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold" style="width:34px;height:34px;font-size:13px;" id="ld-emp-avatar">E</div>
                                                      <div>
@@ -2144,7 +2138,6 @@
                                                          <div class="fs-11 text-muted" id="ld-emp-code"></div>
                                                      </div>
                                                  </div>
-                                             @endif
 
                                              <div class="d-flex align-items-start gap-3">
                                                  <span id="ld-color-dot" class="rounded-circle flex-shrink-0 mt-1" style="width:12px;height:12px;display:inline-block;"></span>
@@ -2213,7 +2206,6 @@
                                          </div>
 
                                         {{-- Status Change --}}
-                                        @if(auth()->user()->hasHrPermission('hr.settings.manage'))
                                             <hr class="my-3" id="ld-status-hr">
                                             <div id="ld-status-change-wrap">
                                                 <div class="text-muted fs-11 text-uppercase fw-semibold mb-2" style="letter-spacing:.5px;">{{ __('hrms.employees.lbl_update_status') }}</div>
@@ -2239,7 +2231,6 @@
                                                     </div>
                                                 </form>
                                             </div>
-                                        @endif
 
                                         <x-slot:footer>
                                             <button type="button" class="btn btn-light border fw-semibold text-uppercase" data-bs-dismiss="offcanvas">{{ __('hrms.common.close_panel') }}</button>
@@ -2486,139 +2477,107 @@
                                                 </td>
                                                 <td class="text-end pe-3" style="white-space: nowrap; min-width:180px;">
                                                     <div class="d-flex align-items-center justify-content-end gap-2">
-                                                        @if($isAdminUser)
-                                                            @if($req->status === 'cancellation_requested')
-                                                                {{-- Cancellation dropdown: Accept / Deny --}}
-                                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative" onclick="event.stopPropagation();">
-                                                                    <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
-                                                                            type="button" 
-                                                                            data-bs-toggle="dropdown" 
-                                                                            data-bs-boundary="viewport"
-                                                                            aria-expanded="false"
-                                                                            style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
-                                                                            title="Action">
-                                                                        <span>Action</span>
-                                                                    </button>
-                                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
-                                                                        <li>
-                                                                            <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirm('Approve this WFH cancellation?')" class="m-0">
-                                                                                @csrf
-                                                                                <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-success">
-                                                                                    <span>Accept</span>
-                                                                                    <i class="feather-check text-success fs-12"></i>
-                                                                                </button>
-                                                                            </form>
-                                                                        </li>
-                                                                        <li>
-                                                                            <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirm('Deny this cancellation request?')" class="m-0">
-                                                                                @csrf
-                                                                                <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-danger">
-                                                                                    <span>Deny</span>
-                                                                                    <i class="feather-x text-danger fs-12"></i>
-                                                                                </button>
-                                                                            </form>
-                                                                        </li>
-                                                                    </ul>
-                                                                </div>
-                                                            @elseif(!in_array($req->status, ['cancelled']))
-                                                                {{-- Normal status dropdown: Approved / Rejected / Pending --}}
-                                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative" onclick="event.stopPropagation();">
-                                                                    <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
-                                                                            type="button" 
-                                                                            data-bs-toggle="dropdown" 
-                                                                            data-bs-boundary="viewport"
-                                                                            aria-expanded="false"
-                                                                            style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
-                                                                            title="Change Status">
-                                                                        <span>{{ $statusBadge['lbl'] }}</span>
-                                                                    </button>
-                                                                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
-                                                                        <li>
-                                                                            <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}"
-                                                                               href="#"
-                                                                               onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'approved'); return false;"
-                                                                               style="{{ $req->status === 'approved' ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                                <span>Approved</span>
-                                                                            </a>
-                                                                        </li>
-                                                                        <li>
-                                                                            <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}"
-                                                                               href="#"
-                                                                               data-action="{{ route('hrms.wfh.reject', $req->id) }}"
-                                                                               onclick="openWfhRejectModal(this); return false;"
-                                                                               style="{{ $req->status === 'rejected' ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                                <span>Rejected</span>
-                                                                            </a>
-                                                                        </li>
-                                                                        <li>
-                                                                            <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'pending' ? 'bg-light text-primary fw-bold' : '' }}"
-                                                                               href="#"
-                                                                               onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'pending'); return false;"
-                                                                               style="{{ $req->status === 'pending' ? 'color: var(--bs-primary) !important;' : '' }}">
-                                                                                <span>Pending</span>
-                                                                            </a>
-                                                                        </li>
-                                                                    </ul>
-                                                                </div>
-                                                            @endif
+                                                        @if($req->status === 'cancellation_requested')
+                                                            {{-- Cancellation dropdown: Accept / Deny --}}
+                                                            <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative" onclick="event.stopPropagation();">
+                                                                <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
+                                                                        type="button" 
+                                                                        data-bs-toggle="dropdown" 
+                                                                        data-bs-boundary="viewport"
+                                                                        aria-expanded="false"
+                                                                        style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
+                                                                        title="Action">
+                                                                    <span>Action</span>
+                                                                </button>
+                                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
+                                                                    <li>
+                                                                        <form method="POST" action="{{ route('hrms.wfh.approve-cancellation', $req->id) }}" onsubmit="return confirm('Approve this WFH cancellation?')" class="m-0">
+                                                                            @csrf
+                                                                            <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-success">
+                                                                                <span>Accept</span>
+                                                                                <i class="feather-check text-success fs-12"></i>
+                                                                            </button>
+                                                                        </form>
+                                                                    </li>
+                                                                    <li>
+                                                                        <form method="POST" action="{{ route('hrms.wfh.deny-cancellation', $req->id) }}" onsubmit="return confirm('Deny this cancellation request?')" class="m-0">
+                                                                            @csrf
+                                                                            <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between text-danger">
+                                                                                <span>Deny</span>
+                                                                                <i class="feather-x text-danger fs-12"></i>
+                                                                            </button>
+                                                                        </form>
+                                                                    </li>
+                                                                </ul>
+                                                            </div>
+                                                        @elseif(!in_array($req->status, ['cancelled']))
+                                                            {{-- Normal status dropdown: Approved / Rejected / Pending --}}
+                                                            <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative" onclick="event.stopPropagation();">
+                                                                <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
+                                                                        type="button" 
+                                                                        data-bs-toggle="dropdown" 
+                                                                        data-bs-boundary="viewport"
+                                                                        aria-expanded="false"
+                                                                        style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;"
+                                                                        title="Change Status">
+                                                                    <span>{{ $statusBadge['lbl'] }}</span>
+                                                                </button>
+                                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 130px; z-index: 1050; background: #ffffff;">
+                                                                    <li>
+                                                                        <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}"
+                                                                           href="#"
+                                                                           onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'approved'); return false;"
+                                                                           style="{{ $req->status === 'approved' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                            <span>Approved</span>
+                                                                        </a>
+                                                                    </li>
+                                                                    <li>
+                                                                        <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}"
+                                                                           href="#"
+                                                                           data-action="{{ route('hrms.wfh.reject', $req->id) }}"
+                                                                           onclick="openWfhRejectModal(this); return false;"
+                                                                           style="{{ $req->status === 'rejected' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                            <span>Rejected</span>
+                                                                        </a>
+                                                                    </li>
+                                                                    <li>
+                                                                        <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $req->status === 'pending' ? 'bg-light text-primary fw-bold' : '' }}"
+                                                                           href="#"
+                                                                           onclick="submitWfhStatusDirect('{{ route('hrms.wfh.update-status', $req->id) }}', 'pending'); return false;"
+                                                                           style="{{ $req->status === 'pending' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                            <span>Pending</span>
+                                                                        </a>
+                                                                    </li>
+                                                                </ul>
+                                                            </div>
+                                                        @endif
 
-                                                            {{-- Unified Withdraw / Cancellation Delete button --}}
-                                                            @if($req->canWithdraw())
-                                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this WFH application?')" class="d-inline-flex" onclick="event.stopPropagation();">
-                                                                    @csrf
-                                                                    <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                                                            title="Withdraw Application"
-                                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                                        <i class="feather-trash-2 fs-14"></i>
-                                                                    </button>
-                                                                </form>
-                                                            @elseif($req->canRequestCancellation())
-                                                                <div class="d-inline-flex">
-                                                                    <button type="button" class="btn btn-sm btn-soft-danger border" 
-                                                                            title="Request Cancellation"
-                                                                            onclick="event.stopPropagation(); openWfhCancellationModal({{ $req->id }}, '{{ route('hrms.wfh.request-cancellation', $req->id) }}')"
-                                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                                        <i class="feather-trash-2 fs-14"></i>
-                                                                    </button>
-                                                                </div>
-                                                            @else
-                                                                <div class="d-inline-flex">
-                                                                    <button type="button" class="btn btn-sm btn-light border disabled" 
-                                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled onclick="event.stopPropagation();">
-                                                                        <i class="feather-trash-2 fs-14"></i>
-                                                                    </button>
-                                                                </div>
-                                                            @endif
-
+                                                        {{-- Unified Withdraw / Cancellation Delete button --}}
+                                                        @if($req->canWithdraw())
+                                                            <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this WFH application?')" class="d-inline-flex" onclick="event.stopPropagation();">
+                                                                @csrf
+                                                                <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                                        title="Withdraw Application"
+                                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                                    <i class="feather-trash-2 fs-14"></i>
+                                                                </button>
+                                                            </form>
+                                                        @elseif($req->canRequestCancellation())
+                                                            <div class="d-inline-flex">
+                                                                <button type="button" class="btn btn-sm btn-soft-danger border" 
+                                                                        title="Request Cancellation"
+                                                                        onclick="event.stopPropagation(); openWfhCancellationModal({{ $req->id }}, '{{ route('hrms.wfh.request-cancellation', $req->id) }}')"
+                                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                                    <i class="feather-trash-2 fs-14"></i>
+                                                                </button>
+                                                            </div>
                                                         @else
-                                                            {{-- Non-admin actions --}}
-                                                            {{-- Unified Withdraw / Cancellation Delete button --}}
-                                                            @if($req->canWithdraw())
-                                                                <form method="POST" action="{{ route('hrms.wfh.withdraw', $req->id) }}" onsubmit="return confirm('Withdraw this WFH application?')" class="d-inline-flex" onclick="event.stopPropagation();">
-                                                                    @csrf
-                                                                    <button type="submit" class="btn btn-sm btn-soft-danger border" 
-                                                                            title="Withdraw Application"
-                                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                                        <i class="feather-trash-2 fs-14"></i>
-                                                                    </button>
-                                                                </form>
-                                                            @elseif($req->canRequestCancellation())
-                                                                <div class="d-inline-flex">
-                                                                    <button type="button" class="btn btn-sm btn-soft-danger border" 
-                                                                            title="Request Cancellation"
-                                                                            onclick="event.stopPropagation(); openWfhCancellationModal({{ $req->id }}, '{{ route('hrms.wfh.request-cancellation', $req->id) }}')"
-                                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
-                                                                        <i class="feather-trash-2 fs-14"></i>
-                                                                    </button>
-                                                                </div>
-                                                            @else
-                                                                <div class="d-inline-flex">
-                                                                    <button type="button" class="btn btn-sm btn-light border disabled" 
-                                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled onclick="event.stopPropagation();">
-                                                                        <i class="feather-trash-2 fs-14"></i>
-                                                                    </button>
-                                                                </div>
-                                                            @endif
+                                                            <div class="d-inline-flex">
+                                                                <button type="button" class="btn btn-sm btn-light border disabled" 
+                                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" disabled onclick="event.stopPropagation();">
+                                                                    <i class="feather-trash-2 fs-14"></i>
+                                                                </button>
+                                                            </div>
                                                         @endif
                                                     </div>
                                                 </td>
@@ -2831,30 +2790,28 @@
                                                         </td>
                                                         <td class="text-end">
                                                             <div class="d-flex align-items-center justify-content-end flex-nowrap gap-2">
-                                                                @if($isAdminUser)
-                                                                    <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="white-space:nowrap;">
-                                                                            <span>{{ $req->status === 'approved' ? 'Approved' : ($req->status === 'rejected' ? 'Rejected' : 'Pending') }}</span>
-                                                                        </button>
-                                                                        <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
-                                                                            <li>
-                                                                                <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('approve', {{ $req->id }})">
-                                                                                    Approved
-                                                                                </button>
-                                                                            </li>
-                                                                            <li>
-                                                                                <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('reject', {{ $req->id }})">
-                                                                                    Rejected
-                                                                                </button>
-                                                                            </li>
-                                                                            <li>
-                                                                                <button type="button" class="dropdown-item {{ $req->status === 'pending' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('pending', {{ $req->id }})">
-                                                                                    Pending
-                                                                                </button>
-                                                                            </li>
-                                                                        </ul>
-                                                                    </div>
-                                                                @endif
+                                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                    <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="white-space:nowrap;">
+                                                                        <span>{{ $req->status === 'approved' ? 'Approved' : ($req->status === 'rejected' ? 'Rejected' : 'Pending') }}</span>
+                                                                    </button>
+                                                                    <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
+                                                                        <li>
+                                                                            <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('approve', {{ $req->id }})">
+                                                                                Approved
+                                                                            </button>
+                                                                        </li>
+                                                                        <li>
+                                                                            <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('reject', {{ $req->id }})">
+                                                                                Rejected
+                                                                            </button>
+                                                                        </li>
+                                                                        <li>
+                                                                            <button type="button" class="dropdown-item {{ $req->status === 'pending' ? 'active-status' : '' }}" onclick="handleEmpShiftDecision('pending', {{ $req->id }})">
+                                                                                Pending
+                                                                            </button>
+                                                                        </li>
+                                                                    </ul>
+                                                                </div>
 
                                                                 <form action="{{ route('hrms.shift-change.destroy', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this shift change request?', { title: 'Delete Shift Change Request', variant: 'danger', confirmButtonText: 'Delete' });" class="d-inline m-0">
                                                                     @csrf
@@ -2932,30 +2889,28 @@
                                                         </td>
                                                         <td class="text-end">
                                                             <div class="d-flex align-items-center justify-content-end flex-nowrap gap-2">
-                                                                @if($isAdminUser)
-                                                                    <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
-                                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="white-space:nowrap;">
-                                                                            <span>{{ $req->status === 'approved' ? 'Approved' : ($req->status === 'rejected' ? 'Rejected' : 'Pending') }}</span>
-                                                                        </button>
-                                                                        <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
-                                                                            <li>
-                                                                                <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('approve', {{ $req->id }}, {{ $req->duration_hours }})">
-                                                                                    Approved
-                                                                                </button>
-                                                                            </li>
-                                                                            <li>
-                                                                                <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('reject', {{ $req->id }}, {{ $req->duration_hours }})">
-                                                                                    Rejected
-                                                                                </button>
-                                                                            </li>
-                                                                            <li>
-                                                                                <button type="button" class="dropdown-item {{ $req->status === 'pending' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('pending', {{ $req->id }}, {{ $req->duration_hours }})">
-                                                                                    Pending
-                                                                                </button>
-                                                                            </li>
-                                                                        </ul>
-                                                                    </div>
-                                                                @endif
+                                                                <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
+                                                                    <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm btn-status-dropdown text-white" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" style="white-space:nowrap;">
+                                                                        <span>{{ $req->status === 'approved' ? 'Approved' : ($req->status === 'rejected' ? 'Rejected' : 'Pending') }}</span>
+                                                                    </button>
+                                                                    <ul class="dropdown-menu dropdown-menu-end status-dropdown-menu">
+                                                                        <li>
+                                                                            <button type="button" class="dropdown-item {{ $req->status === 'approved' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('approve', {{ $req->id }}, {{ $req->duration_hours }})">
+                                                                                Approved
+                                                                            </button>
+                                                                        </li>
+                                                                        <li>
+                                                                            <button type="button" class="dropdown-item {{ $req->status === 'rejected' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('reject', {{ $req->id }}, {{ $req->duration_hours }})">
+                                                                                Rejected
+                                                                            </button>
+                                                                        </li>
+                                                                        <li>
+                                                                            <button type="button" class="dropdown-item {{ $req->status === 'pending' ? 'active-status' : '' }}" onclick="handleEmpOvertimeDecision('pending', {{ $req->id }}, {{ $req->duration_hours }})">
+                                                                                Pending
+                                                                            </button>
+                                                                        </li>
+                                                                    </ul>
+                                                                </div>
                                                                 <form action="{{ route('hrms.overtime.destroy', $req->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this overtime request?', { title: 'Delete Overtime Request', variant: 'danger', confirmButtonText: 'Delete' });" class="d-inline m-0">
                                                                     @csrf
                                                                     @method('DELETE')
@@ -3215,11 +3170,9 @@
                                     </x-ui.filter>
 
                                     <div class="documents-action-group d-flex align-items-center gap-2">
-                                        @if(auth()->user()->hasHrPermission('hr.settings.manage'))
                                             <x-ui.button variant="light" size="sm" class="document-action-btn" data-bs-toggle="modal" data-bs-target="#requestDocumentModal" icon="feather-git-pull-request">
                                                 {{ __('hrms.employees.btn_request_doc') }}
                                             </x-ui.button>
-                                        @endif
                                         <x-ui.button variant="primary" size="sm" class="document-action-btn document-action-btn-primary" data-bs-toggle="modal" data-bs-target="#uploadDocumentModal" icon="feather-upload-cloud">
                                             {{ __('hrms.employees.btn_upload_doc') }}
                                         </x-ui.button>
@@ -3402,7 +3355,6 @@
                                                     <!-- Col 5: Actions (Primary Theme Dropdown Button + Delete Button) -->
                                                      <td class="text-end px-3" style="min-width: 175px;">
                                                          <div class="d-flex align-items-center justify-content-end gap-2">
-                                                             @if(auth()->user()->hasHrPermission('hr.settings.manage'))
                                                                  @if($doc->file_path)
                                                                      <!-- Primary Theme Colored Dropdown -->
                                                                      <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative">
@@ -3440,7 +3392,6 @@
                                                                      @method('DELETE')
                                                                      <x-ui.icon-btn variant="danger" size="sm" icon="feather-trash-2" title="Delete Document Record" type="submit" style="border-radius: 8px; height: 32px; width: 32px;" />
                                                                  </form>
-                                                             @endif
                                                          </div>
                                                      </td>
                                                 </tr>
@@ -3516,7 +3467,6 @@
                                                     <p class="text-muted fs-13 mt-3 mb-0 text-wrap" style="max-width: 100%; white-space: pre-line;">{{ $history->job_description }}</p>
                                                 @endif
                                             </div>
-                                            @if(auth()->user()->hasHrPermission('hr.settings.manage'))
                                                 <form action="{{ route('hrms.employees.history.destroy', [$employee->id, $history->id]) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this record?', { title: 'Delete Employment History', variant: 'danger', confirmButtonText: 'Delete' });">
                                                     @csrf
                                                     @method('DELETE')
@@ -3524,7 +3474,6 @@
                                                         <i class="feather-trash-2"></i> {{ __('hrms.assets.delete') }}
                                                     </button>
                                                 </form>
-                                            @endif
                                         </div>
                                     </div>
                                 @endforeach
@@ -3656,11 +3605,9 @@
                                                     <button type="button" class="btn btn-sm btn-icon btn-light border" style="border-radius: 8px; width: 32px; height: 32px;" data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" data-item-name="{{ $itemObj?->name ?: $firstAsset->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}" title="View Details">
                                                         <i class="feather-eye" style="font-size: 14px; color: #475569;"></i>
                                                     </button>
-                                                    @if(auth()->user()->hasHrPermission('hr.settings.manage'))
-                                                        <button type="button" class="btn btn-sm btn-light border text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center" style="border-color: #cbd5e1; background-color: #ffffff; color: #475569; font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $itemObj?->id }}" data-item-name="{{ $itemObj?->name ?: $firstAsset->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}">
+                                                       <button type="button" class="btn btn-sm btn-light border text-uppercase fw-bold px-3 d-inline-flex align-items-center justify-content-center" style="border-color: #cbd5e1; background-color: #ffffff; color: #475569; font-size: 11px; letter-spacing: 0.5px; height: 32px; border-radius: 8px;" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $itemObj?->id }}" data-item-name="{{ $itemObj?->name ?: $firstAsset->name }}" data-allocated-assets="{{ $encodedAllocatedAssets }}">
                                                              {{ __('hrms.employees.btn_return_asset') }}
                                                          </button>
-                                                    @endif
                                                 </div>
                                             </td>
                                         </tr>

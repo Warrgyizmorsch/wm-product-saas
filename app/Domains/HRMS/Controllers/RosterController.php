@@ -22,8 +22,6 @@ class RosterController extends Controller
 
     public function index(Request $request): View
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $data = $this->rosterRepository->getIndexData($request->all());
 
         return view('modules.hrms.roster.index', $data);
@@ -31,8 +29,6 @@ class RosterController extends Controller
 
     public function storeShift(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_id'            => 'required|exists:companies,id',
             'name'                  => 'required|string|max:255',
@@ -56,8 +52,6 @@ class RosterController extends Controller
 
     public function updateShift(Request $request, ProductionShift $shift): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_id'           => 'required|exists:companies,id',
             'name'                 => 'required|string|max:255',
@@ -81,8 +75,6 @@ class RosterController extends Controller
 
     public function destroyShift(ProductionShift $shift): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $this->rosterRepository->deleteShift($shift);
 
         return redirect()->route('hrms.roster.index', ['tab' => 'shifts'])
@@ -95,8 +87,6 @@ class RosterController extends Controller
 
     public function assign(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'employee_ids'             => 'nullable|array',
             'employee_ids.*'           => 'exists:employees,id',
@@ -156,8 +146,6 @@ class RosterController extends Controller
 
     public function updateCell(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'date'        => 'required|date',
@@ -188,8 +176,6 @@ class RosterController extends Controller
 
     public function updateWeeklyPattern(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'day_of_week' => 'required|integer|between:0,6',
@@ -215,8 +201,6 @@ class RosterController extends Controller
 
     public function assignWeekly(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'employee_ids'   => 'required|array|min:1',
             'employee_ids.*' => 'exists:employees,id',
@@ -240,8 +224,6 @@ class RosterController extends Controller
 
     public function clearWeekly(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'employee_ids'   => 'required|array|min:1',
             'employee_ids.*' => 'exists:employees,id',
@@ -254,8 +236,6 @@ class RosterController extends Controller
 
     public function clear(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'employee_ids'             => 'nullable|array',
             'employee_ids.*'           => 'exists:employees,id',

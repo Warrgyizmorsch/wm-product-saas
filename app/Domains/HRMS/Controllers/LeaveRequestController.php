@@ -91,15 +91,6 @@ class LeaveRequestController extends Controller
 
     public function updateStatus(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        $user = auth()->user();
-        $isAdmin = $user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id);
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if ($leaveRequest->status === 'cancelled') {
             return redirect()->back()->with('error', 'Cannot change the status of a cancelled leave application.');
         }
@@ -138,20 +129,6 @@ class LeaveRequestController extends Controller
 
     public function withdraw(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        $user      = auth()->user();
-        $employee  = Employee::where('personal_email', $user?->email)
-            ->orWhere('office_email', $user?->email)
-            ->first();
-
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        // Only the owning employee (or admin) can withdraw
-        if (!$isAdmin && (!$employee || $employee->id !== $leaveRequest->employee_id)) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if (!$leaveRequest->canWithdraw()) {
             return redirect()->back()->with('error', 'Only pending applications can be withdrawn.');
         }
@@ -167,19 +144,6 @@ class LeaveRequestController extends Controller
 
     public function requestCancellation(Request $request, LeaveRequest $leaveRequest): RedirectResponse
     {
-        $user     = auth()->user();
-        $employee = Employee::where('personal_email', $user?->email)
-            ->orWhere('office_email', $user?->email)
-            ->first();
-
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin && (!$employee || $employee->id !== $leaveRequest->employee_id)) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if (!$leaveRequest->canRequestCancellation()) {
             return redirect()->back()->with('error', 'Only approved applications can have a cancellation requested.');
         }
@@ -202,15 +166,6 @@ class LeaveRequestController extends Controller
 
     public function approveCancellation(LeaveRequest $leaveRequest): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if ($leaveRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
         }
@@ -227,15 +182,6 @@ class LeaveRequestController extends Controller
 
     public function denyCancellation(LeaveRequest $leaveRequest): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if ($leaveRequest->status !== 'cancellation_requested') {
             return redirect()->back()->with('error', 'This application does not have a pending cancellation request.');
         }

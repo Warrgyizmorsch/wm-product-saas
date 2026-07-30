@@ -26,16 +26,10 @@ class OvertimeRequestController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = false;
-        if ($user) {
-            $isAdmin = $user->hasHrPermission('hr.settings.manage')
-                || $user->hasHrPermission('hr.leaves.manage')
-                || !empty($user->role_id);
-        }
+        $user = auth()->user();
 
         $validated = $request->validate([
-            'employee_id'       => $isAdmin ? 'required|exists:employees,id' : 'nullable',
+            'employee_id'       => 'required|exists:employees,id',
             'date'              => 'required|date',
             'start_time'        => 'required|date_format:H:i',
             'end_time'          => 'required|date_format:H:i',
@@ -44,16 +38,10 @@ class OvertimeRequestController extends Controller
             'attachment'        => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
         ]);
 
-        if ($isAdmin && !empty($validated['employee_id'])) {
-            $employee = Employee::findOrFail($validated['employee_id']);
-        } else {
-            $employee = Employee::where('personal_email', $user?->email)
-                ->orWhere('office_email', $user?->email)
-                ->first();
-        }
+        $employee = Employee::findOrFail($validated['employee_id']);
 
         if (!$employee) {
-            return redirect()->back()->with('error', 'Employee profile not found.');
+            return redirect()->back()->with('error', __('hrms.overtime.profile_not_found'));
         }
 
         // Check if an overtime request already exists for this employee on this date
@@ -61,7 +49,7 @@ class OvertimeRequestController extends Controller
             ->where('date', $validated['date'])
             ->exists();
         if ($exists) {
-            return redirect()->back()->withInput()->with('error', 'An overtime request already exists for this date.');
+            return redirect()->back()->withInput()->with('error', __('hrms.overtime.request_exists'));
         }
 
         // Calculate hours
@@ -80,7 +68,7 @@ class OvertimeRequestController extends Controller
         }
 
         if ($durationHours < $minHours) {
-            return redirect()->back()->withInput()->with('error', "Overtime duration must be at least {$minHours} hours.");
+            return redirect()->back()->withInput()->with('error', __('hrms.overtime.duration_error', ['min' => $minHours]));
         }
 
         $validated['duration_hours']          = $durationHours;
@@ -90,7 +78,7 @@ class OvertimeRequestController extends Controller
 
         $this->overtimeRepository->storeOvertimeRequest($validated, $request);
 
-        return redirect()->back()->with('success', 'Overtime application submitted successfully.');
+        return redirect()->back()->with('success', __('hrms.overtime.submitted_successfully'));
     }
 
     public function approve(Request $request, OvertimeRequest $overtimeRequest): RedirectResponse
@@ -105,17 +93,8 @@ class OvertimeRequestController extends Controller
 
     public function updateStatus(Request $request, OvertimeRequest $overtimeRequest, ?string $overrideAction = null): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         if ($overtimeRequest->status === 'cancelled') {
-            return redirect()->back()->with('error', 'Cannot change the status of a cancelled application.');
+            return redirect()->back()->with('error', __('hrms.overtime.cancelled_status_error'));
         }
 
         $action = $overrideAction ?? $request->input('action');
@@ -140,20 +119,11 @@ class OvertimeRequestController extends Controller
             'approved_duration_hours' => $approvedHours,
         ], $request);
 
-        return redirect()->back()->with('success', 'Overtime application status updated.');
+        return redirect()->back()->with('success', __('hrms.overtime.status_updated'));
     }
 
     public function updateSettings(Request $request): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            return redirect()->back()->with('error', 'Unauthorized action.');
-        }
-
         $validated = $request->validate([
             'auto_overtime_threshold_hours' => 'required|numeric|min:0',
             'min_overtime_request_hours'    => 'required|numeric|min:0.5',
@@ -162,31 +132,17 @@ class OvertimeRequestController extends Controller
 
         $this->overtimeRepository->updateGlobalSettings($validated);
 
-        return redirect()->back()->with('success', 'Overtime policies updated successfully.');
+        return redirect()->back()->with('success', __('hrms.overtime.policies_updated'));
     }
 
     public function destroy(OvertimeRequest $overtimeRequest): RedirectResponse
     {
-        $user    = auth()->user();
-        $isAdmin = $user && ($user->hasHrPermission('hr.settings.manage')
-            || $user->hasHrPermission('hr.leaves.manage')
-            || !empty($user->role_id));
-
-        if (!$isAdmin) {
-            $employee = Employee::where('personal_email', $user?->email)
-                ->orWhere('office_email', $user?->email)
-                ->first();
-            if (!$employee || $employee->id !== $overtimeRequest->employee_id) {
-                return redirect()->back()->with('error', 'Unauthorized action.');
-            }
-        }
-
         if ($overtimeRequest->status === 'approved') {
-            return redirect()->back()->with('error', 'Approved applications cannot be deleted.');
+            return redirect()->back()->with('error', __('hrms.overtime.approved_no_delete'));
         }
 
         $overtimeRequest->delete();
 
-        return redirect()->back()->with('success', 'Overtime request deleted successfully.');
+        return redirect()->back()->with('success', __('hrms.overtime.deleted_successfully'));
     }
 }

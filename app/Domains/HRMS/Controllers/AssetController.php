@@ -24,8 +24,6 @@ class AssetController extends Controller
      */
     public function index(Request $request): View
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $data = $this->assetRepository->getIndexData($request->all());
 
         return view('modules.hrms.assets.index', $data);
@@ -33,8 +31,6 @@ class AssetController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $rules = [
             'asset_category_id' => 'required|exists:asset_categories,id',
             'name' => 'required|string|max:255',
@@ -77,8 +73,6 @@ class AssetController extends Controller
 
     public function update(Request $request, Asset $asset): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $rules = [
             'asset_code' => [
                 'required', 'string', 'max:255',
@@ -111,8 +105,6 @@ class AssetController extends Controller
 
     public function destroy(Asset $asset): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         if ($asset->status === 'allocated' || $asset->assigned_employee_id !== null) {
             return redirect()->back()->with('error', "Cannot delete asset '{$asset->asset_code}' because it is currently allocated to an employee. Please return or deallocate it first.");
         }
@@ -124,8 +116,6 @@ class AssetController extends Controller
 
     public function storeCategory(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
@@ -139,8 +129,6 @@ class AssetController extends Controller
 
     public function updateCategory(Request $request, AssetCategory $assetCategory): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|string|max:255',
@@ -154,8 +142,6 @@ class AssetController extends Controller
 
     public function destroyCategory(AssetCategory $assetCategory): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $assetCount = $assetCategory->assets()->count();
         if ($assetCount > 0) {
             return redirect()->back()->with('error', __('hrms.assets.error_cat_has_assets', ['name' => $assetCategory->name, 'count' => $assetCount]));
@@ -173,8 +159,6 @@ class AssetController extends Controller
 
     public function allocate(Request $request, Asset $asset): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'assigned_employee_id' => 'required|exists:employees,id',
             'allocated_at' => 'required|date',
@@ -189,8 +173,6 @@ class AssetController extends Controller
 
     public function returnAsset(Request $request, Asset $asset): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'condition_on_return' => 'required|string|in:new,good,fair,damaged,scrapped',
         ]);
@@ -202,8 +184,6 @@ class AssetController extends Controller
 
     public function allocateItem(Request $request, AssetItem $assetItem): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'assigned_employee_id' => 'required|exists:employees,id',
             'quantity' => 'required|integer|min:1',
@@ -222,8 +202,6 @@ class AssetController extends Controller
 
     public function returnItem(Request $request, AssetItem $assetItem): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'quantity' => 'required|integer|min:1',
@@ -240,8 +218,6 @@ class AssetController extends Controller
 
     public function updateItem(Request $request, AssetItem $assetItem): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'asset_category_id' => 'required|exists:asset_categories,id',
             'name' => 'required|string|max:255',
@@ -255,8 +231,6 @@ class AssetController extends Controller
 
     public function destroyItem(AssetItem $assetItem): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $allocatedCount = $assetItem->assets()->where('status', 'allocated')->count();
         if ($allocatedCount > 0) {
             return redirect()->back()->with('error', "Cannot delete item '{$assetItem->name}' because {$allocatedCount} unit(s) are currently allocated.");
@@ -270,8 +244,6 @@ class AssetController extends Controller
 
     public function storeItem(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'asset_category_id' => 'required|exists:asset_categories,id',
             'name'              => 'required|string|max:255',
@@ -285,14 +257,11 @@ class AssetController extends Controller
 
     public function export(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
         return $this->assetRepository->export();
     }
 
     public function import(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
         ]);
@@ -304,20 +273,16 @@ class AssetController extends Controller
 
     public function downloadTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
         return $this->assetRepository->downloadTemplate();
     }
 
     public function exportCategories(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
         return $this->assetRepository->exportCategories();
     }
 
     public function importCategories(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:5120',
         ]);
@@ -329,7 +294,6 @@ class AssetController extends Controller
 
     public function downloadCategoriesTemplate(): \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
         return $this->assetRepository->downloadCategoriesTemplate();
     }
 
@@ -376,8 +340,6 @@ class AssetController extends Controller
 
     public function rejectRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'admin_notes' => 'required|string|max:1000',
         ]);
@@ -392,8 +354,6 @@ class AssetController extends Controller
 
     public function allocateDirect(AssetRequest $assetRequest): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         if ($assetRequest->status !== 'pending') {
             return redirect()->back()->with('error', 'Only pending asset requests can be allocated.');
         }
@@ -441,8 +401,6 @@ class AssetController extends Controller
 
     public function allocateRequest(Request $request, AssetRequest $assetRequest): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'asset_id'             => 'required|exists:assets,id',
             'allocated_at'         => 'required|date',
@@ -480,8 +438,6 @@ class AssetController extends Controller
 
     public function bulkAllocate(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'allocations'          => 'required|array',
             'allocations.*'        => 'nullable|exists:assets,id',
@@ -531,8 +487,6 @@ class AssetController extends Controller
 
     public function bulkReject(Request $request): RedirectResponse
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'request_ids'   => 'required|array',
             'request_ids.*' => 'exists:asset_requests,id',

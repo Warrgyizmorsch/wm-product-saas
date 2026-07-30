@@ -19,8 +19,6 @@ class OrgController extends Controller
 
     public function index(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $data = $this->orgRepository->getIndexData($request->all());
 
         return view('modules.hrms.org-structure.org', $data);
@@ -28,8 +26,6 @@ class OrgController extends Controller
 
     public function storeCompany(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_name' => 'required|max:255',
             'legal_name' => 'required|max:255',
@@ -56,8 +52,6 @@ class OrgController extends Controller
 
     public function updateCompany(Request $request, Company $company)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_name' => 'required|max:255',
             'legal_name' => 'required|max:255',
@@ -84,8 +78,6 @@ class OrgController extends Controller
 
     public function destroyCompany(Company $company)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $this->orgRepository->destroyCompany($company);
 
         return redirect()->route('hrms.org.index', ['tab' => 'legal-entities'])->with('success', __('hrms.org.company_deleted'));
@@ -93,8 +85,6 @@ class OrgController extends Controller
 
     public function storeBusinessUnit(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|max:255',
@@ -112,8 +102,6 @@ class OrgController extends Controller
 
     public function updateBusinessUnit(Request $request, BusinessUnit $businessUnit)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'company_id' => 'required|exists:companies,id',
             'name' => 'required|max:255',
@@ -131,8 +119,6 @@ class OrgController extends Controller
 
     public function destroyBusinessUnit(BusinessUnit $businessUnit)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $this->orgRepository->destroyBusinessUnit($businessUnit);
 
         return redirect()->route('hrms.org.index', ['tab' => 'business-units'])->with('success', __('hrms.org.bu_deleted'));
@@ -140,8 +126,6 @@ class OrgController extends Controller
 
     public function storeBranch(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'business_unit_id' => 'required|exists:business_units,id',
             'name' => 'required|max:255',
@@ -165,8 +149,6 @@ class OrgController extends Controller
 
     public function updateBranch(Request $request, Branch $branch)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'business_unit_id' => 'required|exists:business_units,id',
             'name' => 'required|max:255',
@@ -190,8 +172,6 @@ class OrgController extends Controller
 
     public function destroyBranch(Branch $branch)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $this->orgRepository->destroyBranch($branch);
 
         return redirect()->route('hrms.org.index', ['tab' => 'branches'])->with('success', __('hrms.org.branch_deleted'));
@@ -199,8 +179,6 @@ class OrgController extends Controller
 
     public function storeDepartment(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'branch_id' => 'required|exists:branches,id',
             'name' => 'required|max:255',
@@ -222,8 +200,6 @@ class OrgController extends Controller
 
     public function updateDepartment(Request $request, Department $department)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'branch_id' => 'required|exists:branches,id',
             'name' => 'required|max:255',
@@ -245,8 +221,6 @@ class OrgController extends Controller
 
     public function destroyDepartment(Department $department)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $this->orgRepository->destroyDepartment($department);
 
         return redirect()->route('hrms.org.index', ['tab' => 'departments'])->with('success', __('hrms.org.dept_deleted'));
@@ -254,8 +228,6 @@ class OrgController extends Controller
 
     public function storeDesignation(Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
@@ -271,8 +243,6 @@ class OrgController extends Controller
 
     public function updateDesignation(Request $request, Designation $designation)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'department_id' => 'required|exists:departments,id',
             'name' => 'required|max:255',
@@ -288,8 +258,6 @@ class OrgController extends Controller
 
     public function destroyDesignation(Designation $designation)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $this->orgRepository->destroyDesignation($designation);
 
         return redirect()->route('hrms.org.index', ['tab' => 'designations'])->with('success', __('hrms.org.desig_deleted'));
@@ -345,8 +313,6 @@ class OrgController extends Controller
 
     public function storeSalaryComponent(\Illuminate\Http\Request $request)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'pay_group_id' => 'nullable|exists:pay_groups,id',
             'name'         => 'required|string|max:255',
@@ -371,8 +337,6 @@ class OrgController extends Controller
 
     public function updateSalaryComponent(\Illuminate\Http\Request $request, \App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'code'        => 'required|string|max:50',
@@ -389,8 +353,6 @@ class OrgController extends Controller
 
     public function destroySalaryComponent(\App\Domains\HRMS\Models\SalaryComponent $salaryComponent)
     {
-        abort_unless(auth()->user()->hasHrPermission('hr.settings.manage'), 403);
-
         $salaryComponent->delete();
 
         return redirect()->route('hrms.org.index')->with('success', 'Salary component deleted successfully.');
