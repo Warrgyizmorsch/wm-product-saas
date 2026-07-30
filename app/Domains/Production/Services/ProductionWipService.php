@@ -396,7 +396,7 @@ class ProductionWipService
 
             $transferQty = 0.0;
 
-            if ($sourceOp->overlap_enabled && (float)$sourceOp->transfer_batch_quantity > 0) {
+            if ($sourceOp->overlap_enabled && (float) $sourceOp->transfer_batch_quantity > 0) {
                 $batchSize = (float) $sourceOp->transfer_batch_quantity;
                 $eligibleBatches = floor($untransferred / $batchSize);
                 $transferQty = round($eligibleBatches * $batchSize, 4);
@@ -429,7 +429,7 @@ class ProductionWipService
                 ->where('production_order_operation_id', $nextOp->id)
                 ->whereHas('schedule', function ($q) use ($sourceOp) {
                     $q->where('tenant_id', $sourceOp->tenant_id)
-                      ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]);
+                        ->whereIn('status', [ProductionSchedule::STATUS_RELEASED, ProductionSchedule::STATUS_IN_PROGRESS]);
                 })
                 ->lockForUpdate()
                 ->first();

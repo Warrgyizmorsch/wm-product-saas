@@ -11,7 +11,8 @@ class BatchProductionService
 {
     public function __construct(
         private readonly BatchNumberService $batchNumberService
-    ) {}
+    ) {
+    }
 
     /**
      * Create a new production batch.
@@ -29,36 +30,36 @@ class BatchProductionService
             $batchNumber = $this->batchNumberService->generateNextNumber($tenantId);
 
             $batch = ProductionBatch::create([
-                'tenant_id'           => $tenantId,
-                'batch_number'        => $batchNumber,
+                'tenant_id' => $tenantId,
+                'batch_number' => $batchNumber,
                 'production_order_id' => $orderId,
-                'product_id'          => $productId,
-                'planned_quantity'    => $plannedQty,
-                'actual_quantity'     => 0.00,
-                'expiry_date'         => $expiryDate,
-                'status'              => $status,
-                'remarks'             => $remarks,
+                'product_id' => $productId,
+                'planned_quantity' => $plannedQty,
+                'actual_quantity' => 0.00,
+                'expiry_date' => $expiryDate,
+                'status' => $status,
+                'remarks' => $remarks,
             ]);
 
             // Log trace from Order to Batch
             ProductionLotTrace::create([
-                'tenant_id'   => $tenantId,
+                'tenant_id' => $tenantId,
                 'source_type' => 'order',
-                'source_id'   => $orderId,
+                'source_id' => $orderId,
                 'target_type' => 'batch',
-                'target_id'   => $batch->id,
-                'quantity'    => $plannedQty,
-                'remarks'     => 'Batch created from order.',
+                'target_id' => $batch->id,
+                'quantity' => $plannedQty,
+                'remarks' => 'Batch created from order.',
             ]);
 
             app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($tenantId, [
                 'production_order_id' => $orderId,
                 'production_batch_id' => $batch->id,
-                'event_type'          => 'Batch Created',
-                'title'               => 'Production Batch Created',
-                'description'         => "Batch {$batch->batch_number} has been created.",
-                'severity'            => 'info',
-                'event_source'        => 'BatchProductionService',
+                'event_type' => 'Batch Created',
+                'title' => 'Production Batch Created',
+                'description' => "Batch {$batch->batch_number} has been created.",
+                'severity' => 'info',
+                'event_source' => 'BatchProductionService',
             ]);
 
             return $batch;
@@ -92,22 +93,22 @@ class BatchProductionService
 
                 // Save parent-child genealogy relation
                 ProductionBatchGenealogy::create([
-                    'tenant_id'       => $tenantId,
+                    'tenant_id' => $tenantId,
                     'parent_batch_id' => $parent->id,
-                    'child_batch_id'  => $child->id,
-                    'type'            => 'split',
-                    'quantity'        => $qty,
+                    'child_batch_id' => $child->id,
+                    'type' => 'split',
+                    'quantity' => $qty,
                 ]);
 
                 // Create lot trace record
                 ProductionLotTrace::create([
-                    'tenant_id'   => $tenantId,
+                    'tenant_id' => $tenantId,
                     'source_type' => 'batch',
-                    'source_id'   => $parent->id,
+                    'source_id' => $parent->id,
                     'target_type' => 'batch',
-                    'target_id'   => $child->id,
-                    'quantity'    => $qty,
-                    'remarks'     => "Split trace from parent batch {$parent->batch_number}.",
+                    'target_id' => $child->id,
+                    'quantity' => $qty,
+                    'remarks' => "Split trace from parent batch {$parent->batch_number}.",
                 ]);
 
                 $children[] = $child;
@@ -117,17 +118,17 @@ class BatchProductionService
             $newPlanned = max(0.00, $parent->planned_quantity - $totalSplitQty);
             $parent->update([
                 'planned_quantity' => $newPlanned,
-                'remarks'          => $parent->remarks . " | Split {$totalSplitQty} quantity into children.",
+                'remarks' => $parent->remarks . " | Split {$totalSplitQty} quantity into children.",
             ]);
 
             app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($tenantId, [
                 'production_order_id' => $parent->production_order_id,
                 'production_batch_id' => $parent->id,
-                'event_type'          => 'Batch Split',
-                'title'               => 'Batch Split Completed',
-                'description'         => "Batch {$parent->batch_number} has been split into child batches.",
-                'severity'            => 'info',
-                'event_source'        => 'BatchProductionService',
+                'event_type' => 'Batch Split',
+                'title' => 'Batch Split Completed',
+                'description' => "Batch {$parent->batch_number} has been split into child batches.",
+                'severity' => 'info',
+                'event_source' => 'BatchProductionService',
             ]);
 
             return $children;
@@ -148,7 +149,7 @@ class BatchProductionService
 
             // Validate same product & check maximum total quantity
             $productId = $parents->first()->product_id;
-            $orderId   = $parents->first()->production_order_id;
+            $orderId = $parents->first()->production_order_id;
             $sumPlannedQty = (float) $parents->sum('planned_quantity');
 
             foreach ($parents as $parent) {
@@ -176,22 +177,22 @@ class BatchProductionService
             foreach ($parents as $parent) {
                 // Link genealogy
                 ProductionBatchGenealogy::create([
-                    'tenant_id'       => $tenantId,
+                    'tenant_id' => $tenantId,
                     'parent_batch_id' => $parent->id,
-                    'child_batch_id'  => $child->id,
-                    'type'            => 'merge',
-                    'quantity'        => $parent->planned_quantity,
+                    'child_batch_id' => $child->id,
+                    'type' => 'merge',
+                    'quantity' => $parent->planned_quantity,
                 ]);
 
                 // Trace log
                 ProductionLotTrace::create([
-                    'tenant_id'   => $tenantId,
+                    'tenant_id' => $tenantId,
                     'source_type' => 'batch',
-                    'source_id'   => $parent->id,
+                    'source_id' => $parent->id,
                     'target_type' => 'batch',
-                    'target_id'   => $child->id,
-                    'quantity'    => $parent->planned_quantity,
-                    'remarks'     => "Merge trace into batch {$child->batch_number}.",
+                    'target_id' => $child->id,
+                    'quantity' => $parent->planned_quantity,
+                    'remarks' => "Merge trace into batch {$child->batch_number}.",
                 ]);
 
                 // Consume/Complete parents
@@ -203,11 +204,11 @@ class BatchProductionService
             app(\App\Domains\Production\Services\ProductionEventService::class)->writeEvent($tenantId, [
                 'production_order_id' => $orderId,
                 'production_batch_id' => $child->id,
-                'event_type'          => 'Batch Merge',
-                'title'               => 'Batches Merged',
-                'description'         => "Multiple batches merged into target batch {$child->batch_number}.",
-                'severity'            => 'info',
-                'event_source'        => 'BatchProductionService',
+                'event_type' => 'Batch Merge',
+                'title' => 'Batches Merged',
+                'description' => "Multiple batches merged into target batch {$child->batch_number}.",
+                'severity' => 'info',
+                'event_source' => 'BatchProductionService',
             ]);
 
             return $child;

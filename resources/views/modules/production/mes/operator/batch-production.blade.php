@@ -22,10 +22,11 @@
                                 @endif
                             </td>
                             <td class="text-end fw-semibold text-dark">{{ number_format($batch->planned_quantity, 2) }}</td>
-                            <td class="text-end text-success fw-semibold">{{ number_format($batch->actual_quantity, 2) }}</td>
+                            <td class="text-end text-success fw-semibold">{{ number_format($batch->actual_quantity, 2) }}
+                            </td>
                             <td class="text-center">
                                 @php
-                                    $badgeClass = match($batch->status) {
+                                    $badgeClass = match ($batch->status) {
                                         'completed' => 'bg-soft-success text-success',
                                         'consumed' => 'bg-soft-secondary text-secondary',
                                         'blocked' => 'bg-soft-danger text-danger',
@@ -37,10 +38,13 @@
                             </td>
                             <td class="text-center">
                                 <div class="d-flex gap-1 justify-content-center">
-                                    <x-ui.button size="sm" variant="light" class="border py-1 px-2" href="{{ route('production.labels.batches.print', $batch->id) }}" target="_blank" title="{{ __('production.print_label') }}">
+                                    <x-ui.button size="sm" variant="light" class="border py-1 px-2"
+                                        href="{{ route('production.labels.batches.print', $batch->id) }}" target="_blank"
+                                        title="{{ __('production.print_label') }}">
                                         <i class="feather-printer me-1"></i> {{ __('production.print_label') }}
                                     </x-ui.button>
-                                    <x-ui.button size="sm" variant="light" class="border py-1 px-2" onclick="openSplitModal({{ $batch->id }}, '{{ $batch->batch_number }}', {{ $batch->planned_quantity }})">
+                                    <x-ui.button size="sm" variant="light" class="border py-1 px-2"
+                                        onclick="openSplitModal({{ $batch->id }}, '{{ $batch->batch_number }}', {{ $batch->planned_quantity }})">
                                         {{ __('production.split_batch') }}
                                     </x-ui.button>
                                 </div>
@@ -69,23 +73,12 @@
 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui 
-                            type="input" 
-                            :label="__('production.planned_qty')" 
-                            name="planned_quantity" 
-                            inputType="number" 
-                            step="0.0001"
-                            :value="$order->quantity_ordered" 
-                            :required="true" 
-                        />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.planned_qty')" name="planned_quantity"
+                            inputType="number" step="0.0001" :value="$order->quantity_ordered" :required="true" />
                     </div>
                     <div class="col-md-6">
-                        <x-ui.odoo-form-ui 
-                            type="input" 
-                            :label="__('production.expiry_date')" 
-                            name="expiry_date" 
-                            inputType="date" 
-                        />
+                        <x-ui.odoo-form-ui type="input" :label="__('production.expiry_date')" name="expiry_date"
+                            inputType="date" />
                     </div>
                     <div class="col-12 mt-4">
                         <x-ui.button type="submit" variant="primary" icon="feather-plus me-1" class="w-100 py-2">
@@ -102,41 +95,25 @@
                 <form method="POST" action="{{ route('production.mes.batches.merge') }}">
                     @csrf
                     <div class="mb-3">
-                        <x-ui.odoo-form-ui 
-                            type="select" 
-                            :label="__('production.select_batches_to_merge')" 
-                            name="parent_batch_ids[]" 
-                            :multiple="true" 
-                            select2Selector="tag" 
-                            :required="true" 
-                            helperText="Select 2 or more batches to merge into a single target batch."
-                        >
+                        <x-ui.odoo-form-ui type="select" :label="__('production.select_batches_to_merge')"
+                            name="parent_batch_ids[]" :multiple="true" select2Selector="tag" :required="true"
+                            helperText="Select 2 or more batches to merge into a single target batch.">
                             @foreach($batches as $b)
-                                <option value="{{ $b->id }}" data-qty="{{ $b->planned_quantity }}">{{ $b->batch_number }} (Qty: {{ number_format($b->planned_quantity, 2) }})</option>
+                                <option value="{{ $b->id }}" data-qty="{{ $b->planned_quantity }}">{{ $b->batch_number }} (Qty:
+                                    {{ number_format($b->planned_quantity, 2) }})</option>
                             @endforeach
                         </x-ui.odoo-form-ui>
                     </div>
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui 
-                                type="input" 
-                                :label="__('production.target_quantity')" 
-                                name="target_planned_quantity" 
-                                id="target_planned_quantity_input"
-                                inputType="number" 
-                                step="0.0001"
-                                placeholder="Merged total qty..." 
-                                :required="true" 
-                                helperText="Auto-calculated sum of selected source batch quantities."
-                            />
+                            <x-ui.odoo-form-ui type="input" :label="__('production.target_quantity')"
+                                name="target_planned_quantity" id="target_planned_quantity_input" inputType="number"
+                                step="0.0001" placeholder="Merged total qty..." :required="true"
+                                helperText="Auto-calculated sum of selected source batch quantities." />
                         </div>
                         <div class="col-md-6">
-                            <x-ui.odoo-form-ui 
-                                type="input" 
-                                :label="__('production.remarks')" 
-                                name="remarks" 
-                                placeholder="Comments..." 
-                            />
+                            <x-ui.odoo-form-ui type="input" :label="__('production.remarks')" name="remarks"
+                                placeholder="Comments..." />
                         </div>
                         <div class="col-12 mt-4">
                             <x-ui.button type="submit" variant="warning" icon="feather-git-merge me-1" class="w-100 py-2">
@@ -151,14 +128,8 @@
 </div>
 
 {{-- Split Batch Modal --}}
-<x-ui.modal 
-    id="splitBatchModal" 
-    :title="__('production.split_batch')" 
-    centered="true" 
-    formAction="{{ route('production.mes.batches.split') }}" 
-    submitText="Apply Split" 
-    closeText="Cancel"
->
+<x-ui.modal id="splitBatchModal" :title="__('production.split_batch')" centered="true"
+    formAction="{{ route('production.mes.batches.split') }}" submitText="Apply Split" closeText="Cancel">
     <input type="hidden" name="parent_batch_id" id="splitParentId">
     <div class="p-3 mb-3 bg-light rounded text-dark fs-13">
         Splitting Batch: <strong id="splitBatchName" class="font-monospace text-primary"></strong>
@@ -168,18 +139,22 @@
     <div id="splitsContainer">
         <div class="row g-3 mb-3">
             <div class="col-5">
-                <x-ui.odoo-form-ui type="input" label="Child Qty 1" name="splits[0][planned_quantity]" inputType="number" step="0.0001" placeholder="Qty..." :required="true" />
+                <x-ui.odoo-form-ui type="input" label="Child Qty 1" name="splits[0][planned_quantity]"
+                    inputType="number" step="0.0001" placeholder="Qty..." :required="true" />
             </div>
             <div class="col-7">
-                <x-ui.odoo-form-ui type="input" :label="__('production.remarks')" name="splits[0][remarks]" placeholder="Optional comments..." />
+                <x-ui.odoo-form-ui type="input" :label="__('production.remarks')" name="splits[0][remarks]"
+                    placeholder="Optional comments..." />
             </div>
         </div>
         <div class="row g-3 mb-2">
             <div class="col-5">
-                <x-ui.odoo-form-ui type="input" label="Child Qty 2" name="splits[1][planned_quantity]" inputType="number" step="0.0001" placeholder="Qty..." :required="true" />
+                <x-ui.odoo-form-ui type="input" label="Child Qty 2" name="splits[1][planned_quantity]"
+                    inputType="number" step="0.0001" placeholder="Qty..." :required="true" />
             </div>
             <div class="col-7">
-                <x-ui.odoo-form-ui type="input" :label="__('production.remarks')" name="splits[1][remarks]" placeholder="Optional comments..." />
+                <x-ui.odoo-form-ui type="input" :label="__('production.remarks')" name="splits[1][remarks]"
+                    placeholder="Optional comments..." />
             </div>
         </div>
     </div>
@@ -190,7 +165,7 @@
         document.getElementById('splitParentId').value = id;
         document.getElementById('splitBatchName').innerText = number;
         document.getElementById('splitTotalLabel').innerText = qty;
-        
+
         let modalEl = document.getElementById('splitBatchModal');
         if (modalEl) {
             let modal = new bootstrap.Modal(modalEl);
