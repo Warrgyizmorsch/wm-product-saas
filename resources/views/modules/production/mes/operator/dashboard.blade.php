@@ -42,6 +42,15 @@
         .status-ribbon-completed {
             background: linear-gradient(135deg, #6c757d, #495057);
         }
+        .status-ribbon-ready {
+            background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+        }
+        .status-ribbon-waiting {
+            background: linear-gradient(135deg, #6f42c1, #59359a);
+        }
+        .status-ribbon-pending {
+            background: linear-gradient(135deg, #6c757d, #495057);
+        }
     </style>
 @endpush
 
@@ -119,18 +128,13 @@
                                 @endphp
                                 <div class="col-md-6">
                                     <div class="card border border-light shadow-sm touch-card h-100">
-                                        @if(in_array($opStatus, ['completed', 'running', 'paused']))
-                                            <div class="status-ribbon status-ribbon-{{ $opStatus }}">
-                                                {{ $opStatus }}
-                                            </div>
-                                        @endif
+                                        <div class="status-ribbon status-ribbon-{{ $opStatus }}">
+                                            {{ $opStatus }}
+                                        </div>
                                         <div class="card-body p-3 d-flex flex-column justify-content-around">
                                             <div>
                                                 <div class="d-flex align-items-center gap-2 mb-2">
                                                     <span class="badge bg-soft-secondary font-monospace text-secondary">{{ $assign->operation->operation_number ?? 'OP-??' }}</span>
-                                                    @if(!in_array($opStatus, ['completed', 'running', 'paused']))
-                                                        <span class="badge {{ $opStatusClass }} fs-9">{{ strtoupper($opStatus) }}</span>
-                                                    @endif
                                                     
                                                     @if($assign->status === 'assigned')
                                                         <span class="badge bg-soft-primary text-primary fs-9">Assigned</span>
@@ -143,7 +147,15 @@
                                                     @endif
                                                 </div>
                                                 <h6 class="fw-bold text-dark mb-1">{{ $assign->operation->name ?? '—' }}</h6>
-                                                <p class="text-muted fs-12 mb-2">Order: <strong>{{ $assign->operation->order->order_number ?? '—' }}</strong></p>
+                                                <p class="text-muted fs-12 mb-1">
+                                                    Order: <strong>{{ $assign->operation->order->order_number ?? '—' }}</strong>
+                                                    @php
+                                                        $firstBatch = $assign->operation->order->batches->first();
+                                                    @endphp
+                                                    @if($firstBatch)
+                                                        | Batch: <span class="badge bg-soft-primary text-primary font-monospace fs-11">{{ $firstBatch->batch_number }}</span>
+                                                    @endif
+                                                </p>
                                                 <div class="fs-11 text-muted"><i class="feather-map-pin me-1"></i> {{ $assign->operation->workCenter->name ?? '—' }}</div>
                                             </div>
 

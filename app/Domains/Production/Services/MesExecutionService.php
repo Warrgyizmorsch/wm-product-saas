@@ -423,7 +423,7 @@ class MesExecutionService
                     $pausedSec = $schedOp->accumulated_paused_seconds ?? 0;
                     $diffSeconds = $now->timestamp - $schedOp->actual_start->timestamp - $pausedSec;
                     $totalElapsedMinutes = max(0.0, round($diffSeconds / 60, 2));
-                    
+
                     // Subtract previously logged minutes to get the increment
                     $previouslyLogged = \App\Domains\Production\Models\ProductionOrderProgressLog::where('operation_id', $orderOp->id)
                         ->sum('run_minutes_logged');
@@ -625,26 +625,26 @@ class MesExecutionService
             }
 
             $now = now();
-            
+
             // Sync with underlying ProductionOrderOperation
             $orderOp = ProductionOrderOperation::findOrFail($schedOp->production_order_operation_id);
 
             // Calculate setup/run minutes automatically from elapsed time if not provided
             $setupMinutes = (float) ($data['setup_minutes'] ?? 0);
             $runMinutes = (float) ($data['run_minutes'] ?? 0);
-            
+
             if ($runMinutes === 0.0 && $schedOp->actual_start) {
                 $endDt = $schedOp->isPaused() && $schedOp->last_paused_at ? $schedOp->last_paused_at : $now;
                 $pausedSec = $schedOp->accumulated_paused_seconds ?? 0;
                 $diffSeconds = $endDt->timestamp - $schedOp->actual_start->timestamp - $pausedSec;
                 $totalElapsedMinutes = max(0.0, round($diffSeconds / 60, 2));
-                
+
                 // Subtract previously logged minutes to get the increment
                 $previouslyLogged = \App\Domains\Production\Models\ProductionOrderProgressLog::where('operation_id', $orderOp->id)
                     ->sum('run_minutes_logged');
                 $runMinutes = max(0.0, $totalElapsedMinutes - $previouslyLogged);
             }
-            
+
             $produced = (float) ($data['quantity_produced'] ?? 0);
             $rejected = (float) ($data['quantity_rejected'] ?? 0);
             $scrapped = (float) ($data['quantity_scrapped'] ?? 0);
@@ -780,14 +780,14 @@ class MesExecutionService
 
                 $downtimeService = app(DowntimeService::class);
                 $downtime = $downtimeService->startDowntime($tenantId, $machineId, $downtimeCategory, $reason, $userId, [
-                    'production_order_id'           => $order->id,
+                    'production_order_id' => $order->id,
                     'production_order_operation_id' => $schedOp->production_order_operation_id,
-                    'remarks'                        => $remarks,
+                    'remarks' => $remarks,
                 ]);
 
                 if ($schedOp->status === ProductionScheduleOperation::STATUS_RUNNING) {
                     $schedOp->update([
-                        'status'         => ProductionScheduleOperation::STATUS_PAUSED,
+                        'status' => ProductionScheduleOperation::STATUS_PAUSED,
                         'last_paused_at' => now(),
                     ]);
 
@@ -800,12 +800,12 @@ class MesExecutionService
             } else {
                 app(ProductionEventService::class)->writeEvent($tenantId, [
                     'production_order_id' => $order->id,
-                    'machine_id'           => $machineId,
-                    'event_type'           => 'Andon Alert Fired',
-                    'title'                => "Operator Andon Alert: {$category}",
-                    'description'          => "Alert raised by operator for sequence #{$schedOp->sequence}: {$reason}. Remarks: {$remarks}",
-                    'severity'             => $severity,
-                    'event_source'         => 'MES Execution',
+                    'machine_id' => $machineId,
+                    'event_type' => 'Andon Alert Fired',
+                    'title' => "Operator Andon Alert: {$category}",
+                    'description' => "Alert raised by operator for sequence #{$schedOp->sequence}: {$reason}. Remarks: {$remarks}",
+                    'severity' => $severity,
+                    'event_source' => 'MES Execution',
                 ]);
 
                 if ($schedOp->status === ProductionScheduleOperation::STATUS_RUNNING && in_array($severity, ['critical', 'warning'], true)) {
@@ -815,9 +815,9 @@ class MesExecutionService
 
             return [
                 'operation_id' => $schedOp->id,
-                'category'     => $category,
-                'severity'     => $severity,
-                'downtime_id'  => $downtime?->id,
+                'category' => $category,
+                'severity' => $severity,
+                'downtime_id' => $downtime?->id,
             ];
         });
     }
