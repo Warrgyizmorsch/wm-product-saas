@@ -149,9 +149,9 @@ class InventoryAuthorizationTest extends TestCase
     {
         $response = $this->actingAs($this->inventoryManager)
             ->withHeader('X-Tenant', 'test-tenant')
-            ->get(route('inventory.requirements.index'));
+            ->get(route('sales.material-requirements.index'));
 
         $response->assertStatus(200);
-        $response->assertViewIs('modules.inventory.requirements.index');
+        $response->assertViewIs('modules.sales.material-requirements.index');
     }
 }

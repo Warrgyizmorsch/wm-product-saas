@@ -14,36 +14,29 @@ class MaterialRequirementPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->access->allows($user, 'sales.material_requirements.view', [
-            'tenant_id' => $user->tenant_id,
-        ]);
+        return $this->access->allows($user, 'sales.material_requirements.view', ['tenant_id' => $user->tenant_id])
+            || $this->access->allows($user, 'inventory.products.view', ['tenant_id' => $user->tenant_id]);
     }
 
     public function view(User $user, MaterialRequirement $delivery): bool
     {
-        return $this->access->allows($user, 'sales.material_requirements.view', [
-            'tenant_id' => $delivery->tenant_id,
-        ]);
+        return $this->access->allows($user, 'sales.material_requirements.view', ['tenant_id' => $delivery->tenant_id])
+            || $this->access->allows($user, 'inventory.products.view', ['tenant_id' => $delivery->tenant_id]);
     }
 
     public function create(User $user): bool
     {
-        return $this->access->allows($user, 'sales.material_requirements.create', [
-            'tenant_id' => $user->tenant_id,
-        ]);
+        return $this->access->allows($user, 'sales.material_requirements.create', ['tenant_id' => $user->tenant_id]);
     }
 
     public function ship(User $user, MaterialRequirement $delivery): bool
     {
-        return $this->access->allows($user, 'sales.material_requirements.ship', [
-            'tenant_id' => $delivery->tenant_id,
-        ]);
+        return $this->access->allows($user, 'sales.material_requirements.ship', ['tenant_id' => $delivery->tenant_id])
+            || $this->access->allows($user, 'inventory.products.update', ['tenant_id' => $delivery->tenant_id]);
     }
 
     public function cancel(User $user, MaterialRequirement $delivery): bool
     {
-        return $this->access->allows($user, 'sales.material_requirements.cancel', [
-            'tenant_id' => $delivery->tenant_id,
-        ]);
+        return $this->access->allows($user, 'sales.material_requirements.cancel', ['tenant_id' => $delivery->tenant_id]);
     }
 }
