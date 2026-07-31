@@ -31,10 +31,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
             </div>
         @endif
-        <!-- Toolbar: Sort, Filters -->
-        <div class="d-flex align-items-center mb-3">
-            <div class="d-flex align-items-center gap-2">
-                <h5 class="fw-bold text-dark mb-0 me-2">{{ __('crm.leads_listing') }}</h5>
+        <!-- Toolbar: Sort, Filters & View Switcher (100% Mobile Responsive) -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <h5 class="fw-bold text-dark mb-0 me-1">{{ __('crm.leads_listing') }}</h5>
                 <a href="{{ request()->fullUrlWithQuery(['duplicates_only' => null]) }}" class="btn btn-xs {{ !request('duplicates_only') ? 'btn-primary' : 'btn-light border' }}">
                     All Leads
                 </a>
@@ -42,9 +42,9 @@
                     <i class="feather-copy me-1"></i>Duplicates View
                 </a>
             </div>
-            <div class="d-flex gap-2 ms-auto align-items-center">
-                <!-- Icon View Switcher (Exact action-dropdown-btn style matching paperclip import/export button) -->
-                <div class="d-flex align-items-center gap-2 me-1">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <!-- Icon View Switcher (Exact action-dropdown-btn style with clear gap) -->
+                <div class="d-flex align-items-center gap-2 me-2">
                     <a href="{{ route('crm.leads.index') }}" class="action-dropdown-btn active" title="List View" data-bs-toggle="tooltip">
                         <i class="feather-list"></i>
                     </a>

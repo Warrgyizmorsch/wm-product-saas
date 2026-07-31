@@ -127,12 +127,12 @@
         };
     @endphp
 
-    <!-- 1. Calendar Header Controls & View Switcher -->
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
-        <div class="d-flex align-items-center gap-2">
+    <!-- 1. Calendar Header Controls & View Switcher (100% Mobile Responsive) -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-3 border-bottom">
+        <div class="d-flex align-items-center flex-wrap gap-2">
             <h5 class="fw-bold text-dark mb-0 me-2">Activity Calendar</h5>
-            <!-- Icon View Switcher (Exact action-dropdown-btn style matching paperclip import/export button) -->
-            <div class="d-flex align-items-center gap-2 me-3">
+            <!-- Icon View Switcher (Exact action-dropdown-btn style with clear gap) -->
+            <div class="d-flex align-items-center gap-2 me-2">
                 <a href="{{ route('crm.leads.index') }}" class="action-dropdown-btn" title="List View" data-bs-toggle="tooltip">
                     <i class="feather-list"></i>
                 </a>
@@ -162,12 +162,50 @@
             <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-sm btn-outline-primary ms-2 fw-semibold">Today</a>
         </div>
 
-        <div class="d-flex align-items-center gap-3">
-            <div class="btn-group" role="group">
+        <div class="d-flex align-items-center gap-2">
+            <div class="btn-group me-2" role="group">
                 <a href="{{ request()->fullUrlWithQuery(['view' => 'day']) }}" class="btn btn-sm {{ $view === 'day' ? 'btn-primary' : 'btn-outline-secondary' }}">Day</a>
                 <a href="{{ request()->fullUrlWithQuery(['view' => 'week']) }}" class="btn btn-sm {{ $view === 'week' ? 'btn-primary' : 'btn-outline-secondary' }}">Week</a>
                 <a href="{{ request()->fullUrlWithQuery(['view' => 'month']) }}" class="btn btn-sm {{ $view === 'month' ? 'btn-primary' : 'btn-outline-secondary' }}">Month</a>
             </div>
+
+            <!-- Custom Filter Component (Identical to Lead Listing) -->
+            <form method="GET" action="{{ route('crm.activities.index') }}" class="d-inline">
+                <x-ui.filter :label="__('ui.filter')" offset="0, 5">
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_leads')" value="{{ request('search') }}" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.priority') }}</label>
+                        <x-ui.odoo-form-ui type="select" name="priority">
+                            <option value="">{{ __('crm.all_priorities') }}</option>
+                            <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>{{ __('crm.priorities.Low') }}</option>
+                            <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>{{ __('crm.priorities.Medium') }}</option>
+                            <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>{{ __('crm.priorities.High') }}</option>
+                            <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>{{ __('crm.priorities.Urgent') }}</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.segment') }}</label>
+                        <x-ui.odoo-form-ui type="select" name="segment">
+                            <option value="">{{ __('crm.all_segments') }}</option>
+                            <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>{{ __('crm.segments.SME') }}</option>
+                            <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>{{ __('crm.segments.Mid-Market') }}</option>
+                            <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>{{ __('crm.segments.Enterprise') }}</option>
+                        </x-ui.odoo-form-ui>
+                    </div>
+
+                    <div class="d-flex gap-2 justify-content-end mt-4">
+                        <a href="{{ route('crm.activities.index') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
+                    </div>
+                </x-ui.filter>
+            </form>
         </div>
     </div>
 
@@ -286,56 +324,51 @@
     </div>
 </div>
 
-<!-- Schedule Activity Modal -->
-<div class="modal fade" id="scheduleActivityModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <form action="#" method="POST" id="quickScheduleForm">
-                @csrf
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold"><i class="feather-calendar me-2 text-primary"></i>Schedule Activity / Follow-up</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold fs-13">Select Lead <span class="text-danger">*</span></label>
-                        <select name="lead_id" id="modal_lead_id" class="form-select" required>
-                            <option value="">— Select Lead —</option>
-                            @foreach($leads as $lead)
-                                <option value="{{ $lead->id }}">{{ $lead->company_name }} ({{ $lead->contact_name ?: 'No Contact' }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold fs-13">Activity Type <span class="text-danger">*</span></label>
-                            <select name="type" class="form-select" required>
-                                <option value="Call">📞 Phone Call</option>
-                                <option value="Meeting">🤝 Client Meeting</option>
-                                <option value="Email">✉️ Send Email / Proposal</option>
-                                <option value="Task">📋 General Task</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold fs-13">Date & Time <span class="text-danger">*</span></label>
-                            <input type="datetime-local" name="followup_date" class="form-control" value="{{ now()->addDay()->format('Y-m-d\TH:i') }}" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold fs-13">Activity Notes / Agenda</label>
-                        <textarea name="notes" class="form-control" rows="3" placeholder="Enter follow-up agenda or discussion notes..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary fw-semibold">Save & Schedule Activity</button>
-                </div>
-            </form>
+<!-- Schedule Activity Modal (Using Common x-ui.modal & x-ui.odoo-form-ui Components) -->
+<x-ui.modal 
+    id="scheduleActivityModal" 
+    title="SCHEDULE NEXT ACTIVITY" 
+    :centered="true"
+    :showFooter="false"
+>
+    <form action="#" method="POST" id="quickScheduleForm">
+        @csrf
+        <div class="mb-3">
+            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">SELECT LEAD <span class="text-danger">*</span></label>
+            <x-ui.odoo-form-ui type="select" name="lead_id" id="modal_lead_id" required="true">
+                <option value="">— Select Lead —</option>
+                @foreach($leads as $lead)
+                    <option value="{{ $lead->id }}">{{ $lead->company_name }} ({{ $lead->contact_name ?: 'No Contact' }})</option>
+                @endforeach
+            </x-ui.odoo-form-ui>
         </div>
-    </div>
-</div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">ACTIVITY TYPE <span class="text-danger">*</span></label>
+            <x-ui.odoo-form-ui type="select" name="type" required="true">
+                <option value="Call">Scheduled Call</option>
+                <option value="Meeting">Meeting / Demo</option>
+                <option value="Email">Send Email / Proposal</option>
+                <option value="Task">General Task</option>
+            </x-ui.odoo-form-ui>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">DUE DATE & TIME <span class="text-danger">*</span></label>
+            <x-ui.odoo-form-ui type="input" name="followup_date" inputType="datetime-local" :value="now()->addDay()->format('Y-m-d\TH:i')" required="true" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">DESCRIPTION / PLAN</label>
+            <x-ui.odoo-form-ui type="textarea" name="notes" placeholder="Enter activity description or discussion plan..." rows="4" />
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end mt-4 pt-3 border-top">
+            <button type="button" class="btn btn-light-brand" data-bs-dismiss="modal">CANCEL</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">SCHEDULE</button>
+        </div>
+    </form>
+</x-ui.modal>
 @endsection
 
 @push('scripts')

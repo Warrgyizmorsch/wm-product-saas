@@ -78,12 +78,12 @@
         <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
     @endif
 
-    <!-- Toolbar: View Switcher & Custom Filter Component -->
-    <div class="d-flex align-items-center mb-3">
+    <!-- Toolbar: View Switcher & Custom Filter Component (100% Mobile Responsive) -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <h5 class="fw-bold text-dark mb-0 me-2">Pipeline Kanban</h5>
-        <div class="d-flex gap-2 ms-auto align-items-center">
-            <!-- Icon View Switcher (Exact action-dropdown-btn style matching paperclip import/export button) -->
-            <div class="d-flex align-items-center gap-2 me-1">
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <!-- Icon View Switcher (Exact action-dropdown-btn style with clear gap) -->
+            <div class="d-flex align-items-center gap-2 me-2">
                 <a href="{{ route('crm.leads.index') }}" class="action-dropdown-btn" title="List View" data-bs-toggle="tooltip">
                     <i class="feather-list"></i>
                 </a>
@@ -95,40 +95,40 @@
                 </a>
             </div>
 
-            <!-- Common Filter Component -->
+            <!-- Common Filter Component (Identical to Lead Listing) -->
             <form method="GET" action="{{ route('crm.leads.kanban') }}" class="d-inline">
                 <x-ui.filter :label="__('ui.filter')" offset="0, 5">
-                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Pipeline</h6>
+                    <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('crm.filter_options') }}</h6>
                     
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Search Keywords</label>
-                        <x-ui.input name="search" placeholder="Search Company, Contact, Phone..." value="{{ request('search') }}" />
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.search_keywords') }}</label>
+                        <x-ui.odoo-form-ui type="input" name="search" :placeholder="__('crm.search_placeholder_leads')" value="{{ request('search') }}" />
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Priority</label>
-                        <select name="priority" class="form-select form-select-sm">
-                            <option value="">— All Priorities —</option>
-                            <option value="Low" @selected(request('priority') === 'Low')>Low Priority</option>
-                            <option value="Medium" @selected(request('priority') === 'Medium')>Medium Priority</option>
-                            <option value="High" @selected(request('priority') === 'High')>High Priority</option>
-                            <option value="Urgent" @selected(request('priority') === 'Urgent')>Urgent Priority</option>
-                        </select>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.priority') }}</label>
+                        <x-ui.odoo-form-ui type="select" name="priority">
+                            <option value="">{{ __('crm.all_priorities') }}</option>
+                            <option value="Low" {{ request('priority') === 'Low' ? 'selected' : '' }}>{{ __('crm.priorities.Low') }}</option>
+                            <option value="Medium" {{ request('priority') === 'Medium' ? 'selected' : '' }}>{{ __('crm.priorities.Medium') }}</option>
+                            <option value="High" {{ request('priority') === 'High' ? 'selected' : '' }}>{{ __('crm.priorities.High') }}</option>
+                            <option value="Urgent" {{ request('priority') === 'Urgent' ? 'selected' : '' }}>{{ __('crm.priorities.Urgent') }}</option>
+                        </x-ui.odoo-form-ui>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Segment</label>
-                        <select name="segment" class="form-select form-select-sm">
-                            <option value="">— All Segments —</option>
-                            <option value="SME" @selected(request('segment') === 'SME')>SME</option>
-                            <option value="Mid-Market" @selected(request('segment') === 'Mid-Market')>Mid-Market</option>
-                            <option value="Enterprise" @selected(request('segment') === 'Enterprise')>Enterprise</option>
-                        </select>
+                        <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('crm.segment') }}</label>
+                        <x-ui.odoo-form-ui type="select" name="segment">
+                            <option value="">{{ __('crm.all_segments') }}</option>
+                            <option value="SME" {{ request('segment') === 'SME' ? 'selected' : '' }}>{{ __('crm.segments.SME') }}</option>
+                            <option value="Mid-Market" {{ request('segment') === 'Mid-Market' ? 'selected' : '' }}>{{ __('crm.segments.Mid-Market') }}</option>
+                            <option value="Enterprise" {{ request('segment') === 'Enterprise' ? 'selected' : '' }}>{{ __('crm.segments.Enterprise') }}</option>
+                        </x-ui.odoo-form-ui>
                     </div>
 
                     <div class="d-flex gap-2 justify-content-end mt-4">
-                        <a href="{{ route('crm.leads.kanban') }}" class="btn btn-sm btn-light border">Reset</a>
-                        <button type="submit" class="btn btn-sm btn-primary">Apply Filters</button>
+                        <a href="{{ route('crm.leads.kanban') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
+                        <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
                     </div>
                 </x-ui.filter>
             </form>
