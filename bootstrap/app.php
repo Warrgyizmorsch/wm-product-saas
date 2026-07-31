@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'purchase/rfq-portal/*/submit',
+            'api/*',
         ]);
 
             // ResolveTenant must run before auth resolves the user (TenantAwareUserProvider

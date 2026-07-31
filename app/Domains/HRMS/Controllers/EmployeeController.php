@@ -25,6 +25,16 @@ class EmployeeController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        if ($request->filled('user_id')) {
+            $targetUser = \App\Models\User::find($request->user_id);
+            if ($targetUser) {
+                $request->merge([
+                    'full_name' => $targetUser->name,
+                    'personal_email' => $targetUser->email,
+                ]);
+            }
+        }
+
         $validated = $this->validatePayload($request);
         $validated = $this->normalizeHierarchy($validated);
 
@@ -55,16 +65,16 @@ class EmployeeController extends Controller
                 ->where('status', 'pending')
                 ->exists();
             if ($hasPending) {
-                return redirect()->route('hrms.leaves.index', ['search' => $employee->full_name])
-                    ->with('error', 'Cannot change the leave plan for ' . $employee->full_name . '. Please approve or reject all pending leave requests for this employee first.');
+                return redirect()->back()
+                    ->with('error', 'Cannot change the leave plan. Please approve or reject all pending leave requests first.');
             }
 
             $hasPendingEncashment = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)
                 ->where('status', 'pending')
                 ->exists();
             if ($hasPendingEncashment) {
-                return redirect()->route('hrms.leaves.index', ['search' => $employee->full_name])
-                    ->with('error', 'Cannot change the leave plan for ' . $employee->full_name . '. Please approve or reject all pending leave encashment requests for this employee first.');
+                return redirect()->back()
+                    ->with('error', 'Cannot change the leave plan. Please approve or reject all pending leave encashment requests first.');
             }
         }
 
@@ -93,6 +103,10 @@ class EmployeeController extends Controller
                 $employee ? 'required' : 'nullable', 'string', 'max:255',
                 Rule::unique('employees', 'employee_id')->ignore($employeeId),
             ],
+            'user_id' => [
+                'nullable',
+                Rule::unique('employees', 'user_id')->ignore($employeeId),
+            ],
 
             'title' => ['nullable', 'string', 'max:50'],
             'full_name' => ['required', 'string', 'max:255'],
@@ -119,9 +133,9 @@ class EmployeeController extends Controller
             'shift_id' => ['nullable', 'exists:production_shifts,id'],
             'employment_type' => ['nullable', 'string', 'max:100'],
             'employee_stage' => ['nullable', 'string', 'max:100'],
-            'date_of_joining' => ['nullable', 'date'],
+            'date_of_joining' => ['required', 'date'],
             'date_of_birth' => ['nullable', 'date'],
-            'gender' => ['nullable', 'string', 'max:50'],
+            'gender' => ['required', 'string', 'max:50'],
             'marital_status' => ['nullable', 'string', 'max:50'],
             'blood_group' => ['nullable', 'string', 'max:20'],
             'personal_mobile_number' => ['nullable', 'string', 'max:50'],

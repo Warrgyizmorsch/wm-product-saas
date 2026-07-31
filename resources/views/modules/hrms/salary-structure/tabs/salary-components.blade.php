@@ -626,3 +626,100 @@
         });
     });
 </script>
+
+<!-- Add Salary Component Modal -->
+<div class="modal fade" id="addSalaryComponentModal" tabindex="-1" aria-labelledby="addSalaryComponentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="addSalaryComponentModalLabel"><i class="feather-plus me-2 text-primary"></i>{{ __('hrms.org.add_salary_component') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.store') : route('hrms.salary-component.store') }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.component_name') }}" name="name" :required="true" placeholder="{{ __('hrms.org.component_name_placeholder') }}" :errorText="$errors->first('name')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.tbl_code') }}" name="code" :required="true" placeholder="{{ __('hrms.org.code_placeholder') }}" :errorText="$errors->first('code')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.type') }}" name="type" :required="true" select2-selector="default" :errorText="$errors->first('type')">
+                                <option value="earning">{{ __('hrms.org.earning') }}</option>
+                                <option value="deduction">{{ __('hrms.org.deduction') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <input type="hidden" name="calculation_type" value="fixed">
+                        <input type="hidden" name="pay_group_id" id="add_component_pay_group_id" value="{{ isset($selectedPayGroup) && $selectedPayGroup ? $selectedPayGroup->id : '' }}">
+                        <input type="hidden" name="is_adhoc" id="add_component_is_adhoc" value="0">
+                        <input type="hidden" name="company_id" id="add_sc_company_id">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" select2-selector="status" :errorText="$errors->first('status')">
+                                <option value="1" data-bg="bg-success" selected>{{ __('hrms.employees.frm_status_active') }}</option>
+                                <option value="0" data-bg="bg-danger">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.description') }}" name="description" rows="3" placeholder="{{ __('hrms.org.description') }}" :errorText="$errors->first('description')" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_component') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Salary Component Modal -->
+<div class="modal fade" id="editSalaryComponentModal" tabindex="-1" aria-labelledby="editSalaryComponentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="editSalaryComponentModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.org.edit_salary_component') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="salary_component_edit_form" method="POST" data-update-route="{{ request()->routeIs('hrms.salary-structure.index') ? route('hrms.salary-structure.update', ['salaryComponent' => '__ID__']) : route('hrms.salary-component.update', ['salaryComponent' => '__ID__']) }}">
+                @csrf
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.component_name') }}" name="name" id="edit_sc_name" :required="true" :errorText="$errors->first('name')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.tbl_code') }}" name="code" id="edit_sc_code" :required="true" :errorText="$errors->first('code')" />
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.type') }}" name="type" id="edit_sc_type" :required="true" select2-selector="default" :errorText="$errors->first('type')">
+                                <option value="earning">{{ __('hrms.org.earning') }}</option>
+                                <option value="deduction">{{ __('hrms.org.deduction') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <input type="hidden" name="calculation_type" id="edit_sc_calculation_type" value="fixed">
+                        <input type="hidden" name="pay_group_id" id="edit_sc_pay_group_id">
+                        <input type="hidden" name="is_adhoc" id="edit_sc_is_adhoc" value="0">
+                        <input type="hidden" name="company_id" id="edit_sc_company_id">
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="edit_sc_status" select2-selector="status" :errorText="$errors->first('status')">
+                                <option value="1" data-bg="bg-success">{{ __('hrms.employees.frm_status_active') }}</option>
+                                <option value="0" data-bg="bg-danger">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                            </x-ui.odoo-form-ui>
+                        </div>
+                        <div class="col-12">
+                            <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.description') }}" name="description" id="edit_sc_description" rows="3" :errorText="$errors->first('description')" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_component') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+

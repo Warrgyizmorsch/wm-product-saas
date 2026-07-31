@@ -250,7 +250,7 @@
     </div>
 
     <!-- Include all Unified Modals at body level to prevent parent wrapper blur/backdrop overlay bugs -->
-    @include('modules.hrms.partials.modals')
+    @include('modules.hrms.partials.form-helpers')
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {

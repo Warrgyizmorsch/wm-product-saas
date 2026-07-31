@@ -309,3 +309,103 @@
         }
     })();
 </script>
+
+<!-- View Branch Modal -->
+<div class="modal fade" id="viewBranchModal" tabindex="-1" aria-labelledby="viewBranchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-soft-primary text-primary py-3">
+                <h5 class="modal-title fw-bold" id="viewBranchModalLabel"><i class="feather-info me-2"></i>{{ __('hrms.org.branch_details') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4">
+                    <div id="modal_view_branch_avatar" class="avatar-text avatar-lg bg-soft-primary text-primary rounded-3 d-flex align-items-center justify-content-center fw-bold fs-16" style="width: 54px; height: 54px;">
+                        BR
+                    </div>
+                    <div>
+                        <h4 class="mb-1 fw-bold text-dark" id="modal_view_branch_name"></h4>
+                        <span class="fs-12 text-muted" id="modal_view_branch_bu"></span>
+                    </div>
+                </div>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
+                            <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.overview') }}</span>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.branch_code') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_code"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.manager') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_manager"></span></div>
+                            <div class="mb-0"><strong class="fs-12 text-muted">{{ __('hrms.org.status') }}:</strong> <span id="modal_view_branch_status"></span></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
+                            <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.contact_info') }}</span>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.phone') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_phone"></span></div>
+                            <div class="mb-0"><strong class="fs-12 text-muted">{{ __('hrms.org.email') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_email"></span></div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
+                            <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.location_details') }}</span>
+                            <div class="row g-2">
+                                <div class="col-sm-3"><strong class="fs-12 text-muted">{{ __('hrms.org.country') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_country"></span></div>
+                                <div class="col-sm-3"><strong class="fs-12 text-muted">{{ __('hrms.org.state') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_state"></span></div>
+                                <div class="col-sm-3"><strong class="fs-12 text-muted">{{ __('hrms.org.city') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_city"></span></div>
+                                <div class="col-sm-3"><strong class="fs-12 text-muted">{{ __('hrms.org.zip_code') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_zip"></span></div>
+                                <div class="col-12 mt-2 pt-2 border-top"><strong class="fs-12 text-muted">{{ __('hrms.org.full_address') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_branch_address"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Branch Modal -->
+<div class="modal fade" id="addBranchModal" tabindex="-1" aria-labelledby="addBranchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="addBranchModalLabel"><i class="feather-plus me-2 text-primary"></i>{{ __('hrms.org.add_branch') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.branch.store') }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    @include('modules.hrms.org-structure.branch-form-fields', ['mode' => 'add'])
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_branch') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Branch Modal -->
+<div class="modal fade" id="editBranchModal" tabindex="-1" aria-labelledby="editBranchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="editBranchModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.assets.edit') }} {{ __('hrms.org.branches') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="branch_edit_form" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    @include('modules.hrms.org-structure.branch-form-fields', ['mode' => 'edit'])
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_branch') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

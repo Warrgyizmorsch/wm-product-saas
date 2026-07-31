@@ -354,3 +354,109 @@
         }
     })();
 </script>
+
+<!-- View Company Modal -->
+<div class="modal fade" id="viewCompanyModal" tabindex="-1" aria-labelledby="viewCompanyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-soft-primary text-primary py-3">
+                <h5 class="modal-title fw-bold" id="viewCompanyModalLabel"><i class="feather-info me-2"></i>{{ __('hrms.org.legal_entity_details') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4">
+                    <div id="modal_view_logo_container" class="avatar-image avatar-xl rounded-3 border border-2 border-white shadow-sm overflow-hidden" style="width: 64px; height: 64px;">
+                        <!-- Dynamically generated -->
+                    </div>
+                    <div>
+                        <h4 class="mb-1 fw-bold text-dark" id="modal_view_company_name"></h4>
+                        <span class="fs-12 text-muted" id="modal_view_legal_name"></span>
+                    </div>
+                </div>
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
+                            <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.registration_info') }}</span>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.gst') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_gst"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.pan') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_pan"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.cin') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_cin"></span></div>
+                            <div class="mb-0"><strong class="fs-12 text-muted">{{ __('hrms.org.reg_no') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_reg"></span></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
+                            <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.contact_locale') }}</span>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.email') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_email"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.phone') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_phone"></span></div>
+                            <div class="mb-2"><strong class="fs-12 text-muted">{{ __('hrms.org.currency') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_currency"></span></div>
+                            <div class="mb-0"><strong class="fs-12 text-muted">{{ __('hrms.org.timezone') }}:</strong> <span class="fs-13 text-dark fw-bold text-truncate d-inline-block align-bottom" style="max-width: 200px;" id="modal_view_timezone"></span></div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="p-3 border rounded-3 bg-light-soft" style="background-color: #f8fafc;">
+                            <span class="fs-11 fw-semibold text-muted text-uppercase d-block mb-2 text-primary">{{ __('hrms.org.location_details') }}</span>
+                            <div class="row g-2">
+                                <div class="col-sm-3"><strong class="fs-12 text-muted">{{ __('hrms.org.country') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_country"></span></div>
+                                <div class="col-sm-3"><strong class="fs-12 text-muted">{{ __('hrms.org.state') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_state"></span></div>
+                                <div class="col-sm-3"><strong class="fs-12 text-muted">{{ __('hrms.org.city') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_city"></span></div>
+                                <div class="col-sm-3"><strong class="fs-12 text-muted">{{ __('hrms.org.zip_code') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_zip"></span></div>
+                                <div class="col-12 mt-2 pt-2 border-top"><strong class="fs-12 text-muted">{{ __('hrms.org.full_address') }}:</strong> <span class="fs-13 text-dark fw-bold" id="modal_view_address"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Company Modal -->
+<div class="modal fade" id="addCompanyModal" tabindex="-1" aria-labelledby="addCompanyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="addCompanyModalLabel"><i class="feather-plus me-2 text-primary"></i>{{ __('hrms.org.add_legal_entity') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.company.store') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="form_mode" value="add_company">
+                <div class="modal-body p-4 hrms-entity-form">
+                    @include('modules.hrms.org-structure.company-form-fields', ['mode' => 'add'])
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_entity') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Company Modal -->
+<div class="modal fade" id="editCompanyModal" tabindex="-1" aria-labelledby="editCompanyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="editCompanyModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.org.edit_legal_entity') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="company_edit_form" method="POST" action="{{ old('form_mode') === 'edit_company' && old('edit_company_id') ? route('hrms.company.update', ['company' => old('edit_company_id')]) : '' }}" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="form_mode" value="edit_company">
+                <input type="hidden" name="edit_company_id" id="edit_company_id" value="{{ old('edit_company_id') }}">
+                <div class="modal-body p-4 hrms-entity-form">
+                    @include('modules.hrms.org-structure.company-form-fields', ['mode' => 'edit'])
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_entity') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
