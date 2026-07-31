@@ -9,7 +9,6 @@ Route::get('/locale/{locale}', LocaleController::class)
     ->whereIn('locale', array_keys(config('localization.supported', [])))
     ->name('locale.switch');
 
-
 Route::middleware(['tenant'])->group(function (): void {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store'])->name('login.store');
@@ -44,5 +43,4 @@ Route::middleware(['tenant'])->group(function (): void {
     foreach (glob(app_path('Domains/*/Routes/api.php')) as $moduleApiRoutes) {
         require $moduleApiRoutes;
     }
-    
 });

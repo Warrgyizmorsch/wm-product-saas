@@ -81,4 +81,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserPermissionOverride::class);
     }
+
+    public function employee(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Domains\HRMS\Models\Employee::class);
+    }
+
 }

@@ -237,3 +237,88 @@
         }
     })();
 </script>
+
+<!-- View Desig Modal -->
+<div class="modal fade" id="viewDesigModal" tabindex="-1" aria-labelledby="viewDesigModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-soft-primary text-primary py-3">
+                <h5 class="modal-title fw-bold" id="viewDesigModalLabel"><i class="feather-info me-2"></i>{{ __('hrms.org.designation_details') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4">
+                    <div id="modal_view_desig_avatar" class="avatar-text avatar-lg bg-soft-primary text-primary rounded-3 d-flex align-items-center justify-content-center fw-bold fs-16" style="width: 54px; height: 54px;">
+                        DS
+                    </div>
+                    <div>
+                        <h4 class="mb-1 fw-bold text-dark" id="modal_view_desig_name"></h4>
+                        <span class="fs-12 text-muted" id="modal_view_desig_dept"></span>
+                    </div>
+                </div>
+                
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.org.grade_level') }}</label>
+                        <span class="fs-13 fw-bold text-dark" id="modal_view_desig_level"></span>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.org.status') }}</label>
+                        <div id="modal_view_desig_status"></div>
+                    </div>
+                    <div class="col-12 mt-2">
+                        <label class="fs-11 fw-semibold text-muted text-uppercase d-block mb-1">{{ __('hrms.org.description') }}</label>
+                        <p class="fs-13 fw-semibold text-dark mb-0" id="modal_view_desig_desc"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Desig Modal -->
+<div class="modal fade" id="addDesigModal" tabindex="-1" aria-labelledby="addDesigModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="addDesigModalLabel"><i class="feather-plus me-2 text-primary"></i>{{ __('hrms.org.add_designation') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ route('hrms.designation.store') }}" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    @include('modules.hrms.org-structure.designation-form-fields', ['mode' => 'add'])
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_designation') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Desig Modal -->
+<div class="modal fade" id="editDesigModal" tabindex="-1" aria-labelledby="editDesigModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="editDesigModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.assets.edit') }} {{ __('hrms.org.designations') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="desig_edit_form" method="POST">
+                @csrf
+                <div class="modal-body p-4">
+                    @include('modules.hrms.org-structure.designation-form-fields', ['mode' => 'edit'])
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_designation') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

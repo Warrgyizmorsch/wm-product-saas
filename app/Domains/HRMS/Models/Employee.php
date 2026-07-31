@@ -13,6 +13,8 @@ class Employee extends BaseModel
 
     protected $fillable = [
 
+        'tenant_id',
+        'user_id',
         'company_id',
         'business_unit_id',
         'branch_id',
@@ -124,6 +126,11 @@ class Employee extends BaseModel
                 $employee->employee_id = $prefix . '-' . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);
             }
         });
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class);
     }
 
     public function company(): BelongsTo

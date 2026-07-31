@@ -88,6 +88,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'company', 'businessUnit', 'branch', 'department', 'designation',
             'payGroup', 'salaryStructure', 'leavePlan', 'attendancePenalty',
             'reportingManager', 'shift', 'employmentHistories', 'documents',
+            'assets.category',
             'assetRequests.requestedAsset',
             'assetRequests.allocatedAsset',
             'assetRequests.allocatedAssets',
@@ -182,8 +183,31 @@ class EmployeeRepository implements EmployeeRepositoryInterface
 
         $adhocComponents = \App\Domains\HRMS\Models\EmployeeAdhocComponent::where('employee_id', $employee->id)->get();
         $penalties = \App\Domains\HRMS\Models\EmployeePenalty::where('employee_id', $employee->id)->get();
+
+        // Leave balances (allowances) for the assigned leave plan
+        $leaveAllowances = \App\Domains\HRMS\Models\LeaveBalance::where('employee_id', $employee->id)
+            ->with('leaveType')
+            ->get();
+
+        // Filtered & paginated leave requests
+        $leaveRequestsQuery = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)
+            ->with('leaveType')
+            ->orderBy('created_at', 'desc');
+        if (!empty($inputs['leave_type'])) {
+            $leaveRequestsQuery->where('leave_type_id', (int) $inputs['leave_type']);
+        }
+        if (!empty($inputs['leave_status'])) {
+            $leaveRequestsQuery->where('status', $inputs['leave_status']);
+        }
+        if (!empty($inputs['leave_search'])) {
+            $leaveRequestsQuery->where('reason', 'like', '%' . $inputs['leave_search'] . '%');
+        }
+        $leaveRequests = $leaveRequestsQuery->paginate(10, ['*'], 'leave_page')->withQueryString();
+
         $empLeaveRequests = \App\Domains\HRMS\Models\LeaveRequest::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
         $empLeaveEncashments = \App\Domains\HRMS\Models\LeaveEncashment::where('employee_id', $employee->id)->with('leaveType')->orderBy('created_at', 'desc')->get();
+        $encashmentRequests = $empLeaveEncashments;
+
         $empWfhRequests = \App\Domains\HRMS\Models\WfhRequest::where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
         $empShiftChangeRequests = \App\Domains\HRMS\Models\ShiftChangeRequest::where('employee_id', $employee->id)->with(['currentShift', 'requestedShift'])->orderBy('created_at', 'desc')->get();
         $empOvertimeRequests = \App\Domains\HRMS\Models\OvertimeRequest::where('employee_id', $employee->id)->orderBy('created_at', 'desc')->get();
@@ -234,6 +258,9 @@ class EmployeeRepository implements EmployeeRepositoryInterface
 
         $options = $this->getDropdownOptions();
 
+        // Determine active tab name from inputs
+        $activeTabName = $inputs['active_tab'] ?? $inputs['tab'] ?? 'overview';
+
         return array_merge([
             'employee'                  => $employee,
             'availableAssets'           => $availableAssets,
@@ -244,6 +271,9 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'adhocComponents'           => $adhocComponents,
             'availableAdhocComponents'  => $availableAdhocComponents,
             'penalties'                 => $penalties,
+            'leaveAllowances'           => $leaveAllowances,
+            'leaveRequests'             => $leaveRequests,
+            'encashmentRequests'        => $encashmentRequests,
             'empLeaveRequests'          => $empLeaveRequests,
             'empLeaveEncashments'       => $empLeaveEncashments,
             'empWfhRequests'            => $empWfhRequests,
@@ -255,6 +285,7 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'isAdminUser'               => $isAdminUser,
             'isAdmin'                   => $isAdminUser,
             'employeeDataMap'           => $employeeDataMap,
+            'activeTabName'             => $activeTabName,
         ], $options);
     }
 
@@ -311,6 +342,11 @@ class EmployeeRepository implements EmployeeRepositoryInterface
             'dietPreferences' => ['veg' => 'Vegetarian', 'non_veg' => 'Non-Vegetarian', 'vegan' => 'Vegan', 'eggetarian' => 'Eggetarian'],
             'reportingManagers' => Employee::query()->orderBy('full_name')->get(),
             'shifts' => \App\Domains\Production\Models\ProductionShift::query()->where('active', true)->orderBy('name')->get(),
+            'unmappedUsers' => \App\Models\User::query()
+                ->where('tenant_id', auth()->user()?->tenant_id)
+                ->whereDoesntHave('employee')
+                ->orderBy('name')
+                ->get(),
         ];
     }
 }

@@ -358,7 +358,94 @@
     </div>
 
     <!-- Include all Unified Modals at body level to prevent parent wrapper blur/backdrop overlay bugs -->
-    @include('modules.hrms.partials.modals')
+    @include('modules.hrms.partials.form-helpers')
+
+
+    <!-- Add Pay Group Modal -->
+    <div class="modal fade" id="addPayGroupModal" tabindex="-1" aria-labelledby="addPayGroupModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="addPayGroupModalLabel"><i class="feather-plus me-2 text-primary"></i>{{ __('hrms.org.add_pay_group') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('hrms.salary-structure.pay-group.store') }}" method="POST">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.pay_group_name') }}" name="name" :required="true" placeholder="{{ __('hrms.org.pay_group_name_placeholder') }}" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_company') }}" name="company_id" select2-selector="default">
+                                    <option value="">{{ __('hrms.org.apply_to_all_companies') }}</option>
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" select2-selector="status">
+                                    <option value="1" data-bg="bg-success" selected>{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0" data-bg="bg-danger">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.description') }}" name="description" rows="3" placeholder="{{ __('hrms.org.pay_group_desc_placeholder') }}" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_pay_group') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Pay Group Modal -->
+    <div class="modal fade" id="editPayGroupModal" tabindex="-1" aria-labelledby="editPayGroupModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="editPayGroupModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.org.edit_pay_group') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editPayGroupForm" method="POST">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.pay_group_name') }}" name="name" id="edit_pg_name" :required="true" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.parent_company') }}" name="company_id" id="edit_pg_company_id" select2-selector="default">
+                                    <option value="">{{ __('hrms.org.apply_to_all_companies') }}</option>
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="status" id="edit_pg_status" select2-selector="status">
+                                    <option value="1" data-bg="bg-success">{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0" data-bg="bg-danger">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="textarea" label="{{ __('hrms.org.description') }}" name="description" id="edit_pg_description" rows="3" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_pay_group') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {

@@ -51,7 +51,7 @@
                 </x-ui.odoo-form-ui>
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_emp_code') }}" name="employee_id" id="{{ $prefix }}_employee_id" :required="false" :value="$fieldValue('employee_id')" placeholder="{{ __('hrms.employees.frm_emp_code_placeholder') }}" :errorText="$errors->first('employee_id')" />
+                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_emp_code') }}" name="employee_id" id="{{ $prefix }}_employee_id" :required="false" :value="$fieldValue('employee_id')" placeholder="{{ __('hrms.employees.frm_emp_code_placeholder') }}" :errorText="$errors->first('employee_id')" :disabled="!$isEdit" />
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_manager') }}" name="reporting_manager_id" id="{{ $prefix }}_reporting_manager_id" select2-selector="default" :errorText="$errors->first('reporting_manager_id')">
@@ -117,16 +117,22 @@
         <div class="employee-modal-section-title">{{ __('hrms.employees.basic_details') }}</div>
         <div class="row g-3">
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_full_name') }}" name="full_name" id="{{ $prefix }}_full_name" :required="true" :value="$fieldValue('full_name')" placeholder="{{ __('hrms.employees.frm_full_name_placeholder') }}" :errorText="$errors->first('full_name')" />
+                @if(!$isEdit)
+                    <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_full_name') }}" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default">
+                        <option value="">Select User...</option>
+                        @foreach($unmappedUsers as $u)
+                            <option value="{{ $u->id }}" @selected((string) $fieldValue('user_id') === (string) $u->id)>{{ $u->name }} ({{ $u->email }})</option>
+                        @endforeach
+                    </x-ui.odoo-form-ui>
+                @else
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_full_name') }}" name="full_name" id="{{ $prefix }}_full_name" :required="true" :value="$fieldValue('full_name')" readonly="readonly" class="bg-light" />
+                @endif
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_nick_name') }}" name="nick_name" id="{{ $prefix }}_nick_name" :value="$fieldValue('nick_name')" placeholder="{{ __('hrms.employees.frm_nick_name_placeholder') }}" :errorText="$errors->first('nick_name')" />
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_job_title') }}" name="job_title" id="{{ $prefix }}_job_title" :required="true" :value="$fieldValue('job_title')" placeholder="{{ __('hrms.employees.frm_job_title_placeholder') }}" :errorText="$errors->first('job_title')" />
-            </div>
-            <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_role') }}" name="role" id="{{ $prefix }}_role" :value="$fieldValue('role')" placeholder="{{ __('hrms.employees.frm_role_placeholder') }}" :errorText="$errors->first('role')" />
             </div>
             <div class="col-md-4">
                 <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_stage') }}" name="employee_stage" id="{{ $prefix }}_employee_stage" select2-selector="default" :errorText="$errors->first('employee_stage')">
@@ -199,7 +205,11 @@
                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_mobile') }}" name="personal_mobile_number" id="{{ $prefix }}_personal_mobile_number" :value="$fieldValue('personal_mobile_number')" placeholder="{{ __('hrms.employees.frm_mobile_placeholder') }}" :errorText="$errors->first('personal_mobile_number')" />
             </div>
             <div class="col-md-6">
-                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" />
+                @if(!$isEdit)
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email')" placeholder="Will auto-fill from selected User" readonly="readonly" class="bg-light" />
+                @else
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" />
+                @endif
             </div>
             <div class="col-md-6">
                 <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_office_email') }}" name="office_email" id="{{ $prefix }}_office_email" inputType="email" :value="$fieldValue('office_email')" placeholder="{{ __('hrms.employees.frm_office_email_placeholder') }}" :errorText="$errors->first('office_email')" />

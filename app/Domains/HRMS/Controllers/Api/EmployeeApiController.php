@@ -103,6 +103,11 @@ class EmployeeApiController extends Controller
             'marital_statuses'     => ['Single', 'Married', 'Divorced', 'Widowed'],
             'blood_groups'         => ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
             'diet_preferences'     => ['Veg', 'Non Veg', 'Vegan'],
+            'unmapped_users'       => \App\Models\User::query()
+                ->where('tenant_id', auth()->user()?->tenant_id)
+                ->whereDoesntHave('employee')
+                ->orderBy('name')
+                ->get(),
         ], 'Employee metadata & dropdown options loaded successfully');
     }
 
@@ -123,7 +128,7 @@ class EmployeeApiController extends Controller
         $sort         = $request->string('sort')->value() ?: 'name_asc';
 
         $query = Employee::query()
-            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan']);
+            ->with(['company', 'businessUnit', 'branch', 'department', 'designation', 'payGroup', 'salaryStructure', 'leavePlan', 'user']);
 
         if ($search !== '') {
             $query->where(function ($inner) use ($search) {
@@ -234,7 +239,7 @@ class EmployeeApiController extends Controller
 
         $employee->load([
             'company', 'businessUnit', 'branch', 'department', 'designation',
-            'payGroup', 'leavePlan', 'documents.requestedBy', 'employmentHistories'
+            'payGroup', 'leavePlan', 'documents.requestedBy', 'employmentHistories', 'user'
         ]);
 
         $adhocComponents = EmployeeAdhocComponent::where('employee_id', $employee->id)->with('component')->get();
@@ -256,6 +261,16 @@ class EmployeeApiController extends Controller
         }
 
         try {
+            if ($request->filled('user_id')) {
+                $targetUser = \App\Models\User::find($request->user_id);
+                if ($targetUser) {
+                    $request->merge([
+                        'full_name' => $targetUser->name,
+                        'personal_email' => $targetUser->email,
+                    ]);
+                }
+            }
+
             $validated = $this->validatePayload($request);
             $validated = $this->normalizeHierarchy($validated);
             $validated['status'] = $request->input('status', '1') === '1' || $request->input('status') === 'true' || $request->input('status') === true;
@@ -786,6 +801,7 @@ class EmployeeApiController extends Controller
             'leave_transition_action'     => ['nullable', 'string', 'in:transfer,prorate'],
             'leave_transition_unused'     => ['nullable', 'string', 'in:carry,lapse'],
             'employee_id'                 => ['nullable', 'string', 'max:255', Rule::unique('employees', 'employee_id')->ignore($employee?->id)],
+            'user_id'                     => ['nullable', Rule::unique('employees', 'user_id')->ignore($employee?->id)],
             'full_name'                   => ['required', 'string', 'max:255'],
             'nick_name'                   => ['nullable', 'string', 'max:255'],
             'blood_group'                 => ['nullable', Rule::in(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])],

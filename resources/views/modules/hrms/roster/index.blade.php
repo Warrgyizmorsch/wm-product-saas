@@ -1211,7 +1211,124 @@
     </div>
 
     <!-- Include all HRMS Modals (includes shift add, edit, view modals) -->
-    @include('modules.hrms.partials.modals')
+    @include('modules.hrms.partials.form-helpers')
+
+    <!-- Add Shift Modal -->
+    <div class="modal fade" id="addShiftModal" tabindex="-1" aria-labelledby="addShiftModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="addShiftModalLabel"><i class="feather-plus me-2 text-primary"></i>{{ __('hrms.org.add_shift') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('hrms.shift.store') }}" method="POST">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.roster.company_legal_entity') }}" name="company_id" select2-selector="default" :errorText="$errors->first('company_id')">
+                                    <option value="">{{ __('hrms.roster.shared_all_companies') }}</option>
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_name') }}" name="name" :required="true" placeholder="{{ __('hrms.org.shift_name_placeholder') }}" :errorText="$errors->first('name')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_code') }}" name="code" :required="true" placeholder="{{ __('hrms.org.shift_code_placeholder') }}" :errorText="$errors->first('code')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.start_time') }}" name="start_time" :required="true" :errorText="$errors->first('start_time')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.end_time') }}" name="end_time" :required="true" :errorText="$errors->first('end_time')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.break_minutes') }}" name="break_minutes" inputType="number" :required="true" placeholder="{{ __('hrms.org.break_minutes_placeholder') }}" value="0" :errorText="$errors->first('break_minutes')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.overtime_allowed') }}" name="overtime_allowed" select2-selector="default" :errorText="$errors->first('overtime_allowed')">
+                                    <option value="1">{{ __('hrms.common.yes') }}</option>
+                                    <option value="0" selected>{{ __('hrms.common.no') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="active" select2-selector="default" :errorText="$errors->first('active')">
+                                    <option value="1" selected>{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.org.save_shift') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Shift Modal -->
+    <div class="modal fade" id="editShiftModal" tabindex="-1" aria-labelledby="editShiftModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="editShiftModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.assets.edit') }} {{ __('hrms.org.shifts') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="shift_edit_form" method="POST">
+                    @csrf
+                    <div class="modal-body p-4">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.roster.company_legal_entity') }}" name="company_id" id="edit_shift_company_id" select2-selector="default" :errorText="$errors->first('company_id')">
+                                    <option value="">{{ __('hrms.roster.shared_all_companies') }}</option>
+                                    @foreach($companies as $company)
+                                        <option value="{{ $company->id }}">{{ $company->company_name }}</option>
+                                    @endforeach
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_name') }}" name="name" id="edit_shift_name" :required="true" :errorText="$errors->first('name')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.shift_code') }}" name="code" id="edit_shift_code" :required="true" :errorText="$errors->first('code')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.start_time') }}" name="start_time" id="edit_shift_start" :required="true" :errorText="$errors->first('start_time')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" inputType="time" label="{{ __('hrms.org.end_time') }}" name="end_time" id="edit_shift_end" :required="true" :errorText="$errors->first('end_time')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="input" label="{{ __('hrms.org.break_minutes') }}" name="break_minutes" id="edit_shift_break" inputType="number" :required="true" :errorText="$errors->first('break_minutes')" />
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.overtime_allowed') }}" name="overtime_allowed" id="edit_shift_overtime" select2-selector="default" :errorText="$errors->first('overtime_allowed')">
+                                    <option value="1">{{ __('hrms.common.yes') }}</option>
+                                    <option value="0">{{ __('hrms.common.no') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="col-12">
+                                <x-ui.odoo-form-ui type="select" label="{{ __('hrms.org.status') }}" name="active" id="edit_shift_active" select2-selector="default" :errorText="$errors->first('active')">
+                                    <option value="1">{{ __('hrms.employees.frm_status_active') }}</option>
+                                    <option value="0">{{ __('hrms.employees.frm_status_inactive') }}</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light py-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('hrms.common.close') }}</button>
+                        <button type="submit" class="btn btn-primary">{{ __('hrms.org.update_shift') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             // Move modals to body root to avoid stacking context issues
