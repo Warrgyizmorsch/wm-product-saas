@@ -407,7 +407,7 @@
                             class="fw-bold text-uppercase" 
                             style="font-size: 11px;"
                         >
-                            <span id="toggleBtnLabel"><i class="feather-dollar-sign me-1"></i> {{ __('hrms.leave.encashment_details') ?? 'Encashment Details' }}</span>
+                            <span id="toggleBtnLabel"><i class="feather-dollar-sign me-1"></i> {{ __('hrms.leave.encashment_app.apply_for_encashment') }}</span>
                         </x-ui.button>
                     </div>
                 </div>
@@ -417,19 +417,19 @@
                         @if(!isset($empLeaveRequests) || $empLeaveRequests->isEmpty())
                             <div class="p-5 text-center text-muted">
                                 <i class="feather-calendar fs-24 text-secondary d-block mb-2"></i>
-                                {{ __('hrms.leave.app.no_requests') ?? 'No leave applications submitted by this employee yet.' }}
+                                {{ __('hrms.leave.no_applications_submitted') }}
                             </div>
                         @else
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0" id="leaveAppTable" style="table-layout: fixed; width: 100%;">
                                     <thead class="table-light">
                                         <tr>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 26%;">{{ __('hrms.leave.leave_type') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 22%;">{{ __('hrms.leave.app.period') ?? 'Period' }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 26%;">{{ __('hrms.leave.leave_type_and_detail') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 22%;">{{ __('hrms.leave.duration_timeline') }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">{{ __('hrms.leave.days') }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 20%;">{{ __('ui.status') }}</th>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">{{ __('hrms.employees.tbl_file') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 14%;">{{ __('hrms.common.action') ?? 'Action' }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 14%;">{{ __('hrms.leave.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -443,13 +443,13 @@
                                                     : $startStr . ' – ' . $endStr;
 
                                                 $statusBadge = match($req->status) {
-                                                    'approved'               => ['cls' => 'bg-soft-success text-success',  'icon' => 'feather-check-circle', 'lbl' => __('hrms.leave.app.status_approved')],
-                                                    'pending'                => ['cls' => 'bg-soft-warning text-warning',  'icon' => 'feather-clock',         'lbl' => __('hrms.leave.app.status_pending')],
-                                                    'rejected'               => ['cls' => 'bg-soft-danger text-danger',    'icon' => 'feather-x-circle',      'lbl' => __('hrms.leave.app.status_rejected')],
-                                                    'cancellation_requested' => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-rotate-ccw',     'lbl' => 'Cancellation Requested'],
-                                                    'cancelled'              => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',          'lbl' => 'Cancelled'],
-                                                    'unauthorized'           => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',        'lbl' => __('hrms.leave.app.status_unauthorized')],
-                                                    'unpaid'                 => ['cls' => 'bg-soft-info text-info',        'icon' => 'feather-alert-circle',  'lbl' => __('hrms.leave.app.status_unpaid')],
+                                                    'approved'               => ['cls' => 'bg-soft-success text-success',  'icon' => 'feather-check-circle', 'lbl' => __('hrms.leave.status_approved')],
+                                                    'pending'                => ['cls' => 'bg-soft-warning text-warning',  'icon' => 'feather-clock',         'lbl' => __('hrms.leave.status_pending')],
+                                                    'rejected'               => ['cls' => 'bg-soft-danger text-danger',    'icon' => 'feather-x-circle',      'lbl' => __('hrms.leave.status_rejected')],
+                                                    'cancellation_requested' => ['cls' => 'bg-soft-info text-info',          'icon' => 'feather-rotate-ccw',     'lbl' => __('hrms.wfh.cancellation_requested')],
+                                                    'cancelled'              => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',          'lbl' => __('hrms.wfh.cancelled')],
+                                                    'unauthorized'           => ['cls' => 'bg-soft-secondary text-secondary','icon' => 'feather-slash',        'lbl' => __('hrms.leave.status_unauthorized')],
+                                                    'unpaid'                 => ['cls' => 'bg-soft-info text-info',        'icon' => 'feather-alert-circle',  'lbl' => __('hrms.leave.status_unpaid')],
                                                     default                  => ['cls' => 'bg-light text-secondary',       'icon' => 'feather-circle',        'lbl' => ucfirst($req->status)],
                                                 };
 
@@ -615,18 +615,18 @@
                                     <thead class="table-light">
                                         <tr>
                                             <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 25%;">{{ __('hrms.leave.leave_type_and_detail') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 35%;">{{ __('hrms.leave.encashment_app.reason') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 15%;">{{ __('ui.status') ?? 'Status' }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-4" style="width: 25%;">{{ __('hrms.leave.app.actions') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 35%;">{{ __('hrms.leave.reason') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 15%;">{{ __('ui.status') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-4" style="width: 25%;">{{ __('hrms.leave.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($empLeaveEncashments as $enc)
                                             @php
                                                 $encStatusBadge = match($enc->status) {
-                                                    'approved' => ['cls' => 'bg-soft-success text-success', 'icon' => 'feather-check-circle', 'lbl' => __('hrms.leave.app.status_approved')],
-                                                    'pending'  => ['cls' => 'bg-soft-warning text-warning', 'icon' => 'feather-clock',        'lbl' => __('hrms.leave.app.status_pending')],
-                                                    'rejected' => ['cls' => 'bg-soft-danger text-danger',   'icon' => 'feather-x-circle',     'lbl' => __('hrms.leave.app.status_rejected')],
+                                                    'approved' => ['cls' => 'bg-soft-success text-success', 'icon' => 'feather-check-circle', 'lbl' => __('hrms.leave.status_approved')],
+                                                    'pending'  => ['cls' => 'bg-soft-warning text-warning', 'icon' => 'feather-clock',        'lbl' => __('hrms.leave.status_pending')],
+                                                    'rejected' => ['cls' => 'bg-soft-danger text-danger',   'icon' => 'feather-x-circle',     'lbl' => __('hrms.leave.status_rejected')],
                                                     default    => ['cls' => 'bg-light text-secondary',      'icon' => 'feather-circle',       'lbl' => ucfirst($enc->status)],
                                                 };
                                             @endphp
@@ -662,8 +662,9 @@
                                                 </td>
                                                 <td class="text-end pe-3" style="white-space: nowrap;">
                                                     @if($enc->status === 'pending')
-                                                        <form action="{{ route('hrms.leaves.encashment.withdraw', $enc->id) }}" method="POST" onsubmit="return confirm('Withdraw this encashment request?')">
+                                                        <form action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" method="POST" onsubmit="return confirm('Withdraw this encashment request?')">
                                                             @csrf
+                                                            @method('DELETE')
                                                             <button type="submit" class="btn btn-sm btn-soft-danger border" style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" title="Withdraw Request">
                                                                 <i class="feather-trash-2 fs-14"></i>
                                                             </button>
@@ -1681,4 +1682,3 @@
             };
         </script>
     @endpush
-</div>
