@@ -26,8 +26,9 @@
                 text-decoration: none !important;
                 cursor: pointer !important;
             }
-            .action-dropdown-btn:hover {
-                background-color: color-mix(in srgb, var(--bs-primary) 10%, transparent) !important;
+            .action-dropdown-btn:hover,
+            .action-dropdown-btn.active {
+                background-color: color-mix(in srgb, var(--bs-primary) 12%, transparent) !important;
                 border-color: var(--bs-primary) !important;
                 color: var(--bs-primary) !important;
             }

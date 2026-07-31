@@ -144,7 +144,7 @@
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.unit')" name="uom_id" required="true">
                                 <option value="">{{ __('inventory.select_unit') }}</option>
                                 @foreach($uoms as $uom)
-                                    <option value="{{ $uom->id }}" {{ $product->uom_id == $uom->id ? 'selected' : '' }}>
+                                    <option value="{{ $uom->id }}" data-uom-category="{{ strtolower($uom->category ?? 'goods') }}" {{ $product->uom_id == $uom->id ? 'selected' : '' }}>
                                         {{ $uom->name }} ({{ $uom->code }})
                                     </option>
                                 @endforeach
@@ -676,6 +676,34 @@
     <script>
         $(document).ready(function() {
             const itemType = '{{ $product->item_type }}';
+
+            const $uomSelect = $('select[name="uom_id"]');
+            const originalUomOptions = $uomSelect.find('option').clone();
+
+            function filterUomOptions() {
+                const targetCategory = itemType === 'Service' ? 'service' : 'goods';
+                const currentVal = $uomSelect.val();
+
+                $uomSelect.empty();
+
+                originalUomOptions.each(function() {
+                    const uomCategory = $(this).attr('data-uom-category');
+                    if (!uomCategory || uomCategory === targetCategory || uomCategory === 'both') {
+                        $uomSelect.append($(this).clone());
+                    }
+                });
+
+                if (currentVal && $uomSelect.find(`option[value="${currentVal}"]`).length) {
+                    $uomSelect.val(currentVal);
+                }
+
+                if ($uomSelect.data('select2')) {
+                    $uomSelect.trigger('change');
+                }
+            }
+
+            filterUomOptions();
+
             if (itemType === 'Service') {
                 $('.physical-goods-only').hide();
                 $('select[name="preferred_vendor_id"]').closest('.odoo-form-group').hide();

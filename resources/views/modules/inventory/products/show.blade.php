@@ -312,7 +312,8 @@
                                                     $qty = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum('quantity'));
                                                     $reserved = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum('reserved_qty'));
                                                     $available = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum('available_qty'));
-                                                    $cost = $product->cost_price; // Average/Default cost price
+                                                    $totalValuation = $product->variants->sum(fn($v) => $v->warehouseStocks->where('warehouse_id', $wh->id)->sum(fn($ws) => $ws->quantity * $ws->unit_cost));
+                                                    $cost = $qty > 0 ? ($totalValuation / $qty) : $product->cost_price;
                                                 @endphp
                                                 <tr>
                                                     <td class="fw-semibold">{{ $wh->code }}</td>
@@ -321,7 +322,7 @@
                                                     <td class="text-end text-warning fw-semibold">{{ number_format($reserved, 0) }}</td>
                                                     <td class="text-end text-success fw-bold">{{ number_format($available, 0) }}</td>
                                                     <td class="text-end">₹{{ number_format($cost, 2) }}</td>
-                                                    <td class="text-end fw-bold">₹{{ number_format($qty * $cost, 2) }}</td>
+                                                    <td class="text-end fw-bold">₹{{ number_format($totalValuation, 2) }}</td>
                                                     <td>{{ number_format($product->reorder_point, 0) }}</td>
                                                 </tr>
                                             @endforeach
@@ -365,19 +366,25 @@
                                             <th>{{ __('inventory.sku_code') }}</th>
                                             <th>{{ __('inventory.selling_price') }}</th>
                                             <th>{{ __('inventory.cost_price') }}</th>
+                                            <th>Valuation Cost</th>
                                             <th>{{ __('inventory.stock_on_hand') }}</th>
                                             <th class="text-end pe-4">{{ __('inventory.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody class="fs-13 text-dark">
                                         @foreach($product->variants as $variant)
+                                            @php
+                                                $variantValuation = $variant->warehouseStocks->sum(fn($ws) => $ws->quantity * $ws->unit_cost);
+                                                $variantAvgCost = $variant->total_stock > 0 ? ($variantValuation / $variant->total_stock) : $variant->cost_price;
+                                            @endphp
                                             <tr>
                                                 <td class="fw-semibold">
                                                     {{ $variant->name }}
                                                 </td>
                                                 <td class="font-monospace">{{ $variant->sku }}</td>
                                                 <td>₹{{ number_format($variant->selling_price, 2) }}</td>
-                                                <td>₹{{ number_format($variant->cost_price, 2) }}</td>
+                                                <td class="text-muted">₹{{ number_format($variant->cost_price, 2) }}</td>
+                                                <td class="fw-semibold text-primary">₹{{ number_format($variantAvgCost, 2) }}</td>
                                                 <td class="fw-bold">
                                                     {{ number_format($variant->total_stock, 0) }}
                                                     <span class="text-muted fs-11">/ {{ $product->uom ? $product->uom->code : 'pcs' }}</span>
@@ -424,10 +431,26 @@
                                             <tr>
                                                 <td>{{ $tx->created_at->format('Y-m-d h:i A') }}</td>
                                                 <td>
-                                                    <span class="fw-semibold text-primary">{{ $tx->reference_type ?? $tx->source_type }}</span>
-                                                    @if($tx->reference_id || $tx->source_id)
-                                                        <span class="text-muted font-monospace">#{{ $tx->reference_id ?? $tx->source_id }}</span>
+                                                    @if($tx->reference_type === 'SalesReturn' && $tx->reference_id)
+                                                        <a href="{{ route('sales.returns.show', $tx->reference_id) }}" class="fw-bold text-primary">
+                                                            <i class="feather-rotate-ccw me-1"></i>{{ $tx->document_number }}
+                                                        </a>
+                                                    @elseif(in_array($tx->reference_type, ['DispatchOrder', 'Dispatch']) && $tx->reference_id)
+                                                        <a href="{{ route('sales.dispatches.show', $tx->reference_id) }}" class="fw-bold text-primary">
+                                                            <i class="feather-truck me-1"></i>{{ $tx->document_number }}
+                                                        </a>
+                                                    @elseif($tx->reference_type === 'SalesOrder' && $tx->reference_id)
+                                                        <a href="{{ route('sales.orders.show', $tx->reference_id) }}" class="fw-bold text-primary">
+                                                            <i class="feather-file-text me-1"></i>{{ $tx->document_number }}
+                                                        </a>
+                                                    @elseif(in_array($tx->reference_type, ['MaterialRequirement', 'DeliveryOrder']) && $tx->reference_id)
+                                                        <a href="{{ route('sales.material-requirements.show', $tx->reference_id) }}" class="fw-bold text-primary">
+                                                            <i class="feather-package me-1"></i>{{ $tx->document_number }}
+                                                        </a>
+                                                    @else
+                                                        <span class="fw-bold text-primary">{{ $tx->document_number }}</span>
                                                     @endif
+
                                                     @if($product->variation_type === 'Variant' && $tx->product && $tx->product_id !== $product->id)
                                                         <small class="d-block text-muted font-monospace fs-11">{{ $tx->product->variant_values['label'] ?? $tx->product->name }}</small>
                                                     @endif
@@ -502,19 +525,39 @@
                                                         @endif
                                                     </td>
                                                     <td>{{ $sn->warehouse ? $sn->warehouse->name : 'N/A' }}</td>
-                                                    <td>{{ $sn->batch ? $sn->batch->batch_number : '&mdash;' }}</td>
+                                                    <td>{{ $sn->batch ? $sn->batch->batch_number : '—' }}</td>
                                                     <td>
                                                         @if($sn->transactionIn)
-                                                            <span class="text-primary">{{ $sn->transactionIn->source_type }}</span>
+                                                            @if($sn->transactionIn->reference_type === 'SalesReturn' && $sn->transactionIn->reference_id)
+                                                                <a href="{{ route('sales.returns.show', $sn->transactionIn->reference_id) }}" class="fw-bold text-primary">
+                                                                    <i class="feather-rotate-ccw me-1"></i>{{ $sn->transactionIn->document_number }}
+                                                                </a>
+                                                            @elseif(in_array($sn->transactionIn->reference_type, ['DispatchOrder', 'Dispatch']) && $sn->transactionIn->reference_id)
+                                                                <a href="{{ route('sales.dispatches.show', $sn->transactionIn->reference_id) }}" class="fw-bold text-primary">
+                                                                    {{ $sn->transactionIn->document_number }}
+                                                                </a>
+                                                            @else
+                                                                <span class="fw-bold text-primary">{{ $sn->transactionIn->document_number }}</span>
+                                                            @endif
                                                         @else
-                                                            <span class="text-muted">&mdash;</span>
+                                                            <span class="text-muted">—</span>
                                                         @endif
                                                     </td>
                                                     <td>
                                                         @if($sn->transactionOut)
-                                                            <span class="text-danger">{{ $sn->transactionOut->source_type }}</span>
+                                                            @if(in_array($sn->transactionOut->reference_type, ['DispatchOrder', 'Dispatch']) && $sn->transactionOut->reference_id)
+                                                                <a href="{{ route('sales.dispatches.show', $sn->transactionOut->reference_id) }}" class="fw-bold text-danger">
+                                                                    {{ $sn->transactionOut->document_number }}
+                                                                </a>
+                                                            @elseif($sn->transactionOut->reference_type === 'SalesOrder' && $sn->transactionOut->reference_id)
+                                                                <a href="{{ route('sales.orders.show', $sn->transactionOut->reference_id) }}" class="fw-bold text-danger">
+                                                                    {{ $sn->transactionOut->document_number }}
+                                                                </a>
+                                                            @else
+                                                                <span class="fw-bold text-danger">{{ $sn->transactionOut->document_number }}</span>
+                                                            @endif
                                                         @else
-                                                            <span class="text-muted">&mdash;</span>
+                                                            <span class="text-muted">—</span>
                                                         @endif
                                                     </td>
                                                     <td>{{ $sn->created_at->format('Y-m-d h:i A') }}</td>

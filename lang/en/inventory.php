@@ -4,6 +4,12 @@ return [
     // General
     'inventory' => 'Inventory',
     'items' => 'Items',
+    'products' => 'Products',
+    'warehouses' => 'Warehouses',
+    'serial_numbers' => 'Serial Numbers',
+    'batches_fefo' => 'Batches & Expiry (FEFO)',
+    'stock_moves' => 'Stock Moves',
+    'adjustments' => 'Adjustments',
     'items_list' => 'Items List',
     'items_management' => 'Items Management',
     'inventory_items' => 'Inventory / Items',

@@ -221,10 +221,10 @@
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <form action="{{ route('inventory.products.destroy', $product) }}" method="POST" onsubmit="return confirm('{{ __('inventory.confirm_delete_product') }}');" class="d-inline">
+                                        <form action="{{ route('inventory.products.destroy', $product) }}" method="POST" id="deleteProductForm_{{ $product->id }}" class="d-inline">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="dropdown-item text-danger">
+                                            <button type="button" class="dropdown-item text-danger" onclick="confirmAction({ title: 'Delete Product', message: 'Are you sure you want to delete product &quot;{{ addslashes($product->name) }}&quot; (SKU: {{ $product->sku ?: '—' }})?', variant: 'danger', confirmText: 'Delete Product', onConfirm: function() { document.getElementById('deleteProductForm_{{ $product->id }}').submit(); } })">
                                                 <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('inventory.delete_item') }}
                                             </button>
                                         </form>

@@ -4,6 +4,12 @@ return [
     // General
     'inventory' => 'Инвентар',
     'items' => 'Артикули',
+    'products' => 'Продукти',
+    'warehouses' => 'Складове',
+    'serial_numbers' => 'Серийни номера',
+    'batches_fefo' => 'Партиди и годност (FEFO)',
+    'stock_moves' => 'Движения на наличности',
+    'adjustments' => 'Корекции',
     'items_list' => 'Списък с артикули',
     'items_management' => 'Управление на артикули',
     'inventory_items' => 'Инвентар / Артикули',

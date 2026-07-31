@@ -45,6 +45,54 @@ class LeadController extends Controller
         return view('modules.crm.leads.index', compact('leads', 'quotations'));
     }
 
+    public function kanban(Request $request)
+    {
+        $this->authorize('viewAny', Lead::class);
+        $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
+
+        $statuses = ['New', 'Follow-up Scheduled', 'Contacted', 'Qualified', 'Converted', 'Lost'];
+
+        $query = Lead::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['owner', 'quotations']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('company_name', 'like', "%{$search}%")
+                  ->orWhere('contact_name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('priority')) {
+            $query->where('priority', $request->priority);
+        }
+
+        if ($request->filled('segment')) {
+            $query->where('segment', $request->segment);
+        }
+
+        $allLeads = $query->orderBy('updated_at', 'desc')->get();
+
+        $kanbanData = [];
+        foreach ($statuses as $status) {
+            $leadsInStatus = $allLeads->filter(fn($l) => ($l->status ?: 'New') === $status);
+            $totalAmount = $leadsInStatus->sum(function($l) {
+                return (float) ($l->expected_amount ?: ($l->quotations->last()?->total_amount ?: 0));
+            });
+
+            $kanbanData[$status] = [
+                'leads' => $leadsInStatus,
+                'count' => $leadsInStatus->count(),
+                'total_amount' => $totalAmount,
+            ];
+        }
+
+        return view('modules.crm.leads.kanban', compact('kanbanData', 'statuses'));
+    }
+
     public function checkDuplicate(Request $request): JsonResponse
     {
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
@@ -159,6 +207,20 @@ class LeadController extends Controller
         $validated = $request->validate(['status' => 'required|string|in:New,Follow-up Scheduled,Contacted,Qualified,Converted,Lost']);
 
         $res = $this->leadService->updateLeadStatus($lead, $validated['status']);
+
+        if ($request->wantsJson() || $request->ajax() || $request->header('Accept') === 'application/json') {
+            if (!$res['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $res['message']
+                ], 422);
+            }
+            return response()->json([
+                'success' => true,
+                'message' => $res['message']
+            ]);
+        }
+
         if (!$res['success']) {
             return redirect()->back()->withErrors(['status' => $res['message']]);
         }

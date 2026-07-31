@@ -22,6 +22,7 @@ class DispatchOrderItem extends Model
         'warehouse_id',
         'quantity_ordered',
         'quantity_dispatched',
+        'serial_numbers',
     ];
 
     protected $casts = [

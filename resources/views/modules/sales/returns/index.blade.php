@@ -63,7 +63,7 @@
                                             {{ $ret->salesOrder->sales_order_number }}
                                         </a>
                                     @else
-                                        <span class="text-muted">—</span>
+                                        <span class="badge bg-soft-success text-success font-monospace">Direct Return</span>
                                     @endif
                                 </td>
                                 <td>

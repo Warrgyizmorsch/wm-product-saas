@@ -42,7 +42,20 @@
                     <i class="feather-copy me-1"></i>Duplicates View
                 </a>
             </div>
-            <div class="d-flex gap-2 ms-auto">
+            <div class="d-flex gap-2 ms-auto align-items-center">
+                <!-- Icon View Switcher (Exact action-dropdown-btn style matching paperclip import/export button) -->
+                <div class="d-flex align-items-center gap-2 me-1">
+                    <a href="{{ route('crm.leads.index') }}" class="action-dropdown-btn active" title="List View" data-bs-toggle="tooltip">
+                        <i class="feather-list"></i>
+                    </a>
+                    <a href="{{ route('crm.leads.kanban') }}" class="action-dropdown-btn" title="Pipeline Kanban" data-bs-toggle="tooltip">
+                        <i class="feather-grid"></i>
+                    </a>
+                    <a href="{{ route('crm.activities.index') }}" class="action-dropdown-btn" title="Activity Calendar" data-bs-toggle="tooltip">
+                        <i class="feather-calendar"></i>
+                    </a>
+                </div>
+
                 <!-- Custom Sort Component -->
                 <x-ui.sort-dropdown :label="__('crm.sort')">
                     <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'call_date', 'sort_order' => 'desc']) }}" class="dropdown-item {{ $sortBy === 'call_date' && $sortOrder === 'desc' ? 'active' : '' }}">
@@ -339,7 +352,7 @@
                                                   @csrf
                                                   @method('DELETE')
 
-                                                  <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Reject & Delete Lead', message: 'Reject & delete lead #{{ $lead->id }} ({{ $lead->company_name }}) permanently?', variant: 'danger', confirmText: 'Reject & Delete' }, function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); })">
+                                                  <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Reject & Delete Lead', message: 'Are you sure you want to reject & delete lead &quot;{{ addslashes($lead->company_name) }}&quot; (#{{ $lead->id }}) permanently?', variant: 'danger', confirmText: 'Reject & Delete', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
                                                       <i class="feather-x-circle me-2 text-danger fs-12"></i>Reject & Delete Lead
                                                   </button>
                                               </form>
@@ -352,7 +365,7 @@
                                                   @csrf
                                                   @method('DELETE')
 
-                                                  <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Delete Lead', message: 'Delete lead #{{ $lead->id }} ({{ $lead->company_name }}) permanently?', variant: 'danger', confirmText: 'Delete' }, function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); })">
+                                                  <button type="button" class="dropdown-item text-danger fw-semibold" onclick="confirmAction({ title: 'Delete Lead', message: 'Are you sure you want to delete lead &quot;{{ addslashes($lead->company_name) }}&quot; (#{{ $lead->id }}) permanently?', variant: 'danger', confirmText: 'Delete Lead', onConfirm: function() { document.getElementById('deleteLeadForm_{{ $lead->id }}').submit(); } })">
                                                       <i class="feather-trash-2 me-2 text-danger fs-12"></i>Delete Lead
                                                   </button>
                                               </form>

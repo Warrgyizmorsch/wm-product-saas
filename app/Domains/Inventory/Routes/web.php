@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Domains\Inventory\Controllers\ProductController;
 use App\Domains\Inventory\Controllers\UomController;
 use App\Domains\Inventory\Controllers\WarehouseController;
+use App\Domains\Inventory\Controllers\SerialNumberController;
+use App\Domains\Inventory\Controllers\BatchController;
 
 Route::prefix('inventory')
     ->as('inventory.')
@@ -20,6 +22,9 @@ Route::prefix('inventory')
         Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
         Route::get('products/{product}/opening-stock', [ProductController::class, 'openingStock'])->name('products.opening-stock');
         Route::post('products/{product}/opening-stock', [ProductController::class, 'saveOpeningStock'])->name('products.opening-stock.save');
+
+        Route::get('serial-numbers', [SerialNumberController::class, 'index'])->name('serial-numbers.index');
+        Route::get('batches', [BatchController::class, 'index'])->name('batches.index');
 
         Route::get('warehouses', [WarehouseController::class, 'index'])->name('warehouses.index');
         Route::post('warehouses', [WarehouseController::class, 'store'])->name('warehouses.store');

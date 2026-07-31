@@ -341,7 +341,7 @@ class ProductService
                         $cost = (float)($data['unit_cost'] ?? 0);
                         $batchNumber = $data['batch_number'] ?? null;
                         $snRaw = $data['serial_numbers'] ?? '';
-                        $serialNumbers = array_filter(array_map('trim', explode(',', $snRaw)));
+                        $serialNumbers = array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$snRaw))));
 
                         $stock = ProductWarehouseStock::query()
                             ->where('tenant_id', $tenantId)
@@ -388,7 +388,7 @@ class ProductService
                     $cost = (float)($data['unit_cost'] ?? 0);
                     $batchNumber = $data['batch_number'] ?? null;
                     $snRaw = $data['serial_numbers'] ?? '';
-                    $serialNumbers = array_filter(array_map('trim', explode(',', $snRaw)));
+                    $serialNumbers = array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$snRaw))));
 
                     $stock = ProductWarehouseStock::query()
                         ->where('tenant_id', $tenantId)

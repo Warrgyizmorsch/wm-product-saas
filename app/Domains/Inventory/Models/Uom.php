@@ -15,5 +15,6 @@ class Uom extends BaseModel
         'tenant_id',
         'name',
         'code',
+        'category', // Goods, Service, Both
     ];
 }

@@ -216,17 +216,24 @@ class LeadService
      */
     public function updateLeadStatus(Lead $lead, string $newStatus): array
     {
-        if ($lead->is_customer && $newStatus !== 'Converted') {
-            return [
-                'success' => false,
-                'message' => 'This lead has already been converted to a customer and its status cannot be changed.'
-            ];
-        }
-
         $updateData = ['status' => $newStatus];
         $message = 'Lead status successfully updated!';
 
-        if ($newStatus === 'Converted' && !$lead->is_customer) {
+        if ($newStatus === 'Lost' && $lead->is_customer) {
+            $updateData['is_customer'] = false;
+            $customer = $lead->getCustomer();
+            if ($customer) {
+                $customer->update(['status' => 'inactive']);
+            }
+            $message = 'Lead status updated to Lost and linked customer record deactivated.';
+        } elseif ($newStatus === 'Converted' && !$lead->is_customer) {
+            if (!$lead->is_qualified) {
+                return [
+                    'success' => false,
+                    'message' => "Lead #{$lead->id} ({$lead->company_name}) cannot be Converted directly because it is not Qualified yet. Please Qualify the lead first!"
+                ];
+            }
+
             $hasAcceptedQuotation = $lead->getQuotations()->where('status', 'Accepted')->isNotEmpty();
             if (!$hasAcceptedQuotation) {
                 return [

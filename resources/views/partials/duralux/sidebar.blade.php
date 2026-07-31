@@ -19,8 +19,6 @@
                 ['label' => 'Leads', 'route' => 'crm.leads.index'],
                 ['label' => 'Track Status', 'route' => 'crm.leads.trackStatus'],
                 ['label' => 'Customers', 'route' => 'crm.customers.index'],
-                ['label' => 'Contacts'],
-                ['label' => 'Activities'],
             ]],
             ['label' => 'Approvals', 'icon' => 'feather-check-circle', 'url' => '#', 'children' => [
                 ['label' => 'Quotation Approval', 'route' => 'crm.approvals.quotations.index'],
@@ -46,10 +44,12 @@
                 ['label' => 'Dispatch Orders', 'route' => 'sales.dispatches.index'],
             ]],
             ['label' => __('ui.inventory'), 'icon' => 'feather-box', 'url' => '#', 'children' => [
-                ['label' => 'Products', 'route' => 'inventory.products.index'],
-                ['label' => 'Warehouses', 'route' => 'inventory.warehouses.index'],
-                'Stock Moves',
-                'Adjustments'
+                ['label' => __('inventory.products'), 'route' => 'inventory.products.index'],
+                ['label' => __('inventory.warehouses'), 'route' => 'inventory.warehouses.index'],
+                ['label' => __('inventory.serial_numbers'), 'route' => 'inventory.serial-numbers.index'],
+                ['label' => __('inventory.batches_fefo'), 'route' => 'inventory.batches.index'],
+                ['label' => __('inventory.stock_moves'), 'url' => '#'],
+                ['label' => __('inventory.adjustments'), 'url' => '#'],
             ]],
             ['label' => __('ui.purchase'), 'icon' => 'feather-truck', 'url' => '#', 'children' => [
                 ['label' => __('purchase.savings_dashboard'), 'route' => 'purchase.rfqs.savings'],
