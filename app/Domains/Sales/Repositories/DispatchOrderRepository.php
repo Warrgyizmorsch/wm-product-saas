@@ -104,11 +104,12 @@ class DispatchOrderRepository
             foreach ($itemsData as $item) {
                 DispatchOrderItem::create([
                     'dispatch_order_id' => $dispatch->id,
-                    'material_requirement_item_id' => $item['material_requirement_item_id'],
+                    'material_requirement_item_id' => $item['material_requirement_item_id'] ?? null,
                     'product_id' => $item['product_id'],
                     'warehouse_id' => $item['warehouse_id'],
                     'quantity_ordered' => $item['quantity'],
                     'quantity_dispatched' => $item['quantity'],
+                    'serial_numbers' => $item['serial_numbers'] ?? null,
                     'status' => 'Pending',
                 ]);
             }

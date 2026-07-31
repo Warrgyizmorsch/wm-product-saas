@@ -49,6 +49,8 @@ Route::prefix('sales')
         Route::get('dispatches/create', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'create'])->name('dispatches.create');
         Route::post('dispatches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'store'])->name('dispatches.store');
         Route::get('dispatches/material-requirements', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'pendingMaterialRequirements'])->name('dispatches.pending-mr');
+        Route::get('dispatches/available-serials', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'getAvailableSerials'])->name('dispatches.available-serials');
+        Route::get('dispatches/available-batches', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'getAvailableBatches'])->name('dispatches.available-batches');
         Route::get('dispatches/warehouse/{warehouse}/address', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'warehouseAddress'])->name('dispatches.warehouse-address');
         Route::get('dispatches/{dispatch}', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'show'])->name('dispatches.show');
         Route::post('dispatches/{dispatch}/confirm', [\App\Domains\Sales\Controllers\DispatchOrderController::class, 'confirm'])->name('dispatches.confirm');

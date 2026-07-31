@@ -4,6 +4,12 @@ return [
     // General
     'inventory' => 'इन्वेंटरी',
     'items' => 'वस्तुएं',
+    'products' => 'उत्पाद',
+    'warehouses' => 'गोदाम (Warehouses)',
+    'serial_numbers' => 'सीरियल नंबर',
+    'batches_fefo' => 'बैच और एक्सपायरी (FEFO)',
+    'stock_moves' => 'स्टॉक मूव्स',
+    'adjustments' => 'एडजस्टमेंट',
     'items_list' => 'वस्तुओं की सूची',
     'items_management' => 'वस्तु प्रबंधन',
     'inventory_items' => 'इन्वेंटरी / वस्तुएं',

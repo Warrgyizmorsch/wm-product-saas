@@ -38,9 +38,11 @@ class SalesReturnController extends Controller
             $salesOrder = SalesOrder::with('items.product', 'items.warehouse', 'customer')->find($salesOrderId);
         }
 
+        $tenantId = require_tenant_id();
         $customers = Customer::query()->orderBy('name')->get();
         $salesOrders = SalesOrder::whereIn('status', ['Confirmed', 'Partially Shipped', 'Shipped'])->latest()->get();
         $warehouses = Warehouse::where('status', 'active')->orderBy('name')->get();
+        $products = \App\Domains\Inventory\Models\Product::where('tenant_id', $tenantId)->orderBy('name')->get();
 
         $latest = SalesReturn::latest('id')->first();
         $nextSeq = $latest ? intval(str_replace('RET-', '', $latest->return_number)) + 1 : 1;
@@ -49,9 +51,18 @@ class SalesReturnController extends Controller
         $prefillSalesOrderId = $salesOrderId;
         $prefillCustomerId   = $salesOrder?->customer_id;
 
+        $formattedWarehouses = $warehouses->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])->values()->all();
+        $formattedProducts   = $products->map(fn ($p) => [
+            'id' => $p->id,
+            'name' => $p->name,
+            'sku' => $p->sku ?: '',
+            'selling_price' => (float)($p->selling_price ?? 0),
+            'track_serial_number' => (bool) $p->track_serial_number,
+        ])->values()->all();
+
         return view('modules.sales.returns.create', compact(
             'customers', 'salesOrders', 'salesOrder', 'warehouses', 'nextReturnNumber',
-            'prefillSalesOrderId', 'prefillCustomerId'
+            'prefillSalesOrderId', 'prefillCustomerId', 'products', 'formattedProducts', 'formattedWarehouses'
         ));
     }
 
@@ -99,6 +110,7 @@ class SalesReturnController extends Controller
             'items.*.warehouse_id' => ['required', 'exists:warehouses,id'],
             'items.*.quantity'     => ['required', 'numeric', 'min:0.0001'],
             'items.*.unit_price'   => ['required', 'numeric', 'min:0'],
+            'items.*.serial_numbers' => ['nullable', 'string'],
         ]);
 
         $returnOrder = DB::transaction(function () use ($validated) {
@@ -127,6 +139,7 @@ class SalesReturnController extends Controller
                     'quantity'        => $item['quantity'],
                     'unit_price'      => $item['unit_price'],
                     'total_amount'    => floatval($item['quantity']) * floatval($item['unit_price']),
+                    'serial_numbers'  => $item['serial_numbers'] ?? null,
                 ]);
             }
 
@@ -159,14 +172,79 @@ class SalesReturnController extends Controller
             $tenantId = $returnOrder->tenant_id ?: (tenant_id() ?? 1);
 
             foreach ($returnOrder->items as $item) {
+                $serials = [];
+                if (!empty($item->serial_numbers)) {
+                    $serials = array_filter(array_map('trim', preg_split('/[\r\n,;]+/', $item->serial_numbers)));
+                }
+
+                // Determine actual Inventory Cost Price (Cost of Goods Sold valuation) for restocking
+                $costPrice = 0.0;
+
+                // 1. If Serial-tracked, fetch exact Purchase Rate from original Serial Number entry
+                if (!empty($serials)) {
+                    $snRate = \App\Domains\Inventory\Models\SerialNumber::where('tenant_id', $tenantId)
+                        ->where('product_id', $item->product_id)
+                        ->whereIn('serial_number', $serials)
+                        ->whereNotNull('purchase_rate')
+                        ->where('purchase_rate', '>', 0)
+                        ->avg('purchase_rate');
+
+                    if ($snRate && $snRate > 0) {
+                        $costPrice = (float)$snRate;
+                    }
+                }
+
+                // 2. If returning against a Sales Order, fetch exact Outflow Unit Cost from original Order dispatch
+                if ($costPrice <= 0 && $returnOrder->sales_order_id) {
+                    $soOutTx = \App\Domains\Inventory\Models\StockTransaction::where('tenant_id', $tenantId)
+                        ->where('product_id', $item->product_id)
+                        ->where('reference_type', 'SalesOrder')
+                        ->where('reference_id', $returnOrder->sales_order_id)
+                        ->first();
+
+                    if ($soOutTx && (float)$soOutTx->unit_cost > 0) {
+                        $costPrice = (float)$soOutTx->unit_cost;
+                    }
+                }
+
+                // 3. Check current Warehouse moving average cost
+                if ($costPrice <= 0) {
+                    $whStock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+                        ->where('product_id', $item->product_id)
+                        ->where('warehouse_id', $item->warehouse_id)
+                        ->first();
+                    if ($whStock && (float)$whStock->unit_cost > 0) {
+                        $costPrice = (float)$whStock->unit_cost;
+                    }
+                }
+
+                // 4. Check Product Master Opening Stock Rate or Cost Price
+                if ($costPrice <= 0) {
+                    $product = \App\Domains\Inventory\Models\Product::find($item->product_id);
+                    if ($product) {
+                        if ((float)($product->opening_stock_rate ?? 0) > 0) {
+                            $costPrice = (float)$product->opening_stock_rate;
+                        } elseif ((float)($product->cost_price ?? $product->unit_cost) > 0) {
+                            $costPrice = (float)($product->cost_price ?: $product->unit_cost);
+                        }
+                    }
+                }
+
+                // 5. Safe Fallback
+                if ($costPrice <= 0) {
+                    $costPrice = (float)$item->unit_price;
+                }
+
                 \App\Domains\Inventory\Services\StockService::recordInflow(
                     $tenantId,
                     (int)$item->product_id,
                     (int)$item->warehouse_id,
                     (float)$item->quantity,
-                    (float)$item->unit_price,
+                    $costPrice,
                     'SalesReturn',
-                    (int)$returnOrder->id
+                    (int)$returnOrder->id,
+                    null,
+                    $serials
                 );
             }
 

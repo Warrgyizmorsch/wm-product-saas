@@ -422,48 +422,57 @@
             initSelect2(document);
 
 
+            function toggleRow($el, show) {
+                if (show) {
+                    $el.removeClass('d-none').addClass('d-flex');
+                } else {
+                    $el.addClass('d-none').removeClass('d-flex');
+                }
+            }
+
             // Toggle Columns based on Tax Type and Discount Type
             function adjustLayout() {
-                const discType = $('select[name="discount_type"]').val();
-                const taxType = $('select[name="tax_type"]').val();
+                const discType = $('select[name="discount_type"]').val() || $('#discountTypeSelect').val();
+                const taxType = $('select[name="tax_type"]').val() || $('#taxTypeSelect').val();
 
                 // 1. Discount option changes
                 if (discType === 'item_wise') {
                     $('.discount-column').show();
-                    $('#summaryDiscountRow').show();
-                    $('#summaryGrossRow').show();
-                    $('#summaryDiscount').prop('readonly', true).css('background-color', '#f8fafc');
+                    toggleRow($('#summaryDiscountRow'), false);
+                    toggleRow($('#summaryGrossRow'), false);
+                    $('#summaryDiscount').val('0.00');
                 } else if (discType === 'order_wise') {
                     $('.discount-column').hide();
                     $('.disc-percent-input').val('0.00');
                     $('.disc-amount-input').val('0.00');
-                    $('#summaryDiscountRow').show();
-                    $('#summaryGrossRow').show();
+                    toggleRow($('#summaryDiscountRow'), true);
+                    toggleRow($('#summaryGrossRow'), true);
                     $('#summaryDiscount').prop('readonly', false).css('background-color', '#ffffff');
                 } else {
                     // without_discount
                     $('.discount-column').hide();
                     $('.disc-percent-input').val('0.00');
                     $('.disc-amount-input').val('0.00');
-                    $('#summaryDiscountRow').hide();
-                    $('#summaryGrossRow').hide();
+                    toggleRow($('#summaryDiscountRow'), false);
+                    toggleRow($('#summaryGrossRow'), false);
                     $('#summaryDiscount').val('0.00');
                 }
 
                 // 2. Tax option changes
                 if (taxType === 'item_wise_tax') {
                     $('.tax-column').show();
-                    $('#orderTaxPercentRow').hide().find('#orderTaxPercent').val('0.00');
-                    $('#summaryTaxRow').show();
+                    toggleRow($('#orderTaxPercentRow'), false);
+                    $('#orderTaxPercent').val('0.00');
+                    toggleRow($('#summaryTaxRow'), false);
                     $('#gstTypeContainer').show();
                 } else if (taxType === 'order_wise_tax') {
                     $('.tax-column').hide();
                     $('.tax-percent-input, .tax-amount-input').val('0.00');
                     $('.cgst-percent-input, .sgst-percent-input, .igst-percent-input').val('0.00');
                     $('.cgst-amount-input, .sgst-amount-input, .igst-amount-input').val('0.00');
-                    $('#orderTaxPercentRow').show();
+                    toggleRow($('#orderTaxPercentRow'), true);
                     $('#orderTaxPercent').prop('readonly', false).css('background-color', '#ffffff');
-                    $('#summaryTaxRow').show();
+                    toggleRow($('#summaryTaxRow'), true);
                     $('#gstTypeContainer').show();
                 } else {
                     // without_tax
@@ -471,8 +480,9 @@
                     $('.tax-percent-input, .tax-amount-input').val('0.00');
                     $('.cgst-percent-input, .sgst-percent-input, .igst-percent-input').val('0.00');
                     $('.cgst-amount-input, .sgst-amount-input, .igst-amount-input').val('0.00');
-                    $('#orderTaxPercentRow').hide().find('#orderTaxPercent').val('0.00');
-                    $('#summaryTaxRow').hide();
+                    toggleRow($('#orderTaxPercentRow'), false);
+                    $('#orderTaxPercent').val('0.00');
+                    toggleRow($('#summaryTaxRow'), false);
                     $('#gstTypeContainer').hide();
                     $('#summaryCgst, #summarySgst, #summaryIgst, #summaryTax').val('0.00');
                 }
@@ -480,7 +490,7 @@
                 calculateAll();
             }
 
-            $(document).on('change', 'select[name="discount_type"], select[name="tax_type"], select[name="gst_type"]', adjustLayout);
+            $(document).on('change', '#discountTypeSelect, #taxTypeSelect, #gstTypeSelect, select[name="discount_type"], select[name="tax_type"], select[name="gst_type"]', adjustLayout);
             adjustLayout(); // run initial layout adjustments
 
             // Recalculations Engine

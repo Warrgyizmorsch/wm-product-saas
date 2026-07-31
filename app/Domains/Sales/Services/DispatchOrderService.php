@@ -69,11 +69,14 @@ class DispatchOrderService
      */
     public function createDispatchOrder(array $validated, int $userId): DispatchOrder
     {
-        $req = MaterialRequirement::findOrFail($validated['material_requirement_id']);
+        $mrId = $validated['material_requirement_id'] ?? null;
+        $req  = $mrId ? MaterialRequirement::find($mrId) : null;
+        $tenantId = require_tenant_id();
 
         // 1. Remaining ordered qty & Stock availability validation
         foreach ($validated['items'] as $item) {
-            $mrItem = MaterialRequirementItem::find($item['material_requirement_item_id']);
+            $mrItemId = $item['material_requirement_item_id'] ?? null;
+            $mrItem = $mrItemId ? MaterialRequirementItem::find($mrItemId) : null;
             if ($mrItem) {
                 $alreadyDispatched = $this->dispatchRepo->getDispatchedQtyForMRItem($mrItem->id);
                 $remainingQty = max(0, (float) $mrItem->quantity - $alreadyDispatched);
@@ -98,9 +101,10 @@ class DispatchOrderService
 
         // 3. Prepare data & save via repository
         $dispatchData = [
-            'tenant_id' => $req->tenant_id,
-            'material_requirement_id' => $req->id,
-            'sales_order_id' => $req->sales_order_id,
+            'tenant_id' => $tenantId,
+            'customer_id' => $validated['customer_id'] ?? ($req?->salesOrder?->customer_id),
+            'material_requirement_id' => $req?->id,
+            'sales_order_id' => $req?->sales_order_id,
             'dispatch_number' => $dispatchNumber,
             'dispatch_date' => $validated['dispatch_date'],
             'status' => 'Pending',
@@ -128,7 +132,7 @@ class DispatchOrderService
 
         // 1. Stock Availability Validation
         foreach ($dispatch->items as $item) {
-            $mrItem = MaterialRequirementItem::find($item->material_requirement_item_id);
+            $mrItem = $item->material_requirement_item_id ? MaterialRequirementItem::find($item->material_requirement_item_id) : null;
             $reservedForThisItem = $mrItem ? (float) ($mrItem->quantity_reserved ?? 0) : 0;
             $unreservedAvail = StockService::getAvailableStock((int) $item->product_id, (int) $item->warehouse_id);
             $totalPhysicalStock = $unreservedAvail + $reservedForThisItem;
@@ -144,7 +148,7 @@ class DispatchOrderService
             $tenantId = $dispatch->tenant_id ?: (tenant_id() ?? 1);
 
             foreach ($dispatch->items as $item) {
-                $mrItem = MaterialRequirementItem::find($item->material_requirement_item_id);
+                $mrItem = $item->material_requirement_item_id ? MaterialRequirementItem::find($item->material_requirement_item_id) : null;
                 $qtyToDispatch = (float) ($item->quantity_dispatched ?? $item->quantity_ordered);
 
                 if ($mrItem && (float) $mrItem->quantity_reserved > 0) {
@@ -167,13 +171,17 @@ class DispatchOrderService
                     }
                 }
 
+                $snRaw = $item->serial_numbers ?? '';
+                $serialNumbers = is_array($snRaw) ? $snRaw : array_values(array_filter(array_map('trim', preg_split('/[\r\n,;]+/', (string)$snRaw))));
+
                 StockService::recordOutflow(
                     $tenantId,
                     (int) $item->product_id,
                     (int) $item->warehouse_id,
                     $qtyToDispatch,
                     'DispatchOrder',
-                    (int) $dispatch->id
+                    (int) $dispatch->id,
+                    $serialNumbers
                 );
 
                 $item->update(['status' => 'Dispatched']);

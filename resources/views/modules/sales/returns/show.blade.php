@@ -357,7 +357,14 @@
                                         <td>
                                             <strong class="text-dark d-block fs-13">{{ $item->product?->name ?: 'Item #' . ($idx + 1) }}</strong>
                                             @if($item->product?->sku)
-                                                <span class="text-muted fs-11">SKU: {{ $item->product->sku }}</span>
+                                                <span class="text-muted fs-11 me-2">SKU: {{ $item->product->sku }}</span>
+                                            @endif
+                                            @if(!empty($item->serial_numbers))
+                                                <div class="mt-1">
+                                                    <span class="badge bg-soft-info text-info font-monospace fs-11 p-1">
+                                                        <i class="feather-hash me-1"></i>Returned Serials: {{ $item->serial_numbers }}
+                                                    </span>
+                                                </div>
                                             @endif
                                         </td>
                                         <td>

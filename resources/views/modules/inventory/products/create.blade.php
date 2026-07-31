@@ -154,7 +154,7 @@
                             <x-ui.odoo-form-ui type="select" :label="__('inventory.unit')" name="uom_id" required="true">
                                 <option value="" selected disabled>{{ __('inventory.select_unit') }}</option>
                                 @foreach($uoms as $uom)
-                                    <option value="{{ $uom->id }}">{{ $uom->name }} ({{ $uom->code }})</option>
+                                    <option value="{{ $uom->id }}" data-uom-category="{{ strtolower($uom->category ?? 'goods') }}">{{ $uom->name }} ({{ $uom->code }})</option>
                                 @endforeach
                             </x-ui.odoo-form-ui>
 
@@ -439,9 +439,39 @@
                 toggleSections();
             });
 
+            const $uomSelect = $('select[name="uom_id"]');
+            const originalUomOptions = $uomSelect.find('option').clone();
+
+            function filterUomOptions() {
+                const itemType = $('input[name="item_type"]:checked').val() || 'Goods';
+                const targetCategory = itemType === 'Service' ? 'service' : 'goods';
+                const currentVal = $uomSelect.val();
+
+                $uomSelect.empty();
+
+                originalUomOptions.each(function() {
+                    const uomCategory = $(this).attr('data-uom-category');
+                    if (!uomCategory || uomCategory === targetCategory || uomCategory === 'both') {
+                        $uomSelect.append($(this).clone());
+                    }
+                });
+
+                if (currentVal && $uomSelect.find(`option[value="${currentVal}"]`).length) {
+                    $uomSelect.val(currentVal);
+                } else {
+                    $uomSelect.val('');
+                }
+
+                if ($uomSelect.data('select2')) {
+                    $uomSelect.trigger('change');
+                }
+            }
+
             function toggleSections() {
                 const itemType = $('input[name="item_type"]:checked').val();
                 const variationType = $('input[name="variation_type"]:checked').val();
+
+                filterUomOptions();
 
                 const hsnLabel = $('input[name="hsn_sac"]').closest('.odoo-form-group').find('.odoo-form-label');
                 if (itemType === 'Service') {

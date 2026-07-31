@@ -122,6 +122,8 @@ class GoodsReceiptNoteController extends Controller
                 'previous_received_qty' => $prevReceived,
                 'remaining_qty' => $remainingQty,
                 'unit_rate' => (float)$first->rate,
+                'track_serial_number' => (bool)($first->product?->track_serial_number ?? false),
+                'track_batch' => (bool)($first->product?->track_batch ?? false),
             ];
         })->values();
 
@@ -158,6 +160,15 @@ class GoodsReceiptNoteController extends Controller
             'items.*.received_qty' => 'required|numeric|min:0',
             'items.*.rejected_qty' => 'nullable|numeric|min:0',
             'items.*.remarks' => 'nullable|string',
+            'items.*.batch_number' => 'nullable|string',
+            'items.*.manufacturing_date' => 'nullable|date',
+            'items.*.expiry_date' => 'nullable|date',
+            'items.*.serial_numbers' => 'nullable|string',
+            'items.*.batches' => 'nullable|array',
+            'items.*.batches.*.batch_number' => 'nullable|string',
+            'items.*.batches.*.received_qty' => 'nullable|numeric|min:0.0001',
+            'items.*.batches.*.manufacturing_date' => 'nullable|date',
+            'items.*.batches.*.expiry_date' => 'nullable|date',
         ]);
 
         $grn = $this->grnService->storeGrn($validated, $tenantId);

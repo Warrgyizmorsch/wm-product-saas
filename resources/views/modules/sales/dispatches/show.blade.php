@@ -28,9 +28,19 @@
                     <span class="fs-12 text-muted text-uppercase fw-bold d-block mb-1">Dispatch Shipment</span>
                     <h3 class="fw-bold text-dark mb-1">{{ $dispatch->dispatch_number }}</h3>
                     <span class="fs-13 text-muted">
-                        Material Requirement: <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-bold text-primary">{{ $dispatch->materialRequirement->requirement_number }}</a>
-                        | Sales Order: <a href="{{ route('sales.orders.show', $dispatch->sales_order_id) }}" class="fw-bold text-info">{{ $dispatch->salesOrder->sales_order_number }}</a>
-                        | Customer: <strong class="text-dark">{{ $dispatch->salesOrder->customer?->name }}</strong>
+                        Material Requirement: 
+                        @if($dispatch->material_requirement_id && $dispatch->materialRequirement)
+                            <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-bold text-primary">{{ $dispatch->materialRequirement->requirement_number }}</a>
+                        @else
+                            <span class="badge bg-soft-success text-success font-monospace">Direct Outward Dispatch</span>
+                        @endif
+                        | Sales Order: 
+                        @if($dispatch->sales_order_id && $dispatch->salesOrder)
+                            <a href="{{ route('sales.orders.show', $dispatch->sales_order_id) }}" class="fw-bold text-info">{{ $dispatch->salesOrder->sales_order_number }}</a>
+                        @else
+                            <span class="text-muted">—</span>
+                        @endif
+                        | Customer: <strong class="text-dark">{{ $dispatch->customer?->name ?? 'Direct / Walk-in Customer' }}</strong>
                     </span>
                 </div>
 
@@ -42,7 +52,7 @@
                         elseif ($dispatch->status === 'Invoiced') $statusClass = 'bg-soft-dark text-dark';
                     @endphp
                     <span class="badge {{ $statusClass }} px-3 py-2 fs-12 fw-semibold">{{ $dispatch->status }}</span>
-                    <small class="text-muted">{{ $dispatch->dispatch_date->format('d M Y') }}</small>
+                    <small class="text-muted">{{ $dispatch->dispatch_date ? $dispatch->dispatch_date->format('d M Y') : '—' }}</small>
                 </div>
 
                 <div class="d-flex gap-2">
@@ -53,14 +63,16 @@
                                 <i class="feather-check-circle me-1.5"></i> Confirm & Dispatch
                             </button>
                         </form>
-                    @elseif (in_array($dispatch->status, ['Dispatched', 'Delivered']))
+                    @elseif (in_array($dispatch->status, ['Dispatched', 'Delivered']) && $dispatch->material_requirement_id)
                         <a href="{{ route('sales.invoices.create', ['material_requirement_id' => $dispatch->material_requirement_id]) }}" class="btn btn-primary fw-bold px-3">
                             <i class="feather-file-text me-1.5"></i> Create Invoice
                         </a>
                     @endif
-                    <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="btn btn-light border">
-                        <i class="feather-arrow-left me-2"></i>Back to MR
-                    </a>
+                    @if($dispatch->material_requirement_id)
+                        <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="btn btn-light border">
+                            <i class="feather-arrow-left me-2"></i>Back to MR
+                        </a>
+                    @endif
                     <a href="{{ route('sales.dispatches.index') }}" class="btn btn-light border">
                         <i class="feather-list me-2"></i>All Dispatches
                     </a>
@@ -166,13 +178,17 @@
                     </div>
                     <div class="mb-2 d-flex justify-content-between">
                         <span class="text-muted">Dispatch Date</span>
-                        <strong>{{ $dispatch->dispatch_date->format('d M Y') }}</strong>
+                        <strong>{{ $dispatch->dispatch_date ? $dispatch->dispatch_date->format('d M Y') : '—' }}</strong>
                     </div>
                     <div class="mb-2 d-flex justify-content-between">
                         <span class="text-muted">Material Requirement</span>
-                        <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-bold text-primary">
-                            {{ $dispatch->materialRequirement->requirement_number }}
-                        </a>
+                        @if ($dispatch->material_requirement_id && $dispatch->materialRequirement)
+                            <a href="{{ route('sales.material-requirements.show', $dispatch->material_requirement_id) }}" class="fw-bold text-primary">
+                                {{ $dispatch->materialRequirement->requirement_number }}
+                            </a>
+                        @else
+                            <span class="badge bg-soft-success text-success font-monospace">Direct Outward Dispatch</span>
+                        @endif
                     </div>
                     <div class="mb-2 d-flex justify-content-between">
                         <span class="text-muted">Total Items</span>

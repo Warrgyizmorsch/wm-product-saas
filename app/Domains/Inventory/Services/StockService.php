@@ -257,7 +257,9 @@ class StockService
         string $referenceType,
         ?int $referenceId = null,
         ?string $batchNumber = null,
-        array $serialNumbers = []
+        array $serialNumbers = [],
+        ?string $mfgDate = null,
+        ?string $expiryDate = null
     ): StockTransaction {
         return DB::transaction(function () use (
             $tenantId,
@@ -268,7 +270,9 @@ class StockService
             $referenceType,
             $referenceId,
             $batchNumber,
-            $serialNumbers
+            $serialNumbers,
+            $mfgDate,
+            $expiryDate
         ) {
             $product = Product::findOrFail($productId);
 
@@ -285,6 +289,9 @@ class StockService
                 if ($batch) {
                     $batch->increment('quantity', $quantity);
                     $batch->increment('available_qty', $quantity);
+                    if ($expiryDate) {
+                        $batch->update(['expiry_date' => \Carbon\Carbon::parse($expiryDate)]);
+                    }
                 } else {
                     $batch = Batch::create([
                         'tenant_id' => $tenantId,
@@ -293,8 +300,8 @@ class StockService
                         'batch_number' => $batchNumber,
                         'quantity' => $quantity,
                         'available_qty' => $quantity,
-                        'manufacturing_date' => now(),
-                        'expiry_date' => now()->addYear(),
+                        'manufacturing_date' => $mfgDate ? \Carbon\Carbon::parse($mfgDate) : now(),
+                        'expiry_date' => $expiryDate ? \Carbon\Carbon::parse($expiryDate) : now()->addYear(),
                     ]);
                 }
                 $batchId = $batch->id;
@@ -317,9 +324,24 @@ class StockService
 
             // 3. Register Serial Numbers
             $createdSerials = [];
-            if ($product->track_serial_number && !empty($serialNumbers)) {
+            if (!empty($serialNumbers)) {
+                if (!$product->track_serial_number) {
+                    $product->update(['track_serial_number' => true]);
+                }
                 foreach ($serialNumbers as $snString) {
+                    $snString = trim((string)$snString);
                     if (empty($snString)) continue;
+
+                    $existingSn = SerialNumber::query()
+                        ->where('tenant_id', $tenantId)
+                        ->where('product_id', $productId)
+                        ->where('serial_number', $snString)
+                        ->first();
+
+                    $purchaseRate = ($existingSn && (float)$existingSn->purchase_rate > 0)
+                        ? (float)$existingSn->purchase_rate
+                        : $unitCost;
+
                     $createdSerials[] = SerialNumber::query()->updateOrCreate(
                         [
                             'tenant_id' => $tenantId,
@@ -330,7 +352,7 @@ class StockService
                             'status' => 'Available',
                             'warehouse_id' => $warehouseId,
                             'batch_id' => $batchId,
-                            'purchase_rate' => $unitCost,
+                            'purchase_rate' => $purchaseRate,
                             'stock_transaction_id_in' => $transaction->id,
                             'stock_transaction_id_out' => null,
                         ]

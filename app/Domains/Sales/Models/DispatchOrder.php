@@ -15,6 +15,7 @@ class DispatchOrder extends BaseModel
 
     protected $fillable = [
         'tenant_id',
+        'customer_id',
         'material_requirement_id',
         'sales_order_id',
         'dispatch_number',
@@ -42,16 +43,11 @@ class DispatchOrder extends BaseModel
         return $this->belongsTo(SalesOrder::class, 'sales_order_id');
     }
 
-    public function customer()
+    public function customer(): BelongsTo
     {
-        return $this->hasOneThrough(
-            \App\Domains\CRM\Models\Customer::class,
-            SalesOrder::class,
-            'id',
-            'id',
-            'sales_order_id',
-            'customer_id'
-        );
+        return $this->belongsTo(\App\Domains\CRM\Models\Customer::class, 'customer_id')->withDefault(function() {
+            return $this->salesOrder?->customer;
+        });
     }
 
     public function items(): HasMany

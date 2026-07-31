@@ -158,7 +158,7 @@
                                         {{ $dispatch->materialRequirement->requirement_number }}
                                     </a>
                                 @else
-                                    <span class="text-muted">—</span>
+                                    <span class="badge bg-soft-success text-success font-monospace">Direct Outward</span>
                                 @endif
                             </td>
                             <td>

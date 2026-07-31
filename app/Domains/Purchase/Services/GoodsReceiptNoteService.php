@@ -59,8 +59,15 @@ class GoodsReceiptNoteService
                 $totalAmount = round($qtyAccepted * $unitRate, 2);
 
                 $batchNumber = $item['batch_number'] ?? null;
+                $mfgDate = $item['manufacturing_date'] ?? null;
+                $expiryDate = $item['expiry_date'] ?? null;
                 $snRaw = $item['serial_numbers'] ?? '';
-                $serialNumbers = is_array($snRaw) ? $snRaw : array_filter(array_map('trim', explode(',', (string)$snRaw)));
+                if (is_array($snRaw)) {
+                    $serialNumbers = $snRaw;
+                } else {
+                    $serialNumbers = preg_split('/[\r\n,;]+/', (string)$snRaw);
+                }
+                $serialNumbers = array_values(array_filter(array_map('trim', $serialNumbers)));
 
                 $grnItem = GoodsReceiptNoteItem::create([
                     'tenant_id'              => $tenantId,
@@ -79,17 +86,51 @@ class GoodsReceiptNoteService
                 ]);
 
                 if ($qtyAccepted > 0) {
-                    StockService::recordInflow(
-                        $tenantId,
-                        $poItem->product_id,
-                        $warehouseId,
-                        $qtyAccepted,
-                        $unitRate,
-                        'Purchase Receipt',
-                        $grn->id,
-                        $batchNumber,
-                        $serialNumbers
-                    );
+                    if (!empty($item['batches']) && is_array($item['batches'])) {
+                        $sumBatchQty = 0;
+                        foreach ($item['batches'] as $b) {
+                            $sumBatchQty += (float)($b['received_qty'] ?? 0);
+                        }
+                        if ($sumBatchQty > ($qtyAccepted + 0.0001)) {
+                            throw new \Exception("Total batch allocation quantity ({$sumBatchQty}) cannot exceed accepted item quantity ({$qtyAccepted}) for product '{$poItem->product?->name}'.");
+                        }
+
+                        foreach ($item['batches'] as $b) {
+                            $bQty = (float)($b['received_qty'] ?? 0);
+                            if ($bQty <= 0) continue;
+                            $bNo = $b['batch_number'] ?? null;
+                            $bMfg = $b['manufacturing_date'] ?? null;
+                            $bExp = $b['expiry_date'] ?? null;
+
+                            StockService::recordInflow(
+                                $tenantId,
+                                $poItem->product_id,
+                                $warehouseId,
+                                $bQty,
+                                $unitRate,
+                                'Purchase Receipt',
+                                $grn->id,
+                                $bNo,
+                                [],
+                                $bMfg,
+                                $bExp
+                            );
+                        }
+                    } else {
+                        StockService::recordInflow(
+                            $tenantId,
+                            $poItem->product_id,
+                            $warehouseId,
+                            $qtyAccepted,
+                            $unitRate,
+                            'Purchase Receipt',
+                            $grn->id,
+                            $batchNumber,
+                            $serialNumbers,
+                            $mfgDate,
+                            $expiryDate
+                        );
+                    }
                 }
 
                 $poItem->increment('received_qty', $qtyReceived);

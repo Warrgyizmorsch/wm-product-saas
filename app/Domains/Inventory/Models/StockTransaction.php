@@ -58,4 +58,21 @@ class StockTransaction extends BaseModel
     {
         return $this->hasMany(SerialNumber::class, 'stock_transaction_id_out');
     }
+
+    public function getDocumentNumberAttribute(): string
+    {
+        if (!$this->reference_type || !$this->reference_id) {
+            return $this->reference_type ?: 'GRN / Opening Stock';
+        }
+
+        return match ($this->reference_type) {
+            'SalesReturn' => \App\Domains\Sales\Models\SalesReturn::where('id', $this->reference_id)->value('return_number') ?: "RET-{$this->reference_id}",
+            'DispatchOrder', 'Dispatch' => \App\Domains\Sales\Models\DispatchOrder::where('id', $this->reference_id)->value('dispatch_number') ?: "DO-{$this->reference_id}",
+            'MaterialRequirement', 'DeliveryOrder' => \App\Domains\Sales\Models\MaterialRequirement::where('id', $this->reference_id)->value('mr_number') ?: "MR-{$this->reference_id}",
+            'SalesOrder' => \App\Domains\Sales\Models\SalesOrder::where('id', $this->reference_id)->value('sales_order_number') ?: "SO-{$this->reference_id}",
+            'GoodsReceiptNote', 'GRN', 'Purchase Receipt' => \App\Domains\Purchase\Models\GoodsReceiptNote::where('id', $this->reference_id)->value('grn_number') ?: (\App\Domains\Purchase\Models\PurchaseOrder::where('id', $this->reference_id)->value('po_number') ?: "GRN-{$this->reference_id}"),
+            'PurchaseOrder' => \App\Domains\Purchase\Models\PurchaseOrder::where('id', $this->reference_id)->value('po_number') ?: "PO-{$this->reference_id}",
+            default => "{$this->reference_type} #{$this->reference_id}",
+        };
+    }
 }

@@ -40,6 +40,16 @@
                     </div>
 
                     <div class="p-4 p-md-5">
+                        @if ($errors->any())
+                            <div class="alert alert-danger mb-4">
+                                <h6 class="fw-bold mb-2"><i class="feather-alert-triangle me-1"></i>Validation Errors:</h6>
+                                <ul class="mb-0 ps-3">
+                                    @foreach ($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
                         <!-- Header Form Controls -->
                         <div class="row g-3 fs-13 pb-4 border-bottom">
                             <div class="col-md-6 border-end">
@@ -161,6 +171,34 @@
 
 @push('scripts')
 <script>
+    function showWarningModal(title, message, callback) {
+        if (typeof confirmAction === 'function') {
+            confirmAction({
+                title: title || 'Validation Warning',
+                message: message || 'Please review the form warnings before saving.',
+                variant: 'warning',
+                confirmText: 'Got It / Fix Errors',
+                cancelButtonText: 'Dismiss',
+                onConfirm: function() {
+                    if (typeof callback === 'function') {
+                        callback();
+                    } else {
+                        var firstError = $('.bg-soft-danger:visible, .border-danger:visible, .is-invalid:visible, [id^="batch_error_"]:visible').first();
+                        if (firstError.length) {
+                            var remarkRow = firstError.closest('.remark-row');
+                            if (remarkRow.length && !remarkRow.is(':visible')) {
+                                remarkRow.slideDown(150);
+                            }
+                            $('html, body').animate({
+                                scrollTop: firstError.offset().top - 160
+                            }, 450);
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     $(document).ready(function() {
         // Initialize PO Selector
         $('#po_selector').on('change', function() {
@@ -187,11 +225,11 @@
 
                         renderPoItems(res.items);
                     } else {
-                        alert('{{ __('purchase.js_failed_to_load_po_details') }}');
+                        showWarningModal('Failed to Load PO', '{{ __('purchase.js_failed_to_load_po_details') }}');
                     }
                 },
                 error: function() {
-                    alert('{{ __('purchase.js_error_fetching_po_items') }}');
+                    showWarningModal('Error Fetching PO', '{{ __('purchase.js_error_fetching_po_items') }}');
                     resetGrnItems();
                 }
             });
@@ -226,17 +264,129 @@
                 var unitRate = parseFloat(item.unit_rate);
                 var totalAmt = defaultAcc * unitRate;
 
+                var isSerialTracked = item.track_serial_number;
+                var isBatchTracked = item.track_batch;
+
+                var trackingBadgeHtml = '';
+                if (isSerialTracked) {
+                    trackingBadgeHtml = `<span class="badge bg-soft-primary text-primary fs-10 px-2 py-0.5 ms-2"><i class="feather-hash me-1"></i>Serial Tracked</span>`;
+                } else if (isBatchTracked) {
+                    trackingBadgeHtml = `<span class="badge bg-soft-warning text-warning fs-10 px-2 py-0.5 ms-2"><i class="feather-layers me-1"></i>Batch Tracked</span>`;
+                }
+
+                var isAutoExpanded = isSerialTracked || isBatchTracked;
+                var defaultPrefix = (item.product_code || 'SN-').replace(/[^a-zA-Z0-9]/g, '').toUpperCase() + '-';
+
+                var trackingSectionHtml = '';
+                if (isSerialTracked) {
+                    trackingSectionHtml = `
+                        <div class="col-md-7">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <label class="form-label fs-11 fw-bold text-uppercase text-primary mb-0">
+                                    <i class="feather-hash me-1"></i>Serial Numbers (Scan / Manual)
+                                </label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-soft-warning text-warning fs-11 serial-count-badge" id="serial_count_badge_${idx}">
+                                        0 / ${Math.round(defaultAcc)} Serials
+                                    </span>
+                                    <button type="button" class="btn btn-xs btn-soft-primary fw-semibold btn-auto-serial" 
+                                            data-idx="${idx}" 
+                                            data-product="${item.product_name}"
+                                            data-prefix="${defaultPrefix}"
+                                            data-count="${Math.round(defaultAcc)}">
+                                        <i class="feather-zap me-1"></i>Auto-Generate
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <textarea class="form-control form-control-sm fs-12 text-dark font-monospace serial-textarea" 
+                                      name="items[${idx}][serial_numbers]" 
+                                      id="serial_input_${idx}" 
+                                      data-idx="${idx}"
+                                      rows="2"
+                                      placeholder="Scan barcodes or enter serial numbers separated by comma or new line..."></textarea>
+                            <span class="fs-10 text-muted">Each scanned barcode or comma/newline registers 1 unique Serial Number.</span>
+                        </div>
+                    `;
+                } else if (isBatchTracked) {
+                    var defaultBatchNo1 = 'BAT-' + (item.product_code || 'LOT').replace(/[^a-zA-Z0-9]/g, '') + '-01';
+                    var defaultMfg = new Date().toISOString().split('T')[0];
+                    var nextYear = new Date();
+                    nextYear.setFullYear(nextYear.getFullYear() + 1);
+                    var defaultExp = nextYear.toISOString().split('T')[0];
+
+                    trackingSectionHtml = `
+                        <div class="col-md-7">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <label class="form-label fs-11 fw-bold text-uppercase text-warning mb-0">
+                                    <i class="feather-layers me-1"></i>Batch / Lot Inward Allocation
+                                </label>
+                                <button type="button" class="btn btn-xs btn-outline-warning fw-semibold btn-add-batch-row" data-idx="${idx}" data-code="${item.product_code || 'LOT'}">
+                                    <i class="feather-plus me-1"></i>+ Add Another Batch / Lot
+                                </button>
+                            </div>
+                            
+                            <div id="batch_rows_container_${idx}" class="d-grid gap-2">
+                                <div class="batch-split-row border p-2 rounded-3 bg-white shadow-xs" data-batch-idx="0">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-md-3">
+                                            <label class="fs-10 text-muted mb-0 fw-semibold">Batch No <span class="text-danger">*</span></label>
+                                            <input type="text" 
+                                                   class="form-control form-control-sm font-monospace fw-bold text-dark" 
+                                                   name="items[${idx}][batches][0][batch_number]" 
+                                                   placeholder="e.g. BAT-01" 
+                                                   value="${defaultBatchNo1}"
+                                                   required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="fs-10 text-muted mb-0 fw-semibold">Qty Rec. <span class="text-danger">*</span></label>
+                                            <input type="number" step="0.0001" min="0.0001" 
+                                                   class="form-control form-control-sm text-center font-monospace fw-bold text-primary batch-qty-input" 
+                                                   data-idx="${idx}"
+                                                   name="items[${idx}][batches][0][received_qty]" 
+                                                   value="${defaultAcc.toFixed(2)}" required>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="fs-10 text-muted mb-0 fw-semibold">Mfg Date</label>
+                                            <input type="date" 
+                                                   class="form-control form-control-sm text-dark fs-11" 
+                                                   name="items[${idx}][batches][0][manufacturing_date]" 
+                                                   value="${defaultMfg}">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="fs-10 text-muted mb-0 fw-semibold">Expiry Date</label>
+                                            <input type="date" 
+                                                   class="form-control form-control-sm text-dark fs-11" 
+                                                   name="items[${idx}][batches][0][expiry_date]" 
+                                                   value="${defaultExp}">
+                                        </div>
+                                        <div class="col-md-1 text-center pt-3">
+                                            <button type="button" class="btn btn-xs btn-link text-muted p-0 border-0 disabled" title="Primary Batch Line" disabled style="opacity: 0.3;">
+                                                <i class="feather-trash-2 fs-14"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="batch_error_${idx}" class="mt-1.5 fs-11 fw-bold p-2 rounded shadow-xs" style="display: none;"></div>
+                            <span class="fs-10 text-muted mt-1 d-block"><i class="feather-info me-1"></i>Split received items into multiple batches if received in different lots/boxes.</span>
+                        </div>
+                    `;
+                }
+
                 html += `
                     <tr class="grn-item-row" data-idx="${idx}">
                         <td class="text-center fw-semibold text-muted">${idx + 1}</td>
                         <td>
                             <div class="d-flex align-items-center justify-content-between">
                                 <div>
-                                    <div class="fw-bold text-dark">${item.product_name}</div>
+                                    <div class="fw-bold text-dark d-flex align-items-center">
+                                        ${item.product_name} ${trackingBadgeHtml}
+                                    </div>
                                     <div class="fs-11 text-muted">Code: ${item.product_code || 'N/A'} | UOM: <strong>${item.uom_name}</strong></div>
                                 </div>
-                                <button type="button" class="btn btn-xs bg-soft-primary text-primary border-0 btn-toggle-remark ms-2 px-2 py-1 rounded-pill fw-semibold" data-target="#remark_row_${idx}">
-                                    <i class="feather-plus me-1 fs-11"></i><span class="btn-lbl">{{ __('purchase.note_lbl') }}</span>
+                                <button type="button" class="btn btn-xs ${isAutoExpanded ? 'bg-soft-danger text-danger' : 'bg-soft-primary text-primary'} border-0 btn-toggle-remark ms-2 px-2 py-1 rounded-pill fw-semibold" data-target="#remark_row_${idx}">
+                                    <i class="${isAutoExpanded ? 'feather-minus' : 'feather-plus'} me-1 fs-11"></i><span class="btn-lbl">${isAutoExpanded ? '{{ __('purchase.hide_lbl') }}' : '{{ __('purchase.note_lbl') }}'}</span>
                                 </button>
                             </div>
                             <input type="hidden" name="items[${idx}][purchase_order_item_id]" value="${item.purchase_order_item_id}">
@@ -267,19 +417,23 @@
                             ${totalAmt.toFixed(2)}
                         </td>
                     </tr>
-                    <tr id="remark_row_${idx}" class="remark-row bg-white" style="display: none;">
+                    <tr id="remark_row_${idx}" class="remark-row bg-white" style="${isAutoExpanded ? '' : 'display: none;'}">
                         <td class="border-0"></td>
                         <td colspan="9" class="py-2 px-3 border-top-0">
                             <div class="p-3 rounded-3 border bg-white shadow-xs">
-                                <div class="d-flex align-items-center gap-2 mb-1.5">
-                                    <span class="badge bg-soft-primary text-primary fs-10 fw-bold text-uppercase">
-                                        <i class="feather-message-square me-1"></i>{{ __('purchase.item_remarks_rejection_reason') }}
-                                    </span>
-                                    <span class="fs-11 text-muted">{{ __('purchase.for') }} <strong>${item.product_name}</strong></span>
+                                <div class="row g-3">
+                                    ${trackingSectionHtml}
+                                    
+                                    <div class="${trackingSectionHtml ? 'col-md-5' : 'col-md-12'}">
+                                        <label class="form-label fs-11 fw-bold text-uppercase text-muted mb-1.5">
+                                            <i class="feather-message-square me-1"></i>Rejection Reason / Remarks
+                                        </label>
+                                        <textarea class="form-control form-control-sm fs-12 text-dark" 
+                                                  name="items[${idx}][remarks]" 
+                                                  rows="2" 
+                                                  placeholder="{{ __('purchase.js_enter_rejection_remarks') }} ${item.product_name}..."></textarea>
+                                    </div>
                                 </div>
-                                <input type="text" class="odoo-table-input fs-12 text-dark px-2 py-1" 
-                                       name="items[${idx}][remarks]" 
-                                       placeholder="{{ __('purchase.js_enter_rejection_remarks') }} ${item.product_name}...">
                             </div>
                         </td>
                     </tr>
@@ -311,6 +465,234 @@
             }
         });
 
+        // Open Auto-Generate Modal
+        $(document).on('click', '.btn-auto-serial', function() {
+            var idx = $(this).data('idx');
+            var product = $(this).data('product');
+            var prefix = $(this).data('prefix') || 'SN-';
+            var count = parseInt($(this).data('count')) || 1;
+
+            var row = $('tr.grn-item-row[data-idx="' + idx + '"]');
+            var acc = Math.round(parseFloat(row.find('.cell-accepted').text()) || count);
+
+            $('#auto_serial_target_idx').val(idx);
+            $('#autoSerialModalTitle').html('<i class="feather-zap me-1"></i>Auto-Generate Serials (' + product + ')');
+            $('#auto_serial_prefix').val(prefix);
+            $('#auto_serial_start').val('1001');
+            $('#auto_serial_count').val(acc > 0 ? acc : 1);
+
+            var modal = new bootstrap.Modal(document.getElementById('autoSerialModal'));
+            modal.show();
+        });
+
+        // Confirm Auto-Generate Serials
+        $('#btn_confirm_auto_serial').on('click', function() {
+            var idx = $('#auto_serial_target_idx').val();
+            var prefix = $('#auto_serial_prefix').val().trim();
+            var startNo = parseInt($('#auto_serial_start').val()) || 1001;
+            var count = parseInt($('#auto_serial_count').val()) || 1;
+
+            var serials = [];
+            for (var i = 0; i < count; i++) {
+                serials.push(prefix + (startNo + i));
+            }
+
+            var textarea = $('#serial_input_' + idx);
+            textarea.val(serials.join(', ')).trigger('input');
+
+            var modalEl = document.getElementById('autoSerialModal');
+            var modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        });
+
+        // Dynamic + Add Another Batch Row Handler
+        $(document).on('click', '.btn-add-batch-row', function() {
+            var idx = $(this).data('idx');
+            var prodCode = $(this).data('code') || 'LOT';
+            var container = $('#batch_rows_container_' + idx);
+            var batchCount = container.children('.batch-split-row').length;
+            var nextNum = (batchCount + 1).toString().padStart(2, '0');
+            var batchNo = 'BAT-' + prodCode.replace(/[^a-zA-Z0-9]/g, '') + '-' + nextNum;
+
+            var defaultMfg = new Date().toISOString().split('T')[0];
+            var nextYear = new Date();
+            nextYear.setFullYear(nextYear.getFullYear() + 1);
+            var defaultExp = nextYear.toISOString().split('T')[0];
+
+            var newRowHtml = `
+                <div class="batch-split-row border p-2 rounded-3 bg-white shadow-xs mt-2" data-batch-idx="${batchCount}">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-3">
+                            <label class="fs-10 text-muted mb-0 fw-semibold">Batch No <span class="text-danger">*</span></label>
+                            <input type="text" 
+                                   class="form-control form-control-sm font-monospace fw-bold text-dark" 
+                                   name="items[${idx}][batches][${batchCount}][batch_number]" 
+                                   placeholder="e.g. BAT-${nextNum}" 
+                                   value="${batchNo}"
+                                   required>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="fs-10 text-muted mb-0 fw-semibold">Qty Rec. <span class="text-danger">*</span></label>
+                            <input type="number" step="0.0001" min="0.0001" 
+                                   class="form-control form-control-sm text-center font-monospace fw-bold text-primary batch-qty-input" 
+                                   name="items[${idx}][batches][${batchCount}][received_qty]" 
+                                   value="1" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="fs-10 text-muted mb-0 fw-semibold">Mfg Date</label>
+                            <input type="date" 
+                                   class="form-control form-control-sm text-dark fs-11" 
+                                   name="items[${idx}][batches][${batchCount}][manufacturing_date]" 
+                                   value="${defaultMfg}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="fs-10 text-muted mb-0 fw-semibold">Expiry Date</label>
+                            <input type="date" 
+                                   class="form-control form-control-sm text-dark fs-11" 
+                                   name="items[${idx}][batches][${batchCount}][expiry_date]" 
+                                   value="${defaultExp}">
+                        </div>
+                        <div class="col-md-1 text-center pt-3">
+                            <button type="button" class="btn btn-xs btn-link text-danger remove-batch-subrow-btn p-0 border-0" title="Remove Batch Line">
+                                <i class="feather-trash-2 fs-14"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.append(newRowHtml);
+        });
+
+        $(document).on('click', '.remove-batch-subrow-btn', function() {
+            var container = $(this).closest('.d-grid');
+            var idxId = container.attr('id');
+            $(this).closest('.batch-split-row').remove();
+            if (idxId) {
+                var idx = idxId.replace('batch_rows_container_', '');
+                validateBatchAllocations(idx);
+            }
+        });
+
+        function validateBatchAllocations(idx) {
+            var row = $('tr.grn-item-row[data-idx="' + idx + '"]');
+            var accVal = parseFloat(row.find('.cell-accepted').text()) || 0;
+            var container = $('#batch_rows_container_' + idx);
+            var errorDiv = $('#batch_error_' + idx);
+
+            if (!container.length || !container.find('.batch-qty-input').length) return true;
+
+            var totalAllocated = 0;
+            container.find('.batch-qty-input').each(function() {
+                totalAllocated += parseFloat($(this).val()) || 0;
+            });
+
+            totalAllocated = Math.round(totalAllocated * 10000) / 10000;
+            var roundedAccepted = Math.round(accVal * 10000) / 10000;
+
+            if (totalAllocated > roundedAccepted) {
+                container.find('.batch-qty-input').addClass('border-danger text-danger');
+                errorDiv.removeClass('bg-soft-success text-success bg-soft-info text-info bg-soft-warning text-warning')
+                        .addClass('bg-soft-danger text-danger border border-danger-subtle d-block')
+                        .html('<i class="feather-alert-triangle me-1 fs-12"></i>Batch Allocation Error: Total Batch Qty (' + totalAllocated + ') exceeds Accepted Item Qty (' + roundedAccepted + '). Please reduce batch quantities before saving.');
+                return false;
+            } else if (totalAllocated < roundedAccepted) {
+                container.find('.batch-qty-input').removeClass('border-danger text-danger');
+                errorDiv.removeClass('bg-soft-danger text-danger bg-soft-success text-success')
+                        .addClass('bg-soft-warning text-warning border border-warning-subtle d-block')
+                        .html('<i class="feather-info me-1 fs-12"></i>Batch Allocation Notice: Allocated ' + totalAllocated + ' of ' + roundedAccepted + ' Accepted Qty. Remaining ' + (Math.round((roundedAccepted - totalAllocated)*10000)/10000) + ' unassigned.');
+                return true;
+            } else {
+                container.find('.batch-qty-input').removeClass('border-danger text-danger');
+                errorDiv.removeClass('bg-soft-danger text-danger bg-soft-warning text-warning')
+                        .addClass('bg-soft-success text-success border border-success-subtle d-block')
+                        .html('<i class="feather-check-circle me-1 fs-12"></i>100% Batch Quantity Allocated (' + totalAllocated + ' / ' + roundedAccepted + ').');
+                return true;
+            }
+        }
+
+        $(document).on('input change', '.batch-qty-input', function() {
+            var container = $(this).closest('.d-grid');
+            var idxId = container.attr('id');
+            if (idxId) {
+                var idx = idxId.replace('batch_rows_container_', '');
+                validateBatchAllocations(idx);
+            }
+        });
+
+        $('form').on('submit', function(e) {
+            var firstErrorIdx = null;
+            var hasBatchError = false;
+
+            $('.grn-item-row').each(function() {
+                var idx = $(this).data('idx');
+                if (!validateBatchAllocations(idx)) {
+                    hasBatchError = true;
+                    if (firstErrorIdx === null) {
+                        firstErrorIdx = idx;
+                    }
+                }
+            });
+
+            if (hasBatchError) {
+                e.preventDefault();
+                showWarningModal(
+                    'Batch Quantity Error',
+                    'Total Batch Quantity allocated exceeds the Accepted Quantity for one or more items. Click below to jump directly to the error.',
+                    function() {
+                        if (firstErrorIdx !== null) {
+                            var remarkRow = $('#remark_row_' + firstErrorIdx);
+                            var toggleBtn = $('tr.grn-item-row[data-idx="' + firstErrorIdx + '"]').find('.btn-toggle-remark');
+                            
+                            if (remarkRow.length && !remarkRow.is(':visible')) {
+                                remarkRow.slideDown(150);
+                                toggleBtn.find('i').removeClass('feather-plus').addClass('feather-minus');
+                                toggleBtn.removeClass('bg-soft-primary text-primary').addClass('bg-soft-danger text-danger');
+                                toggleBtn.find('.btn-lbl').text('{{ __('purchase.hide_lbl') }}');
+                            }
+
+                            var targetError = $('#batch_error_' + firstErrorIdx);
+                            if (targetError.length) {
+                                $('html, body').animate({
+                                    scrollTop: targetError.offset().top - 180
+                                }, 450, function() {
+                                    $('#batch_rows_container_' + firstErrorIdx).find('.batch-qty-input.border-danger').first().focus();
+                                });
+                            }
+                        }
+                    }
+                );
+                return false;
+            }
+        });
+
+        // Live validation and count update for Serial Textarea
+        $(document).on('input change', '.serial-textarea', function() {
+            var idx = $(this).data('idx');
+            var text = $(this).val();
+            var row = $('tr.grn-item-row[data-idx="' + idx + '"]');
+            var accVal = Math.round(parseFloat(row.find('.cell-accepted').text()) || 0);
+
+            var items = text.split(/[\r\n,]+/).map(s => s.trim()).filter(s => s.length > 0);
+            var uniqueSerials = [...new Set(items)];
+            var count = uniqueSerials.length;
+
+            var badge = $('#serial_count_badge_' + idx);
+            if (accVal > 0 && count === accVal) {
+                badge.removeClass('bg-soft-warning text-warning bg-soft-danger text-danger')
+                     .addClass('bg-soft-success text-success')
+                     .html('<i class="feather-check-circle me-1"></i>' + count + ' / ' + accVal + ' Serials Verified');
+            } else if (count > 0) {
+                badge.removeClass('bg-soft-success text-success bg-soft-danger text-danger')
+                     .addClass('bg-soft-warning text-warning')
+                     .text(count + ' / ' + accVal + ' Serials Entered');
+            } else {
+                badge.removeClass('bg-soft-success text-success bg-soft-danger text-danger')
+                     .addClass('bg-soft-warning text-warning')
+                     .text('0 / ' + accVal + ' Serials');
+            }
+        });
+
         // Live calculation on input change
         $(document).on('input change', '.input-receive, .input-reject', function() {
             var row = $(this).closest('tr.grn-item-row');
@@ -323,13 +705,13 @@
             var rejVal = parseFloat(rejectInput.val()) || 0;
 
             if (recVal > remaining) {
-                alert('{{ __('purchase.js_rec_qty_exceed_rem') }} (' + remaining.toFixed(2) + ')');
+                showWarningModal('Quantity Exceeded', '{{ __('purchase.js_rec_qty_exceed_rem') }} (' + remaining.toFixed(2) + ')');
                 recVal = remaining;
                 receiveInput.val(recVal.toFixed(2));
             }
 
             if (rejVal > recVal) {
-                alert('{{ __('purchase.js_rej_qty_exceed_rec') }} (' + recVal.toFixed(2) + ')');
+                showWarningModal('Quantity Exceeded', '{{ __('purchase.js_rej_qty_exceed_rec') }} (' + recVal.toFixed(2) + ')');
                 rejVal = recVal;
                 rejectInput.val(rejVal.toFixed(2));
             }
@@ -350,6 +732,9 @@
 
             row.find('.cell-accepted').text(accVal.toFixed(2));
             row.find('.cell-total').text(totalAmt.toFixed(2));
+
+            // Trigger serial count re-validation
+            $('#serial_input_' + idx).trigger('input');
 
             recalculateTotals();
         });
@@ -379,4 +764,38 @@
         }
     });
 </script>
+
+<!-- Auto-Generate Serials Modal -->
+<div class="modal fade" id="autoSerialModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white py-2.5 px-3">
+                <h6 class="modal-title fw-bold text-white fs-13 mb-0" id="autoSerialModalTitle">
+                    <i class="feather-zap me-1"></i>Auto-Generate Serial Numbers
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <input type="hidden" id="auto_serial_target_idx" value="">
+                <div class="mb-2">
+                    <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Prefix</label>
+                    <input type="text" id="auto_serial_prefix" class="form-control form-control-sm font-monospace" placeholder="e.g. SN-LAP-">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Start Number</label>
+                    <input type="number" id="auto_serial_start" class="form-control form-control-sm font-monospace" value="1001" min="1">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fs-11 fw-bold text-muted text-uppercase mb-1">Quantity</label>
+                    <input type="number" id="auto_serial_count" class="form-control form-control-sm font-monospace" value="1" min="1">
+                </div>
+                <div class="d-grid">
+                    <button type="button" class="btn btn-sm btn-primary fw-semibold" id="btn_confirm_auto_serial">
+                        <i class="feather-check-circle me-1"></i>Generate & Fill
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endpush

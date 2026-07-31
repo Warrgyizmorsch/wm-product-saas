@@ -172,11 +172,11 @@ return [
 
     // Pending Requisitions
     'pending_req_line_items' => 'Pending Requisition Line Items',
-    'pending_pr_help' => 'Review approved requisition items waiting to be ordered. Select items to generate draft Purchase Orders.',
+    'pending_pr_help' => 'Select approved items to open the PO or RFQ creation form.',
     'group_by' => 'Group By:',
     'supplier_vendor' => 'Supplier / Vendor',
     'pr_number' => 'PR Number',
-    'bulk_pr_action_help' => 'Select items from the list below. Choose whether to bulk generate Draft Purchase Orders or Draft RFQs grouped by Supplier.',
+    'bulk_pr_action_help' => 'Select items and click "Create Bulk POs" or "Create Bulk RFQs" to open the order form.',
     'create_bulk_pos' => 'Create Bulk POs',
     'create_bulk_rfqs' => 'Create Bulk RFQs',
     'assigned_suppliers' => 'Assigned Suppliers',

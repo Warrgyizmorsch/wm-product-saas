@@ -3,6 +3,7 @@
 use App\Domains\CRM\Controllers\CustomerController;
 use App\Domains\CRM\Controllers\LeadController;
 use App\Domains\CRM\Controllers\LeadFollowupController;
+use App\Domains\CRM\Controllers\LeadActivityController;
 use App\Domains\CRM\Controllers\QuotationController;
 use Illuminate\Support\Facades\Route;
 
@@ -13,6 +14,10 @@ Route::prefix('crm')
             ->name('leads.create');
         Route::get('leads', [LeadController::class, 'index'])
             ->name('leads.index');
+        Route::get('leads/kanban', [LeadController::class, 'kanban'])
+            ->name('leads.kanban');
+        Route::get('activities', [LeadActivityController::class, 'index'])
+            ->name('activities.index');
         Route::get('leads/track-status', [LeadController::class, 'trackStatus'])
             ->name('leads.trackStatus');
         Route::get('leads/download-sample', [LeadController::class, 'downloadSample'])

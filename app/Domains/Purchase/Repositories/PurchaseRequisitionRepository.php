@@ -106,6 +106,15 @@ class PurchaseRequisitionRepository
         foreach ($requisitions as $pr) {
             foreach ($pr->items as $item) {
                 $alreadyOrderedQty = (float) $item->ordered_qty;
+                $poOrderedQty = (float) PurchaseOrderItem::where('tenant_id', $tenantId)
+                    ->where('product_id', $item->product_id)
+                    ->whereHas('order', function ($q) use ($pr) {
+                        $q->where('purchase_requisition_id', $pr->id)
+                          ->where('status', '!=', 'Cancelled');
+                    })
+                    ->sum('quantity');
+
+                $alreadyOrderedQty = max($alreadyOrderedQty, $poOrderedQty);
                 $pendingQty = max(0.0, (float)$item->quantity - $alreadyOrderedQty);
 
                 if ($pendingQty > 0.0001) {
