@@ -8,9 +8,21 @@
         $assignedAssets = $assignedAssetsGrouped->map(function($group) {
             $first = $group->first();
             $latestDate = $group->max('allocated_at');
+            
+            $mappedUnits = $group->map(function($unit) {
+                return [
+                    'id'            => $unit->id,
+                    'asset_code'    => $unit->asset_code,
+                    'serial_number' => $unit->serial_number,
+                    'allocated_at'  => $unit->allocated_at ? (\Carbon\Carbon::parse($unit->allocated_at)->format('Y-m-d')) : null,
+                    'condition'     => $unit->condition,
+                    'notes'         => $unit->notes,
+                ];
+            })->values()->all();
+
             return [
                 'asset'               => $first,
-                'units'               => $group->values()->all(),
+                'units'               => $mappedUnits,
                 'latest_assigned_date'=> $latestDate ? \Carbon\Carbon::parse($latestDate) : null,
             ];
         })->values();
@@ -61,27 +73,27 @@
                             </div>
                             <div class="dropdown-divider my-3"></div>
                             <div class="d-flex gap-2">
-                                <x-ui.button type="button" id="btnApplyAssignedAssetFilter" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                                <x-ui.button type="button" id="btnAssignedAssetFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
                                 <x-ui.button type="button" id="btnResetAssignedAssetFilter" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
                             </div>
                         </form>
                     </div>
                 </x-ui.filter>
                 <x-ui.button type="button" variant="primary" class="fw-bold text-uppercase d-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#requestAssetModal">
-                    <i class="feather-plus-circle"></i> {{ __('hrms.employees.btn_req_asset') }}
+                    <i class="feather-plus-circle"></i> {{ __('hrms.employees.btn_request_asset') }}
                 </x-ui.button>
             </div>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="assignedAssetsTable" style="table-layout: fixed; width: 100%;">
+             <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 assigned-assets-table" id="assignedAssetsTable" style="table-layout: fixed; width: 100%;">
                     <thead class="table-light text-uppercase fs-11">
                         <tr>
-                            <th class="ps-3" style="width: 25%;">{{ __('hrms.employees.tbl_asset_name') }}</th>
-                            <th style="width: 17%;">{{ __('hrms.employees.tbl_category') }}</th>
-                            <th class="text-center" style="width: 13%;">{{ __('hrms.employees.tbl_units_assigned') }}</th>
-                            <th style="width: 15%;">{{ __('hrms.employees.tbl_date_assigned') }}</th>
-                            <th class="text-end pe-3" style="width: 30%;">{{ __('hrms.employees.tbl_actions') }}</th>
+                            <th class="ps-3" style="width: 40%;">{{ __('hrms.employees.tbl_asset_name') }}</th>
+                            <th style="width: 22%;">{{ __('hrms.employees.tbl_category') }}</th>
+                            <th class="text-center" style="width: 8%;">{{ __('hrms.employees.tbl_units_assigned') }}</th>
+                            <th style="width: 13%;">{{ __('hrms.employees.tbl_date_assigned') }}</th>
+                            <th class="text-end pe-3" style="width: 17%;">{{ __('hrms.employees.tbl_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -91,19 +103,20 @@
                                 $units = $groupedAsset['units'];
                                 $latestAssignedDate = $groupedAsset['latest_assigned_date'];
                             @endphp
-                            <tr class="assigned-asset-row" 
+                             <tr class="assigned-asset-row" 
                                 data-name="{{ strtolower($asset->name) }}" 
+                                data-search="{{ strtolower($asset->name) }}" 
                                 data-category="{{ $asset->category->name ?? '' }}"
-                                data-assigned-timestamp="{{ $latestAssignedDate ? $latestAssignedDate->timestamp : 0 }}">
+                                data-assigned="{{ $latestAssignedDate ? $latestAssignedDate->timestamp : 0 }}">
                                 <td class="ps-3">
                                     <div class="d-flex align-items-center">
                                         <div class="avatar-sm bg-soft-primary text-primary rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
                                             <i class="feather-package fs-16"></i>
                                         </div>
-                                        <div style="max-width: calc(100% - 50px);">
-                                            <div class="fw-bold text-dark text-truncate mb-0.5" title="{{ $asset->name }}">{{ $asset->name }}</div>
+                                        <div style="flex-grow: 1; min-width: 0;">
+                                            <div class="fw-bold text-dark mb-0.5" title="{{ $asset->name }}">{{ $asset->name }}</div>
                                             @if($asset->model_number)
-                                                <small class="text-muted d-block text-truncate" title="Model: {{ $asset->model_number }}">Model: {{ $asset->model_number }}</small>
+                                                <small class="text-muted d-block" title="{{ __('hrms.employees.lbl_model') }}: {{ $asset->model_number }}">{{ __('hrms.employees.lbl_model') }}: {{ $asset->model_number }}</small>
                                             @endif
                                         </div>
                                     </div>
@@ -119,13 +132,13 @@
                                 </td>
                                 <td class="text-end pe-3">
                                     <div class="d-flex align-items-center justify-content-end gap-2">
-                                        <x-ui.button type="button" variant="outline-secondary" size="sm" class="py-1 px-3 d-flex align-items-center gap-1.5 btn-view-asset-details" data-asset-name="{{ $asset->name }}" data-units="{{ base64_encode(json_encode($units)) }}" style="border-radius: 8px; font-size: 11px;">
+                                        <button type="button" class="btn btn-sm btn-soft-primary fw-bold text-uppercase d-flex align-items-center gap-1.5 py-1 px-3" data-bs-toggle="modal" data-bs-target="#viewAssetDetailsModal" data-item-name="{{ $asset->name }}" data-allocated-assets="{{ base64_encode(json_encode($units)) }}" style="border-radius: 8px; font-size: 11px;">
                                             <i class="feather-info"></i> {{ __('hrms.common.detail') }}
-                                        </x-ui.button>
+                                        </button>
                                         
-                                        <x-ui.button type="button" variant="outline-warning" size="sm" class="py-1 px-3 d-flex align-items-center gap-1.5 btn-trigger-return-asset" data-asset-id="{{ $asset->id }}" data-asset-name="{{ $asset->name }}" data-action="{{ route('hrms.assets.item.return', $asset->id) }}" data-units="{{ base64_encode(json_encode($units)) }}" style="border-radius: 8px; font-size: 11px;">
+                                        <button type="button" class="btn btn-sm btn-soft-warning fw-bold text-uppercase d-flex align-items-center gap-1.5 py-1 px-3" data-bs-toggle="modal" data-bs-target="#returnAssetModal" data-item-id="{{ $asset->asset_item_id }}" data-item-name="{{ $asset->name }}" data-allocated-assets="{{ base64_encode(json_encode($units)) }}" style="border-radius: 8px; font-size: 11px;">
                                             <i class="feather-corner-up-left"></i> {{ __('hrms.employees.lbl_return') }}
-                                        </x-ui.button>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -133,14 +146,14 @@
                             <tr id="noAssignedAssetsRowEmpty">
                                 <td colspan="5" class="text-center py-5 text-muted fs-13">
                                     <i class="feather-package d-block fs-32 text-light-muted mb-2"></i>
-                                    No assigned assets found.
+                                    {{ __('hrms.employees.lbl_no_assigned_assets') }}
                                 </td>
                             </tr>
                         @endforelse
-                        <tr id="noMatchingAssignedAssetsRow" class="d-none">
+                         <tr id="assignedAssetNoResultsRow" class="d-none">
                             <td colspan="5" class="text-center py-5 text-muted fs-13">
                                 <i class="feather-package d-block fs-32 text-light-muted mb-2"></i>
-                                No matching assigned assets found.
+                                {{ __('hrms.employees.lbl_no_matching_assigned_assets') }}
                             </td>
                         </tr>
                     </tbody>
@@ -156,30 +169,30 @@
                 <h5 class="card-custom-title"><i class="feather-git-pull-request text-primary"></i> {{ __('hrms.employees.lbl_requests_history') }}</h5>
             </div>
             <div class="asset-toolbar d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
-                <div class="documents-search d-flex align-items-center px-3 py-1">
+                 <div class="documents-search d-flex align-items-center px-3 py-1">
                     <i class="feather-search text-muted me-2 fs-14"></i>
-                    <input type="text" id="reqAssetSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.employees.lbl_search_requests') }}" autocomplete="off" style="box-shadow: none; height: 32px;">
+                    <input type="text" id="assetRequestSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="{{ __('hrms.employees.lbl_search_requests') }}" autocomplete="off" style="box-shadow: none; height: 32px;">
                 </div>
                 <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
-                    <a class="dropdown-item req-asset-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="date_desc">
+                    <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2 active" href="javascript:void(0)" data-sort="date_desc">
                         <span>{{ __('hrms.employees.lbl_req_date_desc') }}</span>
                         <i class="feather-check ms-3"></i>
                     </a>
-                    <a class="dropdown-item req-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="date_asc">
+                    <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="date_asc">
                         <span>{{ __('hrms.employees.lbl_req_date_asc') }}</span>
                     </a>
                     <div class="dropdown-divider"></div>
-                    <a class="dropdown-item req-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="qty_desc">
+                    <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="qty_desc">
                         <span>{{ __('hrms.employees.lbl_qty_desc') }}</span>
                     </a>
-                    <a class="dropdown-item req-asset-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="qty_asc">
+                    <a class="dropdown-item asset-request-sort-link d-flex justify-content-between align-items-center py-2" href="javascript:void(0)" data-sort="qty_asc">
                         <span>{{ __('hrms.employees.lbl_qty_asc') }}</span>
                     </a>
                 </x-ui.sort-dropdown>
                 <x-ui.filter label="{{ __('hrms.common.filter') }}">
                     <div class="document-filter-panel">
                         <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders text-primary me-1"></i> {{ __('hrms.common.filter_options') }}</h6>
-                        <form id="reqAssetFilterForm" onsubmit="return false;">
+                         <form id="assetRequestFilterForm" onsubmit="return false;">
                             <div class="mb-3">
                                 <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.employees.tbl_category') }}</label>
                                 <x-ui.odoo-form-ui type="select" name="category">
@@ -200,8 +213,8 @@
                             </div>
                             <div class="dropdown-divider my-3"></div>
                             <div class="d-flex gap-2">
-                                <x-ui.button type="button" id="btnApplyReqAssetFilter" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
-                                <x-ui.button type="button" id="btnResetReqAssetFilter" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
+                                <x-ui.button type="button" id="btnAssetRequestFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                                <x-ui.button type="button" id="btnAssetRequestFilterReset" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
                             </div>
                         </form>
                     </div>
@@ -209,16 +222,16 @@
             </div>
         </div>
         <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="reqAssetsTable" style="table-layout: fixed; width: 100%;">
+             <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 asset-requests-table" id="reqAssetsTable" style="table-layout: fixed; width: 100%;">
                     <thead class="table-light text-uppercase fs-11">
                         <tr>
-                            <th class="ps-3" style="width: 25%;">{{ __('hrms.employees.tbl_item') }}</th>
-                            <th style="width: 15%;">{{ __('hrms.employees.tbl_category') }}</th>
-                            <th class="text-center" style="width: 10%;">{{ __('hrms.employees.tbl_quantity') }}</th>
-                            <th style="width: 15%;">{{ __('hrms.employees.tbl_date_requested') }}</th>
-                            <th style="width: 12%;">{{ __('hrms.employees.tbl_status') }}</th>
-                            <th class="text-end pe-3" style="width: 23%;">{{ __('hrms.employees.tbl_action') }}</th>
+                            <th class="ps-3" style="width: 40%;">{{ __('hrms.employees.tbl_item') }}</th>
+                            <th style="width: 22%;">{{ __('hrms.employees.tbl_category') }}</th>
+                            <th class="text-center" style="width: 8%;">{{ __('hrms.employees.tbl_quantity') }}</th>
+                            <th style="width: 12%;">{{ __('hrms.employees.tbl_date_requested') }}</th>
+                            <th style="width: 10%;">{{ __('hrms.employees.tbl_status') }}</th>
+                            <th class="text-end pe-3" style="width: 8%;">{{ __('hrms.employees.tbl_action') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -233,16 +246,17 @@
                                     default => 'bg-light text-secondary'
                                 };
                             @endphp
-                            <tr class="req-asset-row" 
+                             <tr class="asset-request-row" 
                                 data-name="{{ strtolower($request->item->name ?? '') }}" 
+                                data-search="{{ strtolower($request->item->name ?? '') }}" 
                                 data-category="{{ $request->item->category->name ?? '' }}" 
                                 data-status="{{ $request->status }}"
                                 data-qty="{{ $request->quantity }}"
-                                data-date-timestamp="{{ $request->created_at ? $request->created_at->timestamp : 0 }}">
+                                data-date="{{ $request->created_at ? $request->created_at->timestamp : 0 }}">
                                 <td class="ps-3">
-                                    <div class="fw-bold text-dark mb-0.5 text-truncate" title="{{ $request->item->name ?? 'N/A' }}">{{ $request->item->name ?? 'N/A' }}</div>
+                                    <div class="fw-bold text-dark mb-0.5" title="{{ $request->item->name ?? 'N/A' }}">{{ $request->item->name ?? 'N/A' }}</div>
                                     @if($request->reason)
-                                        <small class="text-muted d-block text-truncate" title="{{ $request->reason }}">{{ $request->reason }}</small>
+                                        <small class="text-muted d-block" title="{{ $request->reason }}">{{ $request->reason }}</small>
                                     @endif
                                 </td>
                                 <td>
@@ -260,14 +274,14 @@
                                 <td class="text-end pe-3">
                                     <div class="d-flex align-items-center justify-content-end gap-2">
                                         @if($request->status === 'pending')
-                                            <form action="{{ route('hrms.assets.requests.reject', $request->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to withdraw this pending asset request?', { title: 'Withdraw Request', variant: 'warning', confirmButtonText: 'Withdraw' });" class="m-0">
+                                            <form action="{{ route('hrms.assets.requests.reject', $request->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_withdraw_request') }}', { title: '{{ __('hrms.employees.lbl_withdraw_request') }}', variant: 'warning', confirmButtonText: '{{ __('hrms.employees.btn_withdraw') }}' });" class="m-0">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px;" title="Withdraw Request">
                                                     <i class="feather-trash-2 fs-13"></i>
                                                 </button>
                                             </form>
                                         @else
-                                            <span class="text-muted fs-12 italic">Locked</span>
+                                            <span class="text-muted fs-12 italic">{{ __('hrms.employees.lbl_locked') }}</span>
                                         @endif
                                     </div>
                                 </td>
@@ -276,14 +290,14 @@
                             <tr id="noReqAssetsRowEmpty">
                                 <td colspan="6" class="text-center py-5 text-muted fs-13">
                                     <i class="feather-git-pull-request d-block fs-32 text-light-muted mb-2"></i>
-                                    No requests history found.
+                                    {{ __('hrms.employees.lbl_no_requests_history') }}
                                 </td>
                             </tr>
                         @endforelse
-                        <tr id="noMatchingReqAssetsRow" class="d-none">
+                         <tr id="assetRequestNoResultsRow" class="d-none">
                             <td colspan="6" class="text-center py-5 text-muted fs-13">
                                 <i class="feather-git-pull-request d-block fs-32 text-light-muted mb-2"></i>
-                                No matching requests found.
+                                {{ __('hrms.employees.lbl_no_matching_requests') }}
                             </td>
                         </tr>
                     </tbody>

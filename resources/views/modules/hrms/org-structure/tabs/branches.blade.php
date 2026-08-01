@@ -136,12 +136,12 @@
                                         <x-ui.action-dropdown>
                                              <li>
                                                  <a class="dropdown-item btn-edit-branch" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editBranchModal" data-branch="{{ base64_encode($br->toJson()) }}">
-                                                     <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.assets.edit') }}
+                                                     <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.common.edit') }}
                                                  </a>
                                              </li>
                                              <li>
                                                  <button type="submit" class="dropdown-item text-danger">
-                                                     <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.assets.delete') }}
+                                                     <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.common.delete') }}
                                                  </button>
                                              </li>
                                         </x-ui.action-dropdown>
@@ -393,7 +393,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title fw-bold" id="editBranchModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.assets.edit') }} {{ __('hrms.org.branches') }}</h5>
+                <h5 class="modal-title fw-bold" id="editBranchModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.common.edit') }} {{ __('hrms.org.branches') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="branch_edit_form" method="POST">

@@ -2012,129 +2012,7 @@
         </script>
 
         <script>
-            // ── Leave Detail Offcanvas ──────────────────────────────────────────
-            $(document).on('click', '.open-leave-detail', function () {
-                var $row = $(this).closest('tr.leave-app-row');
-                var d    = $row.data();
 
-                // Employee info
-                if (d.employeeName) {
-                    $('#ld-emp-name').text(d.employeeName);
-                    var initials = d.employeeName.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase();
-                    $('#ld-emp-avatar').text(initials);
-                }
-                if (d.employeeCode) {
-                    $('#ld-emp-code').text(d.employeeCode);
-                }
-
-                // Banner
-                $('#ld-color-dot').css('background', d.leaveColor);
-                $('#ld-leave-type').text(d.leaveType);
-                $('#ld-balance-inline').text("{{ __('hrms.leave.app.remaining') }}: " + (d.remaining !== undefined ? d.remaining : '0') + ' / ' + (d.allocated !== undefined ? d.allocated : '0') + ' ' + "{{ __('hrms.leave.days') }}");
-
-                // Status badge
-                var statusHtml = '<i class="' + d.statusIcon + ' me-1"></i>' + d.statusLabel;
-                $('#ld-status-badge').attr('class', 'badge rounded-pill px-2 py-1 fs-11 flex-shrink-0 ' + d.statusCls)
-                                     .html(statusHtml);
-
-                // Applied On
-                $('#ld-applied').text(d.applied || '—');
-
-                // Period
-                $('#ld-date-range').text(d.dateRange || '—');
-                var session = '';
-                if (d.startType && d.startType !== 'full day') {
-                    var capitalize = function(s) {
-                        return s.split(' ').map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
-                    };
-                    session = capitalize(d.startType);
-                    if (d.start !== d.end && d.endType && d.endType !== 'full day') {
-                        session += ' → ' + capitalize(d.endType);
-                    }
-                }
-                $('#ld-session-info').text(session);
-
-                // Duration
-                $('#ld-duration').text(d.duration + ' ' + (d.duration == 1 ? "{{ __('hrms.leave.day') }}" : "{{ __('hrms.leave.days') }}"));
-
-                // Reason
-                $('#ld-reason').text(d.reason || '—');
-
-                // Rejection
-                if (d.rejection) {
-                    $('#ld-rejection-wrap').removeClass('d-none');
-                    $('#ld-rejection').text(d.rejection);
-                } else {
-                    $('#ld-rejection-wrap').addClass('d-none');
-                }
-
-                // Cancellation
-                if (d.cancellation) {
-                    $('#ld-cancellation-wrap').removeClass('d-none');
-                    $('#ld-cancellation').text(d.cancellation);
-                } else {
-                    $('#ld-cancellation-wrap').addClass('d-none');
-                }
-
-                // Attachment
-                if (d.attachment) {
-                    $('#ld-attach-wrap').removeClass('d-none');
-                    $('#ld-attach-link').attr('href', d.attachment);
-                } else {
-                    $('#ld-attach-wrap').addClass('d-none');
-                }
-
-                // Workflow Level
-                $('#ld-workflow').text(d.workflow || '—');
-
-                // Notified contacts
-                if (d.notifiedNames) {
-                    $('#ld-notified-wrap').removeClass('d-none');
-                    $('#ld-notified-names').text(d.notifiedNames);
-                } else {
-                    $('#ld-notified-wrap').addClass('d-none');
-                }
-
-                // Status form action & data urls
-                var form = $('#ld-status-form');
-                form.data('update-url', d.updateUrl || '');
-                form.data('approve-cancel-url', d.approveCancelUrl || '');
-                form.data('deny-cancel-url', d.denyCancelUrl || '');
-
-                // Hide status change panel completely if status is cancelled
-                if (d.status === 'cancelled') {
-                    $('#ld-status-change-wrap').addClass('d-none');
-                    $('#ld-status-hr').addClass('d-none');
-                } else {
-                    $('#ld-status-change-wrap').removeClass('d-none');
-                    $('#ld-status-hr').removeClass('d-none');
-                }
-
-                // Dynamically populate options based on status
-                var $select = $('#ld-status-select');
-                $select.empty();
-
-                if (d.status === 'cancellation_requested') {
-                    $select.append('<option value="approve_cancellation">Approve Cancellation</option>');
-                    $select.append('<option value="deny_cancellation">Deny Cancellation</option>');
-                    $select.val('approve_cancellation').trigger('change');
-                } else {
-                    $select.append('<option value="approved">Approve</option>');
-                    $select.append('<option value="rejected">Reject</option>');
-                    $select.append('<option value="pending">Pending</option>');
-                    $select.append('<option value="unauthorized">Unauthorized</option>');
-                    $select.append('<option value="unpaid">Unpaid</option>');
-                    $select.val(d.status).trigger('change');
-                }
-
-                if (d.status === 'rejected') {
-                    $('#ld-rejection-input-wrap').removeClass('d-none');
-                    $('#ld-rejection-reason-input').val(d.rejection || '');
-                } else {
-                    $('#ld-rejection-input-wrap').addClass('d-none');
-                    $('#ld-rejection-reason-input').val('');
-                }
-            });
 
             $(document).on('change', '#ld-status-select', function() {
                 var selectedVal = $(this).val();
@@ -2187,31 +2065,7 @@
                 }
             };
 
-            // Toggle view between Leave Applications and Leave Encashments in Employee Profile
-            $(document).on('click', '#btnToggleLeaveView', function () {
-                var isEncashmentHidden = $('#leaveEncashmentsViewContainer').hasClass('d-none');
-                if (isEncashmentHidden) {
-                    $('#leaveApplicationsViewContainer').addClass('d-none');
-                    $('#leaveAppsHeaderTitle').addClass('d-none');
-                    $('#leaveAppsToolbar').addClass('d-none');
 
-                    $('#leaveEncashmentsViewContainer').removeClass('d-none');
-                    $('#leaveEncashmentsHeaderTitle').removeClass('d-none');
-                    $('#leaveEncashmentsToolbar').removeClass('d-none');
-
-                    $('#toggleBtnLabel').html('<i class="feather-calendar me-1"></i> ' + "{{ __('hrms.employees.lbl_leave_applications') }}");
-                } else {
-                    $('#leaveEncashmentsViewContainer').addClass('d-none');
-                    $('#leaveEncashmentsHeaderTitle').addClass('d-none');
-                    $('#leaveEncashmentsToolbar').addClass('d-none');
-
-                    $('#leaveApplicationsViewContainer').removeClass('d-none');
-                    $('#leaveAppsHeaderTitle').removeClass('d-none');
-                    $('#leaveAppsToolbar').removeClass('d-none');
-
-                    $('#toggleBtnLabel').html('<i class="feather-dollar-sign me-1"></i> ' + "{{ __('hrms.leave.encashment_details') }}");
-                }
-            });
 
             // Toggle view between Shift Applications and Overtime Applications in Employee Profile
             $(document).on('click', '#btnToggleShiftOvertimeView', function () {
@@ -2232,300 +2086,6 @@
                     $('#shiftAppsHeaderTitle').removeClass('d-none');
 
                     $('#toggleShiftOvertimeBtnLabel').html('<i class="feather-clock me-1"></i> ' + "{{ __('hrms.shift_change.overtime_details') }}");
-                }
-            });
-
-            // ── Employee Leave Applications Search, Sort & Filter & Pagination ──
-            var empLeaveAppSortMode = 'date_desc';
-            var empLeaveAppFilters = { status: '', leave_type_id: '' };
-            var empLeaveAppCurrentPage = 1;
-            var empLeaveAppPerPage = 10;
-
-            function refreshEmpLeaveAppRows() {
-                var query = ($('#empLeaveAppSearchInput').val() || '').toLowerCase().trim();
-                var $allRows = $('#leaveAppTable tbody tr.leave-app-row');
-
-                var $matchingRows = $allRows.filter(function () {
-                    var $row = $(this);
-                    var lType   = ($row.data('leave-type') || '').toString();
-                    var lCode   = ($row.data('leave-code') || '').toString();
-                    var lReason = ($row.data('reason') || '').toString();
-                    var lStatus = ($row.data('status') || '').toString();
-                    var typeId  = ($row.data('leave-type-id') || '').toString();
-
-                    var matchesSearch = !query || lType.indexOf(query) !== -1 || lCode.indexOf(query) !== -1 || lReason.indexOf(query) !== -1 || lStatus.indexOf(query) !== -1;
-                    var matchesStatus = !empLeaveAppFilters.status || lStatus === empLeaveAppFilters.status;
-                    var matchesType   = !empLeaveAppFilters.leave_type_id || typeId === empLeaveAppFilters.leave_type_id;
-
-                    return matchesSearch && matchesStatus && matchesType;
-                });
-
-                var totalItems = $matchingRows.length;
-                var totalPages = Math.ceil(totalItems / empLeaveAppPerPage) || 1;
-
-                if (empLeaveAppCurrentPage > totalPages) {
-                    empLeaveAppCurrentPage = totalPages;
-                }
-                if (empLeaveAppCurrentPage < 1) {
-                    empLeaveAppCurrentPage = 1;
-                }
-
-                // Sort visible rows
-                var matchingArr = $matchingRows.get();
-                matchingArr.sort(function (a, b) {
-                    var $a = $(a), $b = $(b);
-                    if (empLeaveAppSortMode === 'date_desc') {
-                        return ($b.data('created-at') || 0) - ($a.data('created-at') || 0);
-                    } else if (empLeaveAppSortMode === 'date_asc') {
-                        return ($a.data('created-at') || 0) - ($b.data('created-at') || 0);
-                    } else if (empLeaveAppSortMode === 'duration_desc') {
-                        return parseFloat($b.data('duration') || 0) - parseFloat($a.data('duration') || 0);
-                    } else if (empLeaveAppSortMode === 'duration_asc') {
-                        return parseFloat($a.data('duration') || 0) - parseFloat($b.data('duration') || 0);
-                    }
-                    return 0;
-                });
-
-                var startIndex = (empLeaveAppCurrentPage - 1) * empLeaveAppPerPage;
-                var endIndex = Math.min(startIndex + empLeaveAppPerPage, totalItems);
-
-                $allRows.addClass('d-none');
-
-                $.each(matchingArr, function (idx, row) {
-                    var $r = $(row);
-                    $('#leaveAppTable tbody').append($r);
-                    if (idx >= startIndex && idx < endIndex) {
-                        $r.removeClass('d-none');
-                    }
-                });
-
-                if (totalItems > empLeaveAppPerPage) {
-                    $('#empLeaveAppsPaginationContainer').removeClass('d-none');
-                } else {
-                    $('#empLeaveAppsPaginationContainer').addClass('d-none');
-                }
-
-                if (totalItems === 0) {
-                    $('#no_matching_emp_leave_apps_row').removeClass('d-none');
-                } else {
-                    $('#no_matching_emp_leave_apps_row').addClass('d-none');
-                }
-
-                $('#emp_leave_apps_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
-                $('#emp_leave_apps_showing_end').text(endIndex);
-                $('#emp_leave_apps_total_count').text(totalItems);
-
-                var paginationHtml = '';
-                paginationHtml += '<li class="page-item ' + (empLeaveAppCurrentPage === 1 ? 'disabled' : '') + '">';
-                paginationHtml += '<a class="page-link" href="#" data-page="' + (empLeaveAppCurrentPage - 1) + '" aria-label="Previous"><i class="feather-chevron-left"></i></a>';
-                paginationHtml += '</li>';
-
-                for (var i = 1; i <= totalPages; i++) {
-                    paginationHtml += '<li class="page-item ' + (empLeaveAppCurrentPage === i ? 'active' : '') + '">';
-                    paginationHtml += '<a class="page-link" href="#" data-page="' + i + '">' + i + '</a>';
-                    paginationHtml += '</li>';
-                }
-
-                paginationHtml += '<li class="page-item ' + (empLeaveAppCurrentPage === totalPages ? 'disabled' : '') + '">';
-                paginationHtml += '<a class="page-link" href="#" data-page="' + (empLeaveAppCurrentPage + 1) + '" aria-label="Next"><i class="feather-chevron-right"></i></a>';
-                paginationHtml += '</li>';
-
-                $('#emp_leave_apps_pagination_ul').html(paginationHtml);
-            }
-
-            $('#empLeaveAppSearchInput').on('keyup input search', function () {
-                empLeaveAppCurrentPage = 1;
-                refreshEmpLeaveAppRows();
-            });
-
-            $('.emp-leave-app-sort-link').on('click', function (e) {
-                e.preventDefault();
-                empLeaveAppSortMode = $(this).data('sort') || 'date_desc';
-                $('.emp-leave-app-sort-link').removeClass('active').find('.sort-check').addClass('d-none');
-                $(this).addClass('active').find('.sort-check').removeClass('d-none');
-                empLeaveAppCurrentPage = 1;
-                refreshEmpLeaveAppRows();
-                $('.erp-sort-dropdown .dropdown-menu.show').removeClass('show');
-                $('.erp-sort-dropdown.show').removeClass('show');
-            });
-
-            $('#btnEmpLeaveAppFilterApply').on('click', function () {
-                empLeaveAppFilters.status = $('#empLeaveAppFilterStatus').val() || '';
-                empLeaveAppFilters.leave_type_id = $('#empLeaveAppFilterType').val() || '';
-                empLeaveAppCurrentPage = 1;
-                refreshEmpLeaveAppRows();
-                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
-                $('.erp-filter-dropdown.show').removeClass('show');
-            });
-
-            $('#btnEmpLeaveAppFilterReset').on('click', function () {
-                $('#empLeaveAppFilterStatus').val('');
-                $('#empLeaveAppFilterType').val('');
-                empLeaveAppFilters = { status: '', leave_type_id: '' };
-                empLeaveAppCurrentPage = 1;
-                refreshEmpLeaveAppRows();
-            });
-
-            $(document).on('click', '#emp_leave_apps_pagination_ul .page-link', function (e) {
-                e.preventDefault();
-                var page = $(this).data('page');
-                if (page && !$(this).parent().hasClass('disabled')) {
-                    empLeaveAppCurrentPage = parseInt(page);
-                    refreshEmpLeaveAppRows();
-                }
-            });
-
-            // Initial trigger to refresh rows on load
-            refreshEmpLeaveAppRows();
-
-            // ── Employee Leave Encashments Search, Sort & Filter & Pagination ────
-            var empLeaveEncSortMode = 'date_desc';
-            var empLeaveEncFilters = { status: '', leave_type_id: '' };
-            var empLeaveEncCurrentPage = 1;
-            var empLeaveEncPerPage = 10;
-
-            function refreshEmpLeaveEncRows() {
-                var query = ($('#empLeaveEncSearchInput').val() || '').toLowerCase().trim();
-                var $allRows = $('#empLeaveEncashmentTable tbody tr.emp-encash-row');
-
-                var $matchingRows = $allRows.filter(function () {
-                    var $row = $(this);
-                    var lType   = ($row.data('leave-type') || '').toString();
-                    var lReason = ($row.data('reason') || '').toString();
-                    var lStatus = ($row.data('status') || '').toString();
-                    var typeId  = ($row.data('leave-type-id') || '').toString();
-
-                    var matchesSearch = !query || lType.indexOf(query) !== -1 || lReason.indexOf(query) !== -1 || lStatus.indexOf(query) !== -1;
-                    var matchesStatus = !empLeaveEncFilters.status || lStatus === empLeaveEncFilters.status;
-                    var matchesType   = !empLeaveEncFilters.leave_type_id || typeId === empLeaveEncFilters.leave_type_id;
-
-                    return matchesSearch && matchesStatus && matchesType;
-                });
-
-                var totalItems = $matchingRows.length;
-                var totalPages = Math.ceil(totalItems / empLeaveEncPerPage) || 1;
-
-                if (empLeaveEncCurrentPage > totalPages) {
-                    empLeaveEncCurrentPage = totalPages;
-                }
-                if (empLeaveEncCurrentPage < 1) {
-                    empLeaveEncCurrentPage = 1;
-                }
-
-                // Sort visible rows
-                var matchingArr = $matchingRows.get();
-                matchingArr.sort(function (a, b) {
-                    var $a = $(a), $b = $(b);
-                    if (empLeaveEncSortMode === 'date_desc') {
-                        return ($b.data('created-at') || 0) - ($a.data('created-at') || 0);
-                    } else if (empLeaveEncSortMode === 'date_asc') {
-                        return ($a.data('created-at') || 0) - ($b.data('created-at') || 0);
-                    } else if (empLeaveEncSortMode === 'days_desc') {
-                        return parseFloat($b.data('days') || 0) - parseFloat($a.data('days') || 0);
-                    } else if (empLeaveEncSortMode === 'days_asc') {
-                        return parseFloat($a.data('days') || 0) - parseFloat($b.data('days') || 0);
-                    }
-                    return 0;
-                });
-
-                var startIndex = (empLeaveEncCurrentPage - 1) * empLeaveEncPerPage;
-                var endIndex = Math.min(startIndex + empLeaveEncPerPage, totalItems);
-
-                $allRows.addClass('d-none');
-
-                $.each(matchingArr, function (idx, row) {
-                    var $r = $(row);
-                    $('#empLeaveEncashmentTable tbody').append($r);
-                    if (idx >= startIndex && idx < endIndex) {
-                        $r.removeClass('d-none');
-                    }
-                });
-
-                if (totalItems > empLeaveEncPerPage) {
-                    $('#empLeaveEncPaginationContainer').removeClass('d-none');
-                } else {
-                    $('#empLeaveEncPaginationContainer').addClass('d-none');
-                }
-
-                if (totalItems === 0) {
-                    $('#no_matching_emp_leave_enc_row').removeClass('d-none');
-                } else {
-                    $('#no_matching_emp_leave_enc_row').addClass('d-none');
-                }
-
-                $('#emp_leave_enc_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
-                $('#emp_leave_enc_showing_end').text(endIndex);
-                $('#emp_leave_enc_total_count').text(totalItems);
-
-                var paginationHtml = '';
-                paginationHtml += '<li class="page-item ' + (empLeaveEncCurrentPage === 1 ? 'disabled' : '') + '">';
-                paginationHtml += '<a class="page-link" href="#" data-page="' + (empLeaveEncCurrentPage - 1) + '" aria-label="Previous"><i class="feather-chevron-left"></i></a>';
-                paginationHtml += '</li>';
-
-                for (var i = 1; i <= totalPages; i++) {
-                    paginationHtml += '<li class="page-item ' + (empLeaveEncCurrentPage === i ? 'active' : '') + '">';
-                    paginationHtml += '<a class="page-link" href="#" data-page="' + i + '">' + i + '</a>';
-                    paginationHtml += '</li>';
-                }
-
-                paginationHtml += '<li class="page-item ' + (empLeaveEncCurrentPage === totalPages ? 'disabled' : '') + '">';
-                paginationHtml += '<a class="page-link" href="#" data-page="' + (empLeaveEncCurrentPage + 1) + '" aria-label="Next"><i class="feather-chevron-right"></i></a>';
-                paginationHtml += '</li>';
-
-                $('#emp_leave_enc_pagination_ul').html(paginationHtml);
-            }
-
-            $('#empLeaveEncSearchInput').on('keyup input search', function () {
-                empLeaveEncCurrentPage = 1;
-                refreshEmpLeaveEncRows();
-            });
-
-            $('.emp-leave-enc-sort-link').on('click', function (e) {
-                e.preventDefault();
-                empLeaveEncSortMode = $(this).data('sort') || 'date_desc';
-                $('.emp-leave-enc-sort-link').removeClass('active').find('.encash-sort-check').addClass('d-none');
-                $(this).addClass('active').find('.encash-sort-check').removeClass('d-none');
-                empLeaveEncCurrentPage = 1;
-                refreshEmpLeaveEncRows();
-                $('.erp-sort-dropdown .dropdown-menu.show').removeClass('show');
-                $('.erp-sort-dropdown.show').removeClass('show');
-            });
-
-            $('#btnEmpLeaveEncFilterApply').on('click', function () {
-                empLeaveEncFilters.status = $('#empLeaveEncFilterStatus').val() || '';
-                empLeaveEncFilters.leave_type_id = $('#empLeaveEncFilterType').val() || '';
-                empLeaveEncCurrentPage = 1;
-                refreshEmpLeaveEncRows();
-                $('.erp-filter-dropdown .dropdown-menu.show').removeClass('show');
-                $('.erp-filter-dropdown.show').removeClass('show');
-            });
-
-            $('#btnEmpLeaveEncFilterReset').on('click', function () {
-                $('#empLeaveEncFilterStatus').val('');
-                $('#empLeaveEncFilterType').val('');
-                empLeaveEncFilters = { status: '', leave_type_id: '' };
-                empLeaveEncCurrentPage = 1;
-                refreshEmpLeaveEncRows();
-            });
-
-            $(document).on('click', '#emp_leave_enc_pagination_ul .page-link', function (e) {
-                e.preventDefault();
-                var page = $(this).data('page');
-                if (page && !$(this).parent().hasClass('disabled')) {
-                    empLeaveEncCurrentPage = parseInt(page);
-                    refreshEmpLeaveEncRows();
-                }
-            });
-
-            // Initial trigger on load
-            refreshEmpLeaveAppRows();
-            refreshEmpLeaveEncRows();
-
-            $(document).on('change', '#ld-status-select', function() {
-                if ($(this).val() === 'rejected') {
-                    $('#ld-rejection-input-wrap').removeClass('d-none');
-                } else {
-                    $('#ld-rejection-input-wrap').addClass('d-none');
                 }
             });
 
@@ -2850,6 +2410,14 @@
 
         <script>
             $(document).ready(function() {
+                // Fix table-responsive container clipping dropdowns when opened
+                $(document).on('show.bs.dropdown', '.table-responsive .dropdown', function () {
+                    $(this).closest('.table-responsive').css('overflow', 'visible');
+                });
+                $(document).on('hide.bs.dropdown', '.table-responsive .dropdown', function () {
+                    $(this).closest('.table-responsive').css('overflow', '');
+                });
+
                 // Initialize Select2 dropdowns inside Apply WFH modal
                 $('#emp_wfh_notified_contacts').select2({
                     theme: 'bootstrap-5',
@@ -2946,6 +2514,110 @@
                     document.body.appendChild(form);
                     form.submit();
                 };
+
+                // Inline Document status updates
+                window.submitDocumentStatusDirect = function(url, status) {
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = url;
+                    
+                    var csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = '_token';
+                    csrfInput.value = '{{ csrf_token() }}';
+                    form.appendChild(csrfInput);
+
+                    var methodInput = document.createElement('input');
+                    methodInput.type = 'hidden';
+                    methodInput.name = '_method';
+                    methodInput.value = 'PATCH';
+                    form.appendChild(methodInput);
+
+                    var statusInput = document.createElement('input');
+                    statusInput.type = 'hidden';
+                    statusInput.name = 'status';
+                    statusInput.value = status;
+                    form.appendChild(statusInput);
+
+                    document.body.appendChild(form);
+                    form.submit();
+                };
+
+                window.toggleDocText = function(btn) {
+                    var textEl = btn.previousElementSibling;
+                    if (textEl.style.display === 'block') {
+                        textEl.style.display = '-webkit-box';
+                        textEl.style.webkitLineClamp = '2';
+                        btn.textContent = 'See more';
+                    } else {
+                        textEl.style.display = 'block';
+                        textEl.style.webkitLineClamp = 'none';
+                        btn.textContent = 'See less';
+                    }
+                };
+
+                window.adjustDocDescToggles = function() {
+                    $('.doc-desc-text').each(function () {
+                        var el = this;
+                        var $el = $(el);
+                        var $toggle = $el.siblings('.doc-toggle-text-btn');
+                        
+                        if (el.style.display === 'block') {
+                            $toggle.removeClass('d-none');
+                            return;
+                        }
+                        
+                        if (el.scrollHeight > el.clientHeight) {
+                            $toggle.removeClass('d-none');
+                        } else {
+                            $toggle.addClass('d-none');
+                        }
+                    });
+                };
+
+                window.updateInlineFileName = function(input) {
+                    var fileName = input.files[0] ? input.files[0].name : 'Choose File';
+                    $(input).siblings('div').find('.file-name-label').text(fileName);
+                };
+
+                window.toggleInlineUploadForm = function(docId) {
+                    $('#inline-upload-container-' + docId).toggleClass('d-none');
+                };
+
+                // Run adjustDocDescToggles when documents tab is active on load or tab switch
+                if ($('#documents-pane').hasClass('active')) {
+                    setTimeout(window.adjustDocDescToggles, 150);
+                }
+
+                $(document).on('shown.bs.tab', '#profileTabs button[data-bs-toggle="tab"]', function (e) {
+                    if ($(e.target).attr('data-bs-target') === '#documents-pane') {
+                        window.adjustDocDescToggles();
+                    }
+                });
+
+                $(window).on('resize', function() {
+                    if ($('#documents-pane').hasClass('active')) {
+                        window.adjustDocDescToggles();
+                    }
+                });
+
+                // Prefill document ID and details when opening upload modal from table rows
+                $(document).on('show.bs.modal', '#uploadDocumentModal', function (e) {
+                    var button = $(e.relatedTarget);
+                    var docId = button.data('document-id');
+                    var docName = button.data('document-name');
+                    var modal = $(this);
+                    
+                    if (docId) {
+                        modal.find('#upload_doc_modal_document_id').val(docId);
+                        modal.find('input[name="name"]').val(docName).prop('readonly', true);
+                        modal.find('.modal-title').html('<i class="feather-upload-cloud me-2 text-primary"></i>Upload ' + docName);
+                    } else {
+                        modal.find('#upload_doc_modal_document_id').val('');
+                        modal.find('input[name="name"]').val('').prop('readonly', false);
+                        modal.find('.modal-title').html('<i class="feather-upload-cloud me-2 text-primary"></i>' + "{{ __('hrms.employees.mdl_upload_doc_title') }}");
+                    }
+                });
 
                 window.openWfhRejectModal = function(btn) {
                     var actionUrl = btn.getAttribute('data-action');
@@ -3382,6 +3054,19 @@
             white-space: nowrap;
             display: inline-block;
             max-width: 100%;
+        }
+
+        /* ── Assets & Asset Requests tables: wrap long text ── */
+        #assignedAssetsTable td,
+        #assignedAssetsTable td *,
+        #reqAssetsTable td,
+        #reqAssetsTable td * {
+            white-space: normal !important;
+            word-break: break-word !important;
+        }
+        #assignedAssetsTable td .badge,
+        #reqAssetsTable td .badge {
+            white-space: nowrap !important;
         }
     </style>
 @endpush

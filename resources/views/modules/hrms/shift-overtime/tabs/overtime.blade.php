@@ -34,18 +34,18 @@
                     </div>
 
                     <!-- Sort Dropdown -->
-                    <x-ui.sort-dropdown label="{{ __('hrms.assets.filters') }}">
+                    <x-ui.sort-dropdown label="{{ __('hrms.common.sort') }}">
                         <a class="dropdown-item py-2 d-flex align-items-center active" href="#" onclick="setOvertimeSort('newest', this); event.preventDefault();">
-                            <span>{{ __('hrms.assets.sort_newest') }}</span>
+                            <span>{{ __('hrms.overtime.sort_newest') }}</span>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center" href="#" onclick="setOvertimeSort('oldest', this); event.preventDefault();">
-                            <span>{{ __('hrms.assets.sort_oldest') }}</span>
+                            <span>{{ __('hrms.overtime.sort_oldest') }}</span>
                         </a>
                     </x-ui.sort-dropdown>
 
                     <!-- Filter Dropdown -->
-                    <x-ui.filter label="{{ __('hrms.assets.filters') }}" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.assets.filters') }}</h6>
+                    <x-ui.filter label="{{ __('hrms.common.filter') }}" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
                         
                         @if($isAdmin)
                             <div class="mb-3" style="min-width: 250px;">

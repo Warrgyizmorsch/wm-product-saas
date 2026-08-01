@@ -29,7 +29,7 @@
                         <div class="p-5 text-center text-muted">
                             <i class="feather-alert-octagon fs-32 d-block mb-3 text-danger"></i>
                             <div class="fw-bold mb-1">{{ __('hrms.employees.lbl_no_slab_match') }}</div>
-                            <div>The employee's CTC (₹{{ number_format($employee->current_salary, 2) }}) does not fall inside any Salary Structure slab configured for the <strong>{{ $employee->payGroup->name }}</strong>.</div>
+                            <div>{{ __('hrms.employees.lbl_no_slab_match_desc', ['salary' => number_format($employee->current_salary, 2), 'paygroup' => $employee->payGroup->name]) }}</div>
                         </div>
                     @else
                         <!-- Component Table -->
@@ -54,10 +54,10 @@
                                             $item = $compData['item'];
                                             $amt = $compData['amount'];
                                             $calcTypeLabel = match($item->calculation_type) {
-                                                'fixed' => 'Fixed Amount',
-                                                'percentage_of_ctc' => $item->value . '% of CTC',
-                                                'percentage_of_basic' => $item->value . '% of Basic',
-                                                'balancing' => 'Balancing / Remainder',
+                                                'fixed'                => __('hrms.employees.lbl_calc_fixed'),
+                                                'percentage_of_ctc'    => $item->value . '% of CTC',
+                                                'percentage_of_basic'  => $item->value . '% of Basic',
+                                                'balancing'            => __('hrms.employees.lbl_calc_balancing'),
                                                 default => $item->calculation_type
                                             };
                                             
@@ -74,9 +74,9 @@
                                             </td>
                                             <td>
                                                 @if($item->component->type === 'earning')
-                                                    <span class="badge bg-soft-success text-success">Earning</span>
+                                                    <span class="badge bg-soft-success text-success">{{ __('hrms.employees.lbl_type_earning') }}</span>
                                                 @else
-                                                    <span class="badge bg-soft-danger text-danger">Deduction</span>
+                                                    <span class="badge bg-soft-danger text-danger">{{ __('hrms.employees.lbl_type_deduction') }}</span>
                                                 @endif
                                             </td>
                                             <td class="text-muted fs-13">{{ $calcTypeLabel }}</td>
@@ -170,7 +170,7 @@
                                              </td>
                                              <td class="text-end fw-semibold">₹{{ number_format($adhoc->amount, 2) }}</td>
                                              <td class="text-end">
-                                                 <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_adhoc') }}', { title: 'Delete Adhoc Component', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                 <form action="{{ route('hrms.employees.adhoc-components.destroy', $adhoc->id) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_adhoc') }}', { title: '{{ __('hrms.employees.lbl_delete_adhoc') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                                      @csrf
                                                      @method('DELETE')
                                                      <button type="submit" class="btn btn-link text-danger p-1 m-0" style="text-decoration: none !important; box-shadow: none !important;"><i class="feather-trash-2"></i></button>

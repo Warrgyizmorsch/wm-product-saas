@@ -114,12 +114,12 @@
                                          <x-ui.action-dropdown>
                                              <li>
                                                  <a class="dropdown-item btn-edit-company" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editCompanyModal" data-company="{{ base64_encode($company->toJson()) }}">
-                                                     <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.assets.edit') }}
+                                                     <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.common.edit') }}
                                                  </a>
                                              </li>
                                              <li>
                                                  <button type="submit" class="dropdown-item text-danger">
-                                                     <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.assets.delete') }}
+                                                     <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.common.delete') }}
                                                  </button>
                                              </li>
                                          </x-ui.action-dropdown>

@@ -59,8 +59,8 @@
                                 </div>
                                 <div class="dropdown-divider my-3"></div>
                                 <div class="d-flex gap-2">
-                                    <x-ui.button type="button" id="btnApplyDocumentFilter" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
-                                    <x-ui.button type="button" id="btnResetDocumentFilter" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
+                                    <x-ui.button type="button" id="btnDocumentFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') }}</x-ui.button>
+                                    <x-ui.button type="button" id="btnDocumentFilterReset" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') }}</x-ui.button>
                                 </div>
                             </form>
                             </div>
@@ -75,86 +75,261 @@
                     </div>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0" id="documentsTable" style="table-layout: fixed; width: 100%;">
+                    <div class="table-responsive" style="overflow: visible;">
+                        <table class="table table-hover align-middle mb-0 documents-table" id="documentsTable" style="table-layout: fixed; width: 100%;">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-3" style="width: 25%;">{{ __('hrms.employees.tbl_doc_title') }}</th>
-                                    <th style="width: 15%;">{{ __('hrms.employees.tbl_added_by') }}</th>
-                                    <th style="width: 15%;">{{ __('hrms.employees.tbl_expiry_date') }}</th>
+                                    <th class="ps-3" style="width: 30%;">{{ __('hrms.employees.tbl_doc_title') }}</th>
+                                    <th style="width: 18%;">{{ __('hrms.employees.tbl_source_expiry') }}</th>
+                                    <th style="width: 26%;">{{ __('hrms.employees.tbl_file') }}</th>
                                     <th style="width: 12%;">{{ __('hrms.employees.tbl_status') }}</th>
-                                    <th style="width: 13%;">{{ __('hrms.employees.tbl_last_updated') }}</th>
-                                    <th class="text-end pe-3" style="width: 20%;">{{ __('hrms.employees.tbl_actions') }}</th>
+                                    <th class="text-end pe-3" style="width: 14%;">{{ __('hrms.employees.tbl_actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($documents as $doc)
                                     @php
                                         $isExpired = $doc->expiry_date && $doc->expiry_date->isPast();
-                                        $isExpiringSoon = $doc->expiry_date && !$isExpired && $doc->expiry_date->diffInDays(now()) <= 30;
+                                        $isExpiringSoon = $doc->expiry_date && !$isExpired && now()->greaterThanOrEqualTo($doc->expiry_date->copy()->subDays(30));
                                         
-                                        $rowStatus = $doc->status;
+                                        $rowStatus = ($isExpired || $isExpiringSoon) ? 'requested' : $doc->status;
                                         $rowHasExpiry = $doc->expiry_date ? '1' : '0';
                                     @endphp
                                     <tr class="document-row" 
                                         data-title="{{ strtolower($doc->name) }}" 
+                                        data-search="{{ strtolower($doc->name) }}" 
                                         data-status="{{ $rowStatus }}" 
                                         data-has-expiry="{{ $rowHasExpiry }}"
-                                        data-expiry-timestamp="{{ $doc->expiry_date ? $doc->expiry_date->timestamp : 9999999999 }}"
+                                        data-expiry="{{ $doc->expiry_date ? $doc->expiry_date->timestamp : 9999999999 }}"
                                         data-title-raw="{{ $doc->name }}">
                                         <td class="ps-3">
-                                            <div class="d-flex align-items-center">
-                                                <div class="avatar-sm bg-soft-primary text-primary rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 36px; height: 36px;">
-                                                    <i class="feather-file fs-16"></i>
+                                            <div class="fw-bold text-dark fs-14 mb-1" style="word-break: break-word; white-space: normal; line-height: 1.4;" title="{{ $doc->name }}">{{ $doc->name }}</div>
+                                            @if($doc->description)
+                                                <div class="doc-desc-wrapper" style="max-width: 100%;">
+                                                    <div class="text-muted fs-12 mb-0 doc-desc-text" 
+                                                         style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; white-space: normal; line-height: 1.3;"
+                                                         title="{{ $doc->description }}">{{ $doc->description }}</div>
+                                                    <a href="#" class="doc-toggle-text-btn fs-11 text-primary fw-semibold d-none mt-0.5" onclick="toggleDocText(this); return false;">See more</a>
                                                 </div>
-                                                <div style="max-width: calc(100% - 50px);">
-                                                    <div class="fw-bold text-dark text-truncate mb-0.5" title="{{ $doc->name }}">{{ $doc->name }}</div>
-                                                    @if($doc->description)
-                                                        <small class="text-muted text-truncate d-block" title="{{ $doc->description }}">{{ $doc->description }}</small>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <span class="badge bg-light text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
+                                                    <i class="feather-user fs-11"></i>
+                                                    {{ $doc->uploadedBy?->full_name ?? 'System' }}
+                                                </span>
+                                            </div>
+                                            <div class="mt-1.5">
+                                                @if($doc->expiry_date)
+                                                    @if($isExpired)
+                                                        <span class="badge bg-soft-danger text-danger px-2 py-1 fs-11 d-inline-flex align-items-center gap-1">
+                                                            <i class="feather-alert-triangle fs-11"></i>
+                                                            {{ __('hrms.employees.lbl_expired') }} ({{ $doc->expiry_date->format('d M Y') }})
+                                                        </span>
+                                                    @elseif($isExpiringSoon)
+                                                        <span class="badge px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #ff9800 !important; border: 1px solid rgba(255, 152, 0, 0.2);">
+                                                            <i class="feather-clock fs-11"></i>
+                                                            {{ __('hrms.employees.lbl_near_expiry') ?? 'Near Expiry' }} ({{ $doc->expiry_date->format('d M Y') }})
+                                                        </span>
+                                                    @else
+                                                        <span class="badge bg-soft-secondary text-dark px-2 py-1 fs-11 d-inline-flex align-items-center gap-1 border">
+                                                            <i class="feather-clock fs-11"></i>
+                                                            {{ __('hrms.employees.lbl_expiry') ?? 'Expiry' }} ({{ $doc->expiry_date->format('d M Y') }})
+                                                        </span>
                                                     @endif
-                                                </div>
+                                                @elseif($doc->has_expiry)
+                                                    <span class="badge px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.1) !important; color: #ff9800 !important; border: 1px solid rgba(255, 152, 0, 0.2);">
+                                                        <i class="feather-alert-circle fs-11"></i>
+                                                        {{ __('hrms.employees.lbl_expiry_required') }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-soft-success text-success px-2 py-1 fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(40, 167, 69, 0.08) !important; color: #28a745 !important; border: 1px solid rgba(40, 167, 69, 0.15);">
+                                                        <i class="feather-check-circle fs-11"></i>
+                                                        {{ __('hrms.employees.lbl_no_expiry') }}
+                                                    </span>
+                                                @endif
                                             </div>
                                         </td>
                                         <td>
-                                            <div class="fw-medium text-dark">{{ $doc->uploadedBy?->full_name ?? 'System' }}</div>
-                                        </td>
-                                        <td>
-                                            @if($doc->expiry_date)
-                                                <div class="fw-semibold {{ $isExpired ? 'text-danger' : ($isExpiringSoon ? 'text-warning' : 'text-dark') }}">
-                                                    {{ $doc->expiry_date->format('d M, Y') }}
+                                            @if($doc->file_path)
+                                                <div class="d-flex align-items-center justify-content-between p-2 rounded-3 border bg-white" style="width: 280px; max-width: 100%; height: 50px; border-color: #e2e8f0 !important; background-color: #f8fafc !important;">
+                                                    <div class="d-flex align-items-center gap-2" style="min-width: 0;">
+                                                        <div class="d-flex align-items-center justify-content-center bg-white border rounded text-secondary flex-shrink-0" style="width: 32px; height: 32px;">
+                                                            <i class="feather-file fs-15"></i>
+                                                        </div>
+                                                        <div class="text-start" style="line-height: 1.2; min-width: 0;">
+                                                            <div class="fw-semibold text-dark text-truncate fs-12" style="max-width: 150px;" title="{{ $doc->file_name ?? basename($doc->file_path) }}">
+                                                                {{ $doc->file_name ?? basename($doc->file_path) }}
+                                                            </div>
+                                                            <small class="text-muted fs-10">
+                                                                @if($doc->file_size)
+                                                                    {{ number_format($doc->file_size / 1024, 1) }} KB
+                                                                @else
+                                                                    N/A
+                                                                @endif
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-1 ms-1 flex-shrink-0">
+                                                        <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.common.view') }}">
+                                                            <i class="feather-eye fs-11"></i>
+                                                        </a>
+                                                        @if($isExpired || $isExpiringSoon)
+                                                            <a href="#" class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.employees.lbl_reupload') ?? 'Reupload' }}" onclick="toggleInlineUploadForm('{{ $doc->id }}'); return false;">
+                                                                <i class="feather-refresh-cw fs-10"></i>
+                                                            </a>
+                                                        @endif
+                                                        <a href="{{ asset('storage/' . $doc->file_path) }}" download class="btn btn-xs btn-white border rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted hover-primary" style="width: 24px; height: 24px; background: #ffffff;" title="{{ __('hrms.employees.lbl_download_doc') ?? 'Download' }}">
+                                                            <i class="feather-download fs-11"></i>
+                                                        </a>
+                                                    </div>
                                                 </div>
                                                 @if($isExpired)
-                                                    <small class="badge bg-soft-danger text-danger fs-10 px-2 mt-0.5 rounded-pill">{{ __('hrms.employees.lbl_expired') }}</small>
-                                                @elseif($isExpiringSoon)
-                                                    <small class="badge bg-soft-warning text-dark fs-10 px-2 mt-0.5 rounded-pill">{{ __('hrms.employees.lbl_expiring_soon') }}</small>
+                                                    <div class="text-danger fw-bold fs-11 mt-1.5"><i class="feather-alert-triangle me-1"></i>{{ __('hrms.employees.lbl_document_expired') }}</div>
+                                                @endif
+                                                @if($isExpired || $isExpiringSoon)
+                                                    <div id="inline-upload-container-{{ $doc->id }}" class="d-none mt-2">
+                                                        <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column gap-1.5" style="width: 280px; max-width: 100%;">
+                                                            @csrf
+                                                            <input type="hidden" name="document_id" value="{{ $doc->id }}">
+                                                            <input type="hidden" name="name" value="{{ $doc->name }}">
+                                                            
+                                                            <div class="d-flex align-items-center gap-1.5">
+                                                                <div class="position-relative flex-grow-1" style="min-width: 0;">
+                                                                    <input type="file" name="file" class="position-absolute opacity-0" style="left: 0; top: 0; width: 100%; height: 100%; cursor: pointer; z-index: 2;" onchange="updateInlineFileName(this)" required>
+                                                                    <div class="form-control d-flex align-items-center gap-1.5 fs-11 text-muted text-truncate px-2" style="border: 1px dashed rgba(var(--bs-primary-rgb), 0.25); background-color: rgba(var(--bs-primary-rgb), 0.02); height: 32px; border-radius: 8px;">
+                                                                        <i class="feather-upload-cloud fs-13 flex-shrink-0"></i>
+                                                                        <span class="file-name-label text-truncate">{{ __('hrms.employees.lbl_choose_file') ?? 'Choose File' }}</span>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <button type="submit" class="btn btn-sm text-white fw-bold d-inline-flex align-items-center gap-1 px-2.5 flex-shrink-0" style="background-color: var(--bs-primary) !important; font-size: 10.5px; height: 32px; border-radius: 8px; border: none; white-space: nowrap;">
+                                                                    <i class="feather-upload-cloud fs-11"></i> {{ __('hrms.employees.btn_upload') }}
+                                                                </button>
+                                                            </div>
+
+                                                            @if($doc->has_expiry)
+                                                                <div class="d-flex align-items-center gap-1.5 mt-1">
+                                                                    <span class="text-muted fw-bold fs-9 text-uppercase" style="white-space: nowrap;">{{ __('hrms.employees.lbl_expiry') ?? 'EXPIRY' }}:</span>
+                                                                    <input type="date" name="expiry_date" class="form-control py-0 px-2 fs-11 text-muted border" style="height: 26px; border-radius: 6px; width: 120px;" required>
+                                                                </div>
+                                                            @endif
+                                                        </form>
+                                                    </div>
                                                 @endif
                                             @else
-                                                <span class="text-muted fs-13">—</span>
+                                                <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column gap-1.5" style="width: 280px; max-width: 100%;">
+                                                    @csrf
+                                                    <input type="hidden" name="document_id" value="{{ $doc->id }}">
+                                                    <input type="hidden" name="name" value="{{ $doc->name }}">
+                                                    
+                                                    <div class="d-flex align-items-center gap-1.5">
+                                                        <div class="position-relative flex-grow-1" style="min-width: 0;">
+                                                            <input type="file" name="file" class="position-absolute opacity-0" style="left: 0; top: 0; width: 100%; height: 100%; cursor: pointer; z-index: 2;" onchange="updateInlineFileName(this)" required>
+                                                            <div class="form-control d-flex align-items-center gap-1.5 fs-11 text-muted text-truncate px-2" style="border: 1px dashed rgba(var(--bs-primary-rgb), 0.25); background-color: rgba(var(--bs-primary-rgb), 0.02); height: 32px; border-radius: 8px;">
+                                                                <i class="feather-upload-cloud fs-13 flex-shrink-0"></i>
+                                                                <span class="file-name-label text-truncate">{{ __('hrms.employees.lbl_choose_file') ?? 'Choose File' }}</span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <button type="submit" class="btn btn-sm text-white fw-bold d-inline-flex align-items-center gap-1 px-2.5 flex-shrink-0" style="background-color: var(--bs-primary) !important; font-size: 10.5px; height: 32px; border-radius: 8px; border: none; white-space: nowrap;">
+                                                            <i class="feather-upload-cloud fs-11"></i> {{ __('hrms.employees.btn_upload') }}
+                                                        </button>
+                                                    </div>
+
+                                                    @if($doc->has_expiry)
+                                                        <div class="d-flex align-items-center gap-1.5 mt-1">
+                                                            <span class="text-muted fw-bold fs-9 text-uppercase" style="white-space: nowrap;">{{ __('hrms.employees.lbl_expiry') ?? 'EXPIRY' }}:</span>
+                                                            <input type="date" name="expiry_date" class="form-control py-0 px-2 fs-11 text-muted border" style="height: 26px; border-radius: 6px; width: 120px;" required>
+                                                        </div>
+                                                    @endif
+                                                </form>
                                             @endif
                                         </td>
                                         <td>
-                                            @if($doc->status === 'uploaded')
-                                                <span class="badge bg-soft-success text-success px-2.5 py-1 rounded-pill fs-11">{{ __('hrms.employees.lbl_uploaded') }}</span>
+                                            @if($isExpired)
+                                                <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(220, 53, 69, 0.08) !important; color: #dc3545 !important; border: 1px solid rgba(220, 53, 69, 0.15); font-weight: 500;">
+                                                    <i class="feather-alert-triangle fs-11"></i>
+                                                    {{ __('hrms.employees.lbl_expired') }}
+                                                </span>
+                                            @elseif($isExpiringSoon)
+                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
+                                                    <i class="feather-clock fs-11"></i>
+                                                    {{ __('hrms.employees.lbl_pending_upload') }}
+                                                </span>
+                                            @elseif($doc->status === 'approved')
+                                                <span class="badge bg-soft-success text-success px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(40, 167, 69, 0.08) !important; color: #28a745 !important; border: 1px solid rgba(40, 167, 69, 0.15); font-weight: 500;">
+                                                    <i class="feather-check-circle fs-11"></i>
+                                                    {{ __('hrms.employees.status_approved') }}
+                                                </span>
+                                            @elseif($doc->status === 'rejected')
+                                                <span class="badge bg-soft-danger text-danger px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(220, 53, 69, 0.08) !important; color: #dc3545 !important; border: 1px solid rgba(220, 53, 69, 0.15); font-weight: 500;">
+                                                    <i class="feather-x-circle fs-11"></i>
+                                                    {{ __('hrms.employees.status_rejected') }}
+                                                </span>
+                                            @elseif($doc->status === 'uploaded')
+                                                <span class="badge px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(13, 202, 240, 0.08) !important; color: #00bcd4 !important; border: 1px solid rgba(13, 202, 240, 0.15); font-weight: 500;">
+                                                    <i class="feather-clock fs-11"></i>
+                                                    {{ __('hrms.employees.lbl_pending_verification') }}
+                                                </span>
                                             @else
-                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded-pill fs-11">{{ __('hrms.employees.lbl_pending_upload') }}</span>
+                                                <span class="badge bg-soft-warning text-warning px-2.5 py-1 rounded fs-11 d-inline-flex align-items-center gap-1" style="background-color: rgba(255, 193, 7, 0.08) !important; color: #ff9800 !important; border: 1px solid rgba(255, 193, 7, 0.15); font-weight: 500;">
+                                                    <i class="feather-clock fs-11"></i>
+                                                    {{ __('hrms.employees.lbl_pending_upload') }}
+                                                </span>
                                             @endif
-                                        </td>
-                                        <td>
-                                            <div class="fs-12 text-dark">{{ $doc->updated_at->format('d M, Y') }}</div>
-                                            <small class="text-muted fs-11">{{ $doc->updated_at->format('H:i') }}</small>
                                         </td>
                                         <td class="text-end pe-3">
                                             <div class="d-flex align-items-center justify-content-end gap-2">
-                                                @if($doc->status === 'uploaded' && $doc->file_path)
-                                                    <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px;" title="{{ __('hrms.employees.lbl_download_doc') }}">
-                                                        <i class="feather-download fs-13"></i>
-                                                    </a>
+                                                @if($doc->status !== 'requested' && !$isExpired && !$isExpiringSoon)
+                                                    <div class="dropdown {{ $loop->last ? 'dropup' : '' }} d-inline-block position-relative" onclick="event.stopPropagation();">
+                                                        <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
+                                                                type="button" 
+                                                                data-bs-toggle="dropdown" 
+                                                                data-bs-boundary="viewport"
+                                                                aria-expanded="false"
+                                                                style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 120px; border: none;"
+                                                                title="{{ __('hrms.employees.lbl_update_status') ?? 'Change Status' }}">
+                                                            <span>
+                                                                @if($doc->status === 'approved')
+                                                                    {{ __('hrms.employees.status_approved') }}
+                                                                @elseif($doc->status === 'rejected')
+                                                                    {{ __('hrms.employees.status_rejected') }}
+                                                                @else
+                                                                    {{ __('hrms.employees.lbl_select_status') }}
+                                                                @endif
+                                                            </span>
+                                                        </button>
+                                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="border-radius: 8px; min-width: 120px; z-index: 1050; background: #ffffff;">
+                                                            <li>
+                                                                <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium {{ $doc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}"
+                                                                   href="#"
+                                                                   onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'approved'); return false;"
+                                                                   style="{{ $doc->status === 'approved' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                    {{ __('hrms.employees.status_approved') }}
+                                                                </a>
+                                                            </li>
+                                                            <li>
+                                                                <a class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium {{ $doc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}"
+                                                                   href="#"
+                                                                   onclick="submitDocumentStatusDirect('{{ route('hrms.employees.documents.status', $doc->id) }}', 'rejected'); return false;"
+                                                                   style="{{ $doc->status === 'rejected' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                    {{ __('hrms.employees.status_rejected') }}
+                                                                </a>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                @else
+                                                    <button class="btn btn-sm btn-light border py-1 px-3 d-inline-flex align-items-center justify-content-center fw-semibold text-muted disabled" style="font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 120px;" disabled>
+                                                        {{ __('hrms.employees.lbl_pending_upload') }}
+                                                    </button>
                                                 @endif
                                                 
-                                                <form action="{{ route('hrms.employees.documents.destroy', [$employee->id, $doc->id]) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this document record?', { title: 'Delete Document', variant: 'danger', confirmButtonText: 'Delete' });" class="m-0">
+                                                <form action="{{ route('hrms.employees.documents.destroy', [$employee->id, $doc->id]) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_document') }}', { title: '{{ __('hrms.employees.lbl_delete_document') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });" class="m-0 d-inline-flex" onclick="event.stopPropagation();">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px;" title="{{ __('hrms.common.delete') }}">
+                                                    <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
                                                         <i class="feather-trash-2 fs-13"></i>
                                                     </button>
                                                 </form>
@@ -162,10 +337,10 @@
                                         </td>
                                     </tr>
                                 @endforeach
-                                <tr id="noMatchingDocumentsRow" class="d-none">
-                                    <td colspan="6" class="text-center py-5 text-muted fs-13">
+                                <tr id="documentNoResultsRow" class="d-none">
+                                    <td colspan="5" class="text-center py-5 text-muted fs-13">
                                         <i class="feather-folder-minus d-block fs-32 text-light-muted mb-2"></i>
-                                        No matching documents found.
+                                        {{ __('hrms.employees.lbl_no_docs_match') }}
                                     </td>
                                 </tr>
                             </tbody>
@@ -243,6 +418,7 @@
                 </div>
                 <form action="{{ route('hrms.employees.documents.upload', $employee->id) }}" method="POST" enctype="multipart/form-data">
                     @csrf
+                    <input type="hidden" name="document_id" id="upload_doc_modal_document_id" value="">
                     <div class="modal-body">
                         <div class="row g-3">
                             <div class="col-12">

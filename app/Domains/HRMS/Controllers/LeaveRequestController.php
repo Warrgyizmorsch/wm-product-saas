@@ -38,6 +38,8 @@ class LeaveRequestController extends Controller
             'session'          => 'nullable|string|in:full_day,first_half,second_half',
             'reason'           => 'required|string|max:1000',
             'attachment'       => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
+            'notified_contacts'   => 'nullable|array',
+            'notified_contacts.*' => 'exists:employees,id',
         ]);
 
         // Calculate duration server-side from dates + session types
