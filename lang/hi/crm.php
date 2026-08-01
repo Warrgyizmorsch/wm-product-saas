@@ -33,12 +33,10 @@ return [
     'view_details' => 'विवरण देखें',
     'actions' => 'कार्य',
     'statuses' => [
-        'New' => 'नया',
-        'Follow-up Scheduled' => 'फॉलो-अप निर्धारित',
-        'Contacted' => 'संपर्क किया',
-        'Qualified' => 'योग्य',
-        'Converted' => 'कन्वर्टेड',
-        'Lost' => 'खोया',
+        'New' => 'नया (New)',
+        'Qualified' => 'योग्य (Qualified)',
+        'Won' => 'जीता (Won)',
+        'Lost' => 'खोया (Lost)',
     ],
     'priorities' => [
         'High' => 'उच्च',

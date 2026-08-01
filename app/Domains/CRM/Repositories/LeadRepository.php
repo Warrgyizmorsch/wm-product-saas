@@ -70,6 +70,22 @@ class LeadRepository
                 }
             }
 
+            $startDate = $filters['start_date'] ?? $filters['date_from'] ?? null;
+            if (!empty($startDate)) {
+                $query->where(function ($q) use ($startDate) {
+                    $q->whereDate('call_date', '>=', $startDate)
+                      ->orWhereDate('created_at', '>=', $startDate);
+                });
+            }
+
+            $endDate = $filters['end_date'] ?? $filters['date_to'] ?? null;
+            if (!empty($endDate)) {
+                $query->where(function ($q) use ($endDate) {
+                    $q->whereDate('call_date', '<=', $endDate)
+                      ->orWhereDate('created_at', '<=', $endDate);
+                });
+            }
+
             $sortBy = $filters['sort_by'] ?? 'call_date';
             $sortOrder = $filters['sort_order'] ?? 'desc';
             

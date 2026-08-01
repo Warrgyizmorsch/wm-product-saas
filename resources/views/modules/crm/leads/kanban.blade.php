@@ -82,18 +82,8 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <h5 class="fw-bold text-dark mb-0 me-2">Pipeline Kanban</h5>
         <div class="d-flex align-items-center flex-wrap gap-2">
-            <!-- Icon View Switcher (Exact action-dropdown-btn style with clear gap) -->
-            <div class="d-flex align-items-center gap-2 me-2">
-                <a href="{{ route('crm.leads.index') }}" class="action-dropdown-btn" title="List View" data-bs-toggle="tooltip">
-                    <i class="feather-list"></i>
-                </a>
-                <a href="{{ route('crm.leads.kanban') }}" class="action-dropdown-btn active" title="Pipeline Kanban" data-bs-toggle="tooltip">
-                    <i class="feather-grid"></i>
-                </a>
-                <a href="{{ route('crm.activities.index') }}" class="action-dropdown-btn" title="Activity Calendar" data-bs-toggle="tooltip">
-                    <i class="feather-calendar"></i>
-                </a>
-            </div>
+            <!-- Icon View Switcher (Common System Component) -->
+            <x-ui.view-switcher />
 
             <!-- Common Filter Component (Identical to Lead Listing) -->
             <form method="GET" action="{{ route('crm.leads.kanban') }}" class="d-inline">
@@ -126,6 +116,17 @@
                         </x-ui.odoo-form-ui>
                     </div>
 
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date From</label>
+                            <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') ?? request('start_date') }}" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date To</label>
+                            <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') ?? request('end_date') }}" />
+                        </div>
+                    </div>
+
                     <div class="d-flex gap-2 justify-content-end mt-4">
                         <a href="{{ route('crm.leads.kanban') }}" class="btn btn-sm btn-light border">{{ __('crm.reset') }}</a>
                         <button type="submit" class="btn btn-sm btn-primary">{{ __('crm.apply_filters') }}</button>
@@ -139,12 +140,10 @@
     <div class="kanban-board-container">
         @php
             $columnConfigs = [
-                'New' => ['color' => '#3b82f6', 'badge' => 'bg-soft-primary text-primary', 'title' => 'New Leads'],
-                'Follow-up Scheduled' => ['color' => '#f59e0b', 'badge' => 'bg-soft-warning text-warning', 'title' => 'Follow-up Scheduled'],
-                'Contacted' => ['color' => '#06b6d4', 'badge' => 'bg-soft-info text-info', 'title' => 'Contacted'],
-                'Qualified' => ['color' => '#14b8a6', 'badge' => 'bg-soft-teal text-teal', 'title' => 'Qualified'],
-                'Converted' => ['color' => '#22c55e', 'badge' => 'bg-soft-success text-success', 'title' => 'Converted'],
                 'Lost' => ['color' => '#ef4444', 'badge' => 'bg-soft-danger text-danger', 'title' => 'Lost'],
+                'New' => ['color' => '#3b82f6', 'badge' => 'bg-soft-primary text-primary', 'title' => 'New Leads'],
+                'Qualified' => ['color' => '#14b8a6', 'badge' => 'bg-soft-teal text-teal', 'title' => 'Qualified'],
+                'Won' => ['color' => '#22c55e', 'badge' => 'bg-soft-success text-success', 'title' => 'Won'],
             ];
         @endphp
 
@@ -277,10 +276,10 @@
                 const isQualified = draggedCard.getAttribute('data-is-qualified') === '1';
 
                 // Guard 1: Client-Side Instant Qualification Guard for Direct Conversion
-                if (newStatus === 'Converted' && !isQualified) {
+                if (newStatus === 'Won' && !isQualified) {
                     confirmAction({
                         title: 'Action Blocked: Qualification Required',
-                        message: 'Lead "' + companyName + '" (# ' + leadId + ') cannot be converted directly to "Converted" because it is not Qualified yet! Please qualify the lead first.',
+                        message: 'Lead "' + companyName + '" (# ' + leadId + ') cannot be marked directly as "Won" because it is not Qualified yet! Please qualify the lead first.',
                         variant: 'warning',
                         confirmText: 'Got It'
                     });

@@ -121,9 +121,15 @@
 
                         <!-- Item Matrix Section using Common Odoo Table Component -->
                         <div class="mt-4">
-                            <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                                 <h6 class="fw-bold text-primary mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.received_products_matrix') }}</h6>
-                                <span class="badge bg-soft-info text-info fs-11 fw-semibold" id="itemsCountBadge">0 {{ __('purchase.items') }}</span>
+                                <div class="d-flex align-items-center gap-2" style="width: 420px;">
+                                    <div class="input-group input-group-sm shadow-2xs rounded border overflow-hidden">
+                                        <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
+                                        <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
+                                        <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
+                                    </div>
+                                </div>
                             </div>
 
                              <div class="table-responsive border rounded bg-white">
@@ -798,4 +804,55 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Fast Barcode Scan Lookup for GRN Received Items
+    function handleGrnBarcodeScan() {
+        const input = document.getElementById('fastBarcodeScanInput');
+        const code = input ? input.value.trim() : '';
+        if (!code) return;
+
+        fetch("{{ route('inventory.products.barcodeLookup') }}?code=" + encodeURIComponent(code))
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.product) {
+                    const prod = data.product;
+                    let foundMatch = false;
+                    document.querySelectorAll('#grnItemsTbody tr').forEach(row => {
+                        const prodNameEl = row.querySelector('.product-name, td:nth-child(2)');
+                        if (prodNameEl && (prodNameEl.textContent.includes(prod.name) || prodNameEl.textContent.includes(prod.sku))) {
+                            const rxInput = row.querySelector('input[name$="[quantity_received]"]');
+                            if (rxInput) {
+                                rxInput.value = (parseFloat(rxInput.value) || 0) + 1;
+                                rxInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                foundMatch = true;
+                            }
+                        }
+                    });
+                    if (!foundMatch) {
+                        alert('Scanned item (' + prod.name + ') is not present in the selected Purchase Order items.');
+                    }
+                    input.value = '';
+                } else {
+                    alert('Product Not Found for scanned code: ' + code);
+                    input.value = '';
+                }
+            })
+            .catch(err => {
+                alert('Barcode lookup failed: ' + code);
+                input.value = '';
+            });
+    }
+
+    document.getElementById('fastBarcodeScanInput')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleGrnBarcodeScan();
+        }
+    });
+    document.getElementById('fastBarcodeScanBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        handleGrnBarcodeScan();
+    });
+</script>
 @endpush

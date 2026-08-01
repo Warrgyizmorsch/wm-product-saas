@@ -32,10 +32,8 @@
                         
                         @php
                             $statusClass = 'bg-soft-primary text-primary';
-                            if($lead->status === 'Follow-up Scheduled') $statusClass = 'bg-soft-warning text-warning';
-                            elseif($lead->status === 'Contacted') $statusClass = 'bg-soft-info text-info';
-                            elseif($lead->status === 'Qualified') $statusClass = 'bg-soft-teal text-teal';
-                            elseif($lead->status === 'Converted') $statusClass = 'bg-soft-success text-success';
+                            if($lead->status === 'Qualified') $statusClass = 'bg-soft-teal text-teal';
+                            elseif($lead->status === 'Won') $statusClass = 'bg-soft-success text-success';
                             elseif($lead->status === 'Lost') $statusClass = 'bg-soft-danger text-danger';
                         @endphp
                         <span class="badge {{ $statusClass }} px-2 py-0.5 fs-10 fw-semibold">{{ $lead->status ? __('crm.statuses.' . $lead->status) : __('crm.statuses.New') }}</span>
@@ -597,10 +595,8 @@
                                                              @method('PATCH')
                                                              <select class="form-select odoo-select2 status-select" name="status" style="border-radius:0;">
                                                                  <option value="New" @selected($lead->status === 'New' || !$lead->status)>{{ __('crm.statuses.New') }}</option>
-                                                                 <option value="Contacted" @selected($lead->status === 'Contacted')>{{ __('crm.statuses.Contacted') }}</option>
-                                                                 <option value="Follow-up Scheduled" @selected($lead->status === 'Follow-up Scheduled')>{{ __('crm.statuses.Follow-up Scheduled') }}</option>
                                                                  <option value="Qualified" @selected($lead->status === 'Qualified')>{{ __('crm.statuses.Qualified') }}</option>
-                                                                 <option value="Converted" @selected($lead->status === 'Converted')>{{ __('crm.statuses.Converted') }}</option>
+                                                                 <option value="Won" @selected($lead->status === 'Won')>{{ __('crm.statuses.Won') }}</option>
                                                                  <option value="Lost" @selected($lead->status === 'Lost')>{{ __('crm.statuses.Lost') }}</option>
                                                              </select>
                                                          </form>

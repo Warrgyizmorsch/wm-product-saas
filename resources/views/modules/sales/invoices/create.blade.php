@@ -177,7 +177,16 @@
 
                 <!-- Items Table (Matching PO Component Design) -->
                 <div class="mt-5">
-                    <h5 class="fw-bold text-dark mb-3"><i class="feather-layers text-primary me-2"></i>Invoice Line Items</h5>
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                        <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers text-primary me-2"></i>Invoice Line Items</h5>
+                        <div class="d-flex align-items-center gap-2" style="width: 420px;">
+                            <div class="input-group input-group-sm shadow-2xs rounded border overflow-hidden">
+                                <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
+                                <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
+                                <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="table-responsive">
                         <x-ui.odoo-form-ui type="table" id="invoiceItemsTable">
@@ -539,6 +548,64 @@
             if ("{{ $mode }}" === "direct" && $('#invoiceItemsTable tbody tr.item-row').length === 0) {
                 $('#addDirectRowBtn').click();
             }
+
+            // Barcode Scanner Fast Auto-Fill
+            function handleBarcodeScan() {
+                const input = $('#fastBarcodeScanInput');
+                const code = input.val().trim();
+                if (!code) return;
+
+                $.ajax({
+                    url: "{{ route('inventory.products.barcodeLookup') }}",
+                    data: { code: code },
+                    success: function(res) {
+                        if (res.success && res.product) {
+                            const prod = res.product;
+                            let targetRow = null;
+                            $('#invoiceItemsTable tbody tr.item-row').each(function() {
+                                const sel = $(this).find('.product-select');
+                                if (sel.length && !sel.val()) {
+                                    targetRow = $(this);
+                                    return false;
+                                }
+                            });
+
+                            if (!targetRow) {
+                                $('#addDirectRowBtn').click();
+                                targetRow = $('#invoiceItemsTable tbody tr.item-row').last();
+                            }
+
+                            const selectEl = targetRow.find('.product-select');
+                            if (selectEl.length) {
+                                if (!selectEl.find(`option[value="${prod.id}"]`).length) {
+                                    selectEl.append(`<option value="${prod.id}" data-cost="${prod.selling_price || prod.cost_price}" data-name="${prod.name}">${prod.name} (${prod.sku})</option>`);
+                                }
+                                selectEl.val(prod.id).trigger('change');
+                                targetRow.find('.rate-input').val(prod.selling_price || prod.cost_price || prod.unit_cost);
+                                targetRow.find('.tax-input').val(prod.gst_rate || 18);
+                                recalculateInvoiceTotals();
+                            }
+                            input.val('');
+                        }
+                    },
+                    error: function(err) {
+                        alert('Product Not Found for scanned code: ' + code);
+                        input.val('');
+                    }
+                });
+            }
+
+            $('#fastBarcodeScanInput').on('keypress', function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    handleBarcodeScan();
+                }
+            });
+
+            $('#fastBarcodeScanBtn').on('click', function(e) {
+                e.preventDefault();
+                handleBarcodeScan();
+            });
         });
     </script>
 @endpush

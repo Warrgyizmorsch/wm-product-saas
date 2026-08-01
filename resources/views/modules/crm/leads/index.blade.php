@@ -43,18 +43,8 @@
                 </a>
             </div>
             <div class="d-flex align-items-center flex-wrap gap-2">
-                <!-- Icon View Switcher (Exact action-dropdown-btn style with clear gap) -->
-                <div class="d-flex align-items-center gap-2 me-2">
-                    <a href="{{ route('crm.leads.index') }}" class="action-dropdown-btn active" title="List View" data-bs-toggle="tooltip">
-                        <i class="feather-list"></i>
-                    </a>
-                    <a href="{{ route('crm.leads.kanban') }}" class="action-dropdown-btn" title="Pipeline Kanban" data-bs-toggle="tooltip">
-                        <i class="feather-grid"></i>
-                    </a>
-                    <a href="{{ route('crm.activities.index') }}" class="action-dropdown-btn" title="Activity Calendar" data-bs-toggle="tooltip">
-                        <i class="feather-calendar"></i>
-                    </a>
-                </div>
+                <!-- Icon View Switcher (Common System Component) -->
+                <x-ui.view-switcher />
 
                 <!-- Custom Sort Component -->
                 <x-ui.sort-dropdown :label="__('crm.sort')">
@@ -119,10 +109,8 @@
                             <x-ui.odoo-form-ui type="select" name="status">
                                 <option value="">{{ __('crm.all_statuses') }}</option>
                                 <option value="New" {{ request('status') === 'New' ? 'selected' : '' }}>{{ __('crm.statuses.New') }}</option>
-                                <option value="Follow-up Scheduled" {{ request('status') === 'Follow-up Scheduled' ? 'selected' : '' }}>{{ __('crm.statuses.Follow-up Scheduled') }}</option>
-                                <option value="Contacted" {{ request('status') === 'Contacted' ? 'selected' : '' }}>{{ __('crm.statuses.Contacted') }}</option>
                                 <option value="Qualified" {{ request('status') === 'Qualified' ? 'selected' : '' }}>{{ __('crm.statuses.Qualified') }}</option>
-                                <option value="Converted" {{ request('status') === 'Converted' ? 'selected' : '' }}>{{ __('crm.statuses.Converted') }}</option>
+                                <option value="Won" {{ request('status') === 'Won' ? 'selected' : '' }}>{{ __('crm.statuses.Won') }}</option>
                                 <option value="Lost" {{ request('status') === 'Lost' ? 'selected' : '' }}>{{ __('crm.statuses.Lost') }}</option>
                             </x-ui.odoo-form-ui>
                         </div>
@@ -134,6 +122,17 @@
                                 <option value="with_quotation" {{ request('quotation_status') === 'with_quotation' ? 'selected' : '' }}>With Quotation</option>
                                 <option value="without_quotation" {{ request('quotation_status') === 'without_quotation' ? 'selected' : '' }}>Without Quotation</option>
                             </x-ui.odoo-form-ui>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date From</label>
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="date_from" value="{{ request('date_from') ?? request('start_date') }}" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Date To</label>
+                                <x-ui.odoo-form-ui type="input" inputType="date" name="date_to" value="{{ request('date_to') ?? request('end_date') }}" />
+                            </div>
                         </div>
 
                         <div class="d-flex gap-2 justify-content-end mt-4">
@@ -287,21 +286,19 @@
                                 @endif
                             </td>
                             <td>
-                                @if ($lead->is_customer || $lead->status === 'Converted')
-                                    <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 fw-bold"><i class="feather-check-circle me-1"></i>{{ __('crm.converted') }}</span>
+                                @if ($lead->is_customer || $lead->status === 'Won')
+                                    <span class="badge bg-soft-success text-success px-2.5 py-1 fs-11 fw-bold"><i class="feather-check-circle me-1"></i>Won</span>
                                 @else
                                     <div class="d-flex flex-column gap-1">
                                         <form action="{{ route('crm.leads.updateStatus', $lead->id) }}" method="POST" class="d-inline">
                                             @csrf
                                             @method('PATCH')
                                             <select name="status" class="form-control status-select" data-select2-selector="status" style="width: 150px;">
-                                                @foreach(['New', 'Follow-up Scheduled', 'Contacted', 'Qualified', 'Converted', 'Lost'] as $statusOption)
+                                                @foreach(['New', 'Qualified', 'Won', 'Lost'] as $statusOption)
                                                     @php
                                                         $bgClass = 'bg-primary';
-                                                        if($statusOption === 'Follow-up Scheduled') $bgClass = 'bg-warning';
-                                                        elseif($statusOption === 'Contacted') $bgClass = 'bg-info';
-                                                        elseif($statusOption === 'Qualified') $bgClass = 'bg-teal';
-                                                        elseif($statusOption === 'Converted') $bgClass = 'bg-success';
+                                                        if($statusOption === 'Qualified') $bgClass = 'bg-teal';
+                                                        elseif($statusOption === 'Won') $bgClass = 'bg-success';
                                                         elseif($statusOption === 'Lost') $bgClass = 'bg-danger';
                                                     @endphp
                                                     <option value="{{ $statusOption }}" data-bg="{{ $bgClass }}" {{ ($lead->status ?: 'New') === $statusOption ? 'selected' : '' }}>
@@ -309,15 +306,7 @@
                                                     </option>
                                                 @endforeach
                                             </select>
-                                         </form>
-                                         @if (($lead->status ?: 'New') === 'Qualified' && $lead->getQuotations()->isEmpty())
-                                             <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST" class="d-inline">
-                                                 @csrf
-                                                 <button type="submit" class="btn btn-xs btn-primary px-2 py-0.5 mt-1 fs-10 fw-semibold text-nowrap" style="border-radius: 4px;" title="Convert to Quotation">
-                                                     <i class="feather-file-plus me-1"></i>Convert Quotation
-                                                 </button>
-                                             </form>
-                                         @endif
+                                        </form>
                                     </div>
                                 @endif
                             </td>
@@ -330,10 +319,22 @@
                                            <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('crm.edit_lead') }}
                                        </a>
                                    </li>
+
+                                   {{-- Convert to Quotation (for Qualified Leads) --}}
+                                   @if (($lead->status ?: 'New') === 'Qualified' && $lead->getQuotations()->isEmpty())
+                                       <li>
+                                           <form action="{{ route('crm.leads.convertToQuotation', $lead->id) }}" method="POST">
+                                               @csrf
+                                               <button type="submit" class="dropdown-item text-primary fw-semibold">
+                                                   <i class="feather-file-plus me-2 text-primary fs-12"></i>Convert Quotation
+                                               </button>
+                                           </form>
+                                       </li>
+                                   @endif
                            
                                    @if(!empty($lead->is_duplicate))
                                         {{-- Qualify Lead (Only if Duplicate) --}}
-                                        @if(($lead->status ?: 'New') !== 'Qualified' && ($lead->status ?: 'New') !== 'Converted')
+                                        @if(($lead->status ?: 'New') !== 'Qualified' && ($lead->status ?: 'New') !== 'Won')
                                              <li>
                                                  <form action="{{ route('crm.leads.qualify', $lead->id) }}" method="POST">
                                                      @csrf
