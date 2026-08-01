@@ -85,6 +85,101 @@
 
         <!-- RIGHT COLUMN: Shift Change Requests & Overtime Toggle Container -->
         <div class="col-lg-8 col-12 shift-right-col">
+            <!-- ABOVE THE CARD: Search, Sort, Filter Row -->
+            <div class="d-flex align-items-center justify-content-end mb-3 gap-2 flex-wrap">
+                {{-- Shift Apps Toolbar --}}
+                <div id="shiftAppsToolbar" class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background:#f1f5f9; min-width: 180px; max-width: 240px; height: 38px; border-color: #e2e8f0 !important;">
+                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                        <input type="text" id="empShiftAppSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search..." style="box-shadow: none; height: 32px;" autocomplete="off">
+                    </div>
+                    <x-ui.sort-dropdown label="SORT">
+                        <a class="dropdown-item py-2 d-flex align-items-center emp-shift-app-sort-link active" href="#" onclick="event.preventDefault();" data-sort="date_desc">
+                            <span>Newest First</span><i class="feather-check text-dark ms-auto shift-sort-check"></i>
+                        </a>
+                        <a class="dropdown-item py-2 d-flex align-items-center emp-shift-app-sort-link" href="#" onclick="event.preventDefault();" data-sort="date_asc">
+                            <span>Oldest First</span><i class="feather-check text-dark ms-auto shift-sort-check d-none"></i>
+                        </a>
+                    </x-ui.sort-dropdown>
+                    <x-ui.filter label="FILTER" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <form id="empShiftAppFilterForm" onsubmit="return false;">
+                            <div class="mb-3" style="min-width: 220px;">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <x-ui.odoo-form-ui type="select" name="status" id="empShiftAppFilterStatus">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="mb-3" style="min-width: 220px;">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Type</label>
+                                <x-ui.odoo-form-ui type="select" name="type" id="empShiftAppFilterType">
+                                    <option value="">All Types</option>
+                                    <option value="temporary">Temporary</option>
+                                    <option value="permanent">Permanent</option>
+                                    <option value="recurring">Recurring</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="dropdown-divider my-3"></div>
+                            <div class="d-flex gap-2">
+                                <x-ui.button type="button" id="btnEmpShiftAppFilterApply" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                                <x-ui.button type="button" id="btnEmpShiftAppFilterReset" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+                            </div>
+                        </form>
+                    </x-ui.filter>
+                </div>
+
+                {{-- Overtime Apps Toolbar --}}
+                <div id="overtimeAppsToolbar" class="d-flex align-items-center gap-2 d-none">
+                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background:#f1f5f9; min-width: 180px; max-width: 240px; height: 38px; border-color: #e2e8f0 !important;">
+                        <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
+                        <input type="text" id="empOvertimeAppSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search..." style="box-shadow: none; height: 32px;" autocomplete="off">
+                    </div>
+                    <x-ui.sort-dropdown label="SORT">
+                        <a class="dropdown-item py-2 d-flex align-items-center emp-overtime-app-sort-link active" href="#" onclick="event.preventDefault();" data-sort="date_desc">
+                            <span>Newest First</span><i class="feather-check text-dark ms-auto ot-sort-check"></i>
+                        </a>
+                        <a class="dropdown-item py-2 d-flex align-items-center emp-overtime-app-sort-link" href="#" onclick="event.preventDefault();" data-sort="date_asc">
+                            <span>Oldest First</span><i class="feather-check text-dark ms-auto ot-sort-check d-none"></i>
+                        </a>
+                        <a class="dropdown-item py-2 d-flex align-items-center emp-overtime-app-sort-link" href="#" onclick="event.preventDefault();" data-sort="hours_desc">
+                            <span>Hours (High to Low)</span><i class="feather-check text-dark ms-auto ot-sort-check d-none"></i>
+                        </a>
+                        <a class="dropdown-item py-2 d-flex align-items-center emp-overtime-app-sort-link" href="#" onclick="event.preventDefault();" data-sort="hours_asc">
+                            <span>Hours (Low to High)</span><i class="feather-check text-dark ms-auto ot-sort-check d-none"></i>
+                        </a>
+                    </x-ui.sort-dropdown>
+                    <x-ui.filter label="FILTER" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
+                        <form id="empOvertimeAppFilterForm" onsubmit="return false;">
+                            <div class="mb-3" style="min-width: 220px;">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
+                                <x-ui.odoo-form-ui type="select" name="status" id="empOvertimeAppFilterStatus">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="mb-3" style="min-width: 220px;">
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Compensation</label>
+                                <x-ui.odoo-form-ui type="select" name="compensation_type" id="empOvertimeAppFilterCompensation">
+                                    <option value="">All Compensation Types</option>
+                                    <option value="payout">Payout</option>
+                                    <option value="comp_off">Comp-Off</option>
+                                </x-ui.odoo-form-ui>
+                            </div>
+                            <div class="dropdown-divider my-3"></div>
+                            <div class="d-flex gap-2">
+                                <x-ui.button type="button" id="btnEmpOvertimeAppFilterApply" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                                <x-ui.button type="button" id="btnEmpOvertimeAppFilterReset" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
+                            </div>
+                        </form>
+                    </x-ui.filter>
+                </div>
+            </div>
             <!-- MAIN CARD BOX -->
             <div class="card-custom">
                 <div class="card-custom-header d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -139,7 +234,11 @@
                                 </thead>
                                 <tbody>
                                     @forelse($empShiftChangeRequests as $req)
-                                        <tr>
+                                        <tr class="shift-app-row"
+                                            data-status="{{ $req->status }}"
+                                            data-type="{{ $req->type }}"
+                                            data-created-at="{{ $req->created_at ? $req->created_at->timestamp : 0 }}"
+                                            data-search-text="{{ strtolower($req->type . ' ' . $req->status . ' ' . ($req->requestedShift ? $req->requestedShift->name : '') . ' ' . ($req->currentShift ? $req->currentShift->name : '') . ' ' . $req->reason) }}">
                                             <td>
                                                 <span class="badge text-uppercase fs-10" style="background-color: {{ $req->type === 'permanent' ? 'rgba(25, 135, 84, 0.1)' : ($req->type === 'recurring' ? 'rgba(13, 110, 253, 0.1)' : 'rgba(108, 117, 125, 0.1)') }}; color: {{ $req->type === 'permanent' ? '#198754' : ($req->type === 'recurring' ? '#0d6efd' : '#6c757d') }};">
                                                     {{ __('hrms.shift_change.type_' . $req->type) }}
@@ -228,8 +327,23 @@
                                             <td colspan="6" class="text-center py-4 text-muted fs-13">{{ __('hrms.shift_change.no_requests_found') }}</td>
                                         </tr>
                                     @endforelse
+                                    <tr id="no_matching_emp_shift_apps_row" class="d-none">
+                                        <td colspan="6" class="text-center py-5 text-muted">
+                                            <i class="feather-folder fs-3 d-block mb-2 text-secondary"></i>
+                                            No matching shift change requests found.
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
+                            <!-- Shift Applications Pagination Container -->
+                            <div class="erp-pagination-container py-3 px-3 border-top d-none" id="empShiftAppsPaginationContainer">
+                                <ul class="erp-pagination mb-2 justify-content-center" id="emp_shift_apps_pagination_ul">
+                                    <!-- Dynamically generated pagination links -->
+                                </ul>
+                                <div class="erp-pagination-info text-center">
+                                    Showing <span id="emp_shift_apps_showing_start">0</span> to <span id="emp_shift_apps_showing_end">0</span> of <strong id="emp_shift_apps_total_count">0</strong> entries
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <!-- 2. OVERTIME APPLICATIONS VIEW -->
@@ -249,7 +363,12 @@
                                 </thead>
                                 <tbody>
                                     @forelse($empOvertimeRequests as $req)
-                                        <tr>
+                                        <tr class="overtime-app-row"
+                                            data-status="{{ $req->status }}"
+                                            data-compensation="{{ $req->compensation_type }}"
+                                            data-hours="{{ $req->duration_hours }}"
+                                            data-created-at="{{ $req->created_at ? $req->created_at->timestamp : 0 }}"
+                                            data-search-text="{{ strtolower($req->status . ' ' . $req->compensation_type . ' ' . $req->date->format('d M Y') . ' ' . $req->reason) }}">
                                             <td>
                                                 <div class="fw-medium text-dark" style="white-space: nowrap;">{{ $req->date->format('d M Y') }}</div>
                                             </td>
@@ -326,8 +445,23 @@
                                             <td colspan="7" class="text-center py-4 text-muted fs-13">{{ __('hrms.overtime.no_requests_found') }}</td>
                                         </tr>
                                     @endforelse
+                                    <tr id="no_matching_emp_overtime_apps_row" class="d-none">
+                                        <td colspan="7" class="text-center py-5 text-muted">
+                                            <i class="feather-folder fs-3 d-block mb-2 text-secondary"></i>
+                                            No matching overtime requests found.
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
+                            <!-- Overtime Applications Pagination Container -->
+                            <div class="erp-pagination-container py-3 px-3 border-top d-none" id="empOvertimeAppsPaginationContainer">
+                                <ul class="erp-pagination mb-2 justify-content-center" id="emp_overtime_apps_pagination_ul">
+                                    <!-- Dynamically generated pagination links -->
+                                </ul>
+                                <div class="erp-pagination-info text-center">
+                                    Showing <span id="emp_overtime_apps_showing_start">0</span> to <span id="emp_overtime_apps_showing_end">0</span> of <strong id="emp_overtime_apps_total_count">0</strong> entries
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -507,10 +641,301 @@
                     <textarea id="empRejectReasonInput" class="form-control" rows="3" placeholder="Enter reason for rejection..."></textarea>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" id="confirmEmpRejectBtn">Reject</button>
             </div>
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    $(document).ready(function () {
+        // Toggle toolbars on view switch
+        $(document).on('click', '#btnToggleShiftOvertimeView', function () {
+            var isOvertimeHidden = $('#overtimeApplicationsViewContainer').hasClass('d-none');
+            if (isOvertimeHidden) {
+                $('#shiftAppsToolbar').addClass('d-none');
+                $('#overtimeAppsToolbar').removeClass('d-none');
+            } else {
+                $('#overtimeAppsToolbar').addClass('d-none');
+                $('#shiftAppsToolbar').removeClass('d-none');
+            }
+        });
+
+        // 1. Shift Applications Search / Sort / Filter Logic
+        var empShiftAppSortMode = 'date_desc';
+        var empShiftAppFilters = { status: '', type: '' };
+        var empShiftAppCurrentPage = 1;
+        var empShiftAppPerPage = 10;
+
+        function refreshEmpShiftAppRows() {
+            var query = ($('#empShiftAppSearchInput').val() || '').toLowerCase().trim();
+            var $allRows = $('#shiftAppTable tbody tr.shift-app-row');
+
+            var $matchingRows = $allRows.filter(function () {
+                var $row = $(this);
+                var searchText = ($row.data('search-text') || '').toString().toLowerCase();
+                var status = ($row.data('status') || '').toString().toLowerCase();
+                var type = ($row.data('type') || '').toString().toLowerCase();
+
+                var matchesSearch = !query || searchText.indexOf(query) !== -1;
+                var matchesStatus = !empShiftAppFilters.status || status === empShiftAppFilters.status;
+                var matchesType = !empShiftAppFilters.type || type === empShiftAppFilters.type;
+
+                return matchesSearch && matchesStatus && matchesType;
+            });
+
+            var totalItems = $matchingRows.length;
+            var totalPages = Math.ceil(totalItems / empShiftAppPerPage) || 1;
+
+            if (empShiftAppCurrentPage > totalPages) {
+                empShiftAppCurrentPage = totalPages;
+            }
+            if (empShiftAppCurrentPage < 1) {
+                empShiftAppCurrentPage = 1;
+            }
+
+            var matchingArr = $matchingRows.get();
+            matchingArr.sort(function (a, b) {
+                var $a = $(a), $b = $(b);
+                var valA = parseInt($a.data('created-at') || 0, 10);
+                var valB = parseInt($b.data('created-at') || 0, 10);
+                if (empShiftAppSortMode === 'date_desc') {
+                    return valB - valA;
+                } else if (empShiftAppSortMode === 'date_asc') {
+                    return valA - valB;
+                }
+                return 0;
+            });
+
+            var startIndex = (empShiftAppCurrentPage - 1) * empShiftAppPerPage;
+            var endIndex = Math.min(startIndex + empShiftAppPerPage, totalItems);
+
+            $allRows.addClass('d-none');
+
+            $.each(matchingArr, function (idx, row) {
+                var $r = $(row);
+                $('#shiftAppTable tbody').append($r);
+                if (idx >= startIndex && idx < endIndex) {
+                    $r.removeClass('d-none');
+                }
+            });
+
+            if (totalItems > empShiftAppPerPage) {
+                $('#empShiftAppsPaginationContainer').removeClass('d-none');
+            } else {
+                $('#empShiftAppsPaginationContainer').addClass('d-none');
+            }
+
+            if (totalItems === 0) {
+                $('#no_matching_emp_shift_apps_row').removeClass('d-none');
+            } else {
+                $('#no_matching_emp_shift_apps_row').addClass('d-none');
+            }
+
+            $('#emp_shift_apps_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
+            $('#emp_shift_apps_showing_end').text(endIndex);
+            $('#emp_shift_apps_total_count').text(totalItems);
+
+            var paginationHtml = '';
+            paginationHtml += '<li class="page-item ' + (empShiftAppCurrentPage === 1 ? 'disabled' : '') + '">';
+            paginationHtml += '<a class="page-link" href="#" data-page="' + (empShiftAppCurrentPage - 1) + '" aria-label="Previous"><i class="feather-chevron-left"></i></a>';
+            paginationHtml += '</li>';
+
+            for (var i = 1; i <= totalPages; i++) {
+                paginationHtml += '<li class="page-item ' + (empShiftAppCurrentPage === i ? 'active' : '') + '">';
+                paginationHtml += '<a class="page-link" href="#" data-page="' + i + '">' + i + '</a>';
+                paginationHtml += '</li>';
+            }
+
+            paginationHtml += '<li class="page-item ' + (empShiftAppCurrentPage === totalPages ? 'disabled' : '') + '">';
+            paginationHtml += '<a class="page-link" href="#" data-page="' + (empShiftAppCurrentPage + 1) + '" aria-label="Next"><i class="feather-chevron-right"></i></a>';
+            paginationHtml += '</li>';
+
+            $('#emp_shift_apps_pagination_ul').html(paginationHtml);
+        }
+
+        // Event listeners for Shift tab
+        $('#empShiftAppSearchInput').on('keyup input search', function () {
+            empShiftAppCurrentPage = 1;
+            refreshEmpShiftAppRows();
+        });
+
+        $(document).on('click', '.emp-shift-app-sort-link', function (e) {
+            e.preventDefault();
+            var $link = $(this);
+            empShiftAppSortMode = $link.data('sort') || 'date_desc';
+            $('.emp-shift-app-sort-link').removeClass('active').find('.shift-sort-check').addClass('d-none');
+            $link.addClass('active').find('.shift-sort-check').removeClass('d-none');
+            empShiftAppCurrentPage = 1;
+            refreshEmpShiftAppRows();
+            $link.closest('.erp-sort-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+        });
+
+        $('#btnEmpShiftAppFilterApply').on('click', function () {
+            empShiftAppFilters.status = $('#empShiftAppFilterStatus').val() || '';
+            empShiftAppFilters.type = $('#empShiftAppFilterType').val() || '';
+            empShiftAppCurrentPage = 1;
+            refreshEmpShiftAppRows();
+            $(this).closest('.erp-filter-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+        });
+
+        $('#btnEmpShiftAppFilterReset').on('click', function () {
+            $('#empShiftAppFilterStatus').val('').trigger('change');
+            $('#empShiftAppFilterType').val('').trigger('change');
+            empShiftAppFilters.status = '';
+            empShiftAppFilters.type = '';
+            empShiftAppCurrentPage = 1;
+            refreshEmpShiftAppRows();
+            $(this).closest('.erp-filter-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+        });
+
+        $(document).on('click', '#emp_shift_apps_pagination_ul .page-link', function (e) {
+            e.preventDefault();
+            var page = parseInt($(this).data('page') || 1, 10);
+            empShiftAppCurrentPage = page;
+            refreshEmpShiftAppRows();
+        });
+
+        // 2. Overtime Applications Search / Sort / Filter Logic
+        var empOvertimeAppSortMode = 'date_desc';
+        var empOvertimeAppFilters = { status: '', compensation: '' };
+        var empOvertimeAppCurrentPage = 1;
+        var empOvertimeAppPerPage = 10;
+
+        function refreshEmpOvertimeAppRows() {
+            var query = ($('#empOvertimeAppSearchInput').val() || '').toLowerCase().trim();
+            var $allRows = $('#overtimeAppTable tbody tr.overtime-app-row');
+
+            var $matchingRows = $allRows.filter(function () {
+                var $row = $(this);
+                var searchText = ($row.data('search-text') || '').toString().toLowerCase();
+                var status = ($row.data('status') || '').toString().toLowerCase();
+                var compensation = ($row.data('compensation') || '').toString().toLowerCase();
+
+                var matchesSearch = !query || searchText.indexOf(query) !== -1;
+                var matchesStatus = !empOvertimeAppFilters.status || status === empOvertimeAppFilters.status;
+                var matchesComp = !empOvertimeAppFilters.compensation || compensation === empOvertimeAppFilters.compensation;
+
+                return matchesSearch && matchesStatus && matchesComp;
+            });
+
+            var totalItems = $matchingRows.length;
+            var totalPages = Math.ceil(totalItems / empOvertimeAppPerPage) || 1;
+
+            if (empOvertimeAppCurrentPage > totalPages) {
+                empOvertimeAppCurrentPage = totalPages;
+            }
+            if (empOvertimeAppCurrentPage < 1) {
+                empOvertimeAppCurrentPage = 1;
+            }
+
+            var matchingArr = $matchingRows.get();
+            matchingArr.sort(function (a, b) {
+                var $a = $(a), $b = $(b);
+                if (empOvertimeAppSortMode === 'date_desc') {
+                    return ($b.data('created-at') || 0) - ($a.data('created-at') || 0);
+                } else if (empOvertimeAppSortMode === 'date_asc') {
+                    return ($a.data('created-at') || 0) - ($b.data('created-at') || 0);
+                } else if (empOvertimeAppSortMode === 'hours_desc') {
+                    return parseFloat($b.data('hours') || 0) - parseFloat($a.data('hours') || 0);
+                } else if (empOvertimeAppSortMode === 'hours_asc') {
+                    return parseFloat($a.data('hours') || 0) - parseFloat($b.data('hours') || 0);
+                }
+                return 0;
+            });
+
+            var startIndex = (empOvertimeAppCurrentPage - 1) * empOvertimeAppPerPage;
+            var endIndex = Math.min(startIndex + empOvertimeAppPerPage, totalItems);
+
+            $allRows.addClass('d-none');
+
+            $.each(matchingArr, function (idx, row) {
+                var $r = $(row);
+                $('#overtimeAppTable tbody').append($r);
+                if (idx >= startIndex && idx < endIndex) {
+                    $r.removeClass('d-none');
+                }
+            });
+
+            if (totalItems > empOvertimeAppPerPage) {
+                $('#empOvertimeAppsPaginationContainer').removeClass('d-none');
+            } else {
+                $('#empOvertimeAppsPaginationContainer').addClass('d-none');
+            }
+
+            if (totalItems === 0) {
+                $('#no_matching_emp_overtime_apps_row').removeClass('d-none');
+            } else {
+                $('#no_matching_emp_overtime_apps_row').addClass('d-none');
+            }
+
+            $('#emp_overtime_apps_showing_start').text(totalItems === 0 ? 0 : startIndex + 1);
+            $('#emp_overtime_apps_showing_end').text(endIndex);
+            $('#emp_overtime_apps_total_count').text(totalItems);
+
+            var paginationHtml = '';
+            paginationHtml += '<li class="page-item ' + (empOvertimeAppCurrentPage === 1 ? 'disabled' : '') + '">';
+            paginationHtml += '<a class="page-link" href="#" data-page="' + (empOvertimeAppCurrentPage - 1) + '" aria-label="Previous"><i class="feather-chevron-left"></i></a>';
+            paginationHtml += '</li>';
+
+            for (var i = 1; i <= totalPages; i++) {
+                paginationHtml += '<li class="page-item ' + (empOvertimeAppCurrentPage === i ? 'active' : '') + '">';
+                paginationHtml += '<a class="page-link" href="#" data-page="' + i + '">' + i + '</a>';
+                paginationHtml += '</li>';
+            }
+
+            paginationHtml += '<li class="page-item ' + (empOvertimeAppCurrentPage === totalPages ? 'disabled' : '') + '">';
+            paginationHtml += '<a class="page-link" href="#" data-page="' + (empOvertimeAppCurrentPage + 1) + '" aria-label="Next"><i class="feather-chevron-right"></i></a>';
+            paginationHtml += '</li>';
+
+            $('#emp_overtime_apps_pagination_ul').html(paginationHtml);
+        }
+
+        // Event listeners for Overtime tab
+        $('#empOvertimeAppSearchInput').on('keyup input search', function () {
+            empOvertimeAppCurrentPage = 1;
+            refreshEmpOvertimeAppRows();
+        });
+
+        $(document).on('click', '.emp-overtime-app-sort-link', function (e) {
+            e.preventDefault();
+            var $link = $(this);
+            empOvertimeAppSortMode = $link.data('sort') || 'date_desc';
+            $('.emp-overtime-app-sort-link').removeClass('active').find('.ot-sort-check').addClass('d-none');
+            $link.addClass('active').find('.ot-sort-check').removeClass('d-none');
+            empOvertimeAppCurrentPage = 1;
+            refreshEmpOvertimeAppRows();
+            $link.closest('.erp-sort-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+        });
+
+        $('#btnEmpOvertimeAppFilterApply').on('click', function () {
+            empOvertimeAppFilters.status = $('#empOvertimeAppFilterStatus').val() || '';
+            empOvertimeAppFilters.compensation = $('#empOvertimeAppFilterCompensation').val() || '';
+            empOvertimeAppCurrentPage = 1;
+            refreshEmpOvertimeAppRows();
+            $(this).closest('.erp-filter-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+        });
+
+        $('#btnEmpOvertimeAppFilterReset').on('click', function () {
+            $('#empOvertimeAppFilterStatus').val('').trigger('change');
+            $('#empOvertimeAppFilterCompensation').val('').trigger('change');
+            empOvertimeAppFilters.status = '';
+            empOvertimeAppFilters.compensation = '';
+            empOvertimeAppCurrentPage = 1;
+            refreshEmpOvertimeAppRows();
+            $(this).closest('.erp-filter-dropdown').removeClass('show').find('.dropdown-menu').removeClass('show');
+        });
+
+        $(document).on('click', '#emp_overtime_apps_pagination_ul .page-link', function (e) {
+            e.preventDefault();
+            var page = parseInt($(this).data('page') || 1, 10);
+            empOvertimeAppCurrentPage = page;
+            refreshEmpOvertimeAppRows();
+        });
+
+        // Initialize lists
+        refreshEmpShiftAppRows();
+        refreshEmpOvertimeAppRows();
+    });
+</script>
+@endpush

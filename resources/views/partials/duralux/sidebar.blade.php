@@ -114,6 +114,15 @@
             ]],
             ['label' => 'Track Status', 'icon' => 'feather-trending-up', 'route' => 'production.track-status'],
         ],
+        'HRMS' => [
+            ['label' => 'Employees', 'icon' => 'feather-users', 'route' => 'hrms.employees.index'],
+            ['label' => 'Attendance', 'icon' => 'feather-clock', 'url' => '#'],
+            ['label' => 'Leave', 'icon' => 'feather-calendar', 'route' => 'hrms.leaves.index'],
+            ['label' => 'WFH', 'icon' => 'feather-home', 'route' => 'hrms.wfh.index'],
+            ['label' => 'Shift & Overtime', 'icon' => 'feather-activity', 'route' => 'hrms.shift-overtime.index'],
+            ['label' => 'Payroll', 'icon' => 'feather-dollar-sign', 'url' => '#'],
+            ['label' => 'Setting', 'icon' => 'feather-settings', 'route' => 'hrms.org.index'],
+        ],
         'Finance & People' => [
             ['label' => 'Accounting', 'icon' => 'feather-credit-card', 'url' => '#', 'children' => [
                 ['label' => 'Chart of Accounts', 'route' => 'accounting.chart-of-accounts.index'],
@@ -123,7 +132,6 @@
                 ['label' => 'Trial Balance', 'route' => 'accounting.reports.trial-balance'],
                 ['label' => 'General Ledger', 'route' => 'accounting.reports.general-ledger'],
             ]],
-            ['label' => 'HR & Payroll', 'icon' => 'feather-user-check', 'url' => '#', 'children' => [['label' => 'Employees', 'route' => 'hrms.employees.index'], 'Attendance', ['label' => 'Leave', 'route' => 'hrms.leaves.index'], ['label' => 'WFH', 'route' => 'hrms.wfh.index'], ['label' => 'Shift & Overtime', 'route' => 'hrms.shift-overtime.index'], 'Payroll', ['label' => 'Setting', 'route' => 'hrms.org.index']]],
             ['label' => 'Reports & BI', 'icon' => 'feather-bar-chart-2', 'url' => '#', 'children' => ['Financials', 'Sales Analytics', 'Inventory Aging', 'Payroll Summary']],
         ],
         __('ui.platform_admin') => [

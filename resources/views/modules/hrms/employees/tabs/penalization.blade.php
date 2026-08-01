@@ -45,7 +45,7 @@
                                             <td class="text-muted fs-13">{{ $penalty->payroll_month }}</td>
                                             <td class="text-end fw-semibold text-danger">₹{{ number_format($penalty->penalty_amount, 2) }}</td>
                                             <td class="text-end">
-                                                <form action="{{ route('hrms.employees.penalties.destroy', [$employee->id, $penalty->id]) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this logged penalty?', { title: 'Delete Penalty Instance', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                <form action="{{ route('hrms.employees.penalties.destroy', [$employee->id, $penalty->id]) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_penalty') }}', { title: '{{ __('hrms.employees.lbl_delete_penalty') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-link text-danger p-1"><i class="feather-trash-2"></i></button>
@@ -70,7 +70,7 @@
                 <div class="card-body p-4 fs-13">
                     @if(isset($attendancePenalty) && $attendancePenalty)
                         <div class="fw-bold mb-2">{{ $attendancePenalty->name }}</div>
-                        <div class="text-muted mb-4">{{ $attendancePenalty->description ?: 'No description provided.' }}</div>
+                        <div class="text-muted mb-4">{{ $attendancePenalty->description ?: __('hrms.employees.lbl_no_description') }}</div>
 
                         @php
                             $rulesList = is_string($attendancePenalty->rules) ? json_decode($attendancePenalty->rules, true) : ($attendancePenalty->rules ?? []);
@@ -81,18 +81,18 @@
                                 @if(!empty($ruleConfig['enabled']))
                                     @php
                                         $label = match($ruleType) {
-                                            'no_attendance' => 'No Attendance (Absent)',
-                                            'late_arrival' => 'Late Arrival / Late In',
-                                            'under_hours' => 'Under Minimum Working Hours',
-                                            'missing_logs' => 'Missing Single Log (Punch Out)',
+                                            'no_attendance' => __('hrms.employees.rule_no_attendance'),
+                                            'late_arrival'  => __('hrms.employees.rule_late_arrival'),
+                                            'under_hours'   => __('hrms.employees.rule_under_hours'),
+                                            'missing_logs'  => __('hrms.employees.rule_missing_logs'),
                                             default => ucwords(str_replace('_', ' ', $ruleType))
                                         };
                                         $desc = match($ruleType) {
-                                            'no_attendance' => 'Deducts ' . ($ruleConfig['multiplier'] ?? 1) . 'x salary amount per day absent.',
-                                            'late_arrival' => 'Grants ' . ($ruleConfig['grace_days'] ?? 3) . ' grace day(s). Afterwards, deducts ' . ($ruleConfig['deduction_rate'] ?? 0.5) . ' day\'s salary per occurrence.',
-                                            'under_hours' => 'Minimum required hours is ' . ($ruleConfig['min_hours'] ?? 8) . ' hours. Deducts ' . ($ruleConfig['deduction_rate'] ?? 0.5) . ' day\'s salary if violated.',
-                                            'missing_logs' => 'Deducts fixed ₹' . number_format($ruleConfig['fixed_amount'] ?? 100, 2) . ' per occurrence.',
-                                            default => 'Rule policy is active.'
+                                            'no_attendance' => __('hrms.employees.rule_no_attendance_desc', ['multiplier' => $ruleConfig['multiplier'] ?? 1]),
+                                            'late_arrival'  => __('hrms.employees.rule_late_arrival_desc', ['grace' => $ruleConfig['grace_days'] ?? 3, 'rate' => $ruleConfig['deduction_rate'] ?? 0.5]),
+                                            'under_hours'   => __('hrms.employees.rule_under_hours_desc', ['min' => $ruleConfig['min_hours'] ?? 8, 'rate' => $ruleConfig['deduction_rate'] ?? 0.5]),
+                                            'missing_logs'  => __('hrms.employees.rule_missing_logs_desc', ['amount' => number_format($ruleConfig['fixed_amount'] ?? 100, 2)]),
+                                            default => __('hrms.employees.rule_policy_active')
                                         };
                                     @endphp
                                     <div class="p-3 rounded bg-light border border-light-subtle">
@@ -105,7 +105,7 @@
                     @else
                         <div class="text-center py-4 text-muted fs-13">
                             <i class="feather-alert-circle d-block fs-24 mb-2 text-warning"></i>
-                            No company-wide Penalization Policy configured for <strong>{{ $employee->company?->company_name ?? 'this company' }}</strong>.
+                            {{ __('hrms.employees.lbl_no_penalty_policy', ['company' => $employee->company?->company_name ?? __('hrms.employees.lbl_this_company')]) }}
                         </div>
                     @endif
                 </div>

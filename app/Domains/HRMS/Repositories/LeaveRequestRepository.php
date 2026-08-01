@@ -253,19 +253,20 @@ class LeaveRequestRepository implements LeaveRequestRepositoryInterface
         }
 
         return LeaveRequest::create([
-            'company_id'      => $validated['company_id'],
-            'employee_id'     => $validated['employee_id'],
-            'leave_type_id'   => $validated['leave_type_id'],
-            'start_date'      => $validated['start_date'],
-            'end_date'        => $validated['end_date'],
-            'start_date_type' => $validated['start_date_type'] ?? 'full_day',
-            'end_date_type'   => $validated['end_date_type']   ?? 'full_day',
-            'session'         => $validated['session'] ?? 'full_day',
-            'duration'        => $validated['duration'],
-            'reason'          => $validated['reason'],
-            'attachment_path' => $attachmentPath,
-            'status'          => 'pending',
-            'current_level'   => 1,
+            'company_id'        => $validated['company_id'],
+            'employee_id'       => $validated['employee_id'],
+            'leave_type_id'     => $validated['leave_type_id'],
+            'start_date'        => $validated['start_date'],
+            'end_date'          => $validated['end_date'],
+            'start_date_type'   => $validated['start_date_type'] ?? 'full_day',
+            'end_date_type'     => $validated['end_date_type']   ?? 'full_day',
+            'session'           => $validated['session'] ?? 'full_day',
+            'duration'          => $validated['duration'],
+            'reason'            => $validated['reason'],
+            'attachment_path'   => $attachmentPath,
+            'notified_contacts' => $validated['notified_contacts'] ?? null,
+            'status'            => 'pending',
+            'current_level'     => 1,
         ]);
 
     }

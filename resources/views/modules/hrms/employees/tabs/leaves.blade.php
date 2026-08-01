@@ -153,10 +153,10 @@
 
     <div class="row g-4">
         <!-- LEFT COLUMN: Assigned Leave Plan & Brief Allowances -->
-        <div class="col-lg-3 col-12">
+        <div class="col-lg-4 col-12">
             <div class="card-custom">
                 <div class="card-custom-header">
-                    <h5 class="card-custom-title"><i class="feather-info text-primary me-1.5"></i> {{ __('hrms.employees.lbl_assigned_leave_plan') }}</h5>
+                    <h5 class="card-custom-title"><i class="feather-info text-secondary me-1.5"></i> {{ __('hrms.employees.lbl_assigned_leave_plan') }}</h5>
                 </div>
                 <div class="card-body p-3">
                     @if($employee->leavePlan)
@@ -164,69 +164,78 @@
                             <div class="d-flex align-items-center justify-content-between">
                                 <h6 class="fw-bold mb-0 text-dark fs-14">{{ $employee->leavePlan->name }}</h6>
                                 @if(!$employee->leavePlan->status)
-                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-10 px-2 py-0.5 rounded">{{ __('hrms.employees.lbl_inactive') }}</span>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle fs-10 px-2 rounded">Inactive</span>
                                 @else
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 px-2 py-0.5 rounded">{{ __('hrms.employees.lbl_active') }}</span>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle fs-10 px-2 rounded">Active</span>
                                 @endif
                             </div>
-                            <p class="text-muted fs-12 mb-0 mt-2">
-                                {{ $employee->leavePlan->description ?: 'No description provided.' }}
-                            </p>
+                            <p class="text-muted fs-12 mb-0 mt-2">{{ $employee->leavePlan->description ?: 'Default annual leave policy for employees.' }}</p>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center my-3">
-                            <span class="text-muted fs-11 text-uppercase fw-semibold">{{ __('hrms.employees.lbl_effective_from') }}</span>
+                        <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+                            <span class="text-muted fs-11 text-uppercase fw-semibold tracking-wide">EFFECTIVE FROM</span>
                             <span class="fw-bold text-dark fs-12">{{ $employee->leavePlan->effective_from ? $employee->leavePlan->effective_from->format('d M, Y') : 'N/A' }}</span>
                         </div>
                     @else
-                        <div class="text-center py-4 bg-light rounded text-muted fs-12 border border-dashed border-light-subtle">
-                            <i class="feather-alert-circle d-block fs-20 text-warning mb-1.5"></i>
+                        <div class="text-center py-4 bg-light rounded text-muted fs-12 border border-light-subtle mb-3">
+                            <i class="feather-alert-circle d-block fs-20 text-warning mb-1"></i>
                             No leave plan assigned.
                         </div>
                     @endif
- 
-                    <h6 class="fw-bold text-uppercase fs-10 mt-4 mb-2 tracking-wider text-muted">{{ __('hrms.employees.lbl_active_leave_balances') }}</h6>
-                    <div class="d-flex flex-column gap-1 bg-light p-2.5 rounded border border-light-subtle">
-                        @if($leaveAllowances->isEmpty())
-                            <div class="text-center py-3 text-muted fs-12">
-                                No active allowances found.
-                            </div>
-                        @else
-                            @foreach($leaveAllowances as $allowance)
-                                <div class="d-flex align-items-center justify-content-between py-2 {{ !$loop->last ? 'border-bottom border-light-subtle' : '' }}">
-                                    <div class="d-flex align-items-center gap-1.5">
-                                        <span class="fw-semibold text-dark fs-13">{{ $allowance->leaveType->name }}</span>
-                                        <span class="text-muted fs-11">({{ $allowance->leaveType->code }})</span>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2.5">
-                                        <span class="fw-bold text-dark fs-13">
-                                            {{ rtrim(rtrim(number_format($allowance->remaining, 2, '.', ''), '0'), '.') }}/{{ rtrim(rtrim(number_format($allowance->allocated, 2, '.', ''), '0'), '.') }}
-                                        </span>
-                                        <button type="button" class="leave-rules-icon-btn btn btn-light border d-inline-flex align-items-center justify-content-center p-0 rounded view-emp-leave-rules-btn" style="width: 22px; height: 22px;" data-name="{{ $allowance->leaveType->name }}" data-code="{{ $allowance->leaveType->code }}" data-type="{{ ucfirst($allowance->leaveType->type) }}" data-quota="{{ floatval($allowance->allocated) }}" data-rules='@json($allowance->leaveType->rules ?? [])' title="View leave rules" aria-label="View rules for {{ $allowance->leaveType->name }}">
-                                            <i class="feather-sliders text-primary" style="font-size: 10px;"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            @endforeach
-                        @endif
-                    </div>
 
-                    <!-- Action Buttons: Apply Leave & Apply Encashment -->
+                    {{-- Leave Types Table --}}
+                    <table class="table table-sm mb-0" style="border-collapse: separate; border-spacing: 0; table-layout: fixed; width: 100%;">
+                        <thead>
+                            <tr>
+                                <th class="fs-11 text-uppercase text-muted fw-semibold ps-0 pb-2" style="border-bottom: 1px solid #e9ecef; width: 62%;">Type Name</th>
+                                <th class="fs-11 text-uppercase text-muted fw-semibold text-center pb-2" style="border-bottom: 1px solid #e9ecef; width: 23%;">Balance</th>
+                                <th class="fs-11 text-uppercase text-muted fw-semibold text-center pb-2" style="border-bottom: 1px solid #e9ecef; width: 15%;">Rules</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($leaveAllowances as $allowance)
+                                <tr style="border-bottom: 1px solid #f3f4f6;">
+                                    <td class="ps-0 py-2 align-middle" style="border: none;">
+                                        <div class="d-flex align-items-center" style="white-space: nowrap;">
+                                            <span class="rounded-circle flex-shrink-0" style="width:7px;height:7px;background:{{ $allowance->leaveType->color ?: '#6c757d' }};display:inline-block;margin-right:8px;"></span>
+                                            <span class="fw-semibold text-dark fs-12" style="line-height: 1.2;">{{ $allowance->leaveType->name }}</span>
+                                            <span class="text-muted fs-10" style="font-size:10px; font-weight: 500; margin-left: 6px;">{{ $allowance->leaveType->code }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center py-2 align-middle" style="border: none; white-space: nowrap;">
+                                        <span class="fw-bold text-dark fs-12">
+                                            {{ rtrim(rtrim(number_format($allowance->remaining, 2, '.', ''), '0'), '.') }} / {{ rtrim(rtrim(number_format($allowance->allocated, 2, '.', ''), '0'), '.') }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center py-2 align-middle" style="border: none;">
+                                        <button type="button" class="btn btn-light border d-inline-flex align-items-center justify-content-center p-0 rounded-circle view-emp-leave-rules-btn" style="width:24px;height:24px;background:#f8fafc;" data-name="{{ $allowance->leaveType->name }}" data-code="{{ $allowance->leaveType->code }}" data-type="{{ ucfirst($allowance->leaveType->type) }}" data-quota="{{ floatval($allowance->allocated) }}" data-rules='@json($allowance->leaveType->rules ?? [])' title="View rules">
+                                            <i class="feather-sliders text-muted" style="font-size: 11px;"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="3" class="text-center text-muted fs-12 py-3">No active allowances found.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+
+                    {{-- Action Buttons --}}
                     @if($employee->leavePlan && $employee->leavePlan->status)
                         <div class="d-flex align-items-center gap-2 mt-3 pt-2 border-top">
-                            <button type="button" class="btn btn-sm btn-primary flex-grow-1 fw-bold text-uppercase d-flex align-items-center justify-content-center gap-1" data-bs-toggle="modal" data-bs-target="#empApplyLeaveModal">
-                                <i class="feather-plus fs-12"></i> {{ __('hrms.leave.app.apply_for_leave') }}
+                            <button type="button" class="btn btn-sm btn-primary text-white flex-grow-1 fw-bold d-flex align-items-center justify-content-center gap-1 py-2" style="font-size:10px; border-radius:8px; border:none; text-transform:uppercase;" data-bs-toggle="modal" data-bs-target="#empApplyLeaveModal">
+                                <i class="feather-plus" style="font-size:11px;"></i> APPLY FOR LEAVE
                             </button>
-                            <button type="button" class="btn btn-sm btn-primary flex-grow-1 fw-bold text-uppercase d-flex align-items-center justify-content-center gap-1" data-bs-toggle="modal" data-bs-target="#empApplyEncashmentModal">
-                                <i class="feather-dollar-sign fs-12"></i> {{ __('hrms.leave.encashment_app.apply_for_encashment') }}
+                            <button type="button" class="btn btn-sm btn-primary text-white flex-grow-1 fw-bold d-flex align-items-center justify-content-center gap-1 py-2" style="font-size:10px; border-radius:8px; border:none; text-transform:uppercase;" data-bs-toggle="modal" data-bs-target="#empApplyEncashmentModal">
+                                <i class="feather-dollar-sign" style="font-size:11px;"></i> APPLY FOR LEAVE ENCASHMENT
                             </button>
                         </div>
                     @endif
                 </div>
+
             </div>
         </div>
  
         <!-- RIGHT COLUMN: Application Logs & History -->
-        <div class="col-lg-9 col-12">
+        <div class="col-lg-8 col-12">
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
                     <i class="feather-check-circle me-2"></i>{{ session('success') }}
@@ -253,55 +262,47 @@
                 </div>
             @endif
 
-            <!-- ABOVE THE ENCASHMENT CARD BOX (Top Right Corner Toolbars) -->
+            <!-- MAIN CARD BOX -->
+            <!-- ABOVE THE CARD: Search, Sort, Filter Row -->
             <div class="d-flex align-items-center justify-content-end mb-3 gap-2 flex-wrap">
-                <!-- 1. Toolbar for Leave Applications Search, Sort, Filter -->
-                <div id="leaveAppsToolbar" class="d-flex align-items-center gap-2 flex-wrap ms-auto">
-                    <!-- Registry Style Search Input -->
-                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 180px; max-width: 240px; height: 38px;">
+                {{-- Leave Apps Toolbar --}}
+                <div id="leaveAppsToolbar" class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background:#f1f5f9; min-width: 180px; max-width: 240px; height: 38px; border-color: #e2e8f0 !important;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                        <input type="text" id="empLeaveAppSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search reason..." style="box-shadow: none; height: 32px;" autocomplete="off">
+                        <input type="text" id="empLeaveAppSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search..." style="box-shadow: none; height: 32px;" autocomplete="off">
                     </div>
-
-                    <!-- Sort Dropdown with Checkmark Icons -->
-                    <x-ui.sort-dropdown :label="__('hrms.common.sort')">
+                    <x-ui.sort-dropdown label="SORT">
                         <a class="dropdown-item py-2 d-flex align-items-center emp-leave-app-sort-link active" href="#" onclick="event.preventDefault();" data-sort="date_desc">
-                            <span>{{ __('hrms.leave.app.sort_newest') ?? 'Newest First' }}</span>
-                            <i class="feather-check text-dark ms-auto sort-check"></i>
+                            <span>Newest First</span><i class="feather-check text-dark ms-auto sort-check"></i>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center emp-leave-app-sort-link" href="#" onclick="event.preventDefault();" data-sort="date_asc">
-                            <span>{{ __('hrms.leave.app.sort_oldest') ?? 'Oldest First' }}</span>
-                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
+                            <span>Oldest First</span><i class="feather-check text-dark ms-auto sort-check d-none"></i>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center emp-leave-app-sort-link" href="#" onclick="event.preventDefault();" data-sort="duration_desc">
-                            <span>{{ __('hrms.leave.app.sort_duration_high_low') ?? 'Duration (High to Low)' }}</span>
-                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
+                            <span>Duration (High to Low)</span><i class="feather-check text-dark ms-auto sort-check d-none"></i>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center emp-leave-app-sort-link" href="#" onclick="event.preventDefault();" data-sort="duration_asc">
-                            <span>{{ __('hrms.leave.app.sort_duration_low_high') ?? 'Duration (Low to High)' }}</span>
-                            <i class="feather-check text-dark ms-auto sort-check d-none"></i>
+                            <span>Duration (Low to High)</span><i class="feather-check text-dark ms-auto sort-check d-none"></i>
                         </a>
                     </x-ui.sort-dropdown>
-
-                    <!-- Filter Dropdown -->
-                    <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
+                    <x-ui.filter label="FILTER" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                         <form id="empLeaveAppFilterForm" onsubmit="return false;">
                             <div class="mb-3" style="min-width: 220px;">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
                                 <x-ui.odoo-form-ui type="select" name="status" id="empLeaveAppFilterStatus">
-                                    <option value="">{{ __('hrms.common.all_statuses') }}</option>
-                                    <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
-                                    <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
-                                    <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
                                     <option value="unauthorized">Unauthorized</option>
                                     <option value="unpaid">Unpaid</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3" style="min-width: 220px;">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.leave.leave_type') }}</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Leave Type</label>
                                 <x-ui.odoo-form-ui type="select" name="leave_type_id" id="empLeaveAppFilterType">
-                                    <option value="">{{ __('hrms.common.all_types') ?? 'All Types' }}</option>
+                                    <option value="">All Types</option>
                                     @foreach($allLeaveTypes as $lt)
                                         <option value="{{ $lt->id }}">{{ $lt->name }}</option>
                                     @endforeach
@@ -309,58 +310,49 @@
                             </div>
                             <div class="dropdown-divider my-3"></div>
                             <div class="d-flex gap-2">
-                                <x-ui.button type="button" id="btnEmpLeaveAppFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') ?? 'Apply' }}</x-ui.button>
-                                <x-ui.button type="button" id="btnEmpLeaveAppFilterReset" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') ?? 'Reset' }}</x-ui.button>
+                                <x-ui.button type="button" id="btnEmpLeaveAppFilterApply" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                                <x-ui.button type="button" id="btnEmpLeaveAppFilterReset" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
                             </div>
                         </form>
                     </x-ui.filter>
                 </div>
 
-                <!-- 2. Toolbar for Leave Encashments Search, Sort, Filter -->
-                <div id="leaveEncashmentsToolbar" class="d-flex align-items-center gap-2 flex-wrap d-none ms-auto">
-                    <!-- Registry Style Search Input -->
-                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background-color: #f1f5f9; min-width: 180px; max-width: 240px; height: 38px;">
+                {{-- Leave Encashments Toolbar --}}
+                <div id="leaveEncashmentsToolbar" class="d-flex align-items-center gap-2 d-none">
+                    <div class="d-flex align-items-center border rounded px-3 py-1" style="background:#f1f5f9; min-width: 180px; max-width: 240px; height: 38px; border-color: #e2e8f0 !important;">
                         <i class="feather-search text-muted me-2" style="font-size: 14px;"></i>
-                        <input type="text" id="empLeaveEncSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search reason..." style="box-shadow: none; height: 32px;" autocomplete="off">
+                        <input type="text" id="empLeaveEncSearchInput" class="form-control border-0 bg-transparent p-0 fs-13" placeholder="Search..." style="box-shadow: none; height: 32px;" autocomplete="off">
                     </div>
-
-                    <!-- Sort Dropdown with Checkmark Icons -->
-                    <x-ui.sort-dropdown :label="__('hrms.common.sort')">
+                    <x-ui.sort-dropdown label="SORT">
                         <a class="dropdown-item py-2 d-flex align-items-center emp-leave-enc-sort-link active" href="#" onclick="event.preventDefault();" data-sort="date_desc">
-                            <span>{{ __('hrms.leave.encashment_app.sort_newest') ?? 'Newest First' }}</span>
-                            <i class="feather-check text-dark ms-auto encash-sort-check"></i>
+                            <span>Newest First</span><i class="feather-check text-dark ms-auto encash-sort-check"></i>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center emp-leave-enc-sort-link" href="#" onclick="event.preventDefault();" data-sort="date_asc">
-                            <span>{{ __('hrms.leave.encashment_app.sort_oldest') ?? 'Oldest First' }}</span>
-                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
+                            <span>Oldest First</span><i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center emp-leave-enc-sort-link" href="#" onclick="event.preventDefault();" data-sort="days_desc">
-                            <span>{{ __('hrms.leave.encashment_app.sort_days_high_low') ?? 'Days (High to Low)' }}</span>
-                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
+                            <span>Days (High to Low)</span><i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
                         </a>
                         <a class="dropdown-item py-2 d-flex align-items-center emp-leave-enc-sort-link" href="#" onclick="event.preventDefault();" data-sort="days_asc">
-                            <span>{{ __('hrms.leave.encashment_app.sort_days_low_high') ?? 'Days (Low to High)' }}</span>
-                            <i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
+                            <span>Days (Low to High)</span><i class="feather-check text-dark ms-auto encash-sort-check d-none"></i>
                         </a>
                     </x-ui.sort-dropdown>
-
-                    <!-- Filter Dropdown -->
-                    <x-ui.filter :label="__('hrms.common.filter')" offset="0, 5">
-                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> {{ __('hrms.common.filter_options') }}</h6>
+                    <x-ui.filter label="FILTER" offset="0, 5">
+                        <h6 class="fw-bold text-dark fs-12 mb-3"><i class="feather-sliders me-1 text-primary"></i> Filter Options</h6>
                         <form id="empLeaveEncFilterForm" onsubmit="return false;">
                             <div class="mb-3" style="min-width: 220px;">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('ui.status') ?? 'Status' }}</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Status</label>
                                 <x-ui.odoo-form-ui type="select" name="status" id="empLeaveEncFilterStatus">
-                                    <option value="">{{ __('hrms.leave.encashment_app.all_statuses') }}</option>
-                                    <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
-                                    <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
-                                    <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
                                 </x-ui.odoo-form-ui>
                             </div>
                             <div class="mb-3" style="min-width: 220px;">
-                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">{{ __('hrms.leave.leave_type') }}</label>
+                                <label class="form-label fw-bold fs-11 text-uppercase text-muted mb-1">Leave Type</label>
                                 <x-ui.odoo-form-ui type="select" name="leave_type_id" id="empLeaveEncFilterType">
-                                    <option value="">{{ __('hrms.common.all_types') ?? 'All Types' }}</option>
+                                    <option value="">All Types</option>
                                     @foreach($allLeaveTypes as $lt)
                                         <option value="{{ $lt->id }}">{{ $lt->name }}</option>
                                     @endforeach
@@ -368,8 +360,8 @@
                             </div>
                             <div class="dropdown-divider my-3"></div>
                             <div class="d-flex gap-2">
-                                <x-ui.button type="button" id="btnEmpLeaveEncFilterApply" variant="primary" size="sm" class="flex-grow-1">{{ __('hrms.common.apply') ?? 'Apply' }}</x-ui.button>
-                                <x-ui.button type="button" id="btnEmpLeaveEncFilterReset" variant="light" size="sm" class="border flex-grow-1">{{ __('hrms.common.reset') ?? 'Reset' }}</x-ui.button>
+                                <x-ui.button type="button" id="btnEmpLeaveEncFilterApply" variant="primary" size="sm" class="flex-grow-1">Apply</x-ui.button>
+                                <x-ui.button type="button" id="btnEmpLeaveEncFilterReset" variant="light" size="sm" class="border flex-grow-1">Reset</x-ui.button>
                             </div>
                         </form>
                     </x-ui.filter>
@@ -379,41 +371,39 @@
             <!-- MAIN CARD BOX -->
             <div class="card-custom">
                 <div class="card-custom-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    {{-- Left: Title + Count Badge --}}
                     <div class="d-flex align-items-center gap-2">
                         <div id="leaveAppsHeaderTitle" class="d-flex align-items-center gap-2">
                             <h5 class="card-custom-title mb-0">
-                                <i class="feather-calendar text-primary me-1.5"></i> {{ __('hrms.employees.lbl_leave_apps_history') }}
+                                <i class="feather-calendar text-primary me-1"></i> Leave Applications &amp; History
                             </h5>
-                            <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1 fs-11 ms-1 fw-bold" id="empLeaveRequestsCountBadge">
-                                {{ $empLeaveRequests->count() }} {{ $empLeaveRequests->count() === 1 ? __('hrms.employees.lbl_application') : __('hrms.employees.lbl_applications') }}
+                            <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1 fs-11 fw-bold" id="empLeaveRequestsCountBadge">
+                                {{ $empLeaveRequests->count() }} Applications
                             </span>
                         </div>
                         <div id="leaveEncashmentsHeaderTitle" class="d-flex align-items-center gap-2 d-none">
                             <h5 class="card-custom-title mb-0">
-                                <i class="feather-dollar-sign text-primary me-1.5"></i> {{ __('hrms.employees.lbl_leave_encashments') }}
+                                <i class="feather-dollar-sign text-primary me-1"></i> Leave Encashments
                             </h5>
-                            <span class="badge bg-soft-primary text-primary rounded-pill px-2.5 py-1 fs-11 ms-1 fw-bold" id="empLeaveEncashCountBadge">
-                                {{ $empLeaveEncashments->count() }} {{ $empLeaveEncashments->count() === 1 ? 'encashment' : 'encashments' }}
+                            <span class="badge bg-soft-primary text-primary rounded-pill px-2 py-1 fs-11 fw-bold" id="empLeaveEncashCountBadge">
+                                {{ $empLeaveEncashments->count() }} Encashments
                             </span>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center">
-                        <!-- View Toggle Button (Just opposite to Header Title using common x-ui.button) -->
-                        <x-ui.button 
-                            type="button" 
-                            id="btnToggleLeaveView" 
-                            variant="soft-primary" 
-                            size="sm" 
-                            class="fw-bold text-uppercase" 
-                            style="font-size: 11px;"
-                        >
-                            <span id="toggleBtnLabel"><i class="feather-dollar-sign me-1"></i> {{ __('hrms.leave.encashment_app.apply_for_encashment') }}</span>
-                        </x-ui.button>
+
+                    {{-- Right: Toggle Button --}}
+                    <div>
+                        <button type="button" id="btnToggleLeaveView" class="btn btn-sm btn-soft-primary fw-bold text-uppercase" style="font-size:11px;padding:7px 14px;border-radius:6px;">
+                            <span id="toggleBtnLabel"><i class="feather-dollar-sign me-1"></i> ENCASHMENT DETAILS</span>
+                        </button>
                     </div>
                 </div>
                 <div class="card-body p-0">
+
                     <!-- 1. LEAVE APPLICATIONS VIEW -->
                     <div id="leaveApplicationsViewContainer">
+
+
                         @if(!isset($empLeaveRequests) || $empLeaveRequests->isEmpty())
                             <div class="p-5 text-center text-muted">
                                 <i class="feather-calendar fs-24 text-secondary d-block mb-2"></i>
@@ -424,12 +414,12 @@
                                 <table class="table table-hover align-middle mb-0" id="leaveAppTable" style="table-layout: fixed; width: 100%;">
                                     <thead class="table-light">
                                         <tr>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 26%;">{{ __('hrms.leave.leave_type_and_detail') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 22%;">{{ __('hrms.leave.duration_timeline') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">{{ __('hrms.leave.days') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 20%;">{{ __('ui.status') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">{{ __('hrms.employees.tbl_file') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 14%;">{{ __('hrms.leave.actions') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 26%;">Leave Type</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 22%;">Period</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 8%;">Days</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 20%;">Status</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 10%;">File</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-3" style="width: 14%;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -503,7 +493,7 @@
                                                         <span class="flex-shrink-0 rounded-circle" style="width:9px;height:9px;background:{{ $req->leaveType?->color ?: '#3b82f6' }};display:inline-block;"></span>
                                                         <div style="min-width:0; flex-grow:1; white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
                                                             <div class="fw-semibold text-dark fs-13" style="line-height:1.3;">{{ $req->leaveType?->name ?: 'N/A' }}</div>
-                                                            <code class="fs-10 text-muted">#{{ $req->request_id }}</code>
+                                                            <div class="text-muted fs-11 mt-0.5" style="font-weight: 500;">{{ $req->leaveType?->code ?? '' }}</div>
                                                             @if(in_array($req->status, ['cancellation_requested', 'cancelled']) && !empty($req->cancellation_reason))
                                                                 @php
                                                                     $isLongCancelReason = (mb_strlen($req->cancellation_reason ?? '') > 70) || (substr_count($req->cancellation_reason ?? '', "\n") > 1);
@@ -526,7 +516,7 @@
                                                     <div class="text-muted fs-11 mt-0.5">Applied {{ $req->created_at ? $req->created_at->format('d M, H:i') : '—' }}</div>
                                                 </td>
                                                 <td class="text-center" style="white-space: nowrap;">
-                                                    <span class="fw-bold text-dark fs-13">{{ floatval($req->duration) }} {{ floatval($req->duration) == 1 ? 'day' : 'days' }}</span>
+                                                    <span class="badge bg-light text-dark fw-bold px-2.5 py-1.5 fs-12" style="border: 1px solid #e2e8f0; border-radius: 4px;">{{ floatval($req->duration) }}</span>
                                                 </td>
                                                 <td style="white-space: nowrap;">
                                                     <span class="badge {{ $statusBadge['cls'] }} rounded-pill px-2.5 py-1 fs-11">
@@ -543,14 +533,14 @@
                                                     @endif
                                                 </td>
                                                 <td class="text-end pe-3" style="white-space: nowrap; min-width:110px;">
-                                                    <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap" onclick="event.stopPropagation();">
+                                                    <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
                                                         {{-- Eye / detail button --}}
                                                         <button type="button"
-                                                            class="btn btn-sm btn-soft-primary open-leave-detail"
+                                                            class="btn btn-sm open-leave-detail"
                                                             title="View Details"
                                                             data-bs-toggle="offcanvas"
                                                             data-bs-target="#leaveDetailDrawer"
-                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                            style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;">
                                                             <i class="feather-eye fs-14"></i>
                                                         </button>
 
@@ -614,10 +604,10 @@
                                 <table class="table table-hover align-middle mb-0" id="empLeaveEncashmentTable" style="table-layout: fixed; width: 100%;">
                                     <thead class="table-light">
                                         <tr>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 25%;">{{ __('hrms.leave.leave_type_and_detail') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 35%;">{{ __('hrms.leave.reason') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 15%;">{{ __('ui.status') }}</th>
-                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-4" style="width: 25%;">{{ __('hrms.leave.actions') }}</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold ps-3" style="width: 30%;">LEAVE TYPE</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold" style="width: 30%;">REASON</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-center" style="width: 20%;">STATUS</th>
+                                            <th class="fs-12 text-uppercase text-muted fw-semibold text-end pe-4" style="width: 20%;">ACTION</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -640,15 +630,18 @@
                                                 data-created-at="{{ $enc->created_at?->timestamp ?: 0 }}"
                                             >
                                                 <td class="ps-3" style="white-space: normal; word-break: break-word; overflow-wrap: anywhere;">
-                                                    <div>
-                                                        <span class="badge bg-light text-primary fw-semibold fs-12 mb-1" style="white-space: normal; word-break: break-word; text-align: left; display: inline-block; max-width: 100%;">{{ $enc->leaveType?->name ?: 'N/A' }}</span>
-                                                        <div class="text-muted fs-11 d-flex align-items-center gap-1">
-                                                            <i class="feather-calendar text-muted" style="font-size: 11px;"></i>
-                                                            <span>{{ $enc->created_at ? $enc->created_at->format('d M Y') : '—' }}</span>
-                                                        </div>
-                                                        <div class="fw-bold fs-12 text-dark mt-1 d-flex align-items-center gap-1">
-                                                            <i class="feather-clock text-secondary" style="font-size: 11px;"></i>
-                                                            <span>{{ floatval($enc->requested_days) }} {{ __('hrms.leave.days') }}</span>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="flex-shrink-0 rounded-circle" style="width:9px;height:9px;background:{{ $enc->leaveType?->color ?: '#3b82f6' }};display:inline-block;"></span>
+                                                        <div style="min-width:0; flex-grow:1;">
+                                                            <div class="fw-semibold text-dark fs-13" style="line-height:1.3;">{{ $enc->leaveType?->name ?: 'N/A' }}</div>
+                                                            <div class="text-muted fs-11 mt-0.5" style="font-weight: 500;">{{ $enc->leaveType?->code ?? '' }}</div>
+                                                            <div class="text-muted fs-11 mt-1 d-flex align-items-center gap-1">
+                                                                <i class="feather-calendar" style="font-size: 11px;"></i>
+                                                                <span>{{ $enc->created_at ? $enc->created_at->format('d M Y') : '—' }}</span>
+                                                                <span class="mx-1">•</span>
+                                                                <i class="feather-clock" style="font-size: 11px;"></i>
+                                                                <span>{{ floatval($enc->requested_days) }} Days</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -661,17 +654,53 @@
                                                     </span>
                                                 </td>
                                                 <td class="text-end pe-3" style="white-space: nowrap;">
-                                                    @if($enc->status === 'pending')
-                                                        <form action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" method="POST" onsubmit="return confirm('Withdraw this encashment request?')">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="btn btn-sm btn-soft-danger border" style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;" title="Withdraw Request">
-                                                                <i class="feather-trash-2 fs-14"></i>
-                                                            </button>
-                                                        </form>
-                                                    @else
-                                                        <span class="text-muted fs-13">—</span>
-                                                    @endif
+                                                    <div class="d-flex align-items-center justify-content-end gap-2">
+                                                        @if($isAdmin)
+                                                            <div class="dropdown {{ ($loop->last || ($loop->count > 1 && $loop->iteration >= $loop->count - 1)) ? 'dropup' : '' }} d-inline-block position-relative" onclick="event.stopPropagation();">
+                                                                <button class="btn btn-sm dropdown-toggle py-1 px-3 d-inline-flex align-items-center justify-content-between text-capitalize fw-semibold shadow-sm" 
+                                                                        type="button" 
+                                                                        data-bs-toggle="dropdown" 
+                                                                        data-bs-boundary="viewport"
+                                                                        aria-expanded="false" 
+                                                                        style="background-color: var(--bs-primary) !important; color: #ffffff !important; font-size: 11.5px; height: 32px; border-radius: 8px; min-width: 130px; border: none;" 
+                                                                        title="Change Status">
+                                                                    <span>{{ $enc->status === 'approved' ? __('hrms.leave.app.status_approved') : ($enc->status === 'rejected' ? __('hrms.leave.app.status_rejected') : __('hrms.leave.app.status_pending')) }}</span>
+                                                                </button>
+                                                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1.5 mt-1 fs-12" style="min-width: 130px; border-radius: 8px; background: #ffffff; z-index: 1050;">
+                                                                    <li>
+                                                                        <form action="{{ route('hrms.leaves.encashment.approve', $enc->id) }}" method="POST" class="m-0">
+                                                                            @csrf
+                                                                            <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'approved' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'approved' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                                <span>{{ __('hrms.leave.app.status_approved') }}</span>
+                                                                            </button>
+                                                                        </form>
+                                                                    </li>
+                                                                    <li>
+                                                                        <form action="{{ route('hrms.leaves.encashment.reject', $enc->id) }}" method="POST" class="m-0">
+                                                                            @csrf
+                                                                            <button type="submit" class="dropdown-item rounded py-1.5 px-3 text-dark fw-medium d-flex align-items-center justify-content-between {{ $enc->status === 'rejected' ? 'bg-light text-primary fw-bold' : '' }}" style="{{ $enc->status === 'rejected' ? 'color: var(--bs-primary) !important;' : '' }}">
+                                                                                <span>{{ __('hrms.leave.app.status_rejected') }}</span>
+                                                                            </button>
+                                                                        </form>
+                                                                    </li>
+                                                                </ul>
+                                                            </div>
+                                                        @endif
+
+                                                        @if($enc->status === 'pending')
+                                                            <form action="{{ route('hrms.leaves.encashment.destroy', $enc->id) }}" method="POST" onsubmit="return confirm('Withdraw this encashment request?')" class="d-inline-flex m-0" onclick="event.stopPropagation();">
+                                                                @csrf
+                                                                @method('DELETE')
+                                                                <button type="submit" class="btn btn-sm btn-soft-danger border" 
+                                                                        title="Withdraw Request"
+                                                                        style="border-radius: 8px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0;">
+                                                                    <i class="feather-trash-2 fs-14"></i>
+                                                                </button>
+                                                            </form>
+                                                        @elseif(!$isAdmin)
+                                                            <span class="text-muted fs-13">—</span>
+                                                        @endif
+                                                    </div>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -700,6 +729,7 @@
         </div>
     </div>
 
+    {{-- Detail Drawer --}}
     {{-- Detail Drawer --}}
     <x-ui.drawer id="leaveDetailDrawer" :title="__('hrms.employees.lbl_leave_app_detail')" style="width:440px;max-width:100%;">
         {{-- Merged Employee & Leave Type Card --}}
@@ -771,7 +801,47 @@
             <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">Cancellation Reason</div>
             <div class="alert alert-soft-warning py-2 px-3 fs-13 mb-0" id="ld-cancellation" style="word-break: break-word !important; overflow-wrap: anywhere !important;"></div>
         </div>
+
+        {{-- Notified Members --}}
+        <div class="mb-3 d-none" id="ld-notified-wrap">
+            <div class="text-muted fs-11 text-uppercase fw-semibold mb-1" style="letter-spacing:.5px;">{{ __('hrms.leave.app.notify_members') }}</div>
+            <div class="fs-13 text-dark" id="ld-notified-names">—</div>
+        </div>
+
+        {{-- Status Change (For Admins) --}}
+        @if($isAdmin)
+            <hr class="my-3" id="ld-status-hr">
+            <div id="ld-status-change-wrap">
+                <div class="text-muted fs-11 text-uppercase fw-semibold mb-2" style="letter-spacing:.5px;">{{ __('hrms.employees.lbl_update_status') }}</div>
+                <form method="POST" id="ld-status-form" action="">
+                    @csrf
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="flex-grow-1" style="margin-bottom: -1rem;">
+                            <x-ui.select name="status" id="ld-status-select" class="odoo-select2">
+                                <option value="pending">{{ __('hrms.leave.app.status_pending') }}</option>
+                                <option value="approved">{{ __('hrms.leave.app.status_approved') }}</option>
+                                <option value="rejected">{{ __('hrms.leave.app.status_rejected') }}</option>
+                                <option value="unauthorized">{{ __('hrms.leave.app.status_unauthorized') }}</option>
+                                <option value="unpaid">{{ __('hrms.leave.app.status_unpaid') }}</option>
+                            </x-ui.select>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm fw-bold px-3 d-flex align-items-center gap-1" style="height: 38px; border-radius: 6px;">
+                            <i class="feather-check fs-12"></i> {{ __('hrms.common.apply') }}
+                        </button>
+                    </div>
+                    <div class="mt-2 d-none" id="ld-rejection-input-wrap">
+                        <div class="text-muted fs-11 text-uppercase fw-semibold mb-2 mt-2" style="letter-spacing:.5px;">{{ __('hrms.leave.app.rejection_reason') }}</div>
+                        <x-ui.textarea name="rejection_reason" id="ld-rejection-reason-input" rows="2" placeholder="{{ __('hrms.leave.app.rejection_reason_placeholder') }}" />
+                    </div>
+                </form>
+            </div>
+        @endif
+
+        <x-slot:footer>
+            <button type="button" class="btn btn-light border fw-semibold text-uppercase" data-bs-dismiss="offcanvas">CLOSE PANEL</button>
+        </x-slot:footer>
     </x-ui.drawer>
+
 
     {{-- Leave Cancellation Request Modal --}}
     <div class="modal fade" id="leaveCancellationModal" tabindex="-1" aria-labelledby="leaveCancellationModalLabel" aria-hidden="true">
@@ -960,7 +1030,8 @@
             </div>
         </div>
     </div>
-
+</div>
+    
     @push('scripts')
         <script>
             $(document).ready(function() {
@@ -995,7 +1066,7 @@
                         $('#leaveEncashmentsHeaderTitle').removeClass('d-none');
                         $('#leaveEncashmentsToolbar').removeClass('d-none');
 
-                        $('#toggleBtnLabel').html('<i class="feather-calendar me-1"></i> ' + "{{ __('hrms.employees.lbl_leave_applications') }}");
+                        $('#toggleBtnLabel').html('<i class="feather-list me-1"></i> LEAVE APPLICATIONS');
                     } else {
                         $('#leaveEncashmentsViewContainer').addClass('d-none');
                         $('#leaveEncashmentsHeaderTitle').addClass('d-none');
@@ -1005,7 +1076,7 @@
                         $('#leaveAppsHeaderTitle').removeClass('d-none');
                         $('#leaveAppsToolbar').removeClass('d-none');
 
-                        $('#toggleBtnLabel').html('<i class="feather-dollar-sign me-1"></i> ' + "{{ __('hrms.leave.encashment_details') }}");
+                        $('#toggleBtnLabel').html('<i class="feather-dollar-sign me-1"></i> ENCASHMENT DETAILS');
                     }
                 });
 
@@ -1343,6 +1414,56 @@
                         $('#ld-cancellation').text(cancellation);
                     } else {
                         $('#ld-cancellation-wrap').addClass('d-none');
+                    }
+
+                    if (notifiedNames) {
+                        $('#ld-notified-wrap').removeClass('d-none');
+                        $('#ld-notified-names').text(notifiedNames);
+                    } else {
+                        $('#ld-notified-wrap').addClass('d-none');
+                    }
+
+                    var status = ($row.attr('data-status') || '').toLowerCase();
+                    var updateUrl = $row.attr('data-update-url') || '';
+                    var approveCancelUrl = $row.attr('data-approve-cancel-url') || '';
+                    var denyCancelUrl = $row.attr('data-deny-cancel-url') || '';
+
+                    var form = $('#ld-status-form');
+                    form.data('update-url', updateUrl);
+                    form.data('approve-cancel-url', approveCancelUrl);
+                    form.data('deny-cancel-url', denyCancelUrl);
+
+                    if (status === 'cancelled') {
+                        $('#ld-status-change-wrap').addClass('d-none');
+                        $('#ld-status-hr').addClass('d-none');
+                    } else {
+                        $('#ld-status-change-wrap').removeClass('d-none');
+                        $('#ld-status-hr').removeClass('d-none');
+                    }
+
+                    var $select = $('#ld-status-select');
+                    if ($select.length) {
+                        $select.empty();
+                        if (status === 'cancellation_requested') {
+                            $select.append('<option value="approve_cancellation">Approve Cancellation</option>');
+                            $select.append('<option value="deny_cancellation">Deny Cancellation</option>');
+                            $select.val('approve_cancellation').trigger('change');
+                        } else {
+                            $select.append('<option value="approved">Approve</option>');
+                            $select.append('<option value="rejected">Reject</option>');
+                            $select.append('<option value="pending">Pending</option>');
+                            $select.append('<option value="unauthorized">Unauthorized</option>');
+                            $select.append('<option value="unpaid">Unpaid</option>');
+                            $select.val(status).trigger('change');
+                        }
+                    }
+
+                    if (status === 'rejected') {
+                        $('#ld-rejection-input-wrap').removeClass('d-none');
+                        $('#ld-rejection-reason-input').val(rejection || '');
+                    } else {
+                        $('#ld-rejection-input-wrap').addClass('d-none');
+                        $('#ld-rejection-reason-input').val('');
                     }
                 });
 

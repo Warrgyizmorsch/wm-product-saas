@@ -83,7 +83,7 @@
                     <div class="fw-bold mb-1">{{ __('hrms.wfh.no_applications_yet') }}</div>
                 </div>
             @else
-                <div class="table-responsive">
+                <div class="table-responsive" style="overflow: visible;">
                     <table class="table table-hover align-middle mb-0" id="empWfhTable" style="table-layout: fixed; width: 100%;">
                         <thead class="table-light">
                             <tr>

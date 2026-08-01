@@ -515,7 +515,7 @@
                                                                             <li>
                                                                                 <a class="dropdown-item btn-edit-shift" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editShiftModal" data-shift="{{ base64_encode($sf->toJson()) }}">
                                                                                     <i class="feather feather-edit-3 me-3"></i>
-                                                                                    <span>{{ __('hrms.assets.edit') }}</span>
+                                                                                    <span>{{ __('hrms.common.edit') }}</span>
                                                                                 </a>
                                                                             </li>
                                                                             <li>
@@ -1276,7 +1276,7 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="editShiftModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.assets.edit') }} {{ __('hrms.org.shifts') }}</h5>
+                    <h5 class="modal-title fw-bold" id="editShiftModalLabel"><i class="feather-edit me-2 text-primary"></i>{{ __('hrms.common.edit') }} {{ __('hrms.org.shifts') }}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="shift_edit_form" method="POST">

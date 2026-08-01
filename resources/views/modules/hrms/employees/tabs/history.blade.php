@@ -23,12 +23,12 @@
                             $duration = '';
                             if ($history->start_date) {
                                 $start = $history->start_date->format('M Y');
-                                $end = $history->end_date ? $history->end_date->format('M Y') : 'Present';
+                                $end = $history->end_date ? $history->end_date->format('M Y') : __('hrms.employees.lbl_present');
                                 $duration = $start . ' — ' . $end;
                             }
                         @endphp
                         <div class="timeline-item d-flex justify-content-between align-items-start gap-3 pb-4">
-                            <div class="timeline-content">
+                             <div class="timeline-content">
                                 <h6 class="fw-bold text-dark mb-1">{{ $history->designation }}</h6>
                                 <div class="fw-semibold text-primary mb-1 fs-13">{{ $history->company_name }}</div>
                                 <div class="text-muted fs-11 mb-2"><i class="feather-calendar me-1"></i>{{ $duration }}</div>
@@ -37,11 +37,11 @@
                                 @endif
                             </div>
                             <div>
-                                    <form action="{{ route('hrms.employees.history.destroy', [$employee->id, $history->id]) }}" method="POST" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this record?', { title: 'Delete Employment History', variant: 'danger', confirmButtonText: 'Delete' });">
+                                    <form action="{{ route('hrms.employees.history.destroy', [$employee->id, $history->id]) }}" method="POST" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.employees.confirm_delete_history') }}', { title: '{{ __('hrms.employees.lbl_delete_history') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 py-1 px-3" style="border-radius: 6px; font-size: 11px;">
-                                            <i class="feather-trash-2"></i> {{ __('hrms.common.delete') }}
+                                        <button type="submit" class="btn btn-sm btn-soft-danger border d-flex align-items-center justify-content-center p-0" style="border-radius: 8px; width: 32px; height: 32px; background: rgba(220, 53, 69, 0.05);" title="{{ __('hrms.common.delete') }}">
+                                            <i class="feather-trash-2 fs-13"></i>
                                         </button>
                                     </form>
                             </div>

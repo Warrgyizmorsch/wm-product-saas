@@ -124,7 +124,7 @@
                                     <th style="width: 18%;">{{ __('hrms.org.tbl_code') }}</th>
                                     <th style="width: 20%;">{{ __('hrms.org.type') }}</th>
                                     <th style="width: 95px; white-space: nowrap;">{{ __('hrms.org.status') }}</th>
-                                    <th style="width: 95px; white-space: nowrap;" class="text-end">{{ __('hrms.assets.actions') }}</th>
+                                    <th style="width: 95px; white-space: nowrap;" class="text-end">{{ __('hrms.common.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -154,12 +154,12 @@
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item btn-edit-salary-component" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}">
-                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.assets.edit') }}
+                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.common.edit') }}
                                                     </a>
                                                 </li>
                                                 <li>
                                                     <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.assets.delete') }}
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.common.delete') }}
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>
@@ -283,7 +283,7 @@
                                     <th style="width: 18%;">{{ __('hrms.org.tbl_code') }}</th>
                                     <th style="width: 20%;">{{ __('hrms.org.type') }}</th>
                                     <th style="width: 95px; white-space: nowrap;">{{ __('hrms.org.status') }}</th>
-                                    <th style="width: 95px; white-space: nowrap;" class="text-end">{{ __('hrms.assets.actions') }}</th>
+                                    <th style="width: 95px; white-space: nowrap;" class="text-end">{{ __('hrms.common.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -313,12 +313,12 @@
                                             <x-ui.action-dropdown>
                                                 <li>
                                                     <a class="dropdown-item btn-edit-salary-component" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#editSalaryComponentModal" data-component="{{ base64_encode($sc->toJson()) }}">
-                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.assets.edit') }}
+                                                        <i class="feather-edit me-2 text-muted fs-12"></i>{{ __('hrms.common.edit') }}
                                                     </a>
                                                 </li>
                                                 <li>
                                                     <button type="submit" class="dropdown-item text-danger">
-                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.assets.delete') }}
+                                                        <i class="feather-trash-2 me-2 text-danger fs-12"></i>{{ __('hrms.common.delete') }}
                                                     </button>
                                                 </li>
                                             </x-ui.action-dropdown>

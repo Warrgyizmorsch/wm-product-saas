@@ -86,7 +86,7 @@
                             <th style="width: 45px;">#</th>
                             <th>{{ __('hrms.salary.structure_name') }}</th>
                             <th style="width: 100px; white-space: nowrap;">{{ __('hrms.org.status') }}</th>
-                            <th style="width: 110px; white-space: nowrap;" class="text-end">{{ __('hrms.assets.actions') }}</th>
+                            <th style="width: 110px; white-space: nowrap;" class="text-end">{{ __('hrms.common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>

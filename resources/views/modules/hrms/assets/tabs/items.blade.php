@@ -218,7 +218,7 @@
                                                 </a>
                                             </li>
                                             <li>
-                                                <form action="{{ route('hrms.assets.item.destroy', $itemObj->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this item?', { title: 'Delete Asset Item', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                <form action="{{ route('hrms.assets.item.destroy', $itemObj->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.assets.confirm_delete_item') }}', { title: '{{ __('hrms.assets.delete_item_title') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="dropdown-item text-danger">
@@ -299,10 +299,10 @@
                                                                          <button type="button" class="btn btn-xs btn-icon btn-light text-primary show-history-btn" title="View Allocation History" data-asset-name="{{ $asset->name }} ({{ $asset->asset_code }})" data-allocations="{{ base64_encode($asset->allocations()->with('employee')->get()->toJson()) }}">
                                                                              <i class="feather-clock" style="font-size: 11px;"></i>
                                                                          </button>
-                                                                         <form action="{{ route('hrms.assets.destroy', $asset->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, 'Are you sure you want to delete this asset record?', { title: 'Delete Serialized Asset', variant: 'danger', confirmButtonText: 'Delete' });">
+                                                                         <form action="{{ route('hrms.assets.destroy', $asset->id) }}" method="POST" class="d-inline" onsubmit="return confirmFormSubmit(event, '{{ __('hrms.assets.confirm_delete_asset') }}', { title: '{{ __('hrms.assets.delete_asset_title') }}', variant: 'danger', confirmButtonText: '{{ __('hrms.common.delete') }}' });">
                                                                              @csrf
                                                                              @method('DELETE')
-                                                                             <button type="submit" class="btn btn-xs btn-icon btn-light text-danger" title="Delete">
+                                                                             <button type="submit" class="btn btn-xs btn-icon btn-light text-danger" title="{{ __('hrms.common.delete') }}">
                                                                                  <i class="feather-trash-2" style="font-size: 10px;"></i>
                                                                              </button>
                                                                          </form>

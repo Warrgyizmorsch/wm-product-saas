@@ -119,7 +119,7 @@
             <div class="col-md-6">
                 @if(!$isEdit)
                     <x-ui.odoo-form-ui type="select" label="{{ __('hrms.employees.frm_full_name') }}" name="user_id" id="{{ $prefix }}_user_id" :required="true" select2-selector="default">
-                        <option value="">Select User...</option>
+                        <option value="">{{ __('hrms.employees.frm_select_user') }}</option>
                         @foreach($unmappedUsers as $u)
                             <option value="{{ $u->id }}" @selected((string) $fieldValue('user_id') === (string) $u->id)>{{ $u->name }} ({{ $u->email }})</option>
                         @endforeach
@@ -206,7 +206,7 @@
             </div>
             <div class="col-md-6">
                 @if(!$isEdit)
-                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email')" placeholder="Will auto-fill from selected User" readonly="readonly" class="bg-light" />
+                    <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email')" placeholder="{{ __('hrms.employees.frm_email_autofill_placeholder') }}" readonly="readonly" class="bg-light" />
                 @else
                     <x-ui.odoo-form-ui type="input" label="{{ __('hrms.employees.frm_email') }}" name="personal_email" id="{{ $prefix }}_personal_email" inputType="email" :value="$fieldValue('personal_email')" placeholder="{{ __('hrms.employees.frm_email_placeholder') }}" :errorText="$errors->first('personal_email')" />
                 @endif
