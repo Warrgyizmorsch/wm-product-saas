@@ -4,6 +4,8 @@ namespace App\Domains\Inventory\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\Warehouse;
+use App\Domains\Inventory\Models\SerialNumber;
 use Illuminate\Http\Request;
 
 class BarcodeController extends Controller
@@ -12,8 +14,9 @@ class BarcodeController extends Controller
     {
         $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
         $products = Product::where('tenant_id', $tenantId)->sellable()->get();
+        $warehouses = Warehouse::where('tenant_id', $tenantId)->get();
 
-        return view('modules.inventory.barcodes.index', compact('products'));
+        return view('modules.inventory.barcodes.index', compact('products', 'warehouses'));
     }
 
     public function getSerials(Request $request, Product $product)
@@ -41,6 +44,8 @@ class BarcodeController extends Controller
 
         $labels = [];
 
+        $whSuffix = $request->filled('warehouse_id') ? '@' . $request->warehouse_id : '';
+
         if ($printType === 'serial' && $request->filled('serial_numbers')) {
             $selectedSerials = is_array($request->serial_numbers) 
                 ? $request->serial_numbers 
@@ -51,11 +56,11 @@ class BarcodeController extends Controller
                 if (!empty($snClean)) {
                     $labels[] = [
                         'product_name' => $product->name,
-                        'sku' => $product->sku,
-                        'price' => $product->selling_price,
-                        'barcode_value' => $snClean,
-                        'serial_number' => $snClean,
-                        'is_serial' => true,
+                        'sku'          => $product->sku,
+                        'price'        => $product->selling_price,
+                        'barcode_value'=> $snClean . $whSuffix,
+                        'serial_number'=> $snClean,
+                        'is_serial'    => true,
                     ];
                 }
             }
@@ -63,15 +68,15 @@ class BarcodeController extends Controller
 
         if (empty($labels)) {
             $copies = max(1, (int)$request->input('copies', 1));
-            $barcodeValue = $product->barcode ?: $product->sku;
+            $barcodeValue = ($product->barcode ?: $product->sku) . $whSuffix;
             for ($i = 0; $i < $copies; $i++) {
                 $labels[] = [
                     'product_name' => $product->name,
-                    'sku' => $product->sku,
-                    'price' => $product->selling_price,
-                    'barcode_value' => $barcodeValue,
-                    'serial_number' => null,
-                    'is_serial' => false,
+                    'sku'          => $product->sku,
+                    'price'        => $product->selling_price,
+                    'barcode_value'=> $barcodeValue,
+                    'serial_number'=> null,
+                    'is_serial'    => false,
                 ];
             }
         }

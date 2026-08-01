@@ -4,6 +4,8 @@ namespace App\Domains\Inventory\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Domains\Inventory\Models\Product;
+use App\Domains\Inventory\Models\SerialNumber;
+use App\Domains\Inventory\Models\Warehouse;
 use App\Domains\Inventory\Models\Vendor;
 use App\Domains\Inventory\Repositories\ProductRepository;
 use App\Domains\Inventory\Repositories\WarehouseRepository;
@@ -345,6 +347,19 @@ class ProductController extends Controller
             return response()->json(['success' => false, 'message' => 'No barcode provided'], 400);
         }
 
+        // Extract embedded @warehouse_id if barcode was printed with specific warehouse
+        $embeddedWhId = null;
+        if (str_contains($code, '@')) {
+            $parts = explode('@', $code, 2);
+            $code = trim($parts[0]);
+            $embeddedWhId = trim($parts[1] ?? '');
+        }
+
+        $isSerial = false;
+        $serialNumber = null;
+        $snRecord = null;
+
+        // 1. Try finding product directly by barcode, sku, id, or name
         $product = Product::withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
             ->where(function($q) use ($code) {
@@ -356,17 +371,101 @@ class ProductController extends Controller
             ->sellable()
             ->first();
 
+        // 2. If not found directly, check SerialNumber table by exact serial_number string
         if (!$product) {
-            return response()->json(['success' => false, 'message' => 'Product not found for code: ' . $code], 404);
+            $snRecord = SerialNumber::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('serial_number', $code)
+                ->with(['product', 'warehouse'])
+                ->first();
+
+            if (!$snRecord) {
+                // Case-insensitive or without tenant filter fallback
+                $snRecord = SerialNumber::withoutGlobalScopes()
+                    ->where('serial_number', 'LIKE', $code)
+                    ->with(['product', 'warehouse'])
+                    ->first();
+            }
+
+            if ($snRecord && $snRecord->product) {
+                $product = $snRecord->product;
+                $isSerial = true;
+                $serialNumber = $snRecord->serial_number;
+            }
+        }
+
+        // 3. Fallback: If code is formatted as SKU-XXXX / PROD-XXXX / LAP123-1001
+        if (!$product && str_contains($code, '-')) {
+            $parts = explode('-', $code);
+            $possibleSku = trim($parts[0]);
+            if (!empty($possibleSku)) {
+                $possibleProduct = Product::withoutGlobalScopes()
+                    ->where('tenant_id', $tenantId)
+                    ->where(function($q) use ($possibleSku) {
+                        $q->where('sku', $possibleSku)
+                          ->orWhere('barcode', $possibleSku);
+                    })
+                    ->where('track_serial_number', true)
+                    ->sellable()
+                    ->first();
+
+                if ($possibleProduct) {
+                    $product = $possibleProduct;
+                    $isSerial = true;
+                    $serialNumber = $code;
+                }
+            }
+        }
+
+        if (!$product) {
+            return response()->json(['success' => false, 'message' => 'Product or Serial Number not found for code: ' . $code], 404);
+        }
+
+        // 4. Resolve Warehouse: Embedded WH ID > Serial WH ID > Default WH ID
+        $warehouseId = null;
+        $warehouseName = null;
+
+        if (!empty($embeddedWhId)) {
+            $whObj = Warehouse::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $embeddedWhId)
+                ->first();
+            if ($whObj) {
+                $warehouseId = $whObj->id;
+                $warehouseName = $whObj->name;
+            }
+        }
+
+        if (!$warehouseId && $snRecord && $snRecord->warehouse_id) {
+            $warehouseId = $snRecord->warehouse_id;
+            $warehouseName = $snRecord->warehouse?->name;
+        }
+
+        if (!$warehouseId) {
+            $defaultWh = Warehouse::withoutGlobalScopes()
+                ->where('tenant_id', $tenantId)
+                ->where('is_default', true)
+                ->first() ?? Warehouse::withoutGlobalScopes()->where('tenant_id', $tenantId)->first();
+
+            if ($defaultWh) {
+                $warehouseId = $defaultWh->id;
+                $warehouseName = $defaultWh->name;
+            }
         }
 
         return response()->json([
             'success' => true,
+            'is_serial' => $isSerial,
+            'serial_number' => $serialNumber,
+            'warehouse_id' => $warehouseId,
+            'warehouse_name' => $warehouseName,
             'product' => [
                 'id' => $product->id,
                 'name' => $product->name,
                 'sku' => $product->sku,
                 'barcode' => $product->barcode,
+                'track_serial_number' => (bool)$product->track_serial_number,
+                'track_batch' => (bool)$product->track_batch,
                 'selling_price' => (float)($product->selling_price ?: $product->unit_cost),
                 'cost_price' => (float)($product->cost_price ?: $product->unit_cost),
                 'unit_cost' => (float)$product->unit_cost,

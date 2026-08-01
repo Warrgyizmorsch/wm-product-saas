@@ -88,7 +88,7 @@
                 <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                     <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers text-primary me-2"></i>Adjustment Line Items</h5>
                     <div class="d-flex align-items-center gap-2" style="width: 420px;">
-                        <div class="input-group input-group-sm shadow-2xs rounded border overflow-hidden">
+                        <div class="input-group input-group-sm shadow-2xs rounded overflow-hidden" style="border: 1px solid #cbd5e1 !important;">
                             <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
                             <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
                             <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
@@ -222,7 +222,9 @@
         const code = input.value.trim();
         if (!code) return;
 
-        fetch("{{ route('inventory.products.barcodeLookup') }}?code=" + encodeURIComponent(code))
+        fetch("{{ route('inventory.products.barcodeLookup') }}?code=" + encodeURIComponent(code), {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
             .then(res => res.json())
             .then(data => {
                 if (data.success && data.product) {
@@ -248,6 +250,18 @@
                         let costIn = targetRow.querySelector('.cost-input');
                         if (sel) $(sel).val(prod.id).trigger('change');
                         if (costIn) costIn.value = prod.unit_cost || prod.cost_price;
+
+                        const scannedSn = data.serial_number || (data.is_serial ? code : null);
+                        if (scannedSn) {
+                            let snInput = targetRow.querySelector('input[name*="[serial_numbers]"], textarea[name*="[serial_numbers]"]');
+                            if (snInput) {
+                                let currentSns = snInput.value ? snInput.value.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean) : [];
+                                if (!currentSns.includes(scannedSn)) {
+                                    currentSns.push(scannedSn);
+                                    snInput.value = currentSns.join(', ');
+                                }
+                            }
+                        }
                     }
                     input.value = '';
                 } else {

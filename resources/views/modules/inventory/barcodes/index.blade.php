@@ -96,6 +96,19 @@
                             </x-ui.odoo-form-ui>
                         </div>
 
+                        <!-- Optional Warehouse Selection -->
+                        <div class="mb-3">
+                            <x-ui.odoo-form-ui type="select" label="Select Warehouse (Optional)" name="warehouse_id" id="warehouseSelect" class="select2-select">
+                                <option value="">-- No Warehouse / Default Warehouse --</option>
+                                @foreach($warehouses ?? [] as $wh)
+                                    <option value="{{ $wh->id }}">
+                                        {{ $wh->name }} {{ $wh->is_default ? '(Default)' : '' }}
+                                    </option>
+                                @endforeach
+                            </x-ui.odoo-form-ui>
+                            <span class="fs-11 text-muted"><i class="feather-info me-1"></i>Optional: If selected, the warehouse code is embedded into the barcode for automatic warehouse auto-selection upon scanning.</span>
+                        </div>
+
                         <!-- Product Copies Mode Input -->
                         <div class="row g-3" id="copiesContainer">
                             <div class="col-md-6">
@@ -192,11 +205,15 @@
 
         function updatePreviewFromSelect() {
             const opt = $('#productSelect').find('option:selected');
+            const whVal = $('#warehouseSelect').val();
             if (opt.val()) {
                 const textParts = opt.text().split('(');
                 const name = textParts[0].trim();
                 const sku = opt.data('sku') || 'SKU-101';
-                const code = opt.data('barcode') || 'BAR-12345';
+                let code = opt.data('barcode') || 'BAR-12345';
+                if (whVal) {
+                    code += '@' + whVal;
+                }
                 const price = opt.data('price') || '0.00';
 
                 $('#previewName').text(name);

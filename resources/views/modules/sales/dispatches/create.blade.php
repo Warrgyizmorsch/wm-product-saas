@@ -144,7 +144,7 @@
                             <span id="itemsHint" class="fs-12 text-muted">Select a material requirement or scan/add items directly below.</span>
                         </div>
                         <div class="d-flex align-items-center gap-2" style="width: 420px;">
-                            <div class="input-group input-group-sm shadow-2xs rounded border overflow-hidden">
+                            <div class="input-group input-group-sm shadow-2xs rounded overflow-hidden" style="border: 1px solid #cbd5e1 !important;">
                                 <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
                                 <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
                                 <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
@@ -615,37 +615,106 @@
             const code = input ? input.value.trim() : '';
             if (!code) return;
 
-            fetch("{{ route('inventory.products.barcodeLookup') }}?code=" + encodeURIComponent(code))
-                .then(res => res.json())
-                .then(data => {
+            // Switch to direct mode if in MR mode
+            const currentMode = document.querySelector('input[name="dispatch_mode"]:checked')?.value;
+            if (currentMode !== 'direct') {
+                const directRadio = document.getElementById('mode_direct');
+                if (directRadio) {
+                    directRadio.checked = true;
+                    directRadio.dispatchEvent(new Event('change'));
+                }
+            }
+
+            $.ajax({
+                url: "{{ route('inventory.products.barcodeLookup') }}",
+                data: { code: code },
+                success: function(data) {
                     if (data.success && data.product) {
                         const prod = data.product;
-                        // Switch to direct mode if in MR mode
-                        if (mode !== 'direct') {
-                            setMode('direct');
+
+                        // Ensure product is in productsList
+                        const exists = productsList.some(p => p.id == prod.id);
+                        if (!exists) {
+                            productsList.push({
+                                id: prod.id,
+                                name: prod.name,
+                                sku: prod.sku,
+                                track_serial_number: prod.track_serial_number || 0,
+                                track_batch: prod.track_batch || 0
+                            });
                         }
-                        const selectEl = document.querySelector('#dispatchItemsBody select[name$="[product_id]"]');
-                        if (selectEl && !selectEl.value) {
-                            $(selectEl).val(prod.id).trigger('change');
-                        } else {
-                            document.getElementById('addDirectItemBtn').click();
-                            setTimeout(() => {
-                                const lastSelect = Array.from(document.querySelectorAll('#dispatchItemsBody select[name$="[product_id]"]')).pop();
-                                if (lastSelect) {
-                                    $(lastSelect).val(prod.id).trigger('change');
+
+                        // 1. Check if a row already has this product selected
+                        let targetSelect = null;
+                        $('#dispatchItemsBody select[name$="[product_id]"]').each(function() {
+                            if ($(this).val() == prod.id) {
+                                targetSelect = $(this);
+                                return false;
+                            }
+                        });
+
+                        // 2. If no existing row for this product, use an empty row
+                        if (!targetSelect) {
+                            $('#dispatchItemsBody select[name$="[product_id]"]').each(function() {
+                                if (!$(this).val()) {
+                                    targetSelect = $(this);
+                                    return false;
                                 }
-                            }, 50);
+                            });
                         }
-                        input.value = '';
+
+                        // 3. If no empty row exists, add a new row
+                        if (!targetSelect) {
+                            addDirectItemRow();
+                            targetSelect = $('#dispatchItemsBody select[name$="[product_id]"]').last();
+                        }
+
+                        if (targetSelect && targetSelect.length) {
+                            if (!targetSelect.find(`option[value="${prod.id}"]`).length) {
+                                targetSelect.append(`<option value="${prod.id}" data-serial="${prod.track_serial_number ? '1' : '0'}" data-batch="${prod.track_batch ? '1' : '0'}">${escapeHtml(prod.name)} ${prod.sku ? `(${escapeHtml(prod.sku)})` : ''}</option>`);
+                            }
+                            if (targetSelect.val() != prod.id) {
+                                targetSelect.val(prod.id).trigger('change');
+                            }
+
+                            // Auto-select Warehouse for this row if provided
+                            if (data.warehouse_id) {
+                                const targetTr = targetSelect.closest('tr');
+                                const whSelect = targetTr.find('select[name$="[warehouse_id]"]');
+                                if (whSelect.length && whSelect.find(`option[value="${data.warehouse_id}"]`).length) {
+                                    whSelect.val(data.warehouse_id).trigger('change');
+                                }
+                            }
+                        }
+
+                        // Auto-fill Serial Number if scanned code is a Serial Number
+                        const scannedSn = data.serial_number || (data.is_serial ? code : null);
+                        if (scannedSn) {
+                            const targetTr = targetSelect ? targetSelect.closest('tr') : null;
+                            if (targetTr && targetTr.length) {
+                                const serialTextarea = targetTr.find('textarea[name$="[serial_numbers]"], input[name$="[serial_numbers]"]');
+                                if (serialTextarea.length) {
+                                    let currentText = serialTextarea.val().trim();
+                                    let serialsArr = currentText ? currentText.split(/[\r\n,;]+/).map(s => s.trim()).filter(Boolean) : [];
+                                    if (!serialsArr.includes(scannedSn)) {
+                                        serialsArr.push(scannedSn);
+                                        serialTextarea.val(serialsArr.join('\n'));
+                                    }
+                                }
+                            }
+                        }
+
+                        if (input) input.value = '';
                     } else {
-                        alert('Product Not Found for code: ' + code);
-                        input.value = '';
+                        alert('Product or Serial Number Not Found for code: ' + code);
+                        if (input) input.value = '';
                     }
-                })
-                .catch(err => {
-                    alert('Barcode lookup failed: ' + code);
-                    input.value = '';
-                });
+                },
+                error: function() {
+                    alert('Product or Serial Number Not Found for scanned code: ' + code);
+                    if (input) input.value = '';
+                }
+            });
         }
 
         document.getElementById('fastBarcodeScanInput')?.addEventListener('keypress', function(e) {

@@ -124,7 +124,7 @@
                             <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                                 <h6 class="fw-bold text-primary mb-0"><i class="feather-layers text-primary me-2"></i>{{ __('purchase.received_products_matrix') }}</h6>
                                 <div class="d-flex align-items-center gap-2" style="width: 420px;">
-                                    <div class="input-group input-group-sm shadow-2xs rounded border overflow-hidden">
+                                    <div class="input-group input-group-sm shadow-2xs rounded overflow-hidden" style="border: 1px solid #cbd5e1 !important;">
                                         <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
                                         <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
                                         <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
@@ -812,7 +812,9 @@
         const code = input ? input.value.trim() : '';
         if (!code) return;
 
-        fetch("{{ route('inventory.products.barcodeLookup') }}?code=" + encodeURIComponent(code))
+        fetch("{{ route('inventory.products.barcodeLookup') }}?code=" + encodeURIComponent(code), {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
             .then(res => res.json())
             .then(data => {
                 if (data.success && data.product) {
