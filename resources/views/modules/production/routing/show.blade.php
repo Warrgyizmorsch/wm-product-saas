@@ -329,6 +329,10 @@
                                         <span class="badge bg-soft-warning text-warning text-uppercase font-monospace fs-10">{{ __('production.submitted') }}</span>
                                     @elseif ($approval->action === 'Cancelled')
                                         <span class="badge bg-soft-danger text-danger text-uppercase font-monospace fs-10">{{ __('production.cancelled') }}</span>
+                                    @elseif ($approval->action === 'Revision Created')
+                                        <span class="badge bg-soft-info text-info text-uppercase font-monospace fs-10">{{ __('production.revision_created') }}</span>
+                                    @elseif ($approval->action === 'Created')
+                                        <span class="badge bg-soft-secondary text-secondary text-uppercase font-monospace fs-10">{{ __('production.created') }}</span>
                                     @else
                                         <span class="badge bg-soft-secondary text-secondary text-uppercase font-monospace fs-10">{{ $approval->action }}</span>
                                     @endif

@@ -13,7 +13,8 @@ class BatchProductionController extends Controller
 {
     public function __construct(
         private readonly BatchProductionService $batchService
-    ) {}
+    ) {
+    }
 
     public function create(CreateBatchRequest $request)
     {
@@ -25,9 +26,9 @@ class BatchProductionController extends Controller
         try {
             $this->batchService->createBatch(
                 $tenantId,
-                (int)$request->input('production_order_id'),
-                (int)$request->input('product_id'),
-                (float)$request->input('planned_quantity'),
+                (int) $request->input('production_order_id'),
+                (int) $request->input('product_id'),
+                (float) $request->input('planned_quantity'),
                 'planned',
                 $request->input('expiry_date'),
                 $request->input('remarks')
@@ -49,7 +50,7 @@ class BatchProductionController extends Controller
         try {
             $this->batchService->splitBatch(
                 $tenantId,
-                (int)$request->input('parent_batch_id'),
+                (int) $request->input('parent_batch_id'),
                 $request->input('splits')
             );
 
@@ -70,7 +71,7 @@ class BatchProductionController extends Controller
             $this->batchService->mergeBatches(
                 $tenantId,
                 $request->input('parent_batch_ids'),
-                (float)$request->input('target_planned_quantity'),
+                (float) $request->input('target_planned_quantity'),
                 $request->input('remarks')
             );
 

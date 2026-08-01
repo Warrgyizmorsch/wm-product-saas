@@ -34,6 +34,8 @@ class ProductionBatch extends BaseModel
         'manufactured_at',
         'expiry_date',
         'status',
+        'current_operation_id',
+        'source_operation_id',
         'remarks',
         'barcode',
         'qr_code',
@@ -69,5 +71,35 @@ class ProductionBatch extends BaseModel
     public function childGenealogies(): HasMany
     {
         return $this->hasMany(ProductionBatchGenealogy::class, 'parent_batch_id');
+    }
+
+    public function currentOperation(): BelongsTo
+    {
+        return $this->belongsTo(ProductionOrderOperation::class, 'current_operation_id');
+    }
+
+    public function sourceOperation(): BelongsTo
+    {
+        return $this->belongsTo(ProductionOrderOperation::class, 'source_operation_id');
+    }
+
+    public function progressLogs(): HasMany
+    {
+        return $this->hasMany(ProductionOrderProgressLog::class, 'production_batch_id');
+    }
+
+    public function scraps(): HasMany
+    {
+        return $this->hasMany(ProductionOrderScrap::class, 'production_batch_id');
+    }
+
+    public function reworks(): HasMany
+    {
+        return $this->hasMany(ProductionOrderRework::class, 'production_batch_id');
+    }
+
+    public function wips(): HasMany
+    {
+        return $this->hasMany(ProductionWip::class, 'production_batch_id');
     }
 }

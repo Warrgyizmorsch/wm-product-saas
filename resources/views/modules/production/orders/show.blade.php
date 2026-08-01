@@ -2209,15 +2209,12 @@
             
             <input type="hidden" name="production_order_operation_id" id="assign_op_id" value="">
             
-            <div class="mb-3 text-start text-dark">
-                <label class="form-label fs-12 fw-semibold text-dark">Select Operator</label>
-                <select name="user_id" class="form-select form-control" required>
-                    <option value="">-- Choose Operator --</option>
-                    @foreach($operators as $operator)
-                        <option value="{{ $operator->id }}">{{ $operator->name }} ({{ ucfirst($operator->role) }})</option>
-                    @endforeach
-                </select>
-            </div>
+            <x-ui.odoo-form-ui type="select" label="Select Operator" name="user_id" :required="true">
+                <option value="">-- Choose Operator --</option>
+                @foreach($operators as $operator)
+                    <option value="{{ $operator->id }}">{{ $operator->name }} ({{ ucfirst($operator->role) }})</option>
+                @endforeach
+            </x-ui.odoo-form-ui>
             
             <x-ui.odoo-form-ui type="textarea" label="Remarks / Instructions" name="remarks" placeholder="Provide shift remarks or operation requirements..." rows="3" />
         </form>
