@@ -44,9 +44,10 @@ class ProductionExecutionService
         ?int $machineId = null,
         ?int $userId = null,
         bool $completeOperation = false,
-        ?string $idempotencyKey = null
+        ?string $idempotencyKey = null,
+        ?int $batchId = null
     ): ProductionOrderProgressLog {
-        return DB::transaction(function () use ($operationId, $produced, $rejected, $scrapped, $setupMinutes, $runMinutes, $remarks, $machineId, $userId, $completeOperation, $idempotencyKey) {
+        return DB::transaction(function () use ($operationId, $produced, $rejected, $scrapped, $setupMinutes, $runMinutes, $remarks, $machineId, $userId, $completeOperation, $idempotencyKey, $batchId) {
             $op = ProductionOrderOperation::findOrFail($operationId);
             $order = $op->order;
 
@@ -70,22 +71,67 @@ class ProductionExecutionService
                 throw new InvalidArgumentException('Cannot log progress on an already completed operation.');
             }
 
-            if ($op->quantity_produced >= $order->quantity_ordered) {
-                throw new InvalidArgumentException('Cannot log progress: The planned target has already been fully produced.');
-            }
-
             // Prevent logging total processed quantity beyond available input WIP
             $isFirstOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
                 ->where('production_order_id', $op->production_order_id)
                 ->where('sequence', '<', $op->sequence)
                 ->exists();
 
-            $availableWip = app(ProductionWipService::class)->getAvailableInputWip($op);
+            $isFinalOp = !ProductionOrderOperation::where('tenant_id', $op->tenant_id)
+                ->where('production_order_id', $op->production_order_id)
+                ->where('sequence', '>', $op->sequence)
+                ->exists();
+
+            // Resolve deterministic target Production Batch
+            $batchService = app(BatchProductionService::class);
+            $batch = $batchService->resolveBatchForProgress($order, $op, $batchId, $produced);
+
+            $availableWip = app(ProductionWipService::class)->getAvailableInputWip($op, $batch->id);
+            $orderAvailableWip = app(ProductionWipService::class)->getAvailableInputWip($op, null);
             $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
 
-            if ($newConsumed > $availableWip) {
-                throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units.");
+            if ($isFirstOp) {
+                if ($newConsumed > $orderAvailableWip) {
+                    throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available order capacity of {$orderAvailableWip} units.");
+                }
+            } else {
+                if ($newConsumed > $availableWip) {
+                    throw new InvalidArgumentException("Cannot process {$newConsumed} units: Exceeds available transferred input WIP of {$availableWip} units for Batch #{$batch->batch_number}.");
+                }
             }
+
+            // Validate total logged units against remaining planned batch capacity when rejected/scrapped units are logged
+            if ($batch->planned_quantity > 0 && ($rejected > 0 || $scrapped > 0)) {
+                $alreadyLoggedForBatch = ProductionOrderProgressLog::where('tenant_id', $op->tenant_id)
+                    ->where('operation_id', $op->id)
+                    ->where('production_batch_id', $batch->id)
+                    ->sum(\Illuminate\Support\Facades\DB::raw('quantity_produced + quantity_rejected + quantity_scrapped'));
+
+                $remainingBatchCapacity = max(0.0, (float)$batch->planned_quantity - (float)$alreadyLoggedForBatch);
+                $totalInputQty = (float) ($produced + $rejected + $scrapped);
+
+                if ($totalInputQty > ($remainingBatchCapacity + 0.0001)) {
+                    throw new InvalidArgumentException(
+                        "Cannot log " . number_format($totalInputQty, 2) . " total units (Produced: " . number_format($produced, 2) . 
+                        ", Rejected: " . number_format($rejected, 2) . ", Scrapped: " . number_format($scrapped, 2) . 
+                        "): Exceeds remaining planned capacity of " . number_format($remainingBatchCapacity, 2) . 
+                        " units for Batch #{$batch->batch_number} (Planned: " . number_format($batch->planned_quantity, 2) . ")."
+                    );
+                }
+            }
+
+            // Update Batch operation position safely (no backward rewinding of current_operation_id)
+            $currOp = $batch->currentOperation;
+            if (!$currOp || $op->sequence >= $currOp->sequence) {
+                $batch->current_operation_id = $op->id;
+            }
+            if (!$batch->source_operation_id) {
+                $batch->source_operation_id = $op->id;
+            }
+            if ($batch->status === ProductionBatch::STATUS_PLANNED) {
+                $batch->status = ProductionBatch::STATUS_IN_PROGRESS;
+            }
+            $batch->save();
 
             // 2. Create the progress log entry
             $log = ProductionOrderProgressLog::create([
@@ -93,6 +139,7 @@ class ProductionExecutionService
                 'idempotency_key' => $idempotencyKey,
                 'production_order_id' => $op->production_order_id,
                 'operation_id' => $op->id,
+                'production_batch_id' => $batch->id,
                 'quantity_produced' => $produced,
                 'quantity_rejected' => $rejected,
                 'quantity_scrapped' => $scrapped,
@@ -111,48 +158,44 @@ class ProductionExecutionService
             $op->quantity_rejected += $rejected;
             $op->quantity_scrapped += $scrapped;
 
-            // 4. Update Active Production Batches actual_quantity for this order
-            if ($produced > 0) {
-                $activeBatches = ProductionBatch::where('production_order_id', $order->id)
-                    ->whereIn('status', [ProductionBatch::STATUS_PLANNED, ProductionBatch::STATUS_IN_PROGRESS])
-                    ->orderBy('id', 'asc')
-                    ->get();
+            // 4. Update Batch actual_quantity ONLY on final routing operation (or on initial op when overproduction occurs)
+            if ($produced > 0 && ($isFinalOp || $order->operations()->count() === 1 || ($isFirstOp && $produced > $batch->planned_quantity && $batch->planned_quantity > 0))) {
+                $batch->actual_quantity += $produced;
 
-                $rem = $produced;
-                foreach ($activeBatches as $b) {
-                    if ($rem <= 0)
-                        break;
-                    $unfilled = max(0.0, (float) $b->planned_quantity - (float) $b->actual_quantity);
-                    if ($unfilled > 0) {
-                        $alloc = min($rem, $unfilled);
-                        $b->actual_quantity += $alloc;
-                        $rem -= $alloc;
+                $hasPendingRework = ProductionOrderRework::where('tenant_id', $order->tenant_id)
+                    ->where('production_batch_id', $batch->id)
+                    ->where('status', 'pending')
+                    ->exists();
 
-                        if ($b->actual_quantity >= $b->planned_quantity) {
-                            $b->status = ProductionBatch::STATUS_COMPLETED;
-                        } else {
-                            $b->status = ProductionBatch::STATUS_IN_PROGRESS;
-                        }
-                        $b->save();
+                $hasOpenNcr = ProductionNcr::where('tenant_id', $order->tenant_id)
+                    ->where('production_order_id', $order->id)
+                    ->where('status', 'open')
+                    ->exists();
+
+                $qualityPassed = !$hasPendingRework && !$hasOpenNcr;
+
+                if ($batch->actual_quantity > $batch->planned_quantity) {
+                    $overflowQty = $batch->actual_quantity - $batch->planned_quantity;
+                    $batch->actual_quantity = $batch->planned_quantity;
+                    if ($qualityPassed) {
+                        $batch->status = ProductionBatch::STATUS_COMPLETED;
                     }
-                }
+                    $batch->save();
 
-                // If over-production occurs ($rem > 0 after filling active planned batches),
-                // automatically create a surplus batch for the remaining items so they appear in MES batch tracking!
-                if ($rem > 0) {
-                    $batchService = app(BatchProductionService::class);
-                    $surplusBatch = $batchService->createBatch(
-                        $order->tenant_id,
-                        $order->id,
-                        $order->product_id,
-                        $rem,
-                        ProductionBatch::STATUS_COMPLETED,
-                        null,
-                        "Auto-created surplus batch for over-production of {$rem} units."
-                    );
-                    $surplusBatch->actual_quantity = $rem;
-                    $surplusBatch->status = ProductionBatch::STATUS_COMPLETED;
-                    $surplusBatch->save();
+                    // Create linked overflow batch
+                    $overflowBatch = $batchService->createOverflowBatch($batch, $overflowQty, $op);
+                    $overflowBatch->actual_quantity = $overflowQty;
+                    if ($qualityPassed) {
+                        $overflowBatch->status = ProductionBatch::STATUS_COMPLETED;
+                    }
+                    $overflowBatch->save();
+                } elseif ($batch->actual_quantity >= $batch->planned_quantity) {
+                    if ($qualityPassed) {
+                        $batch->status = ProductionBatch::STATUS_COMPLETED;
+                    }
+                    $batch->save();
+                } else {
+                    $batch->save();
                 }
             }
 
@@ -164,7 +207,11 @@ class ProductionExecutionService
                     null,
                     $scrapped,
                     $remarks ?? 'Automatic log scrap from operation execution progress.',
-                    $userId
+                    $userId,
+                    null,
+                    false,
+                    [],
+                    $batch->id
                 );
 
                 $ncr = ProductionNcr::create([
@@ -175,6 +222,7 @@ class ProductionExecutionService
                     'disposition_type' => 'scrap',
                     'production_order_id' => $order->id,
                     'production_order_operation_id' => $op->id,
+                    'batch_id' => $batch->id,
                     'machine_id' => $machineId ?? $op->machine_id,
                     'operator_id' => $userId,
                     'description' => "Automatic NCR generated due to scrapped quantity logged during operation #{$op->operation_number}.",
@@ -196,7 +244,8 @@ class ProductionExecutionService
                     $op->id,
                     $rejected,
                     $remarks ?? 'Automatic log rework from operation execution progress.',
-                    $userId
+                    $userId,
+                    $batch->id
                 );
 
                 $ncr = ProductionNcr::create([
@@ -207,6 +256,7 @@ class ProductionExecutionService
                     'disposition_type' => 'rework',
                     'production_order_id' => $order->id,
                     'production_order_operation_id' => $op->id,
+                    'batch_id' => $batch->id,
                     'machine_id' => $machineId ?? $op->machine_id,
                     'operator_id' => $userId,
                     'description' => "Automatic NCR generated due to rejected quantity logged during operation #{$op->operation_number}.",
@@ -274,12 +324,21 @@ class ProductionExecutionService
             }
             $op->save();
 
-            // Sync with WIP tracking
-            $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $op->production_order_id)->first();
+            // Sync with batch-and-operation-specific WIP tracking
+            $wip = app(ProductionWipService::class)->getOrCreateWipForBatchOperation(
+                $op->production_order_id,
+                $batch->id,
+                $op->routing_operation_id,
+                $userId
+            );
             if ($wip) {
                 if (empty($wip->started_at)) {
-                    $wip->update(['started_at' => now()]);
+                    $wip->started_at = now();
                 }
+                if (!$wip->production_batch_id) {
+                    $wip->production_batch_id = $batch->id;
+                }
+                $wip->save();
 
                 app(ProductionWipService::class)->completeWipOperation(
                     $wip->id,
@@ -296,17 +355,6 @@ class ProductionExecutionService
 
                 // Centralized sub-batch & completion WIP transfer evaluation
                 app(ProductionWipService::class)->evaluateAndExecuteWipTransfers($op->id, $userId);
-
-                if ($completeOperation && isset($nextOp) && $nextOp && $produced > 0 && $op->routing_operation_id && $nextOp->routing_operation_id) {
-                    app(ProductionWipService::class)->transferWip(
-                        $wip->id,
-                        $op->routing_operation_id,
-                        $nextOp->routing_operation_id,
-                        $produced,
-                        'Transferred automatically upon manual operation completion.',
-                        $userId
-                    );
-                }
             }
 
             // 4. Update parent order to in_progress on first execution log
@@ -356,13 +404,14 @@ class ProductionExecutionService
         ?int $userId = null,
         ?int $warehouseId = null,
         bool $createNcr = false,
-        array $ncrParams = []
+        array $ncrParams = [],
+        ?int $batchId = null
     ): ProductionOrderScrap {
         if ($quantity <= 0) {
             throw new InvalidArgumentException('Scrap quantity must be greater than zero.');
         }
 
-        return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId, $warehouseId, $createNcr, $ncrParams) {
+        return DB::transaction(function () use ($orderId, $operationId, $productId, $quantity, $reason, $userId, $warehouseId, $createNcr, $ncrParams, $batchId) {
             $order = ProductionOrder::findOrFail($orderId);
             $scrapProductId = $productId ?? $order->product_id;
 
@@ -371,6 +420,7 @@ class ProductionExecutionService
                 'tenant_id' => $order->tenant_id,
                 'production_order_id' => $order->id,
                 'production_order_operation_id' => $operationId,
+                'production_batch_id' => $batchId,
                 'product_id' => $scrapProductId,
                 'quantity' => $quantity,
                 'reason' => $reason,
@@ -469,7 +519,8 @@ class ProductionExecutionService
         ?int $operationId,
         float $quantity,
         ?string $reason = null,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $batchId = null
     ): ProductionOrderRework {
         if ($quantity <= 0) {
             throw new InvalidArgumentException('Rework quantity must be greater than zero.');
@@ -481,6 +532,7 @@ class ProductionExecutionService
             'tenant_id' => $order->tenant_id,
             'production_order_id' => $order->id,
             'production_order_operation_id' => $operationId,
+            'production_batch_id' => $batchId,
             'quantity' => $quantity,
             'reason' => $reason,
             'status' => 'pending',

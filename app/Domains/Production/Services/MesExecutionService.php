@@ -42,6 +42,16 @@ class MesExecutionService
                 ->lockForUpdate()
                 ->findOrFail($scheduleOpId);
 
+            $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
+
+            // Auto-heal schedule operation status if underlying order operation is ready or has transferred WIP
+            if ($schedOp->isWaiting() && $orderOp) {
+                if ($orderOp->status === ProductionOrderOperation::STATUS_READY || (float) $orderOp->quantity_transferred_in > 0) {
+                    $schedOp->status = ProductionScheduleOperation::STATUS_READY;
+                    $schedOp->save();
+                }
+            }
+
             if (!$schedOp->canStart()) {
                 throw new InvalidArgumentException(
                     "Operation cannot be started. Current status: [{$schedOp->status}]. Only 'ready' operations can be started."
@@ -50,7 +60,6 @@ class MesExecutionService
 
             // Sync with underlying ProductionOrderOperation and check skills qualification
             // Skills validation is opt-in: only enforced if tenant has skills configured
-            $orderOp = ProductionOrderOperation::find($schedOp->production_order_operation_id);
             if ($operatorId && $orderOp) {
                 $tenantId = $schedOp->schedule->order->tenant_id;
                 $tenantHasSkills = ProductionOperatorSkill::where('tenant_id', $tenantId)
@@ -455,7 +464,9 @@ class MesExecutionService
                     ->where('sequence', '<', $orderOp->sequence)
                     ->exists();
 
-                $availableWip = app(ProductionWipService::class)->getAvailableInputWip($orderOp);
+                $batchId = !empty($data['production_batch_id']) ? (int) $data['production_batch_id'] : (!empty($data['batch_id']) ? (int) $data['batch_id'] : null);
+
+                $availableWip = app(ProductionWipService::class)->getAvailableInputWip($orderOp, $batchId);
                 $newConsumed = $isFirstOp ? (float) ($produced + $rejected) : (float) ($produced + $rejected + $scrapped);
 
                 if ($newConsumed > $availableWip) {
@@ -470,6 +481,7 @@ class MesExecutionService
                 ProductionOrderProgressLog::create([
                     'tenant_id' => $schedOp->order->tenant_id,
                     'production_order_id' => $schedOp->production_order_id,
+                    'production_batch_id' => $batchId,
                     'operation_id' => $orderOp->id,
                     'quantity_produced' => $produced,
                     'quantity_rejected' => $rejected,
@@ -495,7 +507,13 @@ class MesExecutionService
                 $orderOp->save();
 
                 // Sync WIP tracking on operation completion
-                $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $schedOp->production_order_id)->first();
+                $batchId = $data['production_batch_id'] ?? \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $schedOp->order->tenant_id)->where('production_order_id', $schedOp->production_order_id)->value('id');
+                $wip = $batchId ? app(ProductionWipService::class)->getOrCreateWipForBatchOperation(
+                    $schedOp->production_order_id,
+                    $batchId,
+                    $orderOp->routing_operation_id,
+                    $operatorId
+                ) : \App\Domains\Production\Models\ProductionWip::where('production_order_id', $schedOp->production_order_id)->first();
                 if ($wip) {
                     app(ProductionWipService::class)->completeWipOperation(
                         $wip->id,
@@ -523,22 +541,6 @@ class MesExecutionService
                 $nextSchedOps = ProductionScheduleOperation::where('production_schedule_id', $schedOp->production_schedule_id)
                     ->where('sequence', $nextSequence)
                     ->get();
-
-                // Perform WIP Transfer if next sequence exists and a WIP tracking record is active
-                if (isset($wip) && $wip && isset($produced) && $produced > 0) {
-                    $firstNextSchedOp = $nextSchedOps->first();
-                    $nextOrderOp = $firstNextSchedOp ? ProductionOrderOperation::find($firstNextSchedOp->production_order_operation_id) : null;
-                    if ($nextOrderOp && $orderOp->routing_operation_id && $nextOrderOp->routing_operation_id) {
-                        app(ProductionWipService::class)->transferWip(
-                            $wip->id,
-                            $orderOp->routing_operation_id,
-                            $nextOrderOp->routing_operation_id,
-                            $produced,
-                            'Transferred automatically upon operation completion.',
-                            $operatorId
-                        );
-                    }
-                }
 
                 foreach ($nextSchedOps as $nsOp) {
                     if ($nsOp->isWaiting()) {
@@ -653,6 +655,8 @@ class MesExecutionService
                 throw new InvalidArgumentException('Quantities cannot be negative.');
             }
 
+            $batchId = !empty($data['production_batch_id']) ? (int) $data['production_batch_id'] : (!empty($data['batch_id']) ? (int) $data['batch_id'] : null);
+
             // Log progress via main ProductionExecutionService
             app(ProductionExecutionService::class)->logProgress(
                 $orderOp->id,
@@ -665,7 +669,8 @@ class MesExecutionService
                 $schedOp->machine_id,
                 $operatorId,
                 false, // Do NOT complete operation
-                $data['idempotency_key'] ?? null
+                $data['idempotency_key'] ?? null,
+                $batchId
             );
 
             app(ProductionEventService::class)->writeEvent($schedOp->schedule->order->tenant_id, [

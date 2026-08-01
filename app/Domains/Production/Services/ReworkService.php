@@ -171,10 +171,15 @@ class ReworkService
                 }
 
                 // Update original ProductionOrderRework status
-                $orderRework = \App\Domains\Production\Models\ProductionOrderRework::where('production_order_id', $rework->original_production_order_id)
-                    ->where('production_order_operation_id', $ncr?->production_order_operation_id)
+                $ncrBatchId = $ncr?->batch_id ?? $ncr?->production_batch_id;
+                $orderRework = \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
+                    ->where('production_order_id', $rework->original_production_order_id)
+                    ->when($ncrBatchId, fn($q) => $q->where('production_batch_id', $ncrBatchId))
                     ->where('status', '!=', 'completed')
-                    ->first();
+                    ->first() ?? \App\Domains\Production\Models\ProductionOrderRework::where('tenant_id', $rework->tenant_id)
+                        ->where('production_order_id', $rework->original_production_order_id)
+                        ->where('status', '!=', 'completed')
+                        ->first();
 
                 if ($orderRework) {
                     $orderRework->update(['status' => 'completed']);
@@ -189,7 +194,15 @@ class ReworkService
                     }
 
                     // Update WIP counts
-                    $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $rework->original_production_order_id)->first();
+                    $targetBatchId = $orderRework->production_batch_id;
+                    $wip = ($targetBatchId && \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $rework->tenant_id)->where('id', $targetBatchId)->exists())
+                        ? \App\Domains\Production\Models\ProductionWip::where('production_order_id', $rework->original_production_order_id)->where('production_batch_id', $targetBatchId)->first()
+                        : null;
+
+                    if (!$wip) {
+                        $wip = \App\Domains\Production\Models\ProductionWip::where('production_order_id', $rework->original_production_order_id)->first();
+                    }
+
                     if ($wip) {
                         $nextOpExists = \App\Domains\Production\Models\ProductionOrderOperation::where('production_order_id', $wip->production_order_id)
                             ->where('sequence', '>', $originalOp->sequence)
@@ -201,6 +214,31 @@ class ReworkService
                         }
                         $wip->available_quantity += $reworkQty;
                         $wip->save();
+
+                        $batchIdCandidate = $orderRework->production_batch_id ?? $wip->production_batch_id;
+                        $validBatchId = ($batchIdCandidate && \App\Domains\Production\Models\ProductionBatch::where('tenant_id', $wip->tenant_id)->where('id', $batchIdCandidate)->exists())
+                            ? (int) $batchIdCandidate
+                            : null;
+
+                        // Log WIP Transaction Ledger for rework recovery
+                        \App\Domains\Production\Models\ProductionWipTransaction::create([
+                            'tenant_id' => $wip->tenant_id,
+                            'wip_id' => $wip->id,
+                            'production_order_id' => $wip->production_order_id,
+                            'production_batch_id' => $validBatchId,
+                            'from_operation_id' => $originalOp ? $originalOp->routing_operation_id : null,
+                            'to_operation_id' => $originalOp ? $originalOp->routing_operation_id : null,
+                            'from_work_center_id' => $originalOp ? $originalOp->work_center_id : null,
+                            'to_work_center_id' => $originalOp ? $originalOp->work_center_id : null,
+                            'transaction_type' => 'rework_completed',
+                            'quantity' => $reworkQty,
+                            'good_quantity' => $reworkQty,
+                            'rework_quantity' => -$reworkQty,
+                            'remarks' => "Rework completed: {$reworkQty} units restored to available WIP.",
+                            'transaction_at' => now(),
+                        ]);
+                        // Trigger downstream auto WIP transfer evaluation
+                        app(\App\Domains\Production\Services\ProductionWipService::class)->evaluateAndExecuteWipTransfers($originalOp->id, auth()->id() ?? $wip->created_by);
                     }
 
                     // Update original production order's quantity_rejected

@@ -276,6 +276,8 @@ class MesController extends Controller
         $op = ProductionOrderOperation::with(['order.product', 'workCenter', 'machine'])->findOrFail($opId);
 
         $order = $op->order;
+        $batchService = app(\App\Domains\Production\Services\BatchProductionService::class);
+        $batchQueue = $batchService->getOperationBatchQueue($op, auth()->id());
         $batches = ProductionBatch::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->get();
         $serials = ProductionSerialNumber::where('tenant_id', $tenantId)->where('production_order_id', $order->id)->get();
 
@@ -295,6 +297,7 @@ class MesController extends Controller
             'op',
             'order',
             'batches',
+            'batchQueue',
             'serials',
             'assignment',
             'operators',

@@ -395,4 +395,19 @@ class ProductionTransferBatchIsolationTest extends TestCase
         $transferred = $this->wipService->evaluateAndExecuteWipTransfers($op20->id, $this->user->id);
         $this->assertEquals(0.0, $transferred);
     }
+
+    /**
+     * 13. Test logging progress exceeding planned batch capacity is rejected.
+     */
+    public function test_logging_progress_exceeding_planned_batch_capacity_is_rejected(): void
+    {
+        [$order, $op10, $op20] = $this->createOrderWithRouting(5.0, true);
+        $batch1 = $this->batchService->createBatch($this->tenant->id, $order->id, $this->product->id, 5.0, ProductionBatch::STATUS_PLANNED);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Exceeds remaining planned capacity of 5.00 units for Batch #' . $batch1->batch_number);
+
+        // Attempting to log 4 produced + 2 rejected = 6 units on a batch of 5
+        $this->executionService->logProgress($op10->id, 4.0, 2.0, 0, 0, 10, 'Invalid log 6 units', null, $this->user->id, false, null, $batch1->id);
+    }
 }

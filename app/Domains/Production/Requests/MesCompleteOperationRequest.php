@@ -14,6 +14,8 @@ class MesCompleteOperationRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'batch_id' => 'nullable|integer|exists:production_batches,id',
+            'production_batch_id' => 'nullable|integer|exists:production_batches,id',
             'quantity_produced' => 'required|numeric|min:0',
             'quantity_rejected' => 'nullable|numeric|min:0',
             'quantity_scrapped' => 'nullable|numeric|min:0',
