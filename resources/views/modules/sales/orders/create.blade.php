@@ -89,7 +89,16 @@
 
             <!-- Order Lines Table -->
             <div class="border-top pt-4">
-                <h5 class="fw-bold text-dark mb-3 fs-14">Order Lines</h5>
+                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                    <h5 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers me-2 text-primary"></i>Order Lines</h5>
+                    <div class="d-flex align-items-center gap-2" style="width: 420px;">
+                        <div class="input-group input-group-sm shadow-2xs rounded border overflow-hidden">
+                            <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
+                            <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
+                            <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
+                        </div>
+                    </div>
+                </div>
                 <div class="table-responsive">
                     <x-ui.odoo-form-ui type="table" id="itemsTable">
                         <thead>
@@ -385,6 +394,68 @@
             } else {
                 addRow();
             }
+
+            // Fast Barcode Scan Lookup for Sales Orders
+            function handleOrderBarcodeScan() {
+                const input = $('#fastBarcodeScanInput');
+                const code = input.val().trim();
+                if (!code) return;
+
+                $.ajax({
+                    url: "{{ route('inventory.products.barcodeLookup') }}",
+                    data: { code: code },
+                    success: function(res) {
+                        if (res.success && res.product) {
+                            const prod = res.product;
+                            
+                            // Ensure product is in JS productsList
+                            const exists = productsList.some(p => p.id == prod.id);
+                            if (!exists) {
+                                productsList.push({
+                                    id: prod.id,
+                                    name: prod.name,
+                                    sku: prod.sku,
+                                    selling_price: prod.selling_price || prod.cost_price || prod.unit_cost
+                                });
+                            }
+
+                            // Remove empty placeholder row if exists
+                            $('.item-row').each(function() {
+                                const sel = $(this).find('.item-name-input');
+                                if (sel.length && (!sel.val() || sel.val() === '')) {
+                                    $(this).remove();
+                                }
+                            });
+
+                            // Add populated row
+                            addRow({
+                                product_id: prod.id,
+                                quantity: 1,
+                                unit_price: prod.selling_price || prod.cost_price || prod.unit_cost,
+                                tax_rate: prod.gst_rate || 18,
+                                discount: 0
+                            });
+                            calculateTotals();
+                            input.val('');
+                        }
+                    },
+                    error: function(err) {
+                        alert('Product Not Found for scanned code: ' + code);
+                        input.val('');
+                    }
+                });
+            }
+
+            $('#fastBarcodeScanInput').on('keypress', function(e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    handleOrderBarcodeScan();
+                }
+            });
+            $('#fastBarcodeScanBtn').on('click', function(e) {
+                e.preventDefault();
+                handleOrderBarcodeScan();
+            });
         });
     </script>
 @endpush

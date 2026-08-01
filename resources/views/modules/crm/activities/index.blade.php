@@ -129,25 +129,22 @@
 
     <!-- 1. Calendar Header Controls & View Switcher (100% Mobile Responsive) -->
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-3 border-bottom">
+        <!-- Left Section: Title & Date Navigation Controls -->
         <div class="d-flex align-items-center flex-wrap gap-2">
             <h5 class="fw-bold text-dark mb-0 me-2">Activity Calendar</h5>
-            <!-- Icon View Switcher (Exact action-dropdown-btn style with clear gap) -->
-            <div class="d-flex align-items-center gap-2 me-2">
-                <a href="{{ route('crm.leads.index') }}" class="action-dropdown-btn" title="List View" data-bs-toggle="tooltip">
-                    <i class="feather-list"></i>
+
+            <!-- Date Prev / Next / Today Controls -->
+            <div class="d-flex align-items-center gap-1 me-2">
+                <a href="{{ request()->fullUrlWithQuery(['start' => $prevStart->toDateString()]) }}" class="btn btn-xs btn-light border py-1 px-2" title="Previous">
+                    <i class="feather-chevron-left"></i>
                 </a>
-                <a href="{{ route('crm.leads.kanban') }}" class="action-dropdown-btn" title="Pipeline Kanban" data-bs-toggle="tooltip">
-                    <i class="feather-grid"></i>
+                <a href="{{ request()->fullUrlWithQuery(['start' => $nextStart->toDateString()]) }}" class="btn btn-xs btn-light border py-1 px-2" title="Next">
+                    <i class="feather-chevron-right"></i>
                 </a>
-                <a href="{{ route('crm.activities.index') }}" class="action-dropdown-btn active" title="Activity Calendar" data-bs-toggle="tooltip">
-                    <i class="feather-calendar"></i>
-                </a>
+                <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-xs btn-outline-primary fw-bold py-1 px-2">Today</a>
             </div>
 
-            <a href="{{ request()->fullUrlWithQuery(['start' => $prevStart->toDateString()]) }}" class="btn btn-sm btn-light border" title="Previous">
-                <i class="feather-chevron-left"></i>
-            </a>
-            <h5 class="fw-bold text-dark mb-0 mx-2">
+            <h5 class="fw-bold text-dark mb-0 fs-14 me-2">
                 @if($view === 'day')
                     {{ $startDate->format('l, d F Y') }}
                 @elseif($view === 'week')
@@ -156,18 +153,19 @@
                     {{ $startDate->format('F Y') }}
                 @endif
             </h5>
-            <a href="{{ request()->fullUrlWithQuery(['start' => $nextStart->toDateString()]) }}" class="btn btn-sm btn-light border" title="Next">
-                <i class="feather-chevron-right"></i>
-            </a>
-            <a href="{{ request()->fullUrlWithQuery(['start' => now()->toDateString()]) }}" class="btn btn-sm btn-outline-primary ms-2 fw-semibold">Today</a>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
-            <div class="btn-group me-2" role="group">
-                <a href="{{ request()->fullUrlWithQuery(['view' => 'day']) }}" class="btn btn-sm {{ $view === 'day' ? 'btn-primary' : 'btn-outline-secondary' }}">Day</a>
-                <a href="{{ request()->fullUrlWithQuery(['view' => 'week']) }}" class="btn btn-sm {{ $view === 'week' ? 'btn-primary' : 'btn-outline-secondary' }}">Week</a>
-                <a href="{{ request()->fullUrlWithQuery(['view' => 'month']) }}" class="btn btn-sm {{ $view === 'month' ? 'btn-primary' : 'btn-outline-secondary' }}">Month</a>
+        <!-- Right Section: Day/Week/Month Switcher, View Switcher (List/Kanban/Cal), Filter Drawer, Schedule Activity Modal -->
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <!-- Day / Week / Month Selector (Matching system tab buttons) -->
+            <div class="d-flex align-items-center me-2" style="gap: 4px;">
+                <a href="{{ request()->fullUrlWithQuery(['view' => 'day']) }}" class="btn btn-xs {{ $view === 'day' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Day</a>
+                <a href="{{ request()->fullUrlWithQuery(['view' => 'week']) }}" class="btn btn-xs {{ $view === 'week' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Week</a>
+                <a href="{{ request()->fullUrlWithQuery(['view' => 'month']) }}" class="btn btn-xs {{ $view === 'month' ? 'btn-primary' : 'btn-light border text-dark' }} fw-medium px-2.5 py-1">Month</a>
             </div>
+
+            <!-- Icon View Switcher (Common System Component) -->
+            <x-ui.view-switcher />
 
             <!-- Custom Filter Component (Identical to Lead Listing) -->
             <form method="GET" action="{{ route('crm.activities.index') }}" class="d-inline">

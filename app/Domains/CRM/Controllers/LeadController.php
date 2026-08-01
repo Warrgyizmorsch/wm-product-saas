@@ -35,7 +35,7 @@ class LeadController extends Controller
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
         $filters = $request->only([
-            'search', 'duplicates_only', 'priority', 'segment', 'status', 'quotation_status', 'sort_by', 'sort_order'
+            'search', 'duplicates_only', 'priority', 'segment', 'status', 'quotation_status', 'start_date', 'end_date', 'date_from', 'date_to', 'sort_by', 'sort_order'
         ]);
 
         $leads = $this->leadRepo->getPaginatedLeads($filters, 15);
@@ -50,7 +50,7 @@ class LeadController extends Controller
         $this->authorize('viewAny', Lead::class);
         $tenantId = tenant_id() ?? app(\App\Core\Tenant\TenantContext::class)->id() ?? 1;
 
-        $statuses = ['New', 'Follow-up Scheduled', 'Contacted', 'Qualified', 'Converted', 'Lost'];
+        $statuses = ['Lost', 'New', 'Qualified', 'Won'];
 
         $query = Lead::query()
             ->where('tenant_id', $tenantId)
@@ -72,6 +72,22 @@ class LeadController extends Controller
 
         if ($request->filled('segment')) {
             $query->where('segment', $request->segment);
+        }
+
+        $startDate = $request->input('start_date') ?: $request->input('date_from');
+        if (!empty($startDate)) {
+            $query->where(function ($q) use ($startDate) {
+                $q->whereDate('call_date', '>=', $startDate)
+                  ->orWhereDate('created_at', '>=', $startDate);
+            });
+        }
+
+        $endDate = $request->input('end_date') ?: $request->input('date_to');
+        if (!empty($endDate)) {
+            $query->where(function ($q) use ($endDate) {
+                $q->whereDate('call_date', '<=', $endDate)
+                  ->orWhereDate('created_at', '<=', $endDate);
+            });
         }
 
         $allLeads = $query->orderBy('updated_at', 'desc')->get();
@@ -204,7 +220,7 @@ class LeadController extends Controller
     public function updateStatus(Request $request, Lead $lead)
     {
         $this->authorize('update', $lead);
-        $validated = $request->validate(['status' => 'required|string|in:New,Follow-up Scheduled,Contacted,Qualified,Converted,Lost']);
+        $validated = $request->validate(['status' => 'required|string|in:New,Qualified,Won,Lost']);
 
         $res = $this->leadService->updateLeadStatus($lead, $validated['status']);
 

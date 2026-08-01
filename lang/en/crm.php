@@ -34,10 +34,8 @@ return [
     'actions' => 'Action',
     'statuses' => [
         'New' => 'New',
-        'Follow-up Scheduled' => 'Follow-up Scheduled',
-        'Contacted' => 'Contacted',
         'Qualified' => 'Qualified',
-        'Converted' => 'Converted',
+        'Won' => 'Won',
         'Lost' => 'Lost',
     ],
     'priorities' => [

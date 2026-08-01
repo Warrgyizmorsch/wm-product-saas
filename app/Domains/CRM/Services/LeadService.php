@@ -226,11 +226,11 @@ class LeadService
                 $customer->update(['status' => 'inactive']);
             }
             $message = 'Lead status updated to Lost and linked customer record deactivated.';
-        } elseif ($newStatus === 'Converted' && !$lead->is_customer) {
+        } elseif ($newStatus === 'Won' && !$lead->is_customer) {
             if (!$lead->is_qualified) {
                 return [
                     'success' => false,
-                    'message' => "Lead #{$lead->id} ({$lead->company_name}) cannot be Converted directly because it is not Qualified yet. Please Qualify the lead first!"
+                    'message' => "Lead #{$lead->id} ({$lead->company_name}) cannot be marked as Won directly because it is not Qualified yet. Please Qualify the lead first!"
                 ];
             }
 
@@ -238,23 +238,23 @@ class LeadService
             if (!$hasAcceptedQuotation) {
                 return [
                     'success' => false,
-                    'message' => 'This lead cannot be converted to a customer because there is no accepted quotation.'
+                    'message' => 'This lead cannot be marked as Won because there is no accepted quotation.'
                 ];
             }
 
             $customer = $lead->getCustomer();
             if ($customer) {
                 $customer->update(['status' => 'active']);
-                $message = 'Lead successfully converted and Customer record activated!';
+                $message = 'Lead successfully marked as Won and Customer record activated!';
             } else {
                 Customer::create([
                     'tenant_id' => $lead->tenant_id,
-                    'name' => $lead->company_name ?: ($lead->contact_person ?: 'Converted Lead'),
+                    'name' => $lead->company_name ?: ($lead->contact_person ?: 'Won Lead'),
                     'email' => $lead->email,
                     'phone' => $lead->phone,
                     'status' => 'active',
                 ]);
-                $message = 'Lead successfully converted and Customer record created!';
+                $message = 'Lead successfully marked as Won and Customer record created!';
             }
 
             $updateData['is_customer'] = true;

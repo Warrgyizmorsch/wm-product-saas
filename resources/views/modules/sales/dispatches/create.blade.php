@@ -138,10 +138,17 @@
 
                 <!-- Line Items Matrix Section -->
                 <div class="border-top pt-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
                         <div>
                             <h6 class="fw-bold text-dark mb-0 fs-14"><i class="feather-layers me-2 text-primary"></i>Items to Dispatch</h6>
-                            <span id="itemsHint" class="fs-12 text-muted">Select a material requirement or add items directly below.</span>
+                            <span id="itemsHint" class="fs-12 text-muted">Select a material requirement or scan/add items directly below.</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2" style="width: 420px;">
+                            <div class="input-group input-group-sm shadow-2xs rounded border overflow-hidden">
+                                <span class="input-group-text bg-primary text-white border-0 px-3 fw-semibold"><i class="feather-camera me-1"></i> Barcode</span>
+                                <input type="text" id="fastBarcodeScanInput" class="form-control border-0 bg-white" placeholder="Scan Barcode / SKU (Press Enter)..." autocomplete="off" style="font-size: 13px;">
+                                <button type="button" class="btn btn-primary border-0 px-3" id="fastBarcodeScanBtn"><i class="feather-search"></i></button>
+                            </div>
                         </div>
                     </div>
 
@@ -601,5 +608,55 @@
                     }
                 });
         }
+
+        // Fast Barcode Scan Lookup for Dispatches
+        function handleDispatchBarcodeScan() {
+            const input = document.getElementById('fastBarcodeScanInput');
+            const code = input ? input.value.trim() : '';
+            if (!code) return;
+
+            fetch("{{ route('inventory.products.barcodeLookup') }}?code=" + encodeURIComponent(code))
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.product) {
+                        const prod = data.product;
+                        // Switch to direct mode if in MR mode
+                        if (mode !== 'direct') {
+                            setMode('direct');
+                        }
+                        const selectEl = document.querySelector('#dispatchItemsBody select[name$="[product_id]"]');
+                        if (selectEl && !selectEl.value) {
+                            $(selectEl).val(prod.id).trigger('change');
+                        } else {
+                            document.getElementById('addDirectItemBtn').click();
+                            setTimeout(() => {
+                                const lastSelect = Array.from(document.querySelectorAll('#dispatchItemsBody select[name$="[product_id]"]')).pop();
+                                if (lastSelect) {
+                                    $(lastSelect).val(prod.id).trigger('change');
+                                }
+                            }, 50);
+                        }
+                        input.value = '';
+                    } else {
+                        alert('Product Not Found for code: ' + code);
+                        input.value = '';
+                    }
+                })
+                .catch(err => {
+                    alert('Barcode lookup failed: ' + code);
+                    input.value = '';
+                });
+        }
+
+        document.getElementById('fastBarcodeScanInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleDispatchBarcodeScan();
+            }
+        });
+        document.getElementById('fastBarcodeScanBtn')?.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleDispatchBarcodeScan();
+        });
     </script>
 @endpush

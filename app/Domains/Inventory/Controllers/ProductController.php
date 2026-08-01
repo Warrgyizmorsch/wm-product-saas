@@ -335,4 +335,79 @@ class ProductController extends Controller
             'type' => $product->type,
         ]);
     }
+
+    public function barcodeLookup(Request $request): JsonResponse
+    {
+        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $code = trim($request->input('code', ''));
+
+        if (empty($code)) {
+            return response()->json(['success' => false, 'message' => 'No barcode provided'], 400);
+        }
+
+        $product = Product::withoutGlobalScopes()
+            ->where('tenant_id', $tenantId)
+            ->where(function($q) use ($code) {
+                $q->where('barcode', $code)
+                  ->orWhere('sku', $code)
+                  ->orWhere('id', $code)
+                  ->orWhere('name', 'LIKE', "%{$code}%");
+            })
+            ->sellable()
+            ->first();
+
+        if (!$product) {
+            return response()->json(['success' => false, 'message' => 'Product not found for code: ' . $code], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'barcode' => $product->barcode,
+                'selling_price' => (float)($product->selling_price ?: $product->unit_cost),
+                'cost_price' => (float)($product->cost_price ?: $product->unit_cost),
+                'unit_cost' => (float)$product->unit_cost,
+                'gst_rate' => (float)$product->gst_rate,
+                'hsn_sac' => $product->hsn_sac,
+                'uom' => $product->uom?->name ?? 'Pcs',
+                'total_stock' => $product->total_stock,
+            ]
+        ]);
+    }
+
+    public function stockCheck(Request $request): JsonResponse
+    {
+        $tenantId = current_tenant_id() ?? tenant_id() ?? 1;
+        $productId = $request->input('product_id');
+        $warehouseId = $request->input('warehouse_id');
+
+        if (!$productId || !$warehouseId) {
+            return response()->json(['success' => false, 'message' => 'Missing product or warehouse ID'], 400);
+        }
+
+        $stock = \App\Domains\Inventory\Models\ProductWarehouseStock::where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->first();
+
+        $reserved = \App\Domains\Inventory\Models\StockReservation::where('tenant_id', $tenantId)
+            ->where('product_id', $productId)
+            ->where('warehouse_id', $warehouseId)
+            ->where('status', 'Active')
+            ->sum('reserved_qty');
+
+        $physicalQty = (float)($stock?->quantity ?? 0);
+        $reservedQty = (float)$reserved;
+        $availableQty = max(0, $physicalQty - $reservedQty);
+
+        return response()->json([
+            'success' => true,
+            'physical_qty' => $physicalQty,
+            'reserved_qty' => $reservedQty,
+            'available_qty' => $availableQty,
+        ]);
+    }
 }
