@@ -91,37 +91,97 @@ class WorkCenterDashboardController extends Controller
             ->count();
 
         // Utilization: sum of planned minutes vs available today (active shifts or 8h fallback)
+        $schedulingService = app(\App\Domains\Production\Services\SchedulingService::class);
         $shifts = $workCenter->shifts()->where('active', true)->get();
-        if ($shifts->isEmpty()) {
-            $baseAvailableMinutes = 8 * 60;
-        } else {
-            $totalMinutes = 0.0;
-            foreach ($shifts as $shift) {
-                $start = \Carbon\Carbon::parse($shift->start_time);
-                $end   = \Carbon\Carbon::parse($shift->end_time);
 
-                if ($end->lt($start)) {
-                    $end->addDay();
-                }
-
-                $diff = $start->diffInMinutes($end);
-                if ($shift->break_minutes > 0) {
-                    $diff -= $shift->break_minutes;
-                }
-
-                $totalMinutes += max(0.0, $diff);
-            }
-            $baseAvailableMinutes = $totalMinutes;
+        // 1. Available Capacity Today (in minutes) considering all active machines & efficiency
+        $availableMinutes = $schedulingService->calculateCapacity($workCenter->id, today());
+        if ($availableMinutes <= 0) {
+            // Fallback for non-working days or unconfigured calendars (8h default per active machine)
+            $machineCount = $workCenter->machines()->where('status', \App\Domains\Production\Models\Machine::STATUS_ACTIVE)->count() ?: 1;
+            $availableMinutes = (8 * 60) * $machineCount * (($workCenter->efficiency_percentage ?? 100.0) / 100.0);
         }
 
-        $plannedMinutes  = $queue->sum('planned_duration_minutes');
-        $availableMinutes = $baseAvailableMinutes * ($workCenter->efficiency_percentage / 100);
-        $utilization     = $availableMinutes > 0
-            ? round(min(100, ($plannedMinutes / $availableMinutes) * 100), 1)
+        // 2. Planned minutes scheduled/active for TODAY
+        $todayStart = today()->startOfDay();
+        $todayEnd = today()->endOfDay();
+
+        $plannedMinutesToday = $queue->filter(function ($op) use ($todayStart, $todayEnd) {
+            if ($op->status === ProductionScheduleOperation::STATUS_RUNNING) {
+                return true;
+            }
+            if ($op->actual_start && $op->actual_start->gte($todayStart)) {
+                return true;
+            }
+            if (!$op->planned_start || !$op->planned_finish) return false;
+            return $op->planned_start->lt($todayEnd) && $op->planned_finish->gt($todayStart);
+        })->sum(function ($op) use ($todayStart, $todayEnd, $workCenter) {
+            if ($op->status === ProductionScheduleOperation::STATUS_RUNNING || ($op->actual_start && $op->actual_start->gte($todayStart))) {
+                $shifts = $workCenter->shifts()->where('active', true)->get();
+                $shiftMin = 480.0;
+                if ($shifts->isNotEmpty()) {
+                    $shiftMin = 0.0;
+                    foreach ($shifts as $s) {
+                        $st = \Carbon\Carbon::parse($s->start_time);
+                        $et = \Carbon\Carbon::parse($s->end_time);
+                        if ($et->lt($st)) $et->addDay();
+                        $diff = $st->diffInMinutes($et);
+                        if ($s->break_minutes > 0) $diff -= $s->break_minutes;
+                        $shiftMin += max(0.0, $diff);
+                    }
+                }
+                $perMachineCap = $shiftMin * (($workCenter->efficiency_percentage ?? 100.0) / 100.0);
+                return min($perMachineCap, (float) ($op->planned_duration_minutes ?: $perMachineCap));
+            }
+            $start = $op->planned_start->max($todayStart);
+            $finish = $op->planned_finish->min($todayEnd);
+            return max(0, $start->diffInMinutes($finish));
+        });
+
+        // 3. Actual elapsed execution minutes worked TODAY (running & paused active elapsed + completed actuals)
+        $now = now();
+        $activeElapsedToday = $queue->whereIn('status', [
+            ProductionScheduleOperation::STATUS_RUNNING,
+            ProductionScheduleOperation::STATUS_PAUSED,
+        ])->sum(function ($op) use ($now, $todayStart) {
+            if (!$op->actual_start) return 0.0;
+            $start = $op->actual_start->max($todayStart);
+            $end = ($op->status === ProductionScheduleOperation::STATUS_PAUSED && $op->last_paused_at)
+                ? $op->last_paused_at
+                : $now;
+            $pausedSec = $op->accumulated_paused_seconds ?? 0;
+            return max(0.0, round(($end->timestamp - $start->timestamp - $pausedSec) / 60, 1));
+        });
+
+        $completedActualsToday = ProductionScheduleOperation::where('work_center_id', $workCenter->id)
+            ->where('status', ProductionScheduleOperation::STATUS_COMPLETED)
+            ->whereDate('actual_finish', today())
+            ->with('orderOperation')
+            ->get()
+            ->sum(function ($op) {
+                return $op->orderOperation
+                    ? ((float) $op->orderOperation->setup_time_actual + (float) $op->orderOperation->processing_time_actual)
+                    : 0.0;
+            });
+
+        $actualMinutesToday = $activeElapsedToday + $completedActualsToday;
+
+        // 4. Total queue backlog duration (in minutes) across all future scheduled dates
+        $totalQueueMinutes = $queue->sum('planned_duration_minutes');
+
+        $actualUtilization = $availableMinutes > 0
+            ? round(min(100.0, ($actualMinutesToday / $availableMinutes) * 100.0), 1)
             : 0;
 
+        $plannedUtilization = $availableMinutes > 0
+            ? round(min(100.0, ($plannedMinutesToday / $availableMinutes) * 100.0), 1)
+            : 0;
+
+        // $utilization defaults to actual execution utilization for MES shop floor tracking
+        $utilization = $actualUtilization;
+
         return view('modules.production.mes.work-center-detail', compact(
-            'workCenter', 'queue', 'completedToday', 'utilization', 'plannedMinutes', 'availableMinutes', 'shifts'
+            'workCenter', 'queue', 'completedToday', 'utilization', 'actualUtilization', 'plannedUtilization', 'actualMinutesToday', 'plannedMinutesToday', 'totalQueueMinutes', 'availableMinutes', 'shifts'
         ));
     }
 }

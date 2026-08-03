@@ -256,7 +256,7 @@ class ProductionOrderService
                     $plannedQty *= (1 + ($item->material_scrap_percentage / 100));
                 }
 
-                $this->createMaterialReservation($order, $item->id, $item->material_id, $plannedQty, $item->uom_id);
+                $this->createMaterialReservation($order, $item->id, $item->material_id, $plannedQty, $item->uom_id, $item->child_bom_id);
 
                 $itemsToResolve[] = [
                     'product_id' => $item->material_id,
@@ -538,8 +538,18 @@ class ProductionOrderService
         ?int $bomItemId,
         int $productId,
         float $plannedQty,
-        int $uomId
+        int $uomId,
+        ?int $childBomId = null
     ): ProductionOrderReservation {
+        // Prevent duplicate reservation if already created for this order & product
+        $existingRes = ProductionOrderReservation::where('production_order_id', $order->id)
+            ->where('product_id', $productId)
+            ->first();
+
+        if ($existingRes) {
+            return $existingRes;
+        }
+
         $warehouseId = $this->resolveReservationWarehouseId($order->tenant_id, $productId);
         $reservedQty = 0.0;
 
@@ -573,6 +583,53 @@ class ProductionOrderService
         }
 
         $reservation->update(['quantity_reserved' => $reservedQty]);
+
+        // If product is semi-finished or has child BOM, explode and create reservations for child components
+        $product = \App\Domains\Inventory\Models\Product::withoutGlobalScopes()
+            ->where('tenant_id', $order->tenant_id)
+            ->find($productId);
+
+        if ($product && ($product->type === 'semi_finished' || $childBomId)) {
+            $subBom = null;
+            if ($childBomId) {
+                $subBom = ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $order->tenant_id)
+                    ->where('id', $childBomId)
+                    ->with(['items.material'])
+                    ->first();
+            }
+            if (!$subBom) {
+                $subBom = ProductionBom::withoutGlobalScopes()
+                    ->where('tenant_id', $order->tenant_id)
+                    ->where('product_id', $productId)
+                    ->where('status', 'approved')
+                    ->with(['items.material'])
+                    ->first();
+            }
+
+            if ($subBom && count($subBom->items) > 0) {
+                $baseQty = $subBom->base_quantity > 0 ? $subBom->base_quantity : 1.0;
+                $multiplier = $plannedQty / $baseQty;
+
+                foreach ($subBom->items as $subItem) {
+                    if (!$subItem->material) continue;
+
+                    $subPlannedQty = $subItem->quantity * $multiplier;
+                    if ($subItem->material_scrap_percentage > 0) {
+                        $subPlannedQty *= (1 + ($subItem->material_scrap_percentage / 100));
+                    }
+
+                    $this->createMaterialReservation(
+                        $order,
+                        $subItem->id,
+                        $subItem->material_id,
+                        $subPlannedQty,
+                        $subItem->uom_id ?? $uomId,
+                        $subItem->child_bom_id
+                    );
+                }
+            }
+        }
 
         return $reservation;
     }

@@ -53,7 +53,7 @@ class MachineDashboardController extends Controller
             ->orderBy('planned_start')
             ->first();
 
-        $history = ProductionScheduleOperation::with(['schedule.order.product'])
+        $history = ProductionScheduleOperation::with(['schedule.order.product', 'orderOperation'])
             ->where('machine_id', $machine->id)
             ->whereIn('status', [
                 ProductionScheduleOperation::STATUS_COMPLETED,

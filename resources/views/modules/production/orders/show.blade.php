@@ -833,41 +833,125 @@
             </div>
         </div>
 
-        {{-- Tab 4: Reservations --}}
+        {{-- Tab 4: Reservations & Store Requisitions --}}
         <div class="tab-pane fade {{ $activeTab === 'vtab-reservations' ? 'show active' : '' }}" id="vtab-reservations" role="tabpanel" aria-labelledby="vtab-reservations-tab">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold text-dark mb-0">{{ __('production.component_reservations') }}</h5>
+                <h5 class="fw-bold text-dark mb-0">Component Material Reservations & Store Requisitions</h5>
                 @if(($order->isReleased() || $order->isInProgress()) && !$order->isCompleted() && !$order->isClosed() && !$order->isCancelled())
                     <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#requestAdditionalMaterialModal">
                         <i class="feather-plus-circle me-1"></i> {{ __('production.request_additional_material') }}
                     </button>
                 @endif
             </div>
+
+            {{-- Store Requisition Slip Banner --}}
+            @if($order->requisitionSlips && $order->requisitionSlips->isNotEmpty())
+                @php
+                    $latestSlip = $order->requisitionSlips->last();
+                    $slipBadge = match($latestSlip->status) {
+                        'pending' => 'bg-soft-warning text-warning border-warning',
+                        'approved' => 'bg-soft-primary text-primary border-primary',
+                        'issued', 'completed' => 'bg-soft-success text-success border-success',
+                        default => 'bg-soft-secondary text-secondary'
+                    };
+                    $slipStatusText = match($latestSlip->status) {
+                        'pending' => 'Pending Store Release',
+                        'approved' => 'Approved - Store Preparing Material',
+                        'issued', 'completed' => 'Issued to Shop Floor',
+                        default => ucfirst($latestSlip->status)
+                    };
+                @endphp
+                <div class="p-3 mb-3 bg-light-subtle rounded border d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="avatar-sm bg-soft-primary text-primary rounded d-flex align-items-center justify-content-center fw-bold fs-16">
+                            <i class="feather-file-text"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold text-dark fs-13">Material Requisition Slip:</span>
+                                <span class="font-monospace fw-bold text-primary fs-13">{{ $latestSlip->requisition_number }}</span>
+                                <span class="badge border {{ $slipBadge }} fs-10 px-2 py-0.5 text-uppercase ms-1">{{ $slipStatusText }}</span>
+                            </div>
+                            <small class="text-muted">Requested on {{ $latestSlip->requisition_date ? \Carbon\Carbon::parse($latestSlip->requisition_date)->format('d/m/Y') : $latestSlip->created_at->format('d/m/Y') }} &bull; Store Requisition Request Sent</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-end">
+                            <span class="fs-11 text-muted d-block">Requested Components</span>
+                            <span class="fw-bold text-dark fs-13">{{ $order->reservations->count() }} items</span>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <div class="table-responsive">
                 <table class="erp-thin-table">
                     <thead>
                         <tr>
-                            <th style="width:30%">{{ __('production.material_component') }}</th>
-                            <th style="width:14%">{{ __('production.warehouse') }}</th>
-                            <th style="width:15%" class="text-center">{{ __('production.planned_qty') }}</th>
-                            <th style="width:15%" class="text-center">{{ __('production.reserved_qty') }}</th>
-                            <th style="width:15%" class="text-center">{{ __('production.issued_qty') }}</th>
-                            <th style="width:10%">UOM</th>
-                            <th style="width:15%" class="text-end">{{ __('production.actions') }}</th>
+                            <th style="width:28%">{{ __('production.material_component') }}</th>
+                            <th style="width:14%">Classification</th>
+                            <th style="width:13%">{{ __('production.warehouse') }}</th>
+                            <th style="width:10%" class="text-center">{{ __('production.planned_qty') }}</th>
+                            <th style="width:10%" class="text-center">{{ __('production.reserved_qty') }}</th>
+                            <th style="width:10%" class="text-center">{{ __('production.issued_qty') }}</th>
+                            <th style="width:12%">Store Status</th>
+                            <th style="width:8%">UOM</th>
+                            <th style="width:10%" class="text-end">{{ __('production.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($order->reservations as $res)
-                            <tr>
+                            @php
+                                $isSemiFinished = ($res->product->type === 'semi_finished' || $res->product->supplier_method === 'manufacture');
+                                $fontWeight = $isSemiFinished ? 'fw-bold text-dark fs-13' : 'fw-semibold text-secondary fs-12';
+                                $bgRowClass = $isSemiFinished ? 'bg-light-subtle' : '';
+                                
+                                // Line level store status
+                                if ($res->quantity_issued >= $res->quantity_planned && $res->quantity_planned > 0) {
+                                    $lineStatusBadge = 'bg-soft-success text-success';
+                                    $lineStatusText = 'Issued';
+                                } elseif ($res->quantity_reserved >= $res->quantity_planned && $res->quantity_planned > 0) {
+                                    $lineStatusBadge = 'bg-soft-info text-info';
+                                    $lineStatusText = 'Reserved in Store';
+                                } elseif ($res->quantity_reserved > 0) {
+                                    $lineStatusBadge = 'bg-soft-warning text-warning';
+                                    $lineStatusText = 'Partial Reserved';
+                                } else {
+                                    $lineStatusBadge = 'bg-soft-danger text-danger';
+                                    $lineStatusText = 'Store Request Sent';
+                                }
+                            @endphp
+                            <tr class="{{ $bgRowClass }}">
                                 <td>
-                                    <div class="fw-bold text-dark">{{ $res->product->name }}</div>
-                                    <small class="text-muted font-monospace fs-10">{{ $res->product->sku }}</small>
+                                    <div class="d-flex align-items-center">
+                                        @if(!$isSemiFinished)
+                                            <span class="ps-2 me-1 text-muted"><i class="feather-corner-down-right fs-11"></i></span>
+                                        @endif
+                                        <div>
+                                            <div class="{{ $fontWeight }}">{{ $res->product->name }}</div>
+                                            <small class="text-muted font-monospace fs-10">{{ $res->product->sku }}</small>
+                                        </div>
+                                    </div>
                                 </td>
-                                <td class="text-muted">{{ $res->warehouse?->name ?? __('production.not_reserved') }}</td>
-                                <td class="text-center fw-semibold text-dark">{{ number_format($res->quantity_planned, 2) }}</td>
+                                <td>
+                                    @if($isSemiFinished)
+                                        <span class="badge bg-soft-primary text-primary border border-primary fs-10 fw-bold">
+                                            <i class="feather-layers me-1"></i>Semi-Finished
+                                        </span>
+                                    @else
+                                        <span class="badge bg-soft-secondary text-secondary fs-10">
+                                            <i class="feather-box me-1"></i>Raw Material
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="text-muted fs-12">{{ $res->warehouse?->name ?? __('production.not_reserved') }}</td>
+                                <td class="text-center {{ $isSemiFinished ? 'fw-bold text-dark' : 'fw-semibold text-dark' }}">{{ number_format($res->quantity_planned, 2) }}</td>
                                 <td class="text-center fw-bold" style="color: var(--bs-info);">{{ number_format($res->quantity_reserved, 2) }}</td>
                                 <td class="text-center fw-bold text-success">{{ number_format($res->quantity_issued, 2) }}</td>
-                                <td>{{ $res->uom->name }}</td>
+                                <td>
+                                    <span class="badge {{ $lineStatusBadge }} fs-10 text-uppercase">{{ $lineStatusText }}</span>
+                                </td>
+                                <td class="fs-12">{{ $res->uom->name }}</td>
                                 <td class="text-end">
                                     @if($order->isReleased() || $order->isInProgress())
                                         <x-ui.action-dropdown id="resActionDropdown{{ $res->id }}">

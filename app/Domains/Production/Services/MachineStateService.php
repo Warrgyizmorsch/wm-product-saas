@@ -30,7 +30,8 @@ class MachineStateService
 
             if ($activeHistory) {
                 $now = now();
-                $duration = max(0, $now->diffInSeconds($activeHistory->started_at));
+                $start = \Illuminate\Support\Carbon::parse($activeHistory->started_at);
+                $duration = max(0, $start->diffInSeconds($now));
                 $activeHistory->update([
                     'ended_at'         => $now,
                     'duration_seconds' => $duration,
