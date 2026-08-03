@@ -23,12 +23,6 @@
 
     <div class="erp-single-panel text-dark">
         <!-- Toast Notifications -->
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <!-- TOP SUMMARY KPI CARDS (Always visible at top without scrolling) -->
         <div class="row g-3 mb-4">

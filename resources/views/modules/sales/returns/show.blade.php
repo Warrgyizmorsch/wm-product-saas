@@ -182,9 +182,6 @@
 @section('content')
     <div class="row text-dark">
         <div class="col-12">
-            @if (session('success'))
-                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-            @endif
 
             @if ($errors->any())
                 <x-ui.toast :auto="true" type="error" title="{{ $errors->first() }}" />

@@ -10,14 +10,6 @@
             <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
         @endif
 
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
-
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-
         <form method="POST" action="{{ route('production.calendars.update', $calendar->id) }}">
             @csrf
             @method('PUT')

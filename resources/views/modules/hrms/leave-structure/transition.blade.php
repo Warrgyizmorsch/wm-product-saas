@@ -100,19 +100,6 @@
 
         <!-- Content Column -->
         <div class="settings-content-col">
-            @if(session('success'))
-                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-                <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                    {{ session('success') }}
-                </x-ui.alert>
-            @endif
-
-            @if(session('error'))
-                <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-                <x-ui.alert variant="danger" icon="feather-alert-triangle" dismissible>
-                    {{ session('error') }}
-                </x-ui.alert>
-            @endif
 
             <form action="{{ route('hrms.leave-structure.transition.process') }}" method="POST" id="bulkTransitionForm">
                 @csrf

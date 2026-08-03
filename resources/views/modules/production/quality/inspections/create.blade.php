@@ -20,10 +20,6 @@
             <x-ui.toast :auto="true" type="error" title="Validation Failed: {{ $errors->first() }}" />
         @endif
 
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
-
         <form method="POST" action="{{ route('production.inspections.store') }}">
             @csrf
 

@@ -90,15 +90,6 @@
 @section('content')
 <div class="erp-single-panel bg-white">
 
-    {{-- Alerts --}}
-    @if(session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
-
-    @if(session('error'))
-        <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-    @endif
-
     {{-- Warnings Diagnostics Panel --}}
     @if(count($warnings) > 0)
         <div class="alert alert-danger border-danger bg-soft-danger mb-4 rounded shadow-sm" role="alert">

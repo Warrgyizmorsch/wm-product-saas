@@ -18,9 +18,6 @@
     <div class="row text-dark">
         <div class="col-12">
             <!-- Toast Notifications -->
-            @if (session('error'))
-                <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-            @endif
 
             <form action="{{ route('purchase.grns.store') }}" method="POST" id="grnCreateForm">
                 @csrf

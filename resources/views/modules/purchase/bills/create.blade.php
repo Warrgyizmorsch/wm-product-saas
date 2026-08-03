@@ -28,7 +28,6 @@
                 </div>
             </div>
 
-
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
                     <x-ui.odoo-form-ui type="select" label="{{ __('purchase.supplier_vendor') }}" name="vendor_id" required="true" :errorText="$errors->first('vendor_id')">

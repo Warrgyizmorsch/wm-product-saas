@@ -203,7 +203,7 @@
             .odoo-table td {
                 padding: 6px 4px;
                 border-bottom: 1px solid #e9ecef;
-                vertical-align: middle;
+                vertical-align: top !important;
             }
             .odoo-table-input {
                 border: none;

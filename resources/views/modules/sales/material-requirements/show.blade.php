@@ -31,9 +31,10 @@
     @endif
 
     @php
-        $doStatusClass = 'secondary';
+        $doStatusClass = 'warning';
         if (in_array($delivery->status, ['Ready', 'Delivered']))               $doStatusClass = 'success';
         elseif (in_array($delivery->status, ['Partially Ready', 'Processing'])) $doStatusClass = 'info';
+        elseif ($delivery->status === 'Pending' || $delivery->status === 'Draft') $doStatusClass = 'warning';
         elseif ($delivery->status === 'Dispatched')                             $doStatusClass = 'dark';
         elseif ($delivery->status === 'Cancelled')                              $doStatusClass = 'danger';
         elseif (in_array($delivery->status, ['Picked', 'Packed']))              $doStatusClass = 'primary';
@@ -66,29 +67,15 @@
                     <i class="feather-arrow-left me-1"></i>SO Details
                 </a>
 
-                @if (in_array($delivery->status, ['Processing', 'Partially Ready', 'Ready']))
-                    <form action="{{ route('sales.material-requirements.picking', $delivery->id) }}" method="POST" class="d-inline">
-                        @csrf
-                        <button type="submit" class="btn btn-primary btn-sm">
-                            <i class="feather-truck me-1"></i>Start Picking
-                        </button>
-                    </form>
-                @elseif ($delivery->status === 'Picked')
-                    <form action="{{ route('sales.material-requirements.pack', $delivery->id) }}" method="POST" class="d-inline">
-                        @csrf
-                        <button type="submit" class="btn btn-info text-white btn-sm">
-                            <i class="feather-box me-1"></i>Pack Items
-                        </button>
-                    </form>
-                @elseif ($delivery->status === 'Packed')
-                    <a href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id]) }}" class="btn btn-success btn-sm">
-                        <i class="feather-send me-1"></i>Dispatch MR
+                @if (in_array($delivery->status, ['Ready', 'Partially Ready', 'Processing', 'Picked', 'Packed']))
+                    <a href="{{ route('sales.dispatches.create', ['material_requirement_id' => $delivery->id, 'sales_order_id' => $delivery->sales_order_id]) }}" class="btn btn-primary btn-sm fw-bold px-3">
+                        <i class="feather-truck me-1.5"></i>Create Dispatch
                     </a>
                 @elseif ($delivery->status === 'Dispatched')
                     <form action="{{ route('sales.material-requirements.deliver', $delivery->id) }}" method="POST" class="d-inline">
                         @csrf
-                        <button type="submit" class="btn btn-success btn-sm">
-                            <i class="feather-check-circle me-1"></i>Mark Delivered
+                        <button type="submit" class="btn btn-success btn-sm fw-bold px-3">
+                            <i class="feather-check-circle me-1.5"></i>Mark Delivered
                         </button>
                     </form>
                 @endif

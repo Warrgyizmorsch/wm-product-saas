@@ -22,19 +22,6 @@
 
 @section('content')
     <div class="erp-single-panel">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if ($errors->any())
-            <div class="alert alert-danger mb-3 alert-dismissible fade show fs-12 py-2" role="alert">
-                <ul class="mb-0 ps-3 text-start">
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.75rem 1rem;"></button>
-            </div>
-        @endif
 
         @php
             $sortBy = request('sort_by', 'created_at');

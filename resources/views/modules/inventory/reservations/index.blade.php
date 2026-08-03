@@ -12,12 +12,6 @@
     @endphp
 
     <div class="erp-single-panel">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <!-- Toolbar: Tabs, Sort & Filters (Matching Lead Module Standards) -->
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">

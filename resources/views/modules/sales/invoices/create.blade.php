@@ -20,27 +20,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-white p-4">
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="danger" title="{{ session('error') }}" />
-        @endif
-        @if ($errors->any())
-            <div class="alert alert-danger alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
-                <div class="d-flex align-items-center">
-                    <div class="avatar-text avatar-md bg-danger text-white me-3">
-                        <i class="feather-alert-triangle"></i>
-                    </div>
-                    <div>
-                        <h6 class="alert-heading fw-bold mb-1">Error!</h6>
-                        <ul class="fs-12 mb-0 ps-3">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        @endif
 
         <form action="{{ route('sales.invoices.store') }}" method="POST" id="invoiceForm">
             @csrf
@@ -562,17 +541,34 @@
                         if (res.success && res.product) {
                             const prod = res.product;
                             let targetRow = null;
+                            let isNewRow = false;
+
+                            // 1. Look for existing row with SAME product
                             $('#invoiceItemsTable tbody tr.item-row').each(function() {
                                 const sel = $(this).find('.product-select');
-                                if (sel.length && !sel.val()) {
+                                if (sel.length && sel.val() == prod.id) {
                                     targetRow = $(this);
                                     return false;
                                 }
                             });
 
+                            // 2. If no matching row found, look for empty row
+                            if (!targetRow) {
+                                $('#invoiceItemsTable tbody tr.item-row').each(function() {
+                                    const sel = $(this).find('.product-select');
+                                    if (sel.length && (!sel.val() || sel.val() === '')) {
+                                        targetRow = $(this);
+                                        isNewRow = true;
+                                        return false;
+                                    }
+                                });
+                            }
+
+                            // 3. If no empty row found, create new row
                             if (!targetRow) {
                                 $('#addDirectRowBtn').click();
                                 targetRow = $('#invoiceItemsTable tbody tr.item-row').last();
+                                isNewRow = true;
                             }
 
                             const selectEl = targetRow.find('.product-select');
@@ -580,9 +576,25 @@
                                 if (!selectEl.find(`option[value="${prod.id}"]`).length) {
                                     selectEl.append(`<option value="${prod.id}" data-cost="${prod.selling_price || prod.cost_price}" data-name="${prod.name}">${prod.name} (${prod.sku})</option>`);
                                 }
-                                selectEl.val(prod.id).trigger('change');
+                                if (selectEl.val() != prod.id) {
+                                    selectEl.val(prod.id).trigger('change');
+                                }
                                 targetRow.find('.rate-input').val(prod.selling_price || prod.cost_price || prod.unit_cost);
                                 targetRow.find('.tax-input').val(prod.gst_rate || 18);
+
+                                // Qty increment or initial set
+                                const qtyInput = targetRow.find('.qty-input');
+                                if (qtyInput.length) {
+                                    const currentQty = parseFloat(qtyInput.val()) || 0;
+                                    if (!isNewRow && currentQty > 0) {
+                                        qtyInput.val(currentQty + 1).trigger('input').trigger('change');
+                                    } else {
+                                        if (currentQty === 0) {
+                                            qtyInput.val(1).trigger('input').trigger('change');
+                                        }
+                                    }
+                                }
+
                                 recalculateInvoiceTotals();
                             }
                             input.val('');

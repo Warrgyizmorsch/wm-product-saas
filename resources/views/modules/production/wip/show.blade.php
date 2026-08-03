@@ -52,12 +52,6 @@
 @section('content')
     <div class="erp-single-panel">
         <!-- Error & Success alerts -->
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <div class="row g-4 text-dark fs-13 mb-4">
             {{-- WIP Info Card --}}
@@ -337,7 +331,6 @@
             formAction="{{ route('production.wip.convert', $wip->id) }}" submitText="Complete FG Inflow" closeText="Cancel">
             <x-ui.odoo-form-ui type="input" label="Convert Qty" name="convert_qty_dummy"
                 :value="number_format($wip->available_quantity, 2) . ' units'" readonly />
-
 
             <x-ui.odoo-form-ui type="select" label="Warehouse" name="warehouse_id" :searchable="false" required>
                 @foreach($warehouses as $w)

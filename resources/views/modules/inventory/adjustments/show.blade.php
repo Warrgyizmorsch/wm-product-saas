@@ -7,18 +7,6 @@
 @section('content')
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-        @if(session('success'))
-            <div class="alert alert-success alert-dismissible fade show">
-                {{ session('success') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        @endif
-        @if(session('error'))
-            <div class="alert alert-danger alert-dismissible fade show">
-                {{ session('error') }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        @endif
 
         <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
             <div>

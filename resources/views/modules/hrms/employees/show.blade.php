@@ -385,8 +385,6 @@
             cursor: not-allowed;
         }
 
-
-
         .profile-page {
             padding: 24px;
             background-color: #f8fafc;
@@ -925,11 +923,6 @@
     </style>
 
     <div class="profile-page">
-        @if(session('success'))
-            <x-ui.alert variant="success" icon="feather-check-circle" dismissible>
-                {{ session('success') }}
-            </x-ui.alert>
-        @endif
 
         <!-- Profile Header -->
         <div class="profile-header-card mb-4">
@@ -2013,7 +2006,6 @@
 
         <script>
 
-
             $(document).on('change', '#ld-status-select', function() {
                 var selectedVal = $(this).val();
                 var form = $('#ld-status-form');
@@ -2064,8 +2056,6 @@
                     btn.textContent = 'See less';
                 }
             };
-
-
 
             // Toggle view between Shift Applications and Overtime Applications in Employee Profile
             $(document).on('click', '#btnToggleShiftOvertimeView', function () {
@@ -2632,7 +2622,6 @@
                     }
                 };
 
-
                 // ── WFH Client Side Filter / Search / Pagination ─────────────────────
                 var empWfhAppCurrentPage = 1;
                 var empWfhAppPerPage = 10;
@@ -2784,7 +2773,6 @@
                     $(this).addClass('active').find('.wfh-sort-check').removeClass('d-none');
                     refreshEmpWfhRows();
                 });
-
 
                 // Initial load
                 refreshEmpWfhRows();

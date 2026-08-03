@@ -318,12 +318,6 @@
 
 @section('content')
     <div class="erp-single-panel bg-transparent border-0 p-0">
-        @if (session('success'))
-            <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-        @endif
-        @if (session('error'))
-            <x-ui.toast :auto="true" type="error" title="{{ session('error') }}" />
-        @endif
 
         <div class="row g-4">
             {{-- LEFT COLUMN: Production Project Dashboard (8 Cols) --}}

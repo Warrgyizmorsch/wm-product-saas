@@ -11,9 +11,6 @@
 @endphp
 
 <div class="erp-single-panel text-dark">
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
 
     <!-- Top Toolbar: Title, Sort & Filter Drawers -->
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">

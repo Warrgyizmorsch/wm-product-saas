@@ -209,9 +209,6 @@
 @section('content')
     <div class="row text-dark">
         <div class="col-12">
-            @if (session('success'))
-                <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-            @endif
 
             <!-- Standard ERP Customer Tax Invoice Sheet (Odoo / Zoho Standard) -->
             <div class="invoice-sheet print-area mb-5">

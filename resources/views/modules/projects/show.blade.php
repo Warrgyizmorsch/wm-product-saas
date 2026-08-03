@@ -395,6 +395,5 @@
         </script>
     @endpush
 
-
     @include('modules.projects._modal-reopen-script')
 @endsection

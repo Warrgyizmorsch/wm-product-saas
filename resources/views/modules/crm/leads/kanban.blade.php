@@ -74,9 +74,6 @@
 
 @section('content')
 <div class="erp-single-panel text-dark">
-    @if (session('success'))
-        <x-ui.toast :auto="true" type="success" title="{{ session('success') }}" />
-    @endif
 
     <!-- Toolbar: View Switcher & Custom Filter Component (100% Mobile Responsive) -->
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">

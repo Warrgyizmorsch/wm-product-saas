@@ -11,12 +11,6 @@
 @endsection
 
 @section('content')
-    @if (session('success'))
-        <x-ui.alert variant="success" icon="feather-check-circle" dismissible class="border-0 shadow-sm mb-4">
-            <h6 class="alert-heading fw-bold mb-1">Success</h6>
-            <p class="fs-12 mb-0">{{ session('success') }}</p>
-        </x-ui.alert>
-    @endif
 
     <x-ui.card title="Roles" bodyClass="p-0">
         <x-ui.table>
